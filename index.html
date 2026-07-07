@@ -392,7 +392,7 @@ a{color:var(--ink);}
 .more-row-chevron{color:var(--ink-subtle);font-size:16px;}
 
 /* ── DOCUMENTS ── */
-.doc-card{cursor:pointer;}
+.doc-card-head{cursor:pointer;}
 .doc-card-head{display:flex;align-items:center;gap:12px;}
 .doc-card-icon{font-size:26px;width:40px;height:40px;border-radius:50%;background:var(--accent-pale);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .doc-card-title{font-size:14.5px;font-weight:600;color:var(--ink);}
@@ -422,6 +422,7 @@ a{color:var(--ink);}
 .detail-title{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:22px;font-weight:700;color:var(--ink);margin-bottom:4px;line-height:1.2;}
 .detail-sub{font-size:12px;color:var(--ink-muted);margin-bottom:16px;}
 .detail-section{margin-bottom:14px;}
+.ai-badge{background:var(--status-upcoming-pale);color:var(--status-upcoming);font-size:12px;font-weight:500;padding:10px 14px;border-radius:var(--r12);margin-bottom:14px;line-height:1.4;}
 .detail-section-title{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-muted);margin-bottom:6px;display:flex;align-items:center;gap:5px;}
 .detail-text{font-size:13px;color:var(--ink);line-height:1.6;}
 .detail-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
@@ -674,11 +675,23 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 <div class="share-modal" id="shareModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title">Accès partagé</div>
-    <div class="modal-sub">Entre le code de session pour rejoindre ce voyage.</div>
-    <input class="modal-field" type="text" placeholder="Code : ASIE2026" id="accessCode"/>
-    <button class="modal-cta" onclick="joinSession()">Rejoindre le voyage</button>
+    <div class="modal-title">Partager le voyage</div>
+    <div class="modal-sub">Génère un lien avec l'état actuel de ton voyage (activités cochées, budget, itinéraire…) à envoyer à ton compagnon par SMS, mail, ou n'importe quelle appli.</div>
+    <div class="status-sub" style="margin-bottom:14px;">⚠️ C'est une photo à l'instant T, pas une synchro en direct — les modifs faites après l'envoi ne se transmettent pas automatiquement. Les photos du carnet de voyage ne sont pas incluses (trop volumineuses pour un lien). Ta clé API et ton code PIN ne sont jamais inclus.</div>
+    <div id="shareLinkStatus" class="status-sub" style="margin-bottom:10px;"></div>
+    <button class="modal-cta" onclick="generateShareLink()" id="shareGenBtn">Générer le lien de partage</button>
     <button class="modal-cancel-btn" onclick="closeShare()">Annuler</button>
+  </div>
+</div>
+
+<!-- Import shared data modal -->
+<div class="share-modal" id="importModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Voyage partagé reçu</div>
+    <div class="modal-sub" id="importModalSub">Quelqu'un t'a envoyé son état du voyage. L'importer remplacera tes données actuelles (activités cochées, budget, itinéraire…) — impossible à annuler.</div>
+    <button class="modal-cta" onclick="confirmImportSharedData()">Importer et remplacer mes données</button>
+    <button class="modal-cancel-btn" onclick="cancelImportSharedData()">Ignorer</button>
   </div>
 </div>
 
@@ -1842,6 +1855,7 @@ function tagsHTML(tags){return(tags||[]).map(t=>'<span class="tag tag-'+t+'">'+(
 function openDetail(actKey, actName, cityKey) {
   const d = ACT_DETAILS[actKey] || (window._customDetails&&window._customDetails[actKey]) || {};
   const modal = document.getElementById('detailModal');
+  const hasAnyDetail = !!(ACT_DETAILS[actKey] || (window._customDetails&&window._customDetails[actKey]));
 
   // Header — real photo first, emoji as instant placeholder while it loads
   var imgEl = document.getElementById('detailImg');
@@ -1861,6 +1875,15 @@ function openDetail(actKey, actName, cityKey) {
 
   // Sections
   let html = '';
+  if(!hasAnyDetail){
+    if(S.apiKey){
+      html = '<div class="detail-section" id="detailAiStatus"><div class="detail-text">✨ Génération des détails avec l\'IA…</div></div>';
+      fetchActDetailWithAI(actKey, actName, cityKey);
+    } else {
+      html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée pour cette activité. Configure une clé API (Plus → Réglages avancés) pour la générer automatiquement avec l\'IA.</div></div>';
+    }
+  }
+  if(d._aiGenerated) html += '<div class="ai-badge">✨ Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir</div>';
   if(d.history) html += '<div class="detail-section"><div class="detail-section-title">📖 Histoire & contexte</div><div class="detail-text">'+d.history+'</div></div>';
   if(d.hours) html += '<div class="detail-section"><div class="detail-section-title">🕐 Horaires</div><div class="detail-text">'+d.hours+'</div></div>';
   if(d.costs && d.costs.length) {
@@ -1880,6 +1903,62 @@ function openDetail(actKey, actName, cityKey) {
   document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(coordKey, actName); };
 
   modal.classList.add('open');
+}
+// Extracts the final text from an Anthropic API response that may include
+// web_search tool-use blocks alongside text blocks (when web_search is enabled).
+function extractAiText(data){
+  if(!data || !data.content) return '';
+  return data.content.filter(function(b){ return b.type==='text'; }).map(function(b){ return b.text; }).join('\n');
+}
+function parseAiJson(text){
+  if(!text) return null;
+  var match = text.match(/\{[\s\S]*\}/);
+  var clean = (match ? match[0] : text).replace(/```json|```/g,'').trim();
+  return JSON.parse(clean);
+}
+
+async function fetchActDetailWithAI(actKey, actName, cityKey){
+  if(!S.apiKey) return;
+  var country = COUNTRIES.find(function(c){ return cityKey && cityKey.startsWith(c.id+'_'); });
+  var countryName = country ? country.name : '';
+  var cityName = cityKey ? cityKey.slice((country?country.id+'_':'').length) : '';
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:1200,
+        tools:[{type:'web_search_20250305', name:'web_search'}],
+        messages:[{role:'user', content:
+`Tu es un expert de voyage. Cherche sur le web des informations actuelles et fiables pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires d'ouverture, tarifs d'entree actuels, et localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin de ta reponse, sans markdown:
+{"tag":"categorie courte","emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels trouves sur le web","costs":["cout 1 actuel","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise trouvee sur le web","lat":0.0,"lng":0.0}
+lat/lng = coordonnees GPS aussi precises que possible.`
+        }]
+      })
+    });
+    const data = await resp.json();
+    const text = extractAiText(data);
+    if(!text) throw new Error('empty');
+    const info = deepSanitize(parseAiJson(text));
+    if(!window._customDetails) window._customDetails={};
+    window._customDetails[actKey] = {
+      emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'',
+      hours: info.hours||'', costs: info.costs||[], tips: info.tips||[],
+      address: info.address||'', lat: info.lat||null, lng: info.lng||null,
+      _aiGenerated: true
+    };
+    S.customDetails = window._customDetails;
+    if(info.lat && info.lng) COORDS[actKey] = [info.lat, info.lng, actName];
+    save();
+    // Re-open to refresh with the new data, only if the modal is still showing this activity
+    if(document.getElementById('detailTitle').textContent === actName){
+      openDetail(actKey, actName, cityKey);
+    }
+  }catch(e){
+    var statusEl = document.getElementById('detailAiStatus');
+    if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
+  }
 }
 function closeDetail(){ document.getElementById('detailModal').classList.remove('open'); }
 
@@ -1910,6 +1989,24 @@ function renderAccomCard(ck) {
 }
 
 function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Strips any HTML tags/angle-brackets from user-typed or imported text —
+// used at trust boundaries (manual entry, imported share links) so unsafe
+// markup never enters app state in the first place, regardless of whether
+// every render call site remembers to escape on output.
+function stripHtml(str){
+  if(typeof str !== 'string') return str;
+  return str.replace(/<[^>]*>/g, '').replace(/[<>]/g, '');
+}
+function deepSanitize(obj){
+  if(typeof obj === 'string') return stripHtml(obj);
+  if(Array.isArray(obj)) return obj.map(deepSanitize);
+  if(obj && typeof obj === 'object'){
+    var out = {};
+    Object.keys(obj).forEach(function(k){ out[k] = deepSanitize(obj[k]); });
+    return out;
+  }
+  return obj;
+}
 function fmtEUR(n){
   n = Math.round(n||0);
   var s = Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -1923,6 +2020,25 @@ var _imgCache = (function(){
 function _saveImgCache(){
   try{ localStorage.setItem('asie2026_imgcache', JSON.stringify(_imgCache)); }catch(e){}
 }
+// Wikipedia/Commons sometimes return a locator map, flag, or coat-of-arms as a
+// place's "lead image" instead of an actual photo — filter those out.
+function isLikelyNotAPhoto(url){
+  if(!url) return true;
+  var lower = url.toLowerCase();
+  if(lower.endsWith('.svg')) return true; // maps/diagrams/heraldry are almost always SVG, photos aren't
+  if(/(^|[_\/])(locator[_-]?map|location[_-]?map|map[_-]?of|blank[_-]?map)/i.test(lower)) return true;
+  if(/(^|[_\/])(flag[_-]?of|coat[_-]?of[_-]?arms|seal[_-]?of|emblem[_-]?of)/i.test(lower)) return true;
+  return false;
+}
+// One-time cleanup: earlier cached results may include maps/flags that we now filter out.
+// Purge those so they're re-fetched fresh through the new filter.
+(function _purgeBadImageCache(){
+  var changed=false;
+  Object.keys(_imgCache).forEach(function(q){
+    if(_imgCache[q] && isLikelyNotAPhoto(_imgCache[q])){ delete _imgCache[q]; changed=true; }
+  });
+  if(changed) _saveImgCache();
+})();
 async function fetchPlaceImage(query){
   if(_imgCache[query]!==undefined) return _imgCache[query];
   var img=null;
@@ -1934,13 +2050,13 @@ async function fetchPlaceImage(query){
     var pages=data&&data.query&&data.query.pages;
     if(pages){
       var first=Object.values(pages)[0];
-      if(first&&first.thumbnail&&first.thumbnail.source) img=first.thumbnail.source;
+      if(first&&first.thumbnail&&first.thumbnail.source && !isLikelyNotAPhoto(first.thumbnail.source)) img=first.thumbnail.source;
     }
   }catch(e){}
   // Source 2: Wikimedia Commons (better coverage for specific spots/viewpoints without their own article)
   if(!img){
     try{
-      var curl='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch='+encodeURIComponent(query)+'&gsrlimit=3&prop=imageinfo&iiprop=url&iiurlwidth=600';
+      var curl='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch='+encodeURIComponent(query)+'&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=600';
       var cres=await fetch(curl);
       var cdata=await cres.json();
       var cpages=cdata&&cdata.query&&cdata.query.pages;
@@ -1948,7 +2064,7 @@ async function fetchPlaceImage(query){
         var list=Object.values(cpages);
         for(var i=0;i<list.length;i++){
           var ii=list[i].imageinfo;
-          if(ii&&ii[0]&&ii[0].thumburl){ img=ii[0].thumburl; break; }
+          if(ii&&ii[0]&&ii[0].thumburl && !isLikelyNotAPhoto(ii[0].thumburl)){ img=ii[0].thumburl; break; }
         }
       }
     }catch(e){}
@@ -2098,18 +2214,19 @@ async function autofillCountryWithAI(countryId){
       headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:700,
+        max_tokens:1100,
+        tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es un expert voyage. Pour le pays "${c.name}", genere un JSON avec ces champs UNIQUEMENT, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (approx)","visa":"politique visa pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"transport":"1 phrase sur les transports locaux","sim":"1 phrase sur SIM/internet","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero"},{"k":"Ambulance","v":"numero"}]}
-Reponds UNIQUEMENT avec le JSON valide. budget_daily = budget backpacker/jour en euros (nombre).`
+`Tu es un expert voyage. Cherche sur le web des informations actuelles et fiables pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
+{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"transport":"1 phrase sur les transports locaux","sim":"1 phrase sur SIM/internet","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}]}
+budget_daily = budget backpacker/jour en euros (nombre).`
         }]
       })
     });
     const data = await resp.json();
-    const text = data.content && data.content[0] && data.content[0].text;
+    const text = extractAiText(data);
     if(!text) throw new Error('empty response');
-    const info = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const info = deepSanitize(parseAiJson(text));
     c.tagline = info.tagline || c.tagline;
     c.currency = info.currency || c.currency;
     c.rate = info.rate || c.rate;
@@ -2120,6 +2237,7 @@ Reponds UNIQUEMENT avec le JSON valide. budget_daily = budget backpacker/jour en
     c.practical.sim = info.sim || c.practical.sim;
     c.practical.tips = info.tips || c.practical.tips;
     c.practical.emergency = info.emergency || c.practical.emergency;
+    c._aiGenerated = true;
     saveCountryEdit(c.id);
     if(badge) badge.textContent='';
     renderContent();
@@ -2132,7 +2250,7 @@ function saveCountryEdit(countryId){
   if(!c) return;
   S.countryEdits[countryId] = {
     tagline:c.tagline, currency:c.currency, rate:c.rate, visa:c.visa, lang:c.lang,
-    budget_daily:c.budget_daily, dates:c.dates, days:c.days,
+    budget_daily:c.budget_daily, dates:c.dates, days:c.days, _aiGenerated:c._aiGenerated||false,
     practical:{transport:c.practical.transport, sim:c.practical.sim, tips:c.practical.tips, emergency:c.practical.emergency}
   };
   save();
@@ -2153,7 +2271,7 @@ function addGuideListItem(countryId, listField, promptLabel){
   if(!val || !val.trim()) return;
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
-  if(listField==='tips'){ c.practical.tips.push(val.trim()); }
+  if(listField==='tips'){ c.practical.tips.push(stripHtml(val.trim())); }
   saveCountryEdit(countryId);
   renderContent();
 }
@@ -2166,9 +2284,9 @@ function removeGuideListItem(countryId, listField, idx){
 }
 
 function addCityToCountry(countryId){
-  var name = prompt('Nom de la ville :');
+  var name = stripHtml(prompt('Nom de la ville :')||'');
   if(!name || !name.trim()) return;
-  var sub = prompt('Durée (ex: "3 jours") :', '2 jours') || '';
+  var sub = stripHtml(prompt('Durée (ex: "3 jours") :', '2 jours') || '');
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
   if(c.cities.find(function(ci){return ci.city===name.trim();})){ alert('Cette ville existe déjà.'); return; }
@@ -2191,18 +2309,19 @@ async function suggestActivitiesWithAI(countryId, cityName){
       headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:600,
+        max_tokens:900,
+        tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es un expert voyage. Pour la ville de "${cityName}" (${c.name}), suggere 5 activites/lieux incontournables. Reponds avec un JSON UNIQUEMENT, sans markdown:
+`Tu es un expert voyage. Cherche sur le web les activites/lieux incontournables actuels pour la ville de "${cityName}" (${c.name}). Puis suggere les 5 meilleurs et reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
 {"activities":[{"n":"nom du lieu","m":"description courte 1 phrase","tags":["photo"]}]}
-Les tags possibles sont: photo, food, temple, must, nature. Reponds UNIQUEMENT avec le JSON valide.`
+Les tags possibles sont: photo, food, temple, must, nature.`
         }]
       })
     });
     const data = await resp.json();
-    const text = data.content && data.content[0] && data.content[0].text;
+    const text = extractAiText(data);
     if(!text) return;
-    const info = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const info = deepSanitize(parseAiJson(text));
     if(!info.activities || !info.activities.length) return;
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
@@ -2225,17 +2344,17 @@ async function enrichActivityWithAI(cityKey, idx, actName) {
       headers:{'Content-Type':'application/json','x-api-key': (S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:800,
+        max_tokens:1200,
+        tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es un expert de voyage. Pour le lieu/activite "${actName}" a ${cityName} (${countryName}), genere un JSON avec ces champs UNIQUEMENT, sans markdown:\n{"m":"description courte 1 phrase","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires","costs":["cout 1","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse approximative","lat":0.0,"lng":0.0}\nReponds UNIQUEMENT avec le JSON valide. lat/lng = coordonnees GPS approximatives.`
+`Tu es un expert de voyage. Cherche sur le web des informations actuelles pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires, tarifs actuels, localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:\n{"m":"description courte 1 phrase","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels","costs":["cout actuel 1","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise","lat":0.0,"lng":0.0}\nlat/lng = coordonnees GPS aussi precises que possible.`
         }]
       })
     });
     const data = await resp.json();
-    const text = data.content && data.content[0] && data.content[0].text;
+    const text = extractAiText(data);
     if(!text) return;
-    const clean = text.replace(/```json|```/g,'').trim();
-    const info = JSON.parse(clean);
+    const info = deepSanitize(parseAiJson(text));
     if(!S.customActs[cityKey] || !S.customActs[cityKey][idx]) return;
     const act = S.customActs[cityKey][idx];
     act.m = info.m || act.m;
@@ -2253,7 +2372,8 @@ async function enrichActivityWithAI(cityKey, idx, actName) {
       tips: info.tips||[],
       address: info.address||'',
       lat: info.lat||null,
-      lng: info.lng||null
+      lng: info.lng||null,
+      _aiGenerated: true
     };
     S.customDetails = window._customDetails;
     // Store GPS
@@ -2421,7 +2541,7 @@ function renderItinerary(c, embedded){
         if(activeDay!=='Tous'&&S.actDay[k]&&S.actDay[k]!==activeDay) return '';
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
-        var hasDetail=!!ACT_DETAILS[k];
+        var hasDetail=true;
         var dayAssigned=S.actDay[k]||'';
         var daySelector=days.length>1?('<select style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 6px;background:var(--sand);color:var(--ink-muted);margin-top:4px;" onchange="assignDay(\''+k+'\',\''+ck+'\',this.value)"><option value="">Jour ?</option>'+days.filter(function(d){return d!=='Tous';}).map(function(d){return '<option value="'+d+'"'+(dayAssigned===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select>'):'';
         return '<div class="act-card'+(done?' done':'')+'">'
@@ -2446,7 +2566,7 @@ function renderItinerary(c, embedded){
         return '<div class="act-card'+(cdone?' done':'')+'" style="border-style:dashed">'
           +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
           +'<div class="act-check" onclick="toggleAct(\''+ck2+'\')">'+( cdone?'✓':'')+'</div>'
-          +'<div class="act-body"><div class="act-name">'+ca.n+'</div>'
+          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+'</div>'
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+ck2+'\')">'+(S.favorites[ck2]?'★':'☆')+'</button>'
           +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+ck+'\','+origIdx+',true)">✕</button></div>'
@@ -2564,7 +2684,7 @@ function renderBudget(c){
   const budget=c.budget_daily*c.days;
   const pct=Math.min(100,Math.round((total/budget)*100));
   let expRows=exps.map(function(e){
-    return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span class="ee-desc">'+e.desc+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+    return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span class="ee-desc">'+escHtml(e.desc)+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
   }).join('');
   return '<div class="section" style="padding-bottom:20px">'
     +'<div class="section-header" style="margin-bottom:14px"><div class="section-title">Budget</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
@@ -2877,7 +2997,7 @@ function renderBudgetOverview(){
     var exps = S.expenses.slice().reverse();
     var expRows = exps.map(function(e){
       var c = COUNTRIES.find(function(co){return co.id===e.country;});
-      return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+e.desc+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+      return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
     }).join('');
     body = '<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
       +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value">'+countryOptions+'</select></div>'
@@ -2926,7 +3046,7 @@ function renderDocuments(){
         return '<input class="ef-input" style="width:100%" type="text" placeholder="'+f.lbl+'" value="'+val+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)"/>';
       }).join('')+'</div>';
     }
-    return '<div class="info-card doc-card" onclick="toggleDocOpen(\''+d.id+'\')"><div class="doc-card-head"><span class="doc-card-icon">'+svgIcon(d.icon,20)+'</span><div style="flex:1"><div class="doc-card-title">'+d.label+'</div><div class="status-sub">'+(filled?'✓ Renseigné':'Non renseigné')+'</div></div><span style="color:var(--ink-subtle)">'+(isOpen?'▾':'▸')+'</span></div>'+body+'</div>';
+    return '<div class="info-card doc-card"><div class="doc-card-head" onclick="toggleDocOpen(\''+d.id+'\')"><span class="doc-card-icon">'+svgIcon(d.icon,20)+'</span><div style="flex:1"><div class="doc-card-title">'+d.label+'</div><div class="status-sub">'+(filled?'✓ Renseigné':'Non renseigné')+'</div></div><span style="color:var(--ink-subtle)">'+(isOpen?'▾':'▸')+'</span></div>'+body+'</div>';
   }).join('');
   return '<div class="subpage-header"><button class="cdh-back-flat" onclick="setTab(\'more\')"><span data-icon="arrow-left" data-icon-size="18"></span></button><div class="section-title">Documents</div></div>'
     +'<div class="section" style="padding-bottom:20px;padding-top:8px">'+cards+'</div>';
@@ -3070,8 +3190,10 @@ function renderGuide(c){
   const p=c.practical;
   const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row"><span class="ir-key">'+escHtml(t)+'</span><span class="ee-del" onclick="removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
   const isEmpty = !c.currency && !c.visa && !c.tagline;
+  const aiBadge = c._aiGenerated ? '<div class="ai-badge">✨ Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Guide</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
-    +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">✨ '+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Basé uniquement sur le nom du pays — à corriger ensuite si besoin.</div></div>'
+    +aiBadge
+    +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">✨ '+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub">Configure une clé API (dans Plus → Réglages avancés) pour auto-remplir ce guide à partir du nom du pays.</div></div>')
     +'<div class="info-card"><div class="ic-header"><span data-icon="info" data-icon-size="16"></span> Présentation</div>'
     +'<input class="ir-input-block" type="text" placeholder="Accroche courte (ex: Temples, pixels & Mont Fuji)" value="'+escHtml(c.tagline)+'" oninput="editCountryField(\''+c.id+'\',\'tagline\',this.value)"/>'
@@ -3114,12 +3236,110 @@ function addExp(cid){
   S.expDesc='';S.expAmt='';save();renderContent();
 }
 function delExp(id){S.expenses=S.expenses.filter(function(e){return e.id!==id;});save();renderContent();}
-function openShare(){document.getElementById('shareModal').classList.add('open');}
+function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
 function closeShare(){document.getElementById('shareModal').classList.remove('open');}
-function joinSession(){
-  const code=document.getElementById('accessCode').value.trim().toUpperCase();
-  if(code==='ASIE2026'){alert('✅ Accès accordé !');closeShare();}
-  else alert('Code incorrect. Essaie : ASIE2026');
+
+// ── SHARE VIA LINK (snapshot, no live sync) ─────────────────────
+async function encodeShareData(obj){
+  const json = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(json);
+  const cs = new CompressionStream('gzip');
+  const compressedBuf = await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer();
+  let binary = '';
+  const arr = new Uint8Array(compressedBuf);
+  for(let i=0;i<arr.length;i++) binary += String.fromCharCode(arr[i]);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function decodeShareData(base64url){
+  const base64 = base64url.replace(/-/g,'+').replace(/_/g,'/');
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  const ds = new DecompressionStream('gzip');
+  const buf = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+  return JSON.parse(new TextDecoder().decode(buf));
+}
+function buildSharePayload(){
+  const clone = JSON.parse(JSON.stringify(S));
+  delete clone.apiKey;
+  delete clone.pin;
+  if(clone.journal) clone.journal = clone.journal.map(function(e){
+    return Object.assign({}, e, {photo:null});
+  });
+  return {
+    v:1,
+    state: clone,
+    countries: COUNTRIES.filter(function(c){ return S.customCountries.find(function(cc){return cc.id===c.id;}); })
+  };
+}
+async function generateShareLink(){
+  const btn = document.getElementById('shareGenBtn');
+  const statusEl = document.getElementById('shareLinkStatus');
+  btn.disabled = true;
+  statusEl.textContent = 'Génération du lien…';
+  try{
+    const payload = buildSharePayload();
+    const encoded = await encodeShareData(payload);
+    const url = location.origin + location.pathname + '#share=' + encoded;
+    if(navigator.share){
+      try{
+        await navigator.share({title:'Mon voyage sur PlaniTrip', text:'Voici l\'état de mon voyage :', url:url});
+        statusEl.textContent = 'Lien partagé !';
+      }catch(shareErr){
+        // user cancelled the native share sheet — fall back to clipboard
+        await copyShareLink(url, statusEl);
+      }
+    } else {
+      await copyShareLink(url, statusEl);
+    }
+  }catch(e){
+    statusEl.textContent = 'Erreur : ' + (e.message||'lien trop volumineux ou navigateur non compatible.');
+  }
+  btn.disabled = false;
+}
+async function copyShareLink(url, statusEl){
+  try{
+    await navigator.clipboard.writeText(url);
+    statusEl.textContent = 'Lien copié — colle-le dans un SMS ou un mail.';
+  }catch(e){
+    statusEl.innerHTML = 'Lien : <span style="word-break:break-all;font-size:10px;">'+url+'</span>';
+  }
+}
+
+// Check on load whether the URL contains shared data to import
+var _pendingImportPayload = null;
+function checkForSharedDataOnLoad(){
+  const hash = location.hash;
+  const match = hash.match(/#share=([^&]+)/);
+  if(!match) return;
+  decodeShareData(match[1]).then(function(payload){
+    _pendingImportPayload = payload;
+    document.getElementById('importModal').classList.add('open');
+  }).catch(function(){
+    // corrupted or incompatible link — silently ignore
+  });
+}
+function confirmImportSharedData(){
+  if(!_pendingImportPayload) return;
+  const incoming = deepSanitize(_pendingImportPayload.state || {});
+  const keepApiKey = S.apiKey, keepPin = S.pin;
+  Object.keys(incoming).forEach(function(k){ S[k]=incoming[k]; });
+  S.apiKey = keepApiKey;
+  S.pin = keepPin;
+  const incomingCountries = deepSanitize(_pendingImportPayload.countries||[]);
+  incomingCountries.forEach(function(c){
+    if(!COUNTRIES.find(function(co){return co.id===c.id;})) COUNTRIES.push(c);
+  });
+  save();
+  history.replaceState(null, '', location.pathname);
+  document.getElementById('importModal').classList.remove('open');
+  S.tab='home';
+  renderContent();
+}
+function cancelImportSharedData(){
+  _pendingImportPayload = null;
+  history.replaceState(null, '', location.pathname);
+  document.getElementById('importModal').classList.remove('open');
 }
 
 // ── GLOBAL MULTI-COUNTRY SEARCH ─────────────────────────────────
@@ -3632,9 +3852,9 @@ function closeCountryModal() {
   document.getElementById('countryModal').classList.remove('open');
 }
 function addCountry() {
-  var flag = document.getElementById('new-country-flag').value.trim()||'🌍';
-  var name = document.getElementById('new-country-name').value.trim();
-  var dates = document.getElementById('new-country-dates').value.trim()||'À définir';
+  var flag = stripHtml(document.getElementById('new-country-flag').value.trim())||'🌍';
+  var name = stripHtml(document.getElementById('new-country-name').value.trim());
+  var dates = stripHtml(document.getElementById('new-country-dates').value.trim())||'À définir';
   if(!name) return;
   var id = name.toLowerCase().replace(/[^a-z]/g,'').slice(0,4)+'_'+Date.now();
   var newCountry = {
@@ -3825,10 +4045,11 @@ var _initTabEl = document.getElementById('tab-'+_initActiveTab);
 if(_initTabEl) _initTabEl.classList.add('active');
 renderContent();
 renderIcons();
+checkForSharedDataOnLoad();
 
 // PWA — Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').catch(function(){});
+  navigator.serviceWorker.register('service-worker.js').catch(function(){});
 }
 
 </script>
