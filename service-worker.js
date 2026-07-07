@@ -1,10 +1,10 @@
-const CACHE_NAME = 'asie2026-v2';
+const CACHE_NAME = 'planitrip-v3';
 const ASSETS = [
   'index.html',
   'manifest.json'
 ];
 
-// Installation : mise en cache des ressources essentielles
+// Installation : mise en cache des ressources essentielles (pour le mode hors-ligne)
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
@@ -22,23 +22,24 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch : cache en priorité, réseau en fallback
+// Fetch : réseau en priorité (pour toujours avoir la dernière version quand il y a internet),
+// cache uniquement en secours si hors-ligne ou requête impossible.
 self.addEventListener('fetch', event => {
-  // Laisser passer les requêtes API météo et Wikipedia/Commons (réseau uniquement)
+  // Laisser passer les requêtes API météo, Wikipedia/Commons et Anthropic (réseau uniquement, jamais mises en cache)
   if (event.request.url.includes('open-meteo.com')) return;
   if (event.request.url.includes('wikipedia.org')) return;
   if (event.request.url.includes('wikimedia.org')) return;
+  if (event.request.url.includes('api.anthropic.com')) return;
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      return cached || fetch(event.request).then(response => {
-        // Mettre en cache les nouvelles ressources statiques
-        if (response.ok && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => caches.match('index.html'));
-    })
+    fetch(event.request).then(response => {
+      if (response.ok && event.request.method === 'GET') {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      }
+      return response;
+    }).catch(() =>
+      caches.match(event.request).then(cached => cached || caches.match('index.html'))
+    )
   );
 });

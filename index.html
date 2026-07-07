@@ -4050,6 +4050,21 @@ checkForSharedDataOnLoad();
 // PWA — Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(function(){});
+  // When a newer version has been fetched, activated, and taken control,
+  // reload once automatically so the update applies without manual action.
+  var _swReloaded = false;
+  function _doAutoReload(){
+    if(_swReloaded) return;
+    var active = document.activeElement;
+    var isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA');
+    if(isTyping){
+      active.addEventListener('blur', function(){ _doAutoReload(); }, {once:true});
+      return;
+    }
+    _swReloaded = true;
+    location.reload();
+  }
+  navigator.serviceWorker.addEventListener('controllerchange', _doAutoReload);
 }
 
 </script>
