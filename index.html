@@ -354,7 +354,7 @@ a{color:var(--ink);}
 .cc-status-done{background:var(--status-done-pale);color:var(--status-done);}
 
 /* ── COUNTRY DETAIL SHELL ── */
-.country-detail-header{position:relative;height:200px;background-size:cover;background-position:center;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;color:#fff;overflow:hidden;}
+.country-detail-header{position:relative;min-height:220px;background-size:cover;background-position:center;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;color:#fff;overflow:hidden;}
 .country-detail-header::before{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 55%,transparent 100%);z-index:1;}
 .cdh-back{position:absolute;top:14px;left:14px;z-index:2;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .cdh-back-flat{display:flex;align-items:center;justify-content:center;}
@@ -2773,6 +2773,15 @@ function renderCountryDetailShell(c, innerHtml){
   var sub = S.countryDetailTab||'lieux';
   var query = getCountryImageQuery(c);
   var status = getCountryStatus(c.id);
+  var allBaseActs = c.cities.reduce(function(s,city){
+    var base = city.acts.filter(function(_,i){return !S.deletedActs[c.id+'_'+city.city+'_'+i];});
+    return s + base.length + (S.customActs[c.id+'_'+city.city]||[]).length;
+  },0);
+  var doneActs = c.cities.reduce(function(s,city){
+    var baseDone = city.acts.filter(function(_,i){return !S.deletedActs[c.id+'_'+city.city+'_'+i] && S.done[c.id+'_'+city.city+'_'+i];}).length;
+    var customDone = (S.customActs[c.id+'_'+city.city]||[]).filter(function(_,i){return S.done[c.id+'_'+city.city+'_c'+i];}).length;
+    return s+baseDone+customDone;
+  },0);
   var subTabs = [
     {id:'guide', label:'Guide'},
     {id:'lieux', label:'Lieux'},
@@ -2785,7 +2794,8 @@ function renderCountryDetailShell(c, innerHtml){
   return '<div class="country-detail-header" style="background-image:linear-gradient('+coverColors[c.id]+',rgba(0,0,0,0.35))" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="backToCountries()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
     +'<span class="cdh-status cdh-status-'+status+'">'+_countryStatusLabel(status)+'</span>'
-    +'<div class="cdh-content"><div class="cdh-flag">'+c.flag+'</div><div class="cdh-name">'+c.name+'</div><div class="cdh-tagline">'+c.tagline+'</div></div>'
+    +'<div class="cdh-content"><div class="cdh-flag">'+c.flag+'</div><div class="cdh-name">'+c.name+'</div><div class="cdh-tagline">'+c.tagline+'</div>'
+    +'<div class="cover-pills" style="margin-top:8px"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div>'
     +'</div>'
     +'<div class="cdt-subtabs">'+tabsHTML+'</div>'
     +innerHtml;
