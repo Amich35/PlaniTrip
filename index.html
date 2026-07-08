@@ -123,7 +123,9 @@ a{color:var(--ink);}
 .map-btn:active{opacity:1;}
 
 .fav-btn{flex-shrink:0;font-size:16px;padding:3px 4px;cursor:pointer;border:none;background:none;line-height:1;opacity:0.45;transition:opacity 0.15s,transform 0.15s;color:var(--ink-subtle);}
+.fav-btn svg{fill:none;}
 .fav-btn.active{opacity:1;color:#C4A020;transform:scale(1.08);}
+.fav-btn.active svg{fill:currentColor;}
 .fav-btn:active{transform:scale(0.92);}
 
 .act-del{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:rgba(29,29,31,0.070);color:var(--ink-subtle);border-radius:50%;line-height:1;opacity:0.5;transition:opacity 0.15s,background 0.15s;padding:0;} .act-card:hover .act-del,.act-card:active .act-del{opacity:1;}
@@ -169,12 +171,12 @@ a{color:var(--ink);}
 /* Live weather */
 .weather-live-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--green-muted);background:#EBF4F0;padding:2px 7px;border-radius:20px;border:1px solid rgba(92,107,74,0.2);margin-left:8px;}
 .weather-loading{font-size:11px;color:var(--ink-muted);font-style:italic;padding:8px 0;}
-.weather-card-live{flex-shrink:0;background:var(--parchment);border:var(--border);border-radius:var(--r12);padding:var(--sp12);text-align:center;min-width:88px;box-shadow:var(--shadow-sm);}
+.weather-card-live{flex-shrink:0;background:var(--parchment);border:var(--border);border-radius:var(--r12);padding:var(--sp12) 6px;text-align:center;width:92px;box-shadow:var(--shadow-sm);}
 .wcl-day{font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:var(--ink-muted);}
 .wcl-date{font-size:9px;letter-spacing:0.4px;text-transform:uppercase;color:var(--ink-subtle);}
 .wcl-icon{font-size:22px;margin:4px 0;line-height:1;}
 .wcl-temp{font-size:14px;font-weight:500;}
-.wcl-desc{font-size:9px;color:var(--ink-muted);margin-top:2px;}
+.wcl-desc{font-size:9px;color:var(--ink-muted);margin-top:4px;line-height:1.25;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:22px;}
 
 /* MAP PICKER MODAL */
 .map-modal{display:none;position:fixed;inset:0;z-index:300;background:rgba(28,24,20,0.6);align-items:flex-end;justify-content:center;}
@@ -640,7 +642,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <div class="map-place-coords" id="mapPlaceCoords"></div>
     <div class="map-options">
       <a class="map-option" id="mapApple" href="#" onclick="return false;">
-        <span class="map-opt-icon" style="font-size:24px">🗺</span>
+        <span class="map-opt-icon" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;color:#2D6A4F"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></span>
         <div class="map-opt-body">
           <div class="map-opt-name">Plans (Apple Maps)</div>
           <div class="map-opt-sub">Ouvrir dans l'app Plans</div>
@@ -663,7 +665,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 <div class="detail-modal" id="detailModal">
   <div class="detail-sheet" id="detailSheet">
     <div class="detail-img-wrap">
-      <div class="detail-img" id="detailImg">🏛️</div>
+      <div class="detail-img" id="detailImg"><span data-icon="camera" data-icon-size="28" style="color:rgba(255,255,255,0.5)"></span></div>
       <button class="detail-close" onclick="closeDetail()">✕</button>
     </div>
     <div class="detail-handle"></div>
@@ -715,7 +717,14 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 <div class="photo-lightbox" id="photoLightbox">
   <div class="pl-card" style="position:relative;">
     <button class="pl-close" onclick="closePhotoSpot()">✕</button>
-    <div class="pl-img" id="plImg">📷</div>
+    <div style="position:relative;">
+      <div class="pl-img" id="plImg"><span data-icon="camera" data-icon-size="32" style="color:rgba(255,255,255,0.5)"></span></div>
+      <button id="plPhotoDots" onclick="event.stopPropagation();openPhotoPicker(_currentSpotQuery)" style="position:absolute;bottom:10px;right:10px;z-index:3;width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;">
+        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
+        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
+        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
+      </button>
+    </div>
     <div class="pl-body">
       <div class="pl-name" id="plName"></div>
       <div class="pl-tip" id="plTip"></div>
@@ -1882,13 +1891,13 @@ function openDetail(actKey, actName, cityKey) {
   let html = '';
   if(!hasAnyDetail){
     if(S.apiKey){
-      html = '<div class="detail-section" id="detailAiStatus"><div class="detail-text">✨ Génération des détails avec l\'IA…</div></div>';
+      html = '<div class="detail-section" id="detailAiStatus"><div class="detail-text">Génération des détails avec l\'IA…</div></div>';
       fetchActDetailWithAI(actKey, actName, cityKey);
     } else {
       html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée pour cette activité. Configure une clé API (Plus → Réglages avancés) pour la générer automatiquement avec l\'IA.</div></div>';
     }
   }
-  if(d._aiGenerated) html += '<div class="ai-badge">✨ Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir</div>';
+  if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir</div>';
   if(d.history) html += '<div class="detail-section"><div class="detail-section-title">📖 Histoire & contexte</div><div class="detail-text">'+d.history+'</div></div>';
   if(d.hours) html += '<div class="detail-section"><div class="detail-section-title">🕐 Horaires</div><div class="detail-text">'+d.hours+'</div></div>';
   if(d.costs && d.costs.length) {
@@ -2082,10 +2091,15 @@ async function fetchPlaceImage(query){
 }
 // ── CUSTOM PHOTO OVERRIDE (manual upload / URL, bypasses auto-fetch) ──
 var _photoModalTarget = null;
+var _currentSpotQuery = null;
 function jsStrEsc(str){ return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function photoEditBtn(query, posStyle){
-  var pos = posStyle || 'position:absolute;top:10px;right:10px;';
-  return '<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="'+pos+'width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.45);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;color:#fff;font-size:14px;line-height:1;">📷</button>';
+  var pos = posStyle || 'position:absolute;bottom:10px;right:10px;';
+  return '<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="'+pos+'width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;z-index:5;">'
+    +'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>'
+    +'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>'
+    +'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>'
+    +'</button>';
 }
 function openPhotoPicker(query){
   _photoModalTarget = query;
@@ -2120,6 +2134,10 @@ function setCustomPhoto(query, url){
   });
   renderContent();
   setTimeout(function(){ loadPlaceImages(); },50);
+  if(_currentSpotQuery===query){
+    var plImg=document.getElementById('plImg');
+    if(plImg){ plImg.style.backgroundImage='url(\''+url+'\')'; plImg.textContent=''; }
+  }
 }
 function resetCustomPhoto(){
   if(!_photoModalTarget) return;
@@ -2620,7 +2638,7 @@ function renderItinerary(c, embedded){
           +'<div class="act-footer" style="margin-top:6px">'
           +(a.tags&&a.tags.length?'<div class="act-tags">'+tagsHTML(a.tags)+'</div>':'<div></div>')
           +'<div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+k+'\')">'+(S.favorites[k]?'★':'☆')+'</button>'
+          +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+k+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+k+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
           +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+ck+'\','+origIdx+',false)">✕</button>'
           +'</div></div></div></div>';
@@ -2634,7 +2652,7 @@ function renderItinerary(c, embedded){
           +'<div class="act-check" onclick="toggleAct(\''+ck2+'\')">'+( cdone?'✓':'')+'</div>'
           +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+'</div>'
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+ck2+'\')">'+(S.favorites[ck2]?'★':'☆')+'</button>'
+          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+ck2+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+ck+'\','+origIdx+',true)">✕</button></div>'
           +'</div></div></div>';
       }
@@ -2645,7 +2663,7 @@ function renderItinerary(c, embedded){
     const cityTrash=(S.trash&&S.trash[ck])||[];
     let trashHTML='';
     if(cityTrash.length){
-      trashHTML='<div class="trash-section"><div class="trash-label">🗑️ Corbeille ('+cityTrash.length+')</div>';
+      trashHTML='<div class="trash-section"><div class="trash-label">Corbeille ('+cityTrash.length+')</div>';
       cityTrash.forEach(function(item,ti){
         const name=item._builtinIndex!==undefined?(city.acts[item._builtinIndex]||{}).n||'Activité supprimée':item.n||'Activité supprimée';
         trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><button class="trash-restore" onclick="restoreActivity(\''+ck+'\','+ti+')">↩ Restaurer</button></div>';
@@ -2663,10 +2681,11 @@ function renderItinerary(c, embedded){
 
     const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+ck+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+ck+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
 
-    return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+ck+'">'
-      +'<div class="city-accordion-header"><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer"><div class="cah-city">'+city.city+'</div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
+    return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+ck+'" style="position:relative">'
+      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
+      +'<div class="city-accordion-header"><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer">'
+      +'<div class="cah-city" style="padding-right:24px">'+city.city+'</div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
       +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span>'
-      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="background:transparent;border:none;color:var(--red-muted);opacity:0.55;cursor:pointer;padding:4px;font-size:14px;display:flex;align-items:center;" title="Supprimer la ville">🗑</button>'
       +'<div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div>'
       +'<span class="cah-chevron" onclick="toggleCity(\''+ck+'\')" style="cursor:pointer">▾</span></div></div>'
       +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
@@ -3231,7 +3250,7 @@ function renderMore(){
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
-    +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);">⚙️ Modifier (PIN requis)</button>'
+    +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
     +'</div>'
     +'</div>';
 }
@@ -3263,7 +3282,7 @@ function renderFavoritesScreen(){
       return '<div class="info-card"><div class="ic-header">'+cat.label+' ('+grouped[cat.id].length+')</div>'+rows+'</div>';
     }).join('');
   } else {
-    favHTML='<div class="info-card"><div class="fav-empty">Aucun favori pour l\'instant — appuie sur ☆ sur une activité pour l\'ajouter ici.</div></div>';
+    favHTML='<div class="info-card"><div class="fav-empty">Aucun favori pour l\'instant — appuie sur l\'étoile d\'une activité pour l\'ajouter ici.</div></div>';
   }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px;display:flex;align-items:center;gap:6px">'+svgIcon('star',18)+' Mes favoris ('+favEntries.length+')</div>'
@@ -3275,10 +3294,10 @@ function renderGuide(c){
   const p=c.practical;
   const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row"><span class="ir-key">'+escHtml(t)+'</span><span class="ee-del" onclick="removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
   const isEmpty = !c.currency && !c.visa && !c.tagline;
-  const aiBadge = c._aiGenerated ? '<div class="ai-badge">✨ Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
+  const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Guide</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
     +aiBadge
-    +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">✨ '+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
+    +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub">Configure une clé API (dans Plus → Réglages avancés) pour auto-remplir ce guide à partir du nom du pays.</div></div>')
     +'<div class="info-card"><div class="ic-header"><span data-icon="info" data-icon-size="16"></span> Présentation</div>'
     +'<input class="ir-input-block" type="text" placeholder="Accroche courte (ex: Temples, pixels & Mont Fuji)" value="'+escHtml(c.tagline)+'" oninput="editCountryField(\''+c.id+'\',\'tagline\',this.value)"/>'
@@ -3505,18 +3524,19 @@ function doSearch(q){
   res.innerHTML=matches.map(function(it){
     return '<div class="search-result" onclick="goToSearchResult(\''+it.countryId+'\',\''+it.city.replace(/'/g,"\\'")+'\',\''+it.k+'\')">'
       +'<span class="search-result-flag">'+it.flag+'</span>'
-      +'<div class="search-result-body"><div class="search-result-name">'+(S.favorites[it.k]?'★ ':'')+it.name+'</div>'
+      +'<div class="search-result-body"><div class="search-result-name">'+(S.favorites[it.k]?'<span data-icon="star" data-icon-size="12" style="color:#C4A020;vertical-align:-1px;margin-right:3px"></span>':'')+it.name+'</div>'
       +'<div class="search-result-loc">'+it.country+' · '+it.city+'</div></div>'
       +'</div>';
   }).join('');
 }
 
 function openPhotoSpot(name, tip, query){
+  _currentSpotQuery = query;
   document.getElementById('plName').textContent = name;
   document.getElementById('plTip').textContent = tip;
   var imgEl = document.getElementById('plImg');
   imgEl.style.backgroundImage = '';
-  imgEl.textContent = '📷';
+  imgEl.innerHTML = svgIcon('camera', 32);
   document.getElementById('photoLightbox').classList.add('open');
   fetchPlaceImage(query).then(function(url){
     if(url){
@@ -3571,7 +3591,7 @@ function cityTrashSectionHTML(countryId){
     var extra = parts.length ? ' · '+parts.join(' · ') : '';
     return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><button class="trash-restore" onclick="restoreCity('+t.id+')">↩ Restaurer</button></div>';
   }).join('');
-  return '<div class="trash-section" style="margin-top:12px"><div class="trash-label">🗑️ Villes supprimées</div>'+rows+'</div>';
+  return '<div class="trash-section" style="margin-top:12px"><div class="trash-label">Villes supprimées</div>'+rows+'</div>';
 }
 function deleteCityConfirm(countryId, cityName){
   showConfirm('Supprimer '+cityName+' et toutes ses activités ? Les dépenses et entrées de carnet liées seront aussi mises en corbeille.', function(){
@@ -3871,13 +3891,13 @@ function renderCountdown() {
   var DEPART = new Date('2026-09-10T00:00:00');
   var now = new Date();
   var diff = DEPART - now;
-  if(diff < 0) return '<div class="countdown-bar"><span class="cd-emoji">✈️</span><div class="cd-info"><div class="cd-label">Voyage en cours !</div><div class="cd-main"><span class="cd-days">J+'+Math.abs(Math.floor(diff/86400000))+'</span><span class="cd-unit">jours</span></div><div class="cd-date">Départ : 10 septembre 2026</div></div></div>';
+  if(diff < 0) return '<div class="countdown-bar"><span class="cd-emoji" data-icon="plane" data-icon-size="22"></span><div class="cd-info"><div class="cd-label">Voyage en cours !</div><div class="cd-main"><span class="cd-days">J+'+Math.abs(Math.floor(diff/86400000))+'</span><span class="cd-unit">jours</span></div><div class="cd-date">Départ : 10 septembre 2026</div></div></div>';
   var totalSecs = Math.floor(diff/1000);
   var days = Math.floor(totalSecs/86400);
   var hrs  = Math.floor((totalSecs%86400)/3600);
   var mins = Math.floor((totalSecs%3600)/60);
   var secs = totalSecs%60;
-  return '<div class="countdown-bar"><span class="cd-emoji">✈️</span><div class="cd-info">'
+  return '<div class="countdown-bar"><span class="cd-emoji" data-icon="plane" data-icon-size="22"></span><div class="cd-info">'
     +'<div class="cd-label">Départ dans</div>'
     +'<div class="cd-main"><span class="cd-days">'+days+'</span><span class="cd-unit">jours</span></div>'
     +'<div class="cd-date">10 septembre 2026 · 7 pays · ~6 mois</div>'
@@ -4341,7 +4361,7 @@ if ('serviceWorker' in navigator) {
     <div class="modal-handle"></div>
     <div class="modal-title" style="font-size:18px">Changer la photo</div>
     <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px;line-height:1.5">Remplace la photo automatique par une photo de ton choix (stockée sur cet appareil).</div>
-    <button class="modal-cta" onclick="triggerPhotoFileInput()" style="margin-bottom:8px">📁 Choisir depuis la galerie</button>
+    <button class="modal-cta" onclick="triggerPhotoFileInput()" style="margin-bottom:8px">Choisir depuis la galerie</button>
     <input class="modal-field" type="text" id="photoUrlInput" placeholder="ou colle une URL d'image…" style="margin-bottom:8px"/>
     <button class="modal-cta" onclick="useCustomPhotoUrl()" style="margin-bottom:8px">Utiliser cette URL</button>
     <button class="modal-cancel-btn" id="photoResetBtn" onclick="resetCustomPhoto()" style="display:none;color:var(--red-muted);margin-bottom:4px">↩ Revenir à la photo automatique</button>
@@ -4355,7 +4375,7 @@ if ('serviceWorker' in navigator) {
     <div class="modal-title" style="font-size:18px;margin-bottom:4px">Ajouter un pays</div>
     <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px">Le pays sera ajouté à la fin de la liste.</div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input class="country-input" id="new-country-flag" placeholder="🌍 Emoji drapeau" style="max-width:80px"/>
+      <input class="country-input" id="new-country-flag" placeholder="Emoji drapeau" style="max-width:80px"/>
       <input class="country-input" id="new-country-name" placeholder="Nom du pays" style="flex:1;margin-bottom:0"/>
     </div>
     <input class="country-input" id="new-country-dates" placeholder="Dates ex: avril 2027"/>
