@@ -43,7 +43,7 @@ a{color:var(--ink);}
 #app{max-width:390px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--sand);}
 
 .top-bar{background:rgba(248,246,242,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:var(--border);padding:calc(var(--sp16) + env(safe-area-inset-top)) var(--sp16) var(--sp12);display:flex;align-items:flex-end;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 rgba(29,29,31,0.056);}
-.brand-name{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.6px;color:var(--ink);}
+.brand-name{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:18px;font-weight:700;letter-spacing:-0.4px;color:#2D6A4F;}
 .brand-sub{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--ink-subtle);margin-top:2px;}
 .access-pill{font-size:11px;padding:8px 14px;min-height:36px;border-radius:20px;border:1px solid rgba(29,29,31,0.140);background:var(--accent-pale);color:var(--accent-deep);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-weight:500;transition:background 0.15s;}
 
@@ -2044,7 +2044,7 @@ function isLikelyNotAPhoto(url){
   if(changed) _saveImgCache();
 })();
 async function fetchPlaceImage(query){
-  if(_imgCache[query]!==undefined) return _imgCache[query];
+  if(_imgCache[query]) return _imgCache[query];
   var img=null;
   // Source 1: Wikipedia (best for well-known landmarks with an article)
   try{
@@ -2073,8 +2073,7 @@ async function fetchPlaceImage(query){
       }
     }catch(e){}
   }
-  _imgCache[query]=img;
-  _saveImgCache();
+  if(img){ _imgCache[query]=img; _saveImgCache(); }
   return img;
 }
 // Loads a photo into a container by data-img-query, keeping fallback content until it resolves.
