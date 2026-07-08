@@ -86,7 +86,7 @@ a{color:var(--ink);}
 .cah-left{flex:1;min-width:0;}
 .cah-city{font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-0.2px;}
 .cah-sub{font-size:11px;color:var(--ink-subtle);margin-top:3px;}
-.cah-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.cah-right{display:flex;align-items:center;gap:8px;flex-shrink:0;align-self:flex-start;margin-top:28px;margin-right:-6px;}
 .cah-progress{font-size:11px;color:var(--ink-muted);background:var(--sand);padding:4px 10px;border-radius:20px;border:1px solid rgba(29,29,31,0.084);font-weight:500;}
 .cah-progress.complete{background:var(--green-muted);color:#fff;border-color:transparent;box-shadow:0 2px 6px rgba(92,107,74,0.3);}
 .cah-chevron{font-size:13px;color:var(--ink-muted);transition:transform 0.25s;display:inline-block;}
@@ -151,9 +151,9 @@ a{color:var(--ink);}
 .drag-handle{flex-shrink:0;width:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;padding:4px 2px;opacity:0.35;touch-action:none;-webkit-tap-highlight-color:transparent;}
 .drag-handle:active{cursor:grabbing;opacity:0.7;}
 .drag-handle span{display:block;width:14px;height:2px;background:var(--ink-muted);border-radius:1px;}
-.city-drag-handle{flex-shrink:0;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;padding:4px 2px;opacity:0.3;touch-action:none;-webkit-tap-highlight-color:transparent;}
-.city-drag-handle:active{cursor:grabbing;opacity:0.6;}
-.city-drag-handle span{display:block;width:12px;height:2px;background:var(--ink-muted);border-radius:1px;}
+.city-drag-handle{flex-shrink:0;width:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;padding:4px 2px;opacity:0.35;touch-action:none;-webkit-tap-highlight-color:transparent;}
+.city-drag-handle:active{cursor:grabbing;opacity:0.7;}
+.city-drag-handle span{display:block;width:14px;height:2px;background:var(--ink-muted);border-radius:1px;}
 .act-card.dragging{opacity:0.4;transform:scale(0.98);}
 .act-card.drag-over{border-top:2px solid var(--accent);}
 .city-accordion.dragging{opacity:0.4;}
@@ -346,7 +346,7 @@ a{color:var(--ink);}
 .country-card-list{display:flex;flex-direction:column;gap:10px;}
 .country-card{display:flex;align-items:center;gap:12px;background:var(--parchment);border-radius:var(--r22);padding:12px;box-shadow:var(--shadow-sm);cursor:pointer;transition:transform 0.1s;}
 .country-card:active{transform:scale(0.98);}
-.cc-thumb{width:56px;height:56px;border-radius:var(--r12);background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.cc-thumb{width:56px;height:56px;border-radius:var(--r12);background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
 .cc-thumb-flag{font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));}
 .cc-thumb.has-photo .cc-thumb-flag{display:none;}
 .cc-body{flex:1;min-width:0;}
@@ -667,6 +667,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <div class="detail-img-wrap">
       <div class="detail-img" id="detailImg"><span data-icon="camera" data-icon-size="28" style="color:rgba(255,255,255,0.5)"></span></div>
       <button class="detail-close" onclick="closeDetail()">✕</button>
+      <button id="detailPhotoDots" onclick="event.stopPropagation();openPhotoPicker(_currentDetailQuery)" style="position:absolute;bottom:10px;right:10px;z-index:3;width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;">
+        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
+        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
+        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
+      </button>
     </div>
     <div class="detail-handle"></div>
     <div class="detail-body">
@@ -1877,6 +1882,7 @@ function openDetail(actKey, actName, cityKey) {
   imgEl.textContent = d.emoji || '📍';
   var cityLabel = cityKey ? cityKey.split('_').slice(1).join(' ') : '';
   var photoQuery = _PLACE_QUERY_OVERRIDES[actName] || (actName+' '+cityLabel);
+  _currentDetailQuery = photoQuery;
   fetchPlaceImage(photoQuery).then(function(url){
     if(url){
       imgEl.style.backgroundImage = 'url(\''+url+'\')';
@@ -2092,6 +2098,7 @@ async function fetchPlaceImage(query){
 // ── CUSTOM PHOTO OVERRIDE (manual upload / URL, bypasses auto-fetch) ──
 var _photoModalTarget = null;
 var _currentSpotQuery = null;
+var _currentDetailQuery = null;
 function jsStrEsc(str){ return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function photoEditBtn(query, posStyle){
   var pos = posStyle || 'position:absolute;bottom:10px;right:10px;';
@@ -2137,6 +2144,10 @@ function setCustomPhoto(query, url){
   if(_currentSpotQuery===query){
     var plImg=document.getElementById('plImg');
     if(plImg){ plImg.style.backgroundImage='url(\''+url+'\')'; plImg.textContent=''; }
+  }
+  if(_currentDetailQuery===query){
+    var dImg=document.getElementById('detailImg');
+    if(dImg){ dImg.style.backgroundImage='url(\''+url+'\')'; dImg.textContent=''; }
   }
 }
 function resetCustomPhoto(){
@@ -2569,7 +2580,7 @@ async function loadWeatherSection(countryId) {
   const {time, weathercode, temperature_2m_max, temperature_2m_min} = data.daily;
   el.innerHTML = time.map((t,i)=>{
     const d = new Date(t);
-    const day = DAYS_FR[d.getDay()];
+    const day = i===0 ? 'Auj.' : DAYS_FR[d.getDay()];
     const dateLabel = d.getDate()+' '+MONTHS_FR[d.getMonth()];
     const code = weathercode[i];
     const icon = WMO_ICONS[code] || '🌡️';
@@ -2578,7 +2589,7 @@ async function loadWeatherSection(countryId) {
     const tmin = Math.round(temperature_2m_min[i]);
     return'<div class="weather-card-live">'
       +'<div class="wcl-date">'+dateLabel+'</div>'
-      +'<div class="wcl-day">'+day+'</div>'
+      +'<div class="wcl-day"'+(i===0?' style="color:var(--accent);font-weight:700"':'')+'>'+day+'</div>'
       +'<div class="wcl-icon">'+icon+'</div>'
       +'<div class="wcl-temp">'+tmax+'° <span style="color:var(--ink-muted);font-size:11px">'+tmin+'°</span></div>'
       +'<div class="wcl-desc">'+desc+'</div>'
@@ -2683,11 +2694,9 @@ function renderItinerary(c, embedded){
 
     return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+ck+'" style="position:relative">'
       +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
-      +'<div class="city-accordion-header"><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer">'
-      +'<div class="cah-city" style="padding-right:24px">'+city.city+'</div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
-      +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span>'
-      +'<div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div>'
-      +'<span class="cah-chevron" onclick="toggleCity(\''+ck+'\')" style="cursor:pointer">▾</span></div></div>'
+      +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer">'
+      +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
+      +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span></div></div>'
       +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
       +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
   }).join('');
@@ -2943,6 +2952,7 @@ function renderHome(){
 
   var heroQuery=getCountryImageQuery(ts.currentCountry);
   var hero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'">'
+    +photoEditBtn(heroQuery)
     +'<div class="home-hero-overlay"><div class="home-hero-greeting">Bonjour !</div><div class="home-hero-sub">'+ts.currentCountry.flag+' '+ts.currentCountry.name+' · Profitez de votre aventure 🌴</div></div></div>';
 
   // Jour card
@@ -3037,7 +3047,7 @@ function renderCountriesScreen(){
     var citiesPreview = c.cities.slice(0,3).map(function(ci){return ci.city;}).join(', ');
     var imgQuery = getCountryImageQuery(c);
     return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">'
-      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
+      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span>'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'…</div></div>'
       +'<span class="cc-status cc-status-'+status+'">'+_countryStatusLabel(status)+'</span>'
       +'</div>';
