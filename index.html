@@ -171,6 +171,7 @@ a{color:var(--ink);}
 .weather-loading{font-size:11px;color:var(--ink-muted);font-style:italic;padding:8px 0;}
 .weather-card-live{flex-shrink:0;background:var(--parchment);border:var(--border);border-radius:var(--r12);padding:var(--sp12);text-align:center;min-width:88px;box-shadow:var(--shadow-sm);}
 .wcl-day{font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:var(--ink-muted);}
+.wcl-date{font-size:9px;letter-spacing:0.4px;text-transform:uppercase;color:var(--ink-subtle);}
 .wcl-icon{font-size:22px;margin:4px 0;line-height:1;}
 .wcl-temp{font-size:14px;font-weight:500;}
 .wcl-desc{font-size:9px;color:var(--ink-muted);margin-top:2px;}
@@ -874,7 +875,7 @@ const COORDS = {
 
 
 const COUNTRIES=[
-  {id:'jp',flag:'🇯🇵',name:'Japon',tagline:'Temples, pixels & Mont Fuji',dates:'10–24 sept',days:14,color:'#3D1C12',currency:'Yen (¥)',rate:'1€ = 155¥',visa:'Non (≤ 90 jours)',lang:'Japonais',budget_daily:70,
+  {id:'jp',flag:'🇯🇵',name:'Japon',tagline:'Temples, pixels & Mont Fuji',dates:'10–24 sept',days:14,color:'#3D1C12',currency:'Yen (¥)',rate:'1€ = 155¥',rateNum:155,visa:'Non (≤ 90 jours)',lang:'Japonais',budget_daily:70,
     alerts:[
     {t:'Fermeture sommet Fuji après le 10 sept', url:'https://www.fujisan-climb.jp/fr/'},
     {t:'Silver Week 19–23 sept : réservez tôt', url:'https://selfguidejapan.com/blog/japan-silver-week-2026'},
@@ -939,7 +940,7 @@ const COUNTRIES=[
     ],
     practical:{transport:'JR Pass + Suica card (aéroport)',sim:'eSIM ou SIM JAL',tips:['Réserver Shinkansen via Klook avant le départ','Payer en cash dans les petits restaurants','Izakayas & ramen pour dîner pas cher','🌦️ Meilleure saison : mars-avril (cerisiers) ou oct-nov (érables) — été humide et chaud','💰 Budget réel voyageurs long-terme : ~70€/j/pers (source Tourdumondiste)'],emergency:[{k:'Police',v:'110'},{k:'Police Tokyo EN',v:'03-3501-0110'},{k:'Ambulance',v:'119'},{k:'Ambassade France',v:'03-5798-6000'}],checklist:['Passeport valide toute la durée','Billets avion enregistrés','Assurance voyage (ACS Globe Partner)','JR Pass commandé avant départ','Vérifier plafond carte bancaire','Espèces en yens','eSIM ou SIM JAL','Apps téléchargées (traduction, transport)','Cartes hors-ligne téléchargées','Imperméable léger (typhon possible)','Batterie externe']}
   },
-  {id:'kh',flag:'🇰🇭',name:'Cambodge',tagline:'Angkor, rizières & mer de jade',dates:'~oct–nov',days:21,color:'#1C3A1F',currency:'Riel / USD',rate:'1€ = 4 500 KHR',visa:'Oui · e-Visa ~30 USD',lang:'Khmer',budget_daily:33,
+  {id:'kh',flag:'🇰🇭',name:'Cambodge',tagline:'Angkor, rizières & mer de jade',dates:'~oct–nov',days:21,color:'#1C3A1F',currency:'Riel / USD',rate:'1€ = 4 500 KHR',rateNum:4500,visa:'Oui · e-Visa ~30 USD',lang:'Khmer',budget_daily:33,
     alerts:[
     {t:'e-Visa obligatoire — faire avant le départ', url:'https://www.evisa.gov.kh/'},
     {t:'USD souvent requis dans les commerces', url:'https://www.cambodge-decouverte.com/guide/argent.htm'},
@@ -977,7 +978,7 @@ const COUNTRIES=[
     ],
     practical:{transport:'Bus Cambodge → Thaïlande',sim:'SIM locale à l\'aéroport',tips:['e-Visa (30 USD) avant le départ','Cash USD obligatoire','Toujours avoir des photos d\'identité','🌦️ Meilleure saison : nov-fév (sèche, pic apprécié fév-mars)','📍 Coups de cœur voyageurs : Angkor, Koh Rong, Mondolkiri/Ratanakiri (Tourdumondiste)'],emergency:[{k:'Police',v:'117'},{k:'Ambulance',v:'119'},{k:'Ambassade France',v:'+855 23 430 020'}],checklist:['e-Visa fait avant départ','Cash USD prévu','Photos d\'identité imprimées','Billet de sortie du Cambodge']}
   },
-  {id:'th',flag:'🇹🇭',name:'Thaïlande',tagline:'Temples dorés, éléphants & plages',dates:'~nov',days:28,color:'#2D1B4E',currency:'Baht (THB)',rate:'1€ = 38 THB',visa:'Non (≤ 30 jours)',lang:'Thaï',budget_daily:34,
+  {id:'th',flag:'🇹🇭',name:'Thaïlande',tagline:'Temples dorés, éléphants & plages',dates:'~nov',days:28,color:'#2D1B4E',currency:'Baht (THB)',rate:'1€ = 38 THB',rateNum:38,visa:'Non (≤ 30 jours)',lang:'Thaï',budget_daily:34,
     alerts:[
     {t:'Billet de sortie obligatoire à l\'immigration', url:'https://www.diplomatie.gouv.fr/fr/conseils-aux-voyageurs/conseils-par-pays-destination/thailande/'},
     {t:'Tenues couvrantes dans les temples', url:'https://www.tourismthailand.org/'},
@@ -1013,7 +1014,7 @@ const COUNTRIES=[
     ],
     practical:{transport:'Train + frontière terrestre vers le Laos',sim:'eSIM ou SIM locale',tips:['Vêtements couvrants pour les temples','Grab pour tous les trajets urbains','Crème solaire haute protection','🌦️ Meilleure saison : nov-fév (fraîche et sèche) — éviter mars-juin (chaleur, jusqu\'à 40°C)','📍 Coups de cœur voyageurs : Sangkhlaburi, îles du golfe/mer d\'Andaman, parc Khao Yai (Tourdumondiste)'],emergency:[{k:'Police',v:'191'},{k:'Ambulance',v:'1669'},{k:'Ambassade France Bangkok',v:'+66 2 657 5100'}],checklist:['Billet de sortie de Thaïlande','Vêtements couvrants pour temples','Crème solaire haute indice','Application Grab installée']}
   },
-  {id:'la',flag:'🇱🇦',name:'Laos',tagline:'Mékong, Bouddhas & karsts',dates:'~nov–déc',days:21,color:'#1B2E4E',currency:'Kip / USD',rate:'1€ = 21 000 LAK',visa:'Oui · à l\'arrivée 30 USD',lang:'Lao',budget_daily:27,
+  {id:'la',flag:'🇱🇦',name:'Laos',tagline:'Mékong, Bouddhas & karsts',dates:'~nov–déc',days:21,color:'#1B2E4E',currency:'Kip / USD',rate:'1€ = 21 000 LAK',rateNum:21000,visa:'Oui · à l\'arrivée 30 USD',lang:'Lao',budget_daily:27,
     alerts:[
     {t:'Visa à l\'arrivée — photo + 30 USD cash', url:'https://www.diplomatie.gouv.fr/fr/conseils-aux-voyageurs/conseils-par-pays-destination/laos/'},
     {t:'Peu de DAB dans les zones rurales', url:'https://laos-decouverte.com/infos-pratiques/argent/'},
@@ -1043,7 +1044,7 @@ const COUNTRIES=[
     ],
     practical:{transport:'Avion Laos → Vietnam',sim:'eSIM recommandée',tips:['Cash USD ou Kip obligatoire','Prévoir médicaments si zones reculées','Respecter les cérémonies religieuses','🌦️ Meilleure saison : nov-mars (sèche) — éviter fév-mars (saison des brûlis, air irrespirable au nord)','📍 Coups de cœur voyageurs : Muang Ngoi Neua, boucle de Thakhek/grotte de Konglor, Luang Prabang (Tourdumondiste)'],emergency:[{k:'Police',v:'191'},{k:'Ambulance',v:'195'},{k:'Ambassade France Vientiane',v:'+856 21 215 258'}],checklist:['Photo d\'identité pour visa arrivée','Cash USD (min 30 USD)','Médicaments si zones rurales','eSIM avant le départ']}
   },
-  {id:'vn',flag:'🇻🇳',name:'Vietnam',tagline:'Baie d\'Halong, lanternes & street food',dates:'~déc–jan',days:28,color:'#6B1A1A',currency:'Dong (VND)',rate:'1€ = 26 000 VND',visa:'e-Visa jusqu\'à 90 jours',lang:'Vietnamien',budget_daily:29,
+  {id:'vn',flag:'🇻🇳',name:'Vietnam',tagline:'Baie d\'Halong, lanternes & street food',dates:'~déc–jan',days:28,color:'#6B1A1A',currency:'Dong (VND)',rate:'1€ = 26 000 VND',rateNum:26000,visa:'e-Visa jusqu\'à 90 jours',lang:'Vietnamien',budget_daily:29,
     alerts:[
     {t:'e-Visa avant départ — vérifier exemption 45j France', url:'https://evisa.xuatnhapcanh.gov.vn/'},
     {t:'Centre (Hoi An/Hué) : pluies possibles en déc', url:'https://www.meteo-monde.com/climate/vietnam.htm'},
@@ -1081,7 +1082,7 @@ const COUNTRIES=[
     ],
     practical:{transport:'Avion ou train interne Nord→Sud',sim:'eSIM ou SIM Viettel',tips:['e-Visa minimum 3j avant arrivée','Grab pour tous les trajets','Street food sûr dans les restos bondés','🌦️ Meilleure saison : nov-avril (littoral centre plutôt fév-juin) — rizières nord vides d\'eau oct-avril','📍 Coups de cœur voyageurs : Phu Quoc, Ha Giang/Sapa, delta du Mékong (Tourdumondiste)'],emergency:[{k:'Police',v:'113'},{k:'Ambulance',v:'115'},{k:'Ambassade France Hanoï',v:'+84 24 3944 5700'}],checklist:['e-Visa Vietnam fait avant départ','Application Grab installée','Vérifier exemption 45j France–Vietnam']}
   },
-  {id:'id',flag:'🇮🇩',name:'Indonésie',tagline:'Volcans, Komodo & Bali',dates:'~jan–fév',days:30,color:'#1A1A3A',currency:'Rupiah (IDR)',rate:'1€ = 17 000 IDR',visa:'VOA à l\'arrivée · 35 USD',lang:'Bahasa Indonésien',budget_daily:36,
+  {id:'id',flag:'🇮🇩',name:'Indonésie',tagline:'Volcans, Komodo & Bali',dates:'~jan–fév',days:30,color:'#1A1A3A',currency:'Rupiah (IDR)',rate:'1€ = 17 000 IDR',rateNum:17000,visa:'VOA à l\'arrivée · 35 USD',lang:'Bahasa Indonésien',budget_daily:36,
     alerts:[
     {t:'e-VOA recommandé avant arrivée', url:'https://molina.imigrasi.go.id/'},
     {t:'Permis Komodo à réserver tôt', url:'https://www.konservasi.or.id/'},
@@ -1117,7 +1118,7 @@ const COUNTRIES=[
     ],
     practical:{transport:'Vols internes inter-îles',sim:'SIM Telkomsel à l\'aéroport',tips:['e-VOA ou VOA à l\'arrivée (35 USD)','Tenue couverte dans les temples Bali','Cash pour les zones reculées','🌦️ Meilleure saison : mai-oct (sèche) — inversée aux Moluques/Papouasie (oct-avril)','📍 Coups de cœur voyageurs : parc Tanjung Puting (orangs-outans), volcan Ijen, Bali/Ubud (Tourdumondiste)'],emergency:[{k:'Police',v:'110'},{k:'Ambulance',v:'118'},{k:'Ambassade France Jakarta',v:'+62 21 2355 7600'}],checklist:['VOA (35 USD cash) ou e-VOA préparé','Permis Komodo réservé','Vêtements couvrants pour temples Bali','Crème solaire haute protection']}
   },
-  {id:'ph',flag:'🇵🇭',name:'Philippines',tagline:'El Nido, Siargao & Chocolate Hills',dates:'~fév–mars',days:37,color:'#1A2E50',currency:'Peso (PHP)',rate:'1€ = 61 PHP',visa:'Non (≤ 30j) + eTravel',lang:'Filipino / Anglais',budget_daily:45,
+  {id:'ph',flag:'🇵🇭',name:'Philippines',tagline:'El Nido, Siargao & Chocolate Hills',dates:'~fév–mars',days:37,color:'#1A2E50',currency:'Peso (PHP)',rate:'1€ = 61 PHP',rateNum:61,visa:'Non (≤ 30j) + eTravel',lang:'Filipino / Anglais',budget_daily:45,
     alerts:[
     {t:'eTravel obligatoire — remplir avant l\'atterrissage', url:'https://etravel.gov.ph/'},
     {t:'Billet de sortie vérifié à l\'immigration', url:'https://www.diplomatie.gouv.fr/fr/conseils-aux-voyageurs/conseils-par-pays-destination/philippines/'},
@@ -1677,14 +1678,14 @@ function getC(){return COUNTRIES.find(c=>c.id===S.country);}
 function setCountry(id){
   S.country=id;
   S.tab='country';
-  if(!S.countryDetailTab) S.countryDetailTab='lieux';
+  if(!S.countryDetailTab) S.countryDetailTab='guide';
   save();
   renderContent();
 }
 function openCountryDetail(id, subTab){
   S.country=id;
   S.tab='country';
-  S.countryDetailTab=subTab||'lieux';
+  S.countryDetailTab=subTab||'guide';
   save();
   renderContent();
   document.getElementById('mainContent').scrollTop=0;
@@ -2030,8 +2031,9 @@ function isLikelyNotAPhoto(url){
   if(!url) return true;
   var lower = url.toLowerCase();
   if(lower.endsWith('.svg')) return true; // maps/diagrams/heraldry are almost always SVG, photos aren't
-  if(/(^|[_\/])(locator[_-]?map|location[_-]?map|map[_-]?of|blank[_-]?map)/i.test(lower)) return true;
-  if(/(^|[_\/])(flag[_-]?of|coat[_-]?of[_-]?arms|seal[_-]?of|emblem[_-]?of)/i.test(lower)) return true;
+  if(/(^|[_\/])(locator[_-]?map|location[_-]?map|map[_-]?of|blank[_-]?map|topographic|topo[_-]?map|physical[_-]?map|administrative[_-]?map|relief[_-]?map|carte[_-]?de|carte[_-]?topo|road[_-]?map|street[_-]?map|world[_-]?map|regions?[_-]?map)/i.test(lower)) return true;
+  if(/(^|[_\/])(flag[_-]?of|coat[_-]?of[_-]?arms|seal[_-]?of|emblem[_-]?of|logo[_-]?of|insignia)/i.test(lower)) return true;
+  if(/(^|[_\/])(diagram|chart|graph|schema|plan[_-]?du|infographic)/i.test(lower)) return true;
   return false;
 }
 // One-time cleanup: earlier cached results may include maps/flags that we now filter out.
@@ -2043,7 +2045,9 @@ function isLikelyNotAPhoto(url){
   });
   if(changed) _saveImgCache();
 })();
+if(!S.customPhotos) S.customPhotos={};
 async function fetchPlaceImage(query){
+  if(S.customPhotos && S.customPhotos[query]) return S.customPhotos[query];
   if(_imgCache[query]) return _imgCache[query];
   var img=null;
   // Source 1: Wikipedia (best for well-known landmarks with an article)
@@ -2075,6 +2079,60 @@ async function fetchPlaceImage(query){
   }
   if(img){ _imgCache[query]=img; _saveImgCache(); }
   return img;
+}
+// ── CUSTOM PHOTO OVERRIDE (manual upload / URL, bypasses auto-fetch) ──
+var _photoModalTarget = null;
+function jsStrEsc(str){ return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function photoEditBtn(query, posStyle){
+  var pos = posStyle || 'position:absolute;top:10px;right:10px;';
+  return '<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="'+pos+'width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.45);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;color:#fff;font-size:14px;line-height:1;">📷</button>';
+}
+function openPhotoPicker(query){
+  _photoModalTarget = query;
+  var urlInput = document.getElementById('photoUrlInput');
+  if(urlInput) urlInput.value='';
+  var resetBtn = document.getElementById('photoResetBtn');
+  if(resetBtn) resetBtn.style.display = (S.customPhotos && S.customPhotos[query]) ? 'block' : 'none';
+  document.getElementById('photoModal').classList.add('open');
+}
+function closePhotoPicker(){ document.getElementById('photoModal').classList.remove('open'); }
+function triggerPhotoFileInput(){ document.getElementById('photoFileInput').click(); }
+function handlePhotoFileSelected(e){
+  var file = e.target.files && e.target.files[0];
+  if(!file || !_photoModalTarget) return;
+  var reader = new FileReader();
+  reader.onload = function(){ setCustomPhoto(_photoModalTarget, reader.result); };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+function useCustomPhotoUrl(){
+  var url = (document.getElementById('photoUrlInput').value||'').trim();
+  if(!url || !_photoModalTarget) return;
+  setCustomPhoto(_photoModalTarget, url);
+}
+function setCustomPhoto(query, url){
+  if(!S.customPhotos) S.customPhotos={};
+  S.customPhotos[query]=url;
+  save();
+  closePhotoPicker();
+  document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
+    el.removeAttribute('data-img-done');
+  });
+  renderContent();
+  setTimeout(function(){ loadPlaceImages(); },50);
+}
+function resetCustomPhoto(){
+  if(!_photoModalTarget) return;
+  if(S.customPhotos) delete S.customPhotos[_photoModalTarget];
+  save();
+  closePhotoPicker();
+  document.querySelectorAll('[data-img-query="'+_photoModalTarget.replace(/"/g,'&quot;')+'"]').forEach(function(el){
+    el.removeAttribute('data-img-done');
+    el.classList.remove('has-photo');
+    el.style.backgroundImage='';
+  });
+  renderContent();
+  setTimeout(function(){ loadPlaceImages(); },50);
 }
 // Loads a photo into a container by data-img-query, keeping fallback content until it resolves.
 function loadPlaceImages(root){
@@ -2411,6 +2469,8 @@ function deleteActivity(cityKey, index, isCustom) {
 }
 if(!S.deletedActs) S.deletedActs={};
 if(!S.trash) S.trash={};
+if(!S.cityTrash) S.cityTrash=[];
+if(!S.customRates) S.customRates={};
 
 function restoreActivity(cityKey, trashIndex) {
   if(!S.trash||!S.trash[cityKey]) return;
@@ -2458,6 +2518,7 @@ const WMO_DESC = {
   95:'Orage',96:'Orage grêle',99:'Orage fort',
 };
 const DAYS_FR = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const MONTHS_FR = ['Janv','Févr','Mars','Avr','Mai','Juin','Juil','Août','Sept','Oct','Nov','Déc'];
 
 // Cache weather per country, expires after 1h
 const weatherCache = {};
@@ -2491,12 +2552,14 @@ async function loadWeatherSection(countryId) {
   el.innerHTML = time.map((t,i)=>{
     const d = new Date(t);
     const day = DAYS_FR[d.getDay()];
+    const dateLabel = d.getDate()+' '+MONTHS_FR[d.getMonth()];
     const code = weathercode[i];
     const icon = WMO_ICONS[code] || '🌡️';
     const desc = WMO_DESC[code] || '';
     const tmax = Math.round(temperature_2m_max[i]);
     const tmin = Math.round(temperature_2m_min[i]);
     return'<div class="weather-card-live">'
+      +'<div class="wcl-date">'+dateLabel+'</div>'
       +'<div class="wcl-day">'+day+'</div>'
       +'<div class="wcl-icon">'+icon+'</div>'
       +'<div class="wcl-temp">'+tmax+'° <span style="color:var(--ink-muted);font-size:11px">'+tmin+'°</span></div>'
@@ -2603,6 +2666,7 @@ function renderItinerary(c, embedded){
     return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+ck+'">'
       +'<div class="city-accordion-header"><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer"><div class="cah-city">'+city.city+'</div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
       +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span>'
+      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="background:transparent;border:none;color:var(--red-muted);opacity:0.55;cursor:pointer;padding:4px;font-size:14px;display:flex;align-items:center;" title="Supprimer la ville">🗑</button>'
       +'<div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div>'
       +'<span class="cah-chevron" onclick="toggleCity(\''+ck+'\')" style="cursor:pointer">▾</span></div></div>'
       +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
@@ -2656,7 +2720,7 @@ function renderItinerary(c, embedded){
     var query = _PLACE_QUERY_OVERRIDES[p.n] || (p.n+' '+c.name);
     var safeN = p.n.replace(/'/g,"\\'");
     var safeT = p.t.replace(/'/g,"\\'");
-    return '<div class="photo-spot-card" style="background-image:'+grad+'" data-img-query="'+escHtml(query)+'" onclick="openPhotoSpot(\''+safeN+'\',\''+safeT+'\',\''+escHtml(query)+'\')"><div class="psc-content"><div class="psc-name">'+p.n+'</div><div class="psc-tip">'+p.t+'</div></div></div>';
+    return '<div class="photo-spot-card" style="background-image:'+grad+'" data-img-query="'+escHtml(query)+'" onclick="openPhotoSpot(\''+safeN+'\',\''+safeT+'\',\''+escHtml(query)+'\')">'+photoEditBtn(query,'position:absolute;top:8px;right:8px;')+'<div class="psc-content"><div class="psc-name">'+p.n+'</div><div class="psc-tip">'+p.t+'</div></div></div>';
   }).join('');
   const wc=WEATHER_COORDS[c.id];
   const weatherSection='<div class="section"><div class="section-header">'
@@ -2675,6 +2739,7 @@ function renderItinerary(c, embedded){
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'+citiesHTML
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(29,29,31,0.2);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif"><span data-icon="plus" data-icon-size="14"></span> Ajouter une ville</button>'
+    +cityTrashSectionHTML(c.id)
     +'</div>'
     +'<div class="section" style="padding-bottom:20px"><div class="section-header"><div class="section-title">Spots photo</div></div><div class="photo-grid">'+photoHTML+'</div></div>';
 }
@@ -2687,13 +2752,14 @@ function renderBudget(c){
   const budget=c.budget_daily*c.days;
   const pct=Math.min(100,Math.round((total/budget)*100));
   let expRows=exps.map(function(e){
-    return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span class="ee-desc">'+escHtml(e.desc)+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+    return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
   }).join('');
   return '<div class="section" style="padding-bottom:20px">'
     +'<div class="section-header" style="margin-bottom:14px"><div class="section-title">Budget</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
     +'<div class="budget-hero"><div class="bh-label">Total dépensé</div><div class="bh-amount">'+fmtEUR(total)+'</div><div class="bh-sub">sur '+fmtEUR(budget)+' prévu · '+pct+'% consommé</div><div class="bh-bar"><div class="bh-fill" style="width:'+pct+'%"></div></div><div class="bh-persons"><div class="bh-person"><div class="bhp-name">André</div><div class="bhp-amount">'+fmtEUR(andre)+'</div></div><div class="bh-person"><div class="bhp-name">Compagnon</div><div class="bhp-amount">'+fmtEUR(comp)+'</div></div></div></div>'
     +'<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
     +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
+    +'<div class="ef-row"><select class="ef-select" id="eCity"><option value="">Ville (optionnel)</option>'+c.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'">'+escHtml(ci.city)+'</option>';}).join('')+'</select></div>'
     +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
     +'<select class="ef-select" onchange="S.expPerson=this.value"><option value="André" '+(S.expPerson==='André'?'selected':'')+'>André</option><option value="Compagnon" '+(S.expPerson==='Compagnon'?'selected':'')+'>Compagnon</option><option value="Commun" '+(S.expPerson==='Commun'?'selected':'')+'>Commun</option></select>'
     +'<button class="ef-btn" onclick="addExp(\''+c.id+'\')">+ Ajouter</button></div></div>'
@@ -2773,7 +2839,7 @@ function getCountryImageQuery(c){
 
 // ── COUNTRY DETAIL SHELL (cover header + Guide/Lieux/Carte sub-tabs) ──
 function renderCountryDetailShell(c, innerHtml){
-  var sub = S.countryDetailTab||'lieux';
+  var sub = S.countryDetailTab||'guide';
   var query = getCountryImageQuery(c);
   var status = getCountryStatus(c.id);
   var allBaseActs = c.cities.reduce(function(s,city){
@@ -2796,6 +2862,7 @@ function renderCountryDetailShell(c, innerHtml){
   }).join('');
   return '<div class="country-detail-header" style="background-image:linear-gradient('+coverColors[c.id]+',rgba(0,0,0,0.35))" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="backToCountries()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
+    +photoEditBtn(query)
     +'<span class="cdh-status cdh-status-'+status+'">'+_countryStatusLabel(status)+'</span>'
     +'<div class="cdh-content"><div class="cdh-flag">'+c.flag+'</div><div class="cdh-name">'+c.name+'</div><div class="cdh-tagline">'+c.tagline+'</div>'
     +'<div class="cover-pills" style="margin-top:8px"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div>'
@@ -2950,7 +3017,7 @@ function renderCountriesScreen(){
     var status = getCountryStatus(c.id);
     var citiesPreview = c.cities.slice(0,3).map(function(ci){return ci.city;}).join(', ');
     var imgQuery = getCountryImageQuery(c);
-    return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')">'
+    return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'…</div></div>'
       +'<span class="cc-status cc-status-'+status+'">'+_countryStatusLabel(status)+'</span>'
@@ -3010,11 +3077,14 @@ function renderBudgetOverview(){
     var exps = S.expenses.slice().reverse();
     var expRows = exps.map(function(e){
       var c = COUNTRIES.find(function(co){return co.id===e.country;});
-      return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+      return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
     }).join('');
+    var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
+    var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
     body = '<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
-      +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value">'+countryOptions+'</select></div>'
+      +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';renderContent()">'+countryOptions+'</select></div>'
       +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
+      +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
       +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
       +'<select class="ef-select" onchange="S.expPerson=this.value"><option value="André" '+(S.expPerson==='André'?'selected':'')+'>André</option><option value="Compagnon" '+(S.expPerson==='Compagnon'?'selected':'')+'>Compagnon</option><option value="Commun" '+(S.expPerson==='Commun'?'selected':'')+'>Commun</option></select>'
       +'<button class="ef-btn" onclick="addExpGlobal()">+ Ajouter</button></div></div>'
@@ -3032,9 +3102,11 @@ function addExpGlobal(){
   var desc=document.getElementById('eDesc').value.trim();
   var amt=parseFloat(document.getElementById('eAmt').value);
   var country = (document.getElementById('expCountrySel')||{}).value || S.expCountry || getC().id;
+  var cityEl = document.getElementById('eCity');
+  var city = cityEl?cityEl.value:'';
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:country,desc:desc,amount:amt,person:S.expPerson,date:new Date().toISOString().slice(0,10)});
-  S.expDesc='';S.expAmt='';S.expCountry=country;save();renderContent();
+  S.expenses.push({id:Date.now(),country:country,city:city,desc:desc,amount:amt,person:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';save();renderContent();
 }
 
 // ── DOCUMENTS ────────────────────────────────────────────────
@@ -3155,7 +3227,7 @@ function renderMore(){
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="globe" data-icon-size="16"></span> Gestion des pays</div>'
     +'<button onclick="openCountryModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
-    +'<button onclick="removeCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">🗑 Supprimer '+getC().name+'</button>'
+    +'<button onclick="removeCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Supprimer '+getC().name+'</button>'
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
@@ -3235,17 +3307,46 @@ function renderPracticalInfo(c){
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
   return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</div>'+emergRows+'</div>'
+    +renderConverterCard(c)
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="check-square" data-icon-size="16"></span> Checklist avant départ</span> <span style="font-size:12px;font-weight:700;color:var(--accent)">'+clDone+'/'+p.checklist.length+'</span></div>'
     +'<div class="bh-bar" style="margin:4px 0 10px"><div class="bh-fill" style="width:'+clPct+'%"></div></div>'
     +clItems+'</div>'
     +'</div>';
 }
 
+function getRate(c){ return (S.customRates && S.customRates[c.id]) || c.rateNum || 1; }
+function renderConverterCard(c){
+  var rate = getRate(c);
+  var dir = S.convDir && S.convDir[c.id] || 'eur';
+  var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 10;
+  var result = dir==='eur' ? (amt*rate) : (amt/rate);
+  var fromLabel = dir==='eur' ? 'EUR' : c.currency;
+  var toLabel = dir==='eur' ? c.currency : 'EUR';
+  var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
+  return '<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="coins" data-icon-size="16"></span> Convertisseur</span>'
+    +'<button onclick="toggleConvDir(\''+c.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer">⇄ '+fromLabel+' → '+toLabel+'</button></div>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-top:8px">'
+    +'<input type="number" value="'+amt+'" id="convAmt_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="flex:1;padding:10px 12px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:15px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)"/>'
+    +'<span style="font-size:13px;color:var(--ink-muted);min-width:44px">'+fromLabel+'</span>'
+    +'</div>'
+    +'<div style="text-align:center;font-size:13px;color:var(--ink-subtle);margin:6px 0">=</div>'
+    +'<div style="display:flex;align-items:center;gap:10px"><div style="flex:1;padding:10px 12px;font-size:15px;font-weight:700;color:var(--accent)">'+resultStr+'</div><span style="font-size:13px;color:var(--ink-muted);min-width:44px">'+toLabel+'</span></div>'
+    +'<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(29,29,31,0.08);display:flex;align-items:center;gap:8px">'
+    +'<span style="font-size:11px;color:var(--ink-subtle)">Taux : 1€ =</span>'
+    +'<input type="number" value="'+rate+'" id="convRate_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:80px;padding:6px 8px;border-radius:8px;border:var(--border);background:var(--sand);font-size:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif"/>'
+    +'<span style="font-size:11px;color:var(--ink-subtle)">'+c.currency+'</span>'
+    +'</div></div>';
+}
+function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
+function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmt_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=n; save(); renderContent(); var i=document.getElementById('convRate_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function addExp(cid){
   const desc=document.getElementById('eDesc').value.trim();
   const amt=parseFloat(document.getElementById('eAmt').value);
+  const cityEl=document.getElementById('eCity');
+  const city=cityEl?cityEl.value:'';
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:cid,desc:desc,amount:amt,person:S.expPerson});
+  S.expenses.push({id:Date.now(),country:cid,city:city,desc:desc,amount:amt,person:S.expPerson});
   S.expDesc='';S.expAmt='';save();renderContent();
 }
 function delExp(id){S.expenses=S.expenses.filter(function(e){return e.id!==id;});save();renderContent();}
@@ -3459,6 +3560,104 @@ function moveCountryInStrip(fromIdx, toIdx) {
 }
 
 // ── CITY ORDER ────────────────────────────────────────────────
+// ── DELETE / RESTORE ENTIRE CITY (with its activities, budget & journal entries) ──
+function cityTrashSectionHTML(countryId){
+  var items = (S.cityTrash||[]).filter(function(t){return t.countryId===countryId;});
+  if(!items.length) return '';
+  var rows = items.map(function(t){
+    var parts=[];
+    if(t.journalEntries&&t.journalEntries.length) parts.push(t.journalEntries.length+' entrée(s) carnet');
+    if(t.expenses&&t.expenses.length) parts.push(t.expenses.length+' dépense(s)');
+    var extra = parts.length ? ' · '+parts.join(' · ') : '';
+    return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><button class="trash-restore" onclick="restoreCity('+t.id+')">↩ Restaurer</button></div>';
+  }).join('');
+  return '<div class="trash-section" style="margin-top:12px"><div class="trash-label">🗑️ Villes supprimées</div>'+rows+'</div>';
+}
+function deleteCityConfirm(countryId, cityName){
+  showConfirm('Supprimer '+cityName+' et toutes ses activités ? Les dépenses et entrées de carnet liées seront aussi mises en corbeille.', function(){
+    deleteCity(countryId, cityName);
+  }, 'Supprimer');
+}
+function deleteCity(countryId, cityName){
+  var c = COUNTRIES.find(function(x){return x.id===countryId;});
+  if(!c) return;
+  var idx = c.cities.findIndex(function(ci){return ci.city===cityName;});
+  if(idx===-1) return;
+  var cityObj = c.cities[idx];
+  var ck = countryId+'_'+cityName;
+
+  var doneKeys={}; Object.keys(S.done).forEach(function(k){ if(k.indexOf(ck+'_')===0) doneKeys[k]=S.done[k]; });
+  var deletedActsKeys={}; Object.keys(S.deletedActs).forEach(function(k){ if(k.indexOf(ck+'_')===0) deletedActsKeys[k]=S.deletedActs[k]; });
+  var actDayKeys={}; Object.keys(S.actDay).forEach(function(k){ if(k.indexOf(ck+'_')===0) actDayKeys[k]=S.actDay[k]; });
+  var journalMatches = S.journal.filter(function(e){ return e.location && e.location.toLowerCase().indexOf(cityName.toLowerCase())>-1; });
+  var expenseMatches = S.expenses.filter(function(e){ return e.country===countryId && e.city===cityName; });
+
+  S.cityTrash.push({
+    id: Date.now(),
+    countryId: countryId,
+    cityName: cityName,
+    index: idx,
+    cityObj: cityObj,
+    customActs: S.customActs[ck]||null,
+    done: doneKeys,
+    deletedActs: deletedActsKeys,
+    trashActs: (S.trash&&S.trash[ck])||null,
+    days: S.days[ck]||null,
+    actDay: actDayKeys,
+    activeDay: S.activeDay[ck]||null,
+    wasOpen: !!S.openCities[ck],
+    journalEntries: journalMatches,
+    expenses: expenseMatches
+  });
+
+  c.cities.splice(idx,1);
+  delete S.customActs[ck];
+  Object.keys(doneKeys).forEach(function(k){ delete S.done[k]; });
+  Object.keys(deletedActsKeys).forEach(function(k){ delete S.deletedActs[k]; });
+  Object.keys(actDayKeys).forEach(function(k){ delete S.actDay[k]; });
+  delete S.days[ck];
+  delete S.activeDay[ck];
+  delete S.openCities[ck];
+  if(S.trash) delete S.trash[ck];
+  if(journalMatches.length){
+    var idsToRemove = journalMatches.map(function(e){return e.id;});
+    S.journal = S.journal.filter(function(e){return idsToRemove.indexOf(e.id)===-1;});
+  }
+  if(expenseMatches.length){
+    var expIdsToRemove = expenseMatches.map(function(e){return e.id;});
+    S.expenses = S.expenses.filter(function(e){return expIdsToRemove.indexOf(e.id)===-1;});
+  }
+  if(S.cityOrder) delete S.cityOrder[countryId];
+
+  save();
+  renderContent();
+}
+function restoreCity(trashId){
+  var idx = S.cityTrash.findIndex(function(t){return t.id===trashId;});
+  if(idx===-1) return;
+  var t = S.cityTrash[idx];
+  var c = COUNTRIES.find(function(x){return x.id===t.countryId;});
+  if(!c){ S.cityTrash.splice(idx,1); save(); renderContent(); return; }
+  var insertAt = Math.min(t.index, c.cities.length);
+  c.cities.splice(insertAt, 0, t.cityObj);
+  var ck = t.countryId+'_'+t.cityName;
+
+  if(t.customActs) S.customActs[ck]=t.customActs;
+  Object.keys(t.done).forEach(function(k){ S.done[k]=t.done[k]; });
+  Object.keys(t.deletedActs).forEach(function(k){ S.deletedActs[k]=t.deletedActs[k]; });
+  Object.keys(t.actDay).forEach(function(k){ S.actDay[k]=t.actDay[k]; });
+  if(t.days) S.days[ck]=t.days;
+  if(t.activeDay) S.activeDay[ck]=t.activeDay;
+  if(t.wasOpen) S.openCities[ck]=true;
+  if(t.trashActs){ if(!S.trash) S.trash={}; S.trash[ck]=t.trashActs; }
+  (t.journalEntries||[]).forEach(function(e){ S.journal.push(e); });
+  (t.expenses||[]).forEach(function(e){ S.expenses.push(e); });
+  if(S.cityOrder) delete S.cityOrder[t.countryId];
+
+  S.cityTrash.splice(idx,1);
+  save();
+  renderContent();
+}
 function getCityOrder(countryId) {
   if(!S.cityOrder) S.cityOrder={};
   const c=COUNTRIES.find(function(co){return co.id===countryId;});
@@ -3903,7 +4102,7 @@ function renderContent(){
   if(S.tab==='home')html=renderHome();
   else if(S.tab==='countries')html=renderCountriesScreen();
   else if(S.tab==='country'){
-    var sub=S.countryDetailTab||'lieux';
+    var sub=S.countryDetailTab||'guide';
     if(sub==='lieux')html=renderCountryDetailShell(c, renderItinerary(c, true));
     else if(sub==='carte')html=renderCountryDetailShell(c, renderMap(c));
     else if(sub==='infos')html=renderCountryDetailShell(c, renderPracticalInfo(c));
@@ -4133,6 +4332,20 @@ if ('serviceWorker' in navigator) {
     <input class="modal-field api-key-field" type="password" id="apiKeyModal" placeholder="sk-ant-api03-…" style="font-family:monospace;font-size:12px"/>
     <button class="modal-cta" onclick="S.apiKey=document.getElementById('apiKeyModal').value;save();document.getElementById('apiModal').classList.remove('open');renderContent();">Enregistrer</button>
     <button class="modal-cancel-btn" onclick="document.getElementById('apiModal').classList.remove('open')">Annuler</button>
+  </div>
+</div>
+<!-- Photo picker modal -->
+<input type="file" id="photoFileInput" accept="image/*" style="display:none" onchange="handlePhotoFileSelected(event)"/>
+<div class="share-modal" id="photoModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="font-size:18px">Changer la photo</div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px;line-height:1.5">Remplace la photo automatique par une photo de ton choix (stockée sur cet appareil).</div>
+    <button class="modal-cta" onclick="triggerPhotoFileInput()" style="margin-bottom:8px">📁 Choisir depuis la galerie</button>
+    <input class="modal-field" type="text" id="photoUrlInput" placeholder="ou colle une URL d'image…" style="margin-bottom:8px"/>
+    <button class="modal-cta" onclick="useCustomPhotoUrl()" style="margin-bottom:8px">Utiliser cette URL</button>
+    <button class="modal-cancel-btn" id="photoResetBtn" onclick="resetCustomPhoto()" style="display:none;color:var(--red-muted);margin-bottom:4px">↩ Revenir à la photo automatique</button>
+    <button class="modal-cancel-btn" onclick="closePhotoPicker()">Annuler</button>
   </div>
 </div>
 <!-- Country management modal -->
