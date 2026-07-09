@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
 <title>PlaniTrip — Guide de voyage</title>
@@ -607,9 +608,49 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .pin-key{height:56px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:20px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.1s;color:var(--ink);}
 .pin-key:active{background:var(--accent-soft);}
 .pin-error{font-size:12px;color:var(--red-muted);margin-top:12px;min-height:18px;}
+.auth-screen{position:fixed;inset:0;z-index:9999;background:#F8F6F2;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;box-sizing:border-box;}
+.auth-hero{display:flex;flex-direction:column;align-items:center;margin-bottom:36px;}
+.auth-logo{width:64px;height:64px;border-radius:18px;box-shadow:0 4px 16px rgba(45,106,79,0.22);margin-bottom:14px;}
+.auth-hero h1{font-size:26px;font-weight:700;color:#1D1D1F;margin:0 0 4px 0;}
+.auth-subtitle{font-size:15px;color:#6E6E73;margin:0;}
+.auth-card{width:100%;max-width:340px;background:#FFFFFF;border-radius:22px;padding:26px 22px;box-shadow:0 2px 14px rgba(0,0,0,0.06);box-sizing:border-box;}
+.auth-label{display:block;font-size:13px;font-weight:500;color:#6E6E73;margin-bottom:8px;}
+.auth-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #E5E3DE;background:#F8F6F2;font-size:16px;color:#1D1D1F;box-sizing:border-box;margin-bottom:14px;}
+.auth-input:focus{outline:none;border-color:#2D6A4F;}
+.auth-hint{font-size:12.5px;color:#6E6E73;line-height:1.5;margin:12px 0 0 0;text-align:center;}
+.auth-icon-success{font-size:36px;text-align:center;margin-bottom:10px;}
+.auth-card h3{text-align:center;font-size:18px;color:#1D1D1F;margin:0 0 6px 0;}
+.auth-card .btn-primary{width:100%;padding:14px;border:none;border-radius:14px;background:#2D6A4F;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+.auth-card .btn-primary:disabled{opacity:0.6;}
+.auth-card .btn-secondary{width:100%;padding:14px;border:1px solid #E5E3DE;border-radius:14px;background:transparent;color:#1D1D1F;font-size:15px;font-weight:500;cursor:pointer;margin-top:14px;}
 </style>
 </head>
 <body>
+
+<!-- Auth screen -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-hero">
+    <img src="icon-192.png" alt="PlaniTrip" class="auth-logo">
+    <h1>PlaniTrip</h1>
+    <p class="auth-subtitle">Planifiez. Voyagez. Partagez.</p>
+  </div>
+  <div class="auth-card">
+    <div id="auth-step-email">
+      <label class="auth-label">Adresse email</label>
+      <input type="email" id="auth-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
+      <button id="auth-send-link-btn" class="btn-primary">Recevoir le lien magique</button>
+      <p class="auth-hint">Pas de mot de passe. On vous envoie un lien de connexion sécurisé.</p>
+    </div>
+    <div id="auth-step-sent" style="display:none;">
+      <div class="auth-icon-success">✉️</div>
+      <h3>Email envoyé</h3>
+      <p class="auth-hint">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
+      <button id="auth-retry-btn" class="btn-secondary">Utiliser une autre adresse</button>
+    </div>
+  </div>
+</div>
+
+<div id="main-app" style="display:none;">
 <div id="app">
   <div class="top-bar">
     <div style="display:flex;flex-direction:column;gap:3px;">
@@ -4309,6 +4350,79 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', _doAutoReload);
 }
 
+// ---- Auth (Supabase) ----
+const SUPABASE_URL = 'https://gfgjwtubvslrkatmshls.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Jf9t5112cIToclT_gu3Wrg_3Jty0-Yg';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function initAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    onAuthenticated(session.user);
+  } else {
+    showAuthScreen();
+  }
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      onAuthenticated(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      showAuthScreen();
+    }
+  });
+}
+
+function showAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+function onAuthenticated(user) {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  // Étape suivante (à venir) : vérifier les trips de l'utilisateur et router
+  // checkUserTrips(user);
+}
+
+document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
+  const emailInput = document.getElementById('auth-email-input');
+  const email = emailInput.value.trim();
+  if (!email || !email.includes('@')) {
+    emailInput.style.borderColor = '#E76F51';
+    return;
+  }
+
+  const btn = document.getElementById('auth-send-link-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi...';
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: window.location.href.split('?')[0].split('#')[0]
+    }
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Recevoir le lien magique';
+
+  if (error) {
+    alert('Erreur : ' + error.message);
+    return;
+  }
+
+  document.getElementById('auth-step-email').style.display = 'none';
+  document.getElementById('auth-step-sent').style.display = 'block';
+});
+
+document.getElementById('auth-retry-btn').addEventListener('click', () => {
+  document.getElementById('auth-step-sent').style.display = 'none';
+  document.getElementById('auth-step-email').style.display = 'block';
+  document.getElementById('auth-email-input').value = '';
+});
+
+initAuth();
+
 </script>
 
 
@@ -4392,6 +4506,7 @@ if ('serviceWorker' in navigator) {
     <button class="modal-cta" onclick="addCountry()">Ajouter</button>
     <button class="modal-cancel-btn" onclick="closeCountryModal()">Annuler</button>
   </div>
+</div>
 </div>
 </body>
 </html>
