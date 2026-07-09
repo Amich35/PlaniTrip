@@ -4409,39 +4409,55 @@ function onAuthenticated(user) {
 }
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
-  const emailInput = document.getElementById('auth-email-input');
-  const email = emailInput.value.trim();
-  if (!email || !email.includes('@')) {
-    emailInput.style.borderColor = '#E76F51';
-    return;
-  }
+  console.log('[PlaniTrip auth] clic sur "Recevoir le lien magique"');
+  try {
+    const emailInput = document.getElementById('auth-email-input');
+    const email = emailInput.value.trim();
+    console.log('[PlaniTrip auth] email saisi:', email);
 
-  if (!supabase) {
-    showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page.");
-    return;
-  }
-
-  const btn = document.getElementById('auth-send-link-btn');
-  btn.disabled = true;
-  btn.textContent = 'Envoi...';
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: window.location.href.split('?')[0].split('#')[0]
+    if (!email || !email.includes('@')) {
+      emailInput.style.borderColor = '#E76F51';
+      alert("Merci d'entrer une adresse email valide.");
+      return;
     }
-  });
+    emailInput.style.borderColor = '';
 
-  btn.disabled = false;
-  btn.textContent = 'Recevoir le lien magique';
+    if (!supabase) {
+      showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page.");
+      return;
+    }
 
-  if (error) {
-    alert('Erreur : ' + error.message);
-    return;
+    const btn = document.getElementById('auth-send-link-btn');
+    btn.disabled = true;
+    btn.textContent = 'Envoi...';
+
+    const redirectTo = window.location.origin + window.location.pathname;
+    console.log('[PlaniTrip auth] redirectTo:', redirectTo);
+
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo }
+    });
+
+    console.log('[PlaniTrip auth] réponse signInWithOtp:', { data, error });
+
+    btn.disabled = false;
+    btn.textContent = 'Recevoir le lien magique';
+
+    if (error) {
+      alert('Erreur : ' + error.message);
+      return;
+    }
+
+    document.getElementById('auth-step-email').style.display = 'none';
+    document.getElementById('auth-step-sent').style.display = 'block';
+  } catch (e) {
+    console.error('[PlaniTrip auth] exception:', e);
+    alert('Erreur inattendue : ' + e.message);
+    const btn = document.getElementById('auth-send-link-btn');
+    btn.disabled = false;
+    btn.textContent = 'Recevoir le lien magique';
   }
-
-  document.getElementById('auth-step-email').style.display = 'none';
-  document.getElementById('auth-step-sent').style.display = 'block';
 });
 
 document.getElementById('auth-retry-btn').addEventListener('click', () => {
