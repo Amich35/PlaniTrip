@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
 <title>PlaniTrip — Guide de voyage</title>
@@ -608,7 +608,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .pin-key{height:56px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:20px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.1s;color:var(--ink);}
 .pin-key:active{background:var(--accent-soft);}
 .pin-error{font-size:12px;color:var(--red-muted);margin-top:12px;min-height:18px;}
-.auth-screen{position:fixed;inset:0;z-index:9999;background:#F8F6F2;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;box-sizing:border-box;}
+.auth-screen{position:fixed;inset:0;z-index:9999;background:#F8F6F2;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;box-sizing:border-box;}
+.auth-error{font-size:13px;color:#E76F51;text-align:center;margin-top:14px;line-height:1.5;}
 .auth-hero{display:flex;flex-direction:column;align-items:center;margin-bottom:36px;}
 .auth-logo{width:64px;height:64px;border-radius:18px;box-shadow:0 4px 16px rgba(45,106,79,0.22);margin-bottom:14px;}
 .auth-hero h1{font-size:26px;font-weight:700;color:#1D1D1F;margin:0 0 4px 0;}
@@ -634,6 +635,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <h1>PlaniTrip</h1>
     <p class="auth-subtitle">Planifiez. Voyagez. Partagez.</p>
   </div>
+  <div id="auth-fatal-error" class="auth-error" style="display:none;"></div>
   <div class="auth-card">
     <div id="auth-step-email">
       <label class="auth-label">Adresse email</label>
@@ -4353,23 +4355,45 @@ if ('serviceWorker' in navigator) {
 // ---- Auth (Supabase) ----
 const SUPABASE_URL = 'https://gfgjwtubvslrkatmshls.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Jf9t5112cIToclT_gu3Wrg_3Jty0-Yg';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase = null;
+
+function showFatalAuthError(msg) {
+  var el = document.getElementById('auth-fatal-error');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+  var btn = document.getElementById('auth-send-link-btn');
+  if (btn) { btn.disabled = true; }
+  console.error('[PlaniTrip auth]', msg);
+}
 
 async function initAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    onAuthenticated(session.user);
-  } else {
-    showAuthScreen();
-  }
+  try {
+    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      showFatalAuthError("Impossible de charger le service de connexion (bloqueur de pub ou réseau ?). Réessaie de recharger la page.");
+      return;
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session) {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      showFatalAuthError("Erreur de connexion : " + error.message);
+      return;
+    }
+    if (session) {
       onAuthenticated(session.user);
-    } else if (event === 'SIGNED_OUT') {
+    } else {
       showAuthScreen();
     }
-  });
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        onAuthenticated(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        showAuthScreen();
+      }
+    });
+  } catch (e) {
+    showFatalAuthError("Erreur inattendue au démarrage : " + e.message);
+  }
 }
 
 function showAuthScreen() {
@@ -4389,6 +4413,11 @@ document.getElementById('auth-send-link-btn').addEventListener('click', async ()
   const email = emailInput.value.trim();
   if (!email || !email.includes('@')) {
     emailInput.style.borderColor = '#E76F51';
+    return;
+  }
+
+  if (!supabase) {
+    showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page.");
     return;
   }
 
