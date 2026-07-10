@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="PlaniTrip"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.383.0/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
@@ -624,6 +624,21 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .auth-card .btn-primary{width:100%;padding:14px;border:none;border-radius:14px;background:#2D6A4F;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
 .auth-card .btn-primary:disabled{opacity:0.6;}
 .auth-card .btn-secondary{width:100%;padding:14px;border:1px solid #E5E3DE;border-radius:14px;background:transparent;color:#1D1D1F;font-size:15px;font-weight:500;cursor:pointer;margin-top:14px;}
+
+.ct-card{max-width:360px;}
+.ct-dates-row{display:flex;gap:10px;margin-bottom:14px;}
+.ct-date{margin-bottom:0;flex:1;}
+.ct-countries-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.ct-country-chip{display:flex;align-items:center;justify-content:space-between;background:#F8F6F2;border-radius:14px;padding:10px 14px;font-size:14px;color:#1D1D1F;}
+.ct-country-chip button{border:none;background:none;color:#6E6E73;font-size:16px;cursor:pointer;padding:0 4px;}
+.ct-add-btn{margin-top:0;}
+.ct-modal{position:fixed;inset:0;z-index:10000;background:rgba(29,29,31,0.35);display:flex;align-items:flex-end;}
+.ct-modal-sheet{background:#FFFFFF;width:100%;max-height:70vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);}
+.ct-modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 10px;font-size:16px;font-weight:600;color:#1D1D1F;}
+.ct-modal-close{border:none;background:#F8F6F2;width:30px;height:30px;border-radius:50%;font-size:14px;color:#6E6E73;cursor:pointer;}
+.ct-country-options{overflow-y:auto;padding:0 16px 16px;}
+.ct-country-option{padding:12px 8px;font-size:15px;color:#1D1D1F;cursor:pointer;border-bottom:1px solid #F0ECE4;}
+.ct-country-option:hover{background:#F8F6F2;}
 </style>
 </head>
 <body>
@@ -649,6 +664,43 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <p class="auth-hint">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
       <button id="auth-retry-btn" class="btn-secondary">Utiliser une autre adresse</button>
     </div>
+  </div>
+</div>
+
+<!-- Create trip screen -->
+<div id="create-trip-screen" class="auth-screen" style="display:none;">
+  <div class="auth-hero">
+    <h1 style="font-size:22px;">Créer mon voyage</h1>
+    <p class="auth-subtitle">Quelques infos pour démarrer</p>
+  </div>
+  <div class="auth-card ct-card">
+    <label class="auth-label">Nom du voyage</label>
+    <input type="text" id="ct-name-input" class="auth-input" placeholder="ex : Mexique 2026">
+
+    <label class="auth-label">Dates</label>
+    <div class="ct-dates-row">
+      <input type="date" id="ct-start-input" class="auth-input ct-date">
+      <input type="date" id="ct-end-input" class="auth-input ct-date">
+    </div>
+
+    <label class="auth-label">Pays visités</label>
+    <div id="ct-countries-list" class="ct-countries-list"></div>
+    <button id="ct-add-country-btn" class="btn-secondary ct-add-btn" type="button">+ Ajouter un pays</button>
+
+    <div id="ct-error" class="auth-error" style="display:none;"></div>
+    <button id="ct-submit-btn" class="btn-primary" style="margin-top:18px;">Créer le voyage</button>
+  </div>
+</div>
+
+<!-- Country picker modal (used by create-trip screen) -->
+<div id="ct-country-modal" class="ct-modal" style="display:none;">
+  <div class="ct-modal-sheet">
+    <div class="ct-modal-header">
+      <span>Choisir un pays</span>
+      <button id="ct-country-modal-close" class="ct-modal-close" type="button">✕</button>
+    </div>
+    <input type="text" id="ct-country-search" class="auth-input" placeholder="Rechercher un pays..." style="margin:0 16px 10px;width:calc(100% - 32px);">
+    <div id="ct-country-options" class="ct-country-options"></div>
   </div>
 </div>
 
@@ -4403,10 +4455,191 @@ function showAuthScreen() {
 
 function onAuthenticated(user) {
   document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('main-app').style.display = 'block';
-  // Étape suivante (à venir) : vérifier les trips de l'utilisateur et router
-  // checkUserTrips(user);
+  document.getElementById('main-app').style.display = 'none';
+  checkUserTrips(user);
 }
+
+// ---- Trips: routing post-connexion ----
+let CURRENT_USER = null;
+let CURRENT_TRIP = null;
+
+async function checkUserTrips(user) {
+  CURRENT_USER = user;
+  try {
+    const { data: ownedTrips, error: ownedErr } = await sb
+      .from('trips')
+      .select('id, name')
+      .eq('owner_id', user.id);
+
+    const { data: collabRows, error: collabErr } = await sb
+      .from('collaborators')
+      .select('trip_id, trips(id, name)')
+      .eq('user_id', user.id);
+
+    if (ownedErr || collabErr) {
+      console.error('[PlaniTrip trips] erreur:', ownedErr || collabErr);
+      showCreateTripScreen("Impossible de charger tes voyages pour le moment. Tu peux réessayer, ou en créer un nouveau ci-dessous.");
+      return;
+    }
+
+    const collabTrips = (collabRows || []).map(r => r.trips).filter(Boolean);
+    const allTrips = [...(ownedTrips || []), ...collabTrips];
+    const uniqueTrips = Array.from(new Map(allTrips.map(t => [t.id, t])).values());
+
+    if (uniqueTrips.length === 0) {
+      showCreateTripScreen();
+    } else {
+      // Pour l'instant (avant l'écran sélecteur multi-trips) : on entre dans le premier trouvé
+      enterTrip(uniqueTrips[0]);
+    }
+  } catch (e) {
+    console.error('[PlaniTrip trips] exception:', e);
+    showCreateTripScreen("Une erreur est survenue. Tu peux créer ton voyage ci-dessous.");
+  }
+}
+
+function enterTrip(trip) {
+  CURRENT_TRIP = trip;
+  document.getElementById('create-trip-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+}
+
+// ---- Écran Créer mon voyage ----
+let CT_COUNTRIES = [];
+let CT_ALL_COUNTRY_NAMES = [];
+
+async function loadCountryList() {
+  if (CT_ALL_COUNTRY_NAMES.length) return CT_ALL_COUNTRY_NAMES;
+  try {
+    const res = await fetch('countries.json');
+    CT_ALL_COUNTRY_NAMES = await res.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger countries.json', e);
+    CT_ALL_COUNTRY_NAMES = [];
+  }
+  return CT_ALL_COUNTRY_NAMES;
+}
+
+function showCreateTripScreen(errorMsg) {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('create-trip-screen').style.display = 'flex';
+  CT_COUNTRIES = [];
+  renderCtCountries();
+  const errEl = document.getElementById('ct-error');
+  if (errorMsg) { errEl.textContent = errorMsg; errEl.style.display = 'block'; }
+  else { errEl.style.display = 'none'; }
+  loadCountryList();
+}
+
+function renderCtCountries() {
+  const list = document.getElementById('ct-countries-list');
+  list.innerHTML = '';
+  CT_COUNTRIES.forEach((c, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'ct-country-chip';
+    chip.innerHTML = '<span></span><button type="button" aria-label="Retirer">✕</button>';
+    chip.querySelector('span').textContent = c;
+    chip.querySelector('button').addEventListener('click', () => {
+      CT_COUNTRIES.splice(idx, 1);
+      renderCtCountries();
+    });
+    list.appendChild(chip);
+  });
+}
+
+async function openCountryModal() {
+  await loadCountryList();
+  const modal = document.getElementById('ct-country-modal');
+  const optionsEl = document.getElementById('ct-country-options');
+  const searchInput = document.getElementById('ct-country-search');
+  searchInput.value = '';
+
+  function renderOptions(filter) {
+    const f = (filter || '').toLowerCase();
+    const available = CT_ALL_COUNTRY_NAMES.filter(c => !CT_COUNTRIES.includes(c));
+    const filtered = f ? available.filter(c => c.toLowerCase().includes(f)) : available;
+    optionsEl.innerHTML = '';
+    filtered.forEach(c => {
+      const opt = document.createElement('div');
+      opt.className = 'ct-country-option';
+      opt.textContent = c;
+      opt.addEventListener('click', () => {
+        CT_COUNTRIES.push(c);
+        renderCtCountries();
+        modal.style.display = 'none';
+      });
+      optionsEl.appendChild(opt);
+    });
+    if (filtered.length === 0) {
+      optionsEl.innerHTML = '<div class="ct-country-option" style="color:#6E6E73;">Aucun résultat</div>';
+    }
+  }
+
+  searchInput.oninput = () => renderOptions(searchInput.value);
+  renderOptions('');
+  modal.style.display = 'flex';
+}
+
+document.getElementById('ct-add-country-btn').addEventListener('click', openCountryModal);
+document.getElementById('ct-country-modal-close').addEventListener('click', () => {
+  document.getElementById('ct-country-modal').style.display = 'none';
+});
+document.getElementById('ct-country-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'ct-country-modal') e.currentTarget.style.display = 'none';
+});
+
+document.getElementById('ct-submit-btn').addEventListener('click', async () => {
+  const errEl = document.getElementById('ct-error');
+  errEl.style.display = 'none';
+
+  const name = document.getElementById('ct-name-input').value.trim();
+  const start = document.getElementById('ct-start-input').value;
+  const end = document.getElementById('ct-end-input').value;
+
+  if (!name) {
+    errEl.textContent = 'Merci de donner un nom à ton voyage.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (CT_COUNTRIES.length === 0) {
+    errEl.textContent = 'Ajoute au moins un pays.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!sb || !CURRENT_USER) {
+    errEl.textContent = 'Erreur de connexion. Recharge la page.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('ct-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Création...';
+
+  const { data, error } = await sb
+    .from('trips')
+    .insert({
+      name: name,
+      owner_id: CURRENT_USER.id
+    })
+    .select()
+    .single();
+
+  btn.disabled = false;
+  btn.textContent = 'Créer le voyage';
+
+  if (error) {
+    errEl.textContent = 'Erreur : ' + error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  enterTrip(data);
+});
+
+initAuth();
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
   console.log('[PlaniTrip auth] clic sur "Recevoir le lien magique"');
@@ -4465,8 +4698,6 @@ document.getElementById('auth-retry-btn').addEventListener('click', () => {
   document.getElementById('auth-step-email').style.display = 'block';
   document.getElementById('auth-email-input').value = '';
 });
-
-initAuth();
 
 </script>
 
