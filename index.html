@@ -639,6 +639,9 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ct-country-options{overflow-y:auto;padding:0 16px 16px;}
 .ct-country-option{padding:12px 8px;font-size:15px;color:#1D1D1F;cursor:pointer;border-bottom:1px solid #F0ECE4;}
 .ct-country-option:hover{background:#F8F6F2;}
+.ts-trip-item{display:flex;align-items:center;justify-content:space-between;background:#F8F6F2;border-radius:14px;padding:14px;font-size:15px;font-weight:500;color:#1D1D1F;cursor:pointer;margin-bottom:8px;transition:background .15s;}
+.ts-trip-item:hover{background:#F0ECE4;}
+.ts-trip-item .ts-arrow{color:#6E6E73;font-size:14px;}
 </style>
 </head>
 <body>
@@ -664,6 +667,18 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <p class="auth-hint">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
       <button id="auth-retry-btn" class="btn-secondary">Utiliser une autre adresse</button>
     </div>
+  </div>
+</div>
+
+<!-- Trip selector screen -->
+<div id="trip-selector-screen" class="auth-screen" style="display:none;">
+  <div class="auth-hero">
+    <h1 style="font-size:22px;">Mes voyages</h1>
+    <p class="auth-subtitle">Choisis un voyage à ouvrir</p>
+  </div>
+  <div class="auth-card ct-card">
+    <div id="ts-trip-list" class="ct-countries-list"></div>
+    <button id="ts-new-trip-btn" class="btn-secondary ct-add-btn" type="button">+ Créer un nouveau voyage</button>
   </div>
 </div>
 
@@ -4488,9 +4503,10 @@ async function checkUserTrips(user) {
 
     if (uniqueTrips.length === 0) {
       showCreateTripScreen();
-    } else {
-      // Pour l'instant (avant l'écran sélecteur multi-trips) : on entre dans le premier trouvé
+    } else if (uniqueTrips.length === 1) {
       enterTrip(uniqueTrips[0]);
+    } else {
+      showTripSelectorScreen(uniqueTrips);
     }
   } catch (e) {
     console.error('[PlaniTrip trips] exception:', e);
@@ -4498,12 +4514,72 @@ async function checkUserTrips(user) {
   }
 }
 
+function applyTripCountryFilter(trip) {
+  const tripCountries = trip.countries || [];
+  if (tripCountries.length === 0) return; // trip sans pays défini : on ne filtre rien (sécurité)
+
+  // Masquer les pays existants qui ne sont pas dans le trip
+  COUNTRIES.forEach(c => {
+    if (!tripCountries.includes(c.name) && S.deletedCountryIds.indexOf(c.id) === -1) {
+      S.deletedCountryIds.push(c.id);
+    }
+  });
+
+  // Créer les pays du trip qui n'existent pas encore dans COUNTRIES
+  tripCountries.forEach(countryName => {
+    const exists = COUNTRIES.find(c => c.name === countryName);
+    if (!exists) {
+      const id = countryName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) + '_' + Date.now() + Math.floor(Math.random()*1000);
+      const newCountry = {
+        id: id, flag: '🌍', name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
+        currency: '', rate: '', visa: '', lang: '', budget_daily: 50,
+        alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[]}
+      };
+      COUNTRIES.push(newCountry);
+      if (!S.customCountries) S.customCountries = [];
+      S.customCountries.push(newCountry);
+    } else {
+      const idx = S.deletedCountryIds.indexOf(exists.id);
+      if (idx !== -1) S.deletedCountryIds.splice(idx, 1);
+    }
+  });
+
+  S.country = COUNTRIES.filter(c => S.deletedCountryIds.indexOf(c.id) === -1)[0]?.id || S.country;
+  save();
+}
+
 function enterTrip(trip) {
   CURRENT_TRIP = trip;
+  applyTripCountryFilter(trip);
   document.getElementById('create-trip-screen').style.display = 'none';
+  document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
+  renderContent();
 }
+
+// ---- Écran sélecteur de trips ----
+function showTripSelectorScreen(trips) {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('create-trip-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('trip-selector-screen').style.display = 'flex';
+
+  const list = document.getElementById('ts-trip-list');
+  list.innerHTML = '';
+  trips.forEach(t => {
+    const item = document.createElement('div');
+    item.className = 'ts-trip-item';
+    item.innerHTML = '<span></span><span class="ts-arrow">›</span>';
+    item.querySelector('span').textContent = t.name;
+    item.addEventListener('click', () => enterTrip(t));
+    list.appendChild(item);
+  });
+}
+
+document.getElementById('ts-new-trip-btn').addEventListener('click', () => {
+  showCreateTripScreen();
+});
 
 // ---- Écran Créer mon voyage ----
 let CT_COUNTRIES = [];
@@ -4524,6 +4600,7 @@ async function loadCountryList() {
 function showCreateTripScreen(errorMsg) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'none';
+  document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('create-trip-screen').style.display = 'flex';
   CT_COUNTRIES = [];
   renderCtCountries();
@@ -4622,7 +4699,8 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     .from('trips')
     .insert({
       name: name,
-      owner_id: CURRENT_USER.id
+      owner_id: CURRENT_USER.id,
+      countries: CT_COUNTRIES
     })
     .select()
     .single();
