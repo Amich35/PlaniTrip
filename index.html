@@ -4355,7 +4355,7 @@ if ('serviceWorker' in navigator) {
 // ---- Auth (Supabase) ----
 const SUPABASE_URL = 'https://gfgjwtubvslrkatmshls.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Jf9t5112cIToclT_gu3Wrg_3Jty0-Yg';
-let supabase = null;
+let sb = null;
 
 function showFatalAuthError(msg) {
   var el = document.getElementById('auth-fatal-error');
@@ -4371,9 +4371,9 @@ async function initAuth() {
       showFatalAuthError("Impossible de charger le service de connexion (bloqueur de pub ou réseau ?). Réessaie de recharger la page.");
       return;
     }
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { session }, error } = await sb.auth.getSession();
     if (error) {
       showFatalAuthError("Erreur de connexion : " + error.message);
       return;
@@ -4384,7 +4384,7 @@ async function initAuth() {
       showAuthScreen();
     }
 
-    supabase.auth.onAuthStateChange((event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         onAuthenticated(session.user);
       } else if (event === 'SIGNED_OUT') {
@@ -4422,7 +4422,7 @@ document.getElementById('auth-send-link-btn').addEventListener('click', async ()
     }
     emailInput.style.borderColor = '';
 
-    if (!supabase) {
+    if (!sb) {
       showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page.");
       return;
     }
@@ -4434,7 +4434,7 @@ document.getElementById('auth-send-link-btn').addEventListener('click', async ()
     const redirectTo = window.location.origin + window.location.pathname;
     console.log('[PlaniTrip auth] redirectTo:', redirectTo);
 
-    const { data, error } = await supabase.auth.signInWithOtp({
+    const { data, error } = await sb.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: redirectTo }
     });
