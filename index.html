@@ -3103,7 +3103,10 @@ function renderHome(){
   // Vol / transport card
   var flightLabel, flightSub;
   if(ts.elapsedDays<0){
-    flightLabel='Vol Paris → Osaka'; flightSub='10 septembre 2026';
+    var startLabel = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date)
+      ? new Date(CURRENT_TRIP.start_date).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})
+      : 'À définir';
+    flightLabel='Départ du voyage'; flightSub=startLabel;
   } else if(ts.nextTransport){
     var fromC=COUNTRIES.find(function(c){return c.id===ts.nextTransport[0];});
     var toC=COUNTRIES.find(function(c){return c.id===ts.nextTransport[1];});
@@ -4484,12 +4487,12 @@ async function checkUserTrips(user) {
   try {
     const { data: ownedTrips, error: ownedErr } = await sb
       .from('trips')
-      .select('id, name, owner_id, countries')
+      .select('id, name, owner_id, countries, start_date, end_date')
       .eq('owner_id', user.id);
 
     const { data: collabRows, error: collabErr } = await sb
       .from('collaborators')
-      .select('trip_id, trips(id, name, owner_id, countries)')
+      .select('trip_id, trips(id, name, owner_id, countries, start_date, end_date)')
       .eq('user_id', user.id);
 
     if (ownedErr || collabErr) {
@@ -4731,7 +4734,9 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     .insert({
       name: name,
       owner_id: CURRENT_USER.id,
-      countries: CT_COUNTRIES
+      countries: CT_COUNTRIES,
+      start_date: start || null,
+      end_date: end || null
     })
     .select()
     .single();
