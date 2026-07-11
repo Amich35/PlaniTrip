@@ -1288,6 +1288,7 @@ const COUNTRIES=[
     practical:{transport:'Vols domestiques Cebu Pacific / AirAsia PH',sim:'SIM Globe ou Smart à l\'arrivée',tips:['eTravel à remplir avant l\'atterrissage','Billet de sortie obligatoire','Cash PHP pour les îles reculées','🌦️ Meilleure saison : déc-avril (sèche) — côte est (Siargao) pluvieuse même en saison sèche','📍 Coups de cœur voyageurs : rivière souterraine Palawan, Chocolate Hills/tarsiers Bohol, Siargao, El Nido/Coron (Tourdumondiste)'],emergency:[{k:'Police',v:'117'},{k:'Ambulance',v:'911'},{k:'Ambassade France Manille',v:'+63 2 8857 6900'}],checklist:['eTravel rempli avant le vol','Billet de sortie des Philippines prévu','Crème solaire haute protection','Équipement snorkeling']}
   },
 ];
+const BUILT_IN_COUNTRIES = JSON.parse(JSON.stringify(COUNTRIES));
 
 const coverColors={jp:'#3D1C12',kh:'#1C3A1F',th:'#2D1B4E',la:'#1B3060',vn:'#6B1A1A',id:'#1A1A3A',ph:'#1A2E50'};
 const tagMap={photo:'📷',food:'🍜',temple:'⛩️',must:'⭐',nature:'🌿'};
@@ -1777,29 +1778,34 @@ if(!S.deletedCountryIds) S.deletedCountryIds=[];
 if(!S.countryEdits) S.countryEdits={};
 if(!S.addedCities) S.addedCities={};
 
-// Restore countries the user added (persisted separately from the built-in catalog)
-S.customCountries.forEach(function(cc){
-  if(!COUNTRIES.find(function(c){return c.id===cc.id;})) COUNTRIES.push(cc);
-});
-// Remove countries the user deleted (built-in or custom)
-for(var _i=COUNTRIES.length-1;_i>=0;_i--){
-  if(S.deletedCountryIds.indexOf(COUNTRIES[_i].id)>-1) COUNTRIES.splice(_i,1);
-}
-// Re-apply any manual edits made to built-in countries' Guide fields
-Object.keys(S.countryEdits).forEach(function(cid){
-  var c=COUNTRIES.find(function(co){return co.id===cid;});
-  if(c) Object.assign(c, S.countryEdits[cid]);
-});
-// Restore user-added cities (appended after the built-in ones, never overwriting them)
-Object.keys(S.addedCities).forEach(function(cid){
-  var c=COUNTRIES.find(function(co){return co.id===cid;});
-  if(!c) return;
-  S.addedCities[cid].forEach(function(savedCity){
-    if(!c.cities.find(function(ci){return ci.city===savedCity.city;})){
-      c.cities.push(savedCity);
-    }
+function rebuildCountriesFromState(){
+  COUNTRIES.length = 0;
+  BUILT_IN_COUNTRIES.forEach(function(c){ COUNTRIES.push(JSON.parse(JSON.stringify(c))); });
+  // Restore countries the user added (persisted separately from the built-in catalog)
+  (S.customCountries||[]).forEach(function(cc){
+    if(!COUNTRIES.find(function(c){return c.id===cc.id;})) COUNTRIES.push(cc);
   });
-});
+  // Remove countries the user deleted/archived (built-in or custom)
+  for(var _i=COUNTRIES.length-1;_i>=0;_i--){
+    if(S.deletedCountryIds.indexOf(COUNTRIES[_i].id)>-1) COUNTRIES.splice(_i,1);
+  }
+  // Re-apply any manual edits made to built-in countries' Guide fields
+  Object.keys(S.countryEdits||{}).forEach(function(cid){
+    var c=COUNTRIES.find(function(co){return co.id===cid;});
+    if(c) Object.assign(c, S.countryEdits[cid]);
+  });
+  // Restore user-added cities (appended after the built-in ones, never overwriting them)
+  Object.keys(S.addedCities||{}).forEach(function(cid){
+    var c=COUNTRIES.find(function(co){return co.id===cid;});
+    if(!c) return;
+    S.addedCities[cid].forEach(function(savedCity){
+      if(!c.cities.find(function(ci){return ci.city===savedCity.city;})){
+        c.cities.push(savedCity);
+      }
+    });
+  });
+}
+rebuildCountriesFromState();
 
 function getC(){return COUNTRIES.find(c=>c.id===S.country);}
 function setCountry(id){
@@ -4636,6 +4642,7 @@ function enterTrip(trip) {
   const freshState = loadState();
   Object.keys(S).forEach(k => delete S[k]);
   Object.assign(S, freshState);
+  rebuildCountriesFromState();
 
   applyTripCountryFilter(trip);
   document.getElementById('create-trip-screen').style.display = 'none';
