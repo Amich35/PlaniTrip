@@ -4235,6 +4235,11 @@ function addCountry() {
   setCountry(id);
   if(S.apiKey) autofillCountryWithAI(id);
 }
+function effectiveTripCountries() {
+  if (CURRENT_TRIP && CURRENT_TRIP.countries && CURRENT_TRIP.countries.length > 0) return CURRENT_TRIP.countries;
+  return BUILT_IN_COUNTRIES.map(function(c){ return c.name; });
+}
+
 function archiveCurrentCountry() {
   var c = getC();
   if(COUNTRIES.length <= 1){ alert("Impossible d'archiver le dernier pays."); return; }
@@ -4249,7 +4254,7 @@ function archiveCurrentCountry() {
     save(); S.tab='countries'; renderContent();
 
     if (typeof sb !== 'undefined' && sb && typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP) {
-      var activeCountries = (CURRENT_TRIP.countries || []).filter(function(name){return name !== c.name;});
+      var activeCountries = effectiveTripCountries().filter(function(name){return name !== c.name;});
       var archivedCountries = (CURRENT_TRIP.archived_countries || []).concat([c.name]);
       sb.from('trips').update({ countries: activeCountries, archived_countries: archivedCountries }).eq('id', CURRENT_TRIP.id).then(function(res){
         if (res.error) console.error('[PlaniTrip] erreur archivage:', res.error);
@@ -4280,7 +4285,7 @@ function restoreCountry(countryName) {
 
   if (typeof sb !== 'undefined' && sb && typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP) {
     var archivedCountries = (CURRENT_TRIP.archived_countries || []).filter(function(name){return name !== countryName;});
-    var activeCountries = (CURRENT_TRIP.countries || []).concat([countryName]);
+    var activeCountries = effectiveTripCountries().concat([countryName]);
     sb.from('trips').update({ countries: activeCountries, archived_countries: archivedCountries }).eq('id', CURRENT_TRIP.id).then(function(res){
       if (!res.error) { CURRENT_TRIP.countries = activeCountries; CURRENT_TRIP.archived_countries = archivedCountries; }
       S.tab='archived-countries'; renderContent();
