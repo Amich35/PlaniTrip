@@ -4852,15 +4852,97 @@ function showTripSelectorScreen(trips) {
   document.getElementById('main-app').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'flex';
 
+  const owned = trips.filter(t => t.owner_id === CURRENT_USER.id);
+  const shared = trips.filter(t => t.owner_id !== CURRENT_USER.id);
+
   const list = document.getElementById('ts-trip-list');
   list.innerHTML = '';
-  trips.forEach(t => {
+
+  function buildItem(t, canRename) {
     const item = document.createElement('div');
     item.className = 'ts-trip-item';
-    item.innerHTML = '<span></span><span class="ts-arrow">›</span>';
-    item.querySelector('span').textContent = t.name;
-    item.addEventListener('click', () => enterTrip(t, true));
-    list.appendChild(item);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = t.name;
+    nameSpan.style.flex = '1';
+    nameSpan.style.overflow = 'hidden';
+    nameSpan.style.textOverflow = 'ellipsis';
+    nameSpan.style.whiteSpace = 'nowrap';
+    nameSpan.addEventListener('click', () => enterTrip(t, true));
+
+    item.appendChild(nameSpan);
+
+    if (canRename) {
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '✎';
+      editBtn.setAttribute('aria-label', 'Renommer');
+      editBtn.style.cssText = 'border:none;background:none;color:var(--ink-muted);font-size:15px;cursor:pointer;padding:4px 8px;flex-shrink:0;';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startRenameTrip(item, t, nameSpan);
+      });
+      item.appendChild(editBtn);
+    }
+
+    const arrow = document.createElement('span');
+    arrow.className = 'ts-arrow';
+    arrow.textContent = '›';
+    arrow.addEventListener('click', () => enterTrip(t, true));
+    item.appendChild(arrow);
+
+    return item;
+  }
+
+  if (owned.length) {
+    const label = document.createElement('div');
+    label.textContent = 'Mes voyages';
+    label.style.cssText = 'font-size:12px;font-weight:600;letter-spacing:0.04em;color:var(--ink-muted);text-transform:uppercase;margin:4px 0 8px;';
+    list.appendChild(label);
+    owned.forEach(t => list.appendChild(buildItem(t, true)));
+  }
+
+  if (shared.length) {
+    const label = document.createElement('div');
+    label.textContent = 'Partagés avec moi';
+    label.style.cssText = 'font-size:12px;font-weight:600;letter-spacing:0.04em;color:var(--ink-muted);text-transform:uppercase;margin:16px 0 8px;';
+    list.appendChild(label);
+    shared.forEach(t => list.appendChild(buildItem(t, false)));
+  }
+}
+
+function startRenameTrip(item, trip, nameSpan) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = trip.name;
+  input.className = 'auth-input';
+  input.style.cssText = 'margin:0;padding:8px 10px;font-size:14px;flex:1;';
+
+  item.replaceChild(input, nameSpan);
+  input.focus();
+  input.select();
+
+  async function commit() {
+    const newName = input.value.trim();
+    if (!newName || newName === trip.name) {
+      input.replaceWith(nameSpan);
+      return;
+    }
+    const { error } = await sb.from('trips').update({ name: newName }).eq('id', trip.id);
+    if (error) {
+      alert('Erreur lors du renommage : ' + error.message);
+      input.replaceWith(nameSpan);
+      return;
+    }
+    trip.name = newName;
+    nameSpan.textContent = newName;
+    if (CURRENT_TRIP && CURRENT_TRIP.id === trip.id) CURRENT_TRIP.name = newName;
+    input.replaceWith(nameSpan);
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.value = trip.name; input.blur(); }
   });
 }
 
