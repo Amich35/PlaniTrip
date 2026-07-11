@@ -3381,6 +3381,7 @@ function renderMore(){
     +'<button onclick="archiveCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">Archiver '+getC().name+'</button>'
     +'<div class="more-row" onclick="showArchivedCountriesScreen()" style="padding:8px 4px 0"><span class="more-row-icon" data-icon="archive" data-icon-size="19"></span><span class="more-row-label">Pays archivés</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
+    +'<div class="info-card"><button onclick="backToTripSelector()" style="width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">↩ Changer de voyage</button></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
@@ -4293,6 +4294,13 @@ function showArchivedCountriesScreen(){
   S.tab='archived-countries'; save(); renderContent();
 }
 
+async function backToTripSelector() {
+  if (!sb || !CURRENT_USER) return;
+  document.getElementById('main-app').style.display = 'none';
+  CURRENT_TRIP = null;
+  await checkUserTrips(CURRENT_USER);
+}
+
 function renderArchivedCountriesScreen(){
   var names = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.archived_countries) ? CURRENT_TRIP.archived_countries : [];
   var rows = names.length
@@ -4632,6 +4640,7 @@ function applyTripCountryFilter(trip) {
 
   S.country = COUNTRIES.filter(c => S.deletedCountryIds.indexOf(c.id) === -1)[0]?.id || S.country;
   save();
+  rebuildCountriesFromState();
 }
 
 function enterTrip(trip) {
