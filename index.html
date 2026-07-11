@@ -4312,6 +4312,7 @@ async function backToTripSelector() {
   if (!sb || !CURRENT_USER) return;
   document.getElementById('main-app').style.display = 'none';
   CURRENT_TRIP = null;
+  localStorage.removeItem('planitrip_last_trip_id');
   await checkUserTrips(CURRENT_USER);
 }
 
@@ -4404,7 +4405,8 @@ function renderAccessManagementScreen(){
   var isOwner = CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id;
   var tripCountries = effectiveTripCountries();
 
-  var ownerRow = '<div class="more-row"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">Toi (propriétaire)</span><span style="font-size:12px;color:var(--ink-muted)">Tous les pays</span></div>';
+  var ownerLabel = isOwner ? 'Toi (propriétaire)' : 'Propriétaire du voyage';
+  var ownerRow = '<div class="more-row"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">'+ownerLabel+'</span><span style="font-size:12px;color:var(--ink-muted)">Tous les pays</span></div>';
 
   var collabRows = CURRENT_COLLABORATORS.map(function(c){
     var scopeLabel = (c.scope && c.scope.indexOf('all')>-1) ? 'Tous les pays' : ((c.scope||[]).join(', ')||'Aucun pays');
@@ -4731,6 +4733,13 @@ async function checkUserTrips(user) {
       }
       return;
     } else {
+      const lastTripId = localStorage.getItem('planitrip_last_trip_id');
+      const lastTrip = uniqueTrips.find(t => t.id === lastTripId);
+      if (lastTrip) {
+        await loadCountryFlags();
+        try { enterTrip(lastTrip); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
+        return;
+      }
       showTripSelectorScreen(uniqueTrips);
       return;
     }
@@ -4828,6 +4837,7 @@ async function enterTrip(trip) {
     S.country = COUNTRIES[0] ? COUNTRIES[0].id : null;
     save();
   }
+  localStorage.setItem('planitrip_last_trip_id', trip.id);
   document.getElementById('create-trip-screen').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'none';
