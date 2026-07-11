@@ -848,6 +848,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 </div>
 
 <script>
+let CURRENT_USER = null;
+let CURRENT_TRIP = null;
 // ── GPS COORDINATES ────────────────────────────────────────────
 // Format: [lat, lng, "Place name for search fallback"]
 const COORDS = {
@@ -4479,8 +4481,6 @@ function onAuthenticated(user) {
 }
 
 // ---- Trips: routing post-connexion ----
-let CURRENT_USER = null;
-let CURRENT_TRIP = null;
 
 async function checkUserTrips(user) {
   CURRENT_USER = user;
