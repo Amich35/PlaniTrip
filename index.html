@@ -3386,9 +3386,7 @@ function renderMore(){
     +'<div class="more-row" onclick="setTab(\'journal\')"><span class="more-row-icon" data-icon="notebook-pen" data-icon-size="19"></span><span class="more-row-label">Carnet de voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="users" data-icon-size="16"></span> Voyageurs</div>'
-    +'<div class="traveler-row"><div class="t-avatar t-av-a">AN</div><div class="t-info"><div class="t-name">André</div><div class="t-access">Accès complet · 7 pays · Admin</div></div><span class="t-role">Admin</span></div>'
-    +'<div class="traveler-row"><div class="t-avatar t-av-b">CO</div><div class="t-info"><div class="t-name">Compagnon</div><div class="t-access">Accès complet · 7 pays</div></div><span class="t-role">Voyageur</span></div>'
-    +'<div class="traveler-row" style="cursor:pointer" onclick="openShare()"><div class="t-avatar t-av-c">＋</div><div class="t-info"><div class="t-name">Inviter un voyageur</div><div class="t-access">Accès limité par pays ou période</div></div><span class="t-role" style="color:var(--accent);border-color:var(--accent)">Inviter</span></div>'
+    +'<div class="more-row" onclick="showAccessManagementScreen()" style="padding:6px 0"><span class="more-row-label">'+(1+CURRENT_COLLABORATORS.length)+' voyageur'+(CURRENT_COLLABORATORS.length?'s':'')+' sur ce voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="globe" data-icon-size="16"></span> Gestion des pays</div>'
     +'<button onclick="openCountryModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
@@ -4334,6 +4332,120 @@ function renderArchivedCountriesScreen(){
     +'</div>';
 }
 
+var _acmScopeAll = true;
+var _acmScopeCountries = [];
+
+function showAccessManagementScreen(){
+  S.tab='access-management'; save();
+  _acmScopeAll = true; _acmScopeCountries = [];
+  renderContent();
+  loadCollaborators().then(function(){ if(S.tab==='access-management') renderContent(); });
+}
+
+function toggleAcmScope(mode){
+  _acmScopeAll = (mode==='all');
+  renderContent();
+}
+function toggleAcmCountry(name){
+  var idx = _acmScopeCountries.indexOf(name);
+  if(idx===-1) _acmScopeCountries.push(name); else _acmScopeCountries.splice(idx,1);
+  renderContent();
+}
+
+async function addCollaboratorSubmit(){
+  var input = document.getElementById('acm-email-input');
+  var email = (input.value||'').trim().toLowerCase();
+  var errEl = document.getElementById('acm-error');
+  errEl.style.display='none';
+  if(!email || !email.includes('@')){
+    errEl.textContent = 'Merci de renseigner un email valide.'; errEl.style.display='block'; return;
+  }
+  if(!_acmScopeAll && _acmScopeCountries.length===0){
+    errEl.textContent = 'Sélectionne au moins un pays, ou choisis "Tous les pays".'; errEl.style.display='block'; return;
+  }
+  if(!sb || !CURRENT_TRIP){ errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
+
+  var scope = _acmScopeAll ? ['all'] : _acmScopeCountries.slice();
+  var btn = document.getElementById('acm-add-btn');
+  btn.disabled = true; btn.textContent = 'Ajout...';
+
+  var { data: existingUsers } = await sb.from('collaborators').select('id').eq('trip_id', CURRENT_TRIP.id).eq('invited_email', email);
+  if(existingUsers && existingUsers.length){
+    btn.disabled=false; btn.textContent='Inviter';
+    errEl.textContent = 'Cette personne est déjà invitée sur ce voyage.'; errEl.style.display='block';
+    return;
+  }
+
+  const { error } = await sb.from('collaborators').insert({
+    trip_id: CURRENT_TRIP.id,
+    invited_email: email,
+    scope: scope,
+    role: 'editor'
+  });
+
+  btn.disabled = false; btn.textContent = 'Inviter';
+
+  if(error){
+    errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block'; return;
+  }
+  input.value=''; _acmScopeAll=true; _acmScopeCountries=[];
+  await loadCollaborators();
+  renderContent();
+}
+
+async function removeCollaboratorAction(id){
+  showConfirm('Retirer cette personne du voyage ?', async function(){
+    const { error } = await sb.from('collaborators').delete().eq('id', id);
+    if(!error){ await loadCollaborators(); renderContent(); }
+  }, 'Retirer');
+}
+
+function renderAccessManagementScreen(){
+  var isOwner = CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id;
+  var tripCountries = effectiveTripCountries();
+
+  var ownerRow = '<div class="more-row"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">Toi (propriétaire)</span><span style="font-size:12px;color:var(--ink-muted)">Tous les pays</span></div>';
+
+  var collabRows = CURRENT_COLLABORATORS.map(function(c){
+    var scopeLabel = (c.scope && c.scope.indexOf('all')>-1) ? 'Tous les pays' : ((c.scope||[]).join(', ')||'Aucun pays');
+    var statusLabel = c.user_id ? '' : ' · en attente';
+    var label = c.invited_email || c.user_id;
+    var removeBtn = isOwner ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
+    return '<div class="more-row"><span class="more-row-icon" data-icon="user" data-icon-size="19"></span>'
+      +'<div style="flex:1;min-width:0"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(label)+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
+      +removeBtn+'</div>';
+  }).join('');
+
+  var inviteForm = '';
+  if(isOwner){
+    var countryChecks = tripCountries.map(function(name){
+      var checked = _acmScopeCountries.indexOf(name)>-1;
+      var flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[name]) || '🌍';
+      return '<div class="more-row" onclick="toggleAcmCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:8px 0;cursor:pointer">'
+        +'<span style="font-size:16px;margin-right:8px">'+flag+'</span><span class="more-row-label">'+escHtml(name)+'</span>'
+        +'<span style="font-size:16px;color:'+(checked?'var(--accent)':'var(--ink-subtle)')+'">'+(checked?'✓':'')+'</span></div>';
+    }).join('');
+
+    inviteForm = '<div class="info-card"><div class="ic-header"><span data-icon="plus" data-icon-size="16"></span> Inviter quelqu\'un</div>'
+      +'<input type="email" id="acm-email-input" class="auth-input" placeholder="email@exemple.com" style="margin-bottom:10px">'
+      +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<button onclick="toggleAcmScope(\'all\')" style="flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid '+(_acmScopeAll?'var(--accent)':'rgba(29,29,31,0.12)')+';background:'+(_acmScopeAll?'var(--accent-pale)':'transparent')+';color:'+(_acmScopeAll?'var(--accent)':'var(--ink-muted)')+'">Tous les pays</button>'
+      +'<button onclick="toggleAcmScope(\'custom\')" style="flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid '+(!_acmScopeAll?'var(--accent)':'rgba(29,29,31,0.12)')+';background:'+(!_acmScopeAll?'var(--accent-pale)':'transparent')+';color:'+(!_acmScopeAll?'var(--accent)':'var(--ink-muted)')+'">Pays spécifiques</button>'
+      +'</div>'
+      +(_acmScopeAll ? '' : '<div style="max-height:220px;overflow-y:auto;margin-bottom:6px">'+countryChecks+'</div>')
+      +'<div id="acm-error" class="auth-error" style="display:none;margin:6px 0"></div>'
+      +'<button id="acm-add-btn" class="btn-primary" onclick="addCollaboratorSubmit()">Inviter</button>'
+      +'</div>';
+  }
+
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Voyageurs</div>'
+    +'<div class="info-card" style="padding:6px">'+ownerRow+collabRows+'</div>'
+    +inviteForm
+    +'</div>';
+}
+
 
 // ── LUCIDE ICONS ──────────────────────────────────────────────
 function renderContent(){
@@ -4352,6 +4464,7 @@ function renderContent(){
   else if(S.tab==='documents')html=renderDocuments();
   else if(S.tab==='journal')html=renderCarnetScreen();
   else if(S.tab==='archived-countries')html=renderArchivedCountriesScreen();
+  else if(S.tab==='access-management')html=renderAccessManagementScreen();
   else html=renderMore();
   document.getElementById('mainContent').innerHTML=html;
   document.querySelectorAll('.day-badge[data-actkey]').forEach(function(btn){
@@ -4407,6 +4520,7 @@ const ICON_PATHS = {
   leaf: '<path d="M11 20A7 7 0 0 1 4 13c0-8 7-11 16-11 0 9-3 16-11 16z"/><path d="M4 13c3-1 6-3 8-6"/>',
   archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
 };
 function svgIcon(name, size){
   size=size||22;
@@ -4583,6 +4697,7 @@ function onAuthenticated(user) {
 async function checkUserTrips(user) {
   CURRENT_USER = user;
   try {
+    if (sb) { try { await sb.rpc('claim_pending_invitations'); } catch(e) { console.warn('[PlaniTrip] claim_pending_invitations:', e); } }
     const { data: ownedTrips, error: ownedErr } = await sb
       .from('trips')
       .select('id, name, owner_id, countries, archived_countries, start_date, end_date')
@@ -4661,7 +4776,15 @@ function applyTripCountryFilter(trip) {
   rebuildCountriesFromState();
 }
 
-function enterTrip(trip) {
+let CURRENT_COLLABORATORS = [];
+async function loadCollaborators() {
+  if (!sb || !CURRENT_TRIP) { CURRENT_COLLABORATORS = []; return; }
+  const { data, error } = await sb.from('collaborators').select('*').eq('trip_id', CURRENT_TRIP.id);
+  if (!error) CURRENT_COLLABORATORS = data || [];
+  else console.error('[PlaniTrip] erreur chargement collaborateurs:', error);
+}
+
+async function enterTrip(trip) {
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
 
@@ -4700,6 +4823,9 @@ function enterTrip(trip) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   renderContent();
+
+  await loadCollaborators();
+  if (S.tab === 'more' || S.tab === 'access-management') renderContent();
 }
 
 // ---- Écran sélecteur de trips ----
