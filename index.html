@@ -4741,7 +4741,16 @@ async function checkUserTrips(user) {
 }
 
 function applyTripCountryFilter(trip) {
-  const tripCountries = trip.countries || [];
+  let tripCountries = trip.countries || [];
+
+  // Si l'utilisateur connecté est un collaborateur (pas le propriétaire), restreindre encore selon SON scope
+  if (CURRENT_USER && trip.owner_id !== CURRENT_USER.id) {
+    const myCollab = CURRENT_COLLABORATORS.find(c => c.user_id === CURRENT_USER.id);
+    if (myCollab && myCollab.scope && myCollab.scope.indexOf('all') === -1) {
+      tripCountries = myCollab.scope;
+    }
+  }
+
   if (tripCountries.length === 0) return; // trip sans pays défini : on ne filtre rien (sécurité)
 
   // Masquer les pays existants qui ne sont pas dans le trip
@@ -4805,6 +4814,7 @@ async function enterTrip(trip) {
   S.tab = 'home';
   rebuildCountriesFromState();
 
+  await loadCollaborators();
   applyTripCountryFilter(trip);
 
   if (COUNTRIES.length === 0) {
@@ -4823,9 +4833,6 @@ async function enterTrip(trip) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   renderContent();
-
-  await loadCollaborators();
-  if (S.tab === 'more' || S.tab === 'access-management') renderContent();
 }
 
 // ---- Écran sélecteur de trips ----
