@@ -4726,7 +4726,7 @@ async function checkUserTrips(user) {
     } else if (uniqueTrips.length === 1) {
       await loadCountryFlags();
       try {
-        enterTrip(uniqueTrips[0]);
+        enterTrip(uniqueTrips[0], false);
       } catch (renderErr) {
         console.error('[PlaniTrip trips] erreur d\'affichage (trip conservé):', renderErr);
         alert("Une erreur d'affichage est survenue, mais ton voyage est bien là. Recharge la page — si le problème persiste, préviens André.");
@@ -4737,7 +4737,7 @@ async function checkUserTrips(user) {
       const lastTrip = uniqueTrips.find(t => t.id === lastTripId);
       if (lastTrip) {
         await loadCountryFlags();
-        try { enterTrip(lastTrip); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
+        try { enterTrip(lastTrip, false); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
         return;
       }
       showTripSelectorScreen(uniqueTrips);
@@ -4802,7 +4802,7 @@ async function loadCollaborators() {
   else console.error('[PlaniTrip] erreur chargement collaborateurs:', error);
 }
 
-async function enterTrip(trip) {
+async function enterTrip(trip, resetTab) {
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
 
@@ -4820,7 +4820,7 @@ async function enterTrip(trip) {
   const freshState = loadState();
   Object.keys(S).forEach(k => delete S[k]);
   Object.assign(S, freshState);
-  S.tab = 'home';
+  S.tab = resetTab ? 'home' : (S.tab || 'home');
   rebuildCountriesFromState();
 
   await loadCollaborators();
@@ -4859,7 +4859,7 @@ function showTripSelectorScreen(trips) {
     item.className = 'ts-trip-item';
     item.innerHTML = '<span></span><span class="ts-arrow">›</span>';
     item.querySelector('span').textContent = t.name;
-    item.addEventListener('click', () => enterTrip(t));
+    item.addEventListener('click', () => enterTrip(t, true));
     list.appendChild(item);
   });
 }
@@ -5014,7 +5014,7 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     return;
   }
 
-  enterTrip(data);
+  enterTrip(data, true);
 });
 
 loadCountryFlags();
