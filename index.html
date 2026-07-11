@@ -1446,9 +1446,10 @@ const _PLACE_QUERY_OVERRIDES = {
   'Coucher de soleil Pacifico Beach':'Pacifico Beach Siargao sunset',
 };
 
+let CURRENT_STORAGE_KEY = 'asie2026';
 function loadState(){
   try{
-    const s=localStorage.getItem('asie2026');
+    const s=localStorage.getItem(CURRENT_STORAGE_KEY);
     if(s){
       const parsed=JSON.parse(s);
       // Restore custom details and coords from persisted data
@@ -1469,7 +1470,7 @@ function save(){
   try{
     // Persist customDetails and custom COORDS into S before saving
     if(window._customDetails) S.customDetails=window._customDetails;
-    localStorage.setItem('asie2026',JSON.stringify(S));
+    localStorage.setItem(CURRENT_STORAGE_KEY,JSON.stringify(S));
   }catch(e){}
 }
 
@@ -4483,12 +4484,12 @@ async function checkUserTrips(user) {
   try {
     const { data: ownedTrips, error: ownedErr } = await sb
       .from('trips')
-      .select('id, name')
+      .select('id, name, owner_id, countries')
       .eq('owner_id', user.id);
 
     const { data: collabRows, error: collabErr } = await sb
       .from('collaborators')
-      .select('trip_id, trips(id, name)')
+      .select('trip_id, trips(id, name, owner_id, countries)')
       .eq('user_id', user.id);
 
     if (ownedErr || collabErr) {
@@ -4504,6 +4505,7 @@ async function checkUserTrips(user) {
     if (uniqueTrips.length === 0) {
       showCreateTripScreen();
     } else if (uniqueTrips.length === 1) {
+      await loadCountryFlags();
       enterTrip(uniqueTrips[0]);
     } else {
       showTripSelectorScreen(uniqueTrips);
@@ -4530,8 +4532,9 @@ function applyTripCountryFilter(trip) {
     const exists = COUNTRIES.find(c => c.name === countryName);
     if (!exists) {
       const id = countryName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) + '_' + Date.now() + Math.floor(Math.random()*1000);
+      const flagEmoji = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[countryName]) || '🌍';
       const newCountry = {
-        id: id, flag: '🌍', name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
+        id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
         currency: '', rate: '', visa: '', lang: '', budget_daily: 50,
         alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[]}
       };
@@ -4550,6 +4553,19 @@ function applyTripCountryFilter(trip) {
 
 function enterTrip(trip) {
   CURRENT_TRIP = trip;
+  const namespacedKey = 'planitrip_trip_' + trip.id;
+
+  // Migration one-shot : uniquement pour TON trip (owner), et seulement s'il n'a pas encore de données propres
+  if (!localStorage.getItem(namespacedKey) && trip.owner_id === CURRENT_USER.id) {
+    const legacy = localStorage.getItem('asie2026');
+    if (legacy) localStorage.setItem(namespacedKey, legacy);
+  }
+
+  CURRENT_STORAGE_KEY = namespacedKey;
+  const freshState = loadState();
+  Object.keys(S).forEach(k => delete S[k]);
+  Object.assign(S, freshState);
+
   applyTripCountryFilter(trip);
   document.getElementById('create-trip-screen').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'none';
@@ -4584,6 +4600,17 @@ document.getElementById('ts-new-trip-btn').addEventListener('click', () => {
 // ---- Écran Créer mon voyage ----
 let CT_COUNTRIES = [];
 let CT_ALL_COUNTRY_NAMES = [];
+window.COUNTRY_FLAGS = {};
+
+async function loadCountryFlags() {
+  if (Object.keys(window.COUNTRY_FLAGS).length) return;
+  try {
+    const res = await fetch('country_flags.json');
+    window.COUNTRY_FLAGS = await res.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger country_flags.json', e);
+  }
+}
 
 async function loadCountryList() {
   if (CT_ALL_COUNTRY_NAMES.length) return CT_ALL_COUNTRY_NAMES;
@@ -4717,6 +4744,7 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   enterTrip(data);
 });
 
+loadCountryFlags();
 initAuth();
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
