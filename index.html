@@ -4555,10 +4555,14 @@ function enterTrip(trip) {
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
 
-  // Migration one-shot : uniquement pour TON trip (owner), et seulement s'il n'a pas encore de données propres
-  if (!localStorage.getItem(namespacedKey) && trip.owner_id === CURRENT_USER.id) {
+  // Migration one-shot : le tout premier trip ouvert dans ce navigateur (tous comptes confondus)
+  // réclame les anciennes données Asie. Aucun autre trip n'y touche ensuite.
+  if (!localStorage.getItem(namespacedKey) && !localStorage.getItem('planitrip_legacy_claimed')) {
     const legacy = localStorage.getItem('asie2026');
-    if (legacy) localStorage.setItem(namespacedKey, legacy);
+    if (legacy) {
+      localStorage.setItem(namespacedKey, legacy);
+      localStorage.setItem('planitrip_legacy_claimed', trip.id);
+    }
   }
 
   CURRENT_STORAGE_KEY = namespacedKey;
