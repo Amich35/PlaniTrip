@@ -4577,14 +4577,22 @@ async function checkUserTrips(user) {
 
     if (uniqueTrips.length === 0) {
       showCreateTripScreen();
+      return;
     } else if (uniqueTrips.length === 1) {
       await loadCountryFlags();
-      enterTrip(uniqueTrips[0]);
+      try {
+        enterTrip(uniqueTrips[0]);
+      } catch (renderErr) {
+        console.error('[PlaniTrip trips] erreur d\'affichage (trip conservé):', renderErr);
+        alert("Une erreur d'affichage est survenue, mais ton voyage est bien là. Recharge la page — si le problème persiste, préviens André.");
+      }
+      return;
     } else {
       showTripSelectorScreen(uniqueTrips);
+      return;
     }
   } catch (e) {
-    console.error('[PlaniTrip trips] exception:', e);
+    console.error('[PlaniTrip trips] exception (récupération):', e);
     showCreateTripScreen("Une erreur est survenue. Tu peux créer ton voyage ci-dessous.");
   }
 }
@@ -4645,6 +4653,11 @@ function enterTrip(trip) {
   rebuildCountriesFromState();
 
   applyTripCountryFilter(trip);
+
+  if (!COUNTRIES.find(c => c.id === S.country)) {
+    S.country = COUNTRIES[0] ? COUNTRIES[0].id : null;
+    save();
+  }
   document.getElementById('create-trip-screen').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'none';
