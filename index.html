@@ -306,6 +306,7 @@ a{color:var(--ink);}
 
 .share-modal{display:none;position:fixed;inset:0;z-index:200;background:rgba(28,24,20,0.55);align-items:flex-end;justify-content:center;}
 .share-modal.open{display:flex;}
+#photoModal{z-index:450;}
 .share-sheet{background:var(--parchment);border-radius:var(--r20) var(--r20) 0 0;padding:28px 24px 40px;width:100%;max-width:420px;}
 .modal-handle{width:36px;height:4px;background:rgba(29,29,31,0.140);border-radius:2px;margin:0 auto 20px;}
 .modal-title{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:22px;font-weight:700;margin-bottom:6px;}
@@ -378,7 +379,7 @@ a{color:var(--ink);}
 /* ── BUDGET OVERVIEW ── */
 .budget-country-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(30,80,55,0.07);cursor:pointer;}
 .budget-country-row:last-child{border-bottom:none;}
-.bcr-flag{font-size:20px;flex-shrink:0;}
+.bcr-flag{font-size:20px;flex-shrink:0;width:26px;text-align:center;display:inline-block;}
 .bcr-body{flex:1;min-width:0;}
 .bcr-top{display:flex;justify-content:space-between;align-items:baseline;}
 .bcr-name{font-size:13.5px;font-weight:600;color:var(--ink);}
@@ -660,12 +661,21 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <input type="email" id="auth-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
       <button id="auth-send-link-btn" class="btn-primary">Recevoir le lien magique</button>
       <p class="auth-hint">Pas de mot de passe. On vous envoie un lien de connexion sécurisé.</p>
+      <p class="auth-hint" style="margin-top:14px"><a href="#" id="auth-show-password-link" style="color:var(--accent);text-decoration:none;font-weight:600">J'ai un compte avec mot de passe</a></p>
     </div>
     <div id="auth-step-sent" style="display:none;">
       <div class="auth-icon-success">✉️</div>
       <h3>Email envoyé</h3>
       <p class="auth-hint">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
       <button id="auth-retry-btn" class="btn-secondary">Utiliser une autre adresse</button>
+    </div>
+    <div id="auth-step-password" style="display:none;">
+      <label class="auth-label">Adresse email</label>
+      <input type="email" id="auth-pw-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
+      <label class="auth-label">Mot de passe</label>
+      <input type="password" id="auth-pw-password-input" class="auth-input" placeholder="••••••••" autocomplete="current-password">
+      <button id="auth-pw-signin-btn" class="btn-primary">Se connecter</button>
+      <p class="auth-hint" style="margin-top:14px"><a href="#" id="auth-show-magic-link" style="color:var(--accent);text-decoration:none;font-weight:600">Recevoir un lien magique à la place</a></p>
     </div>
   </div>
 </div>
@@ -2916,8 +2926,14 @@ function renderBudget(c){
 
 // ── TRIP STATUS: current day / next transport / tonight's accommodation ──
 var TRANSPORTS=[['jp','kh','Avion'],['kh','th','Bus'],['th','la','Train'],['la','vn','Avion'],['vn','id','Avion'],['id','ph','Avion']];
+function getTripDepartDate(){
+  if (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) {
+    return new Date(CURRENT_TRIP.start_date + 'T00:00:00');
+  }
+  return new Date('2026-09-10T00:00:00');
+}
 function getTripStatus(){
-  var DEPART=new Date('2026-09-10T00:00:00');
+  var DEPART=getTripDepartDate();
   var now=new Date();
   var elapsedDays=Math.floor((now-DEPART)/86400000);
   var cumulative=0, currentCountry=null, dayInCountry=0, countryIdx=-1;
@@ -2955,7 +2971,7 @@ function getTripStatus(){
 
 // ── COUNTRY STATUS (done / current / upcoming) ──────────────────
 function getCountryStatus(countryId){
-  var DEPART=new Date('2026-09-10T00:00:00');
+  var DEPART=getTripDepartDate();
   var elapsedDays=Math.floor((new Date()-DEPART)/86400000);
   var cumulative=0;
   for(var i=0;i<COUNTRIES.length;i++){
@@ -3041,7 +3057,7 @@ function getNextStage(ts){
     if(nextCountry.cities[j].city===nextCity.city) break;
     cityCum+=parseInt((nextCountry.cities[j].sub||'').match(/\d+/))||1;
   }
-  var DEPART=new Date('2026-09-10T00:00:00');
+  var DEPART=getTripDepartDate();
   var startDate=new Date(DEPART.getTime()+(countryCum+cityCum)*86400000);
   var duration=parseInt((nextCity.sub||'').match(/\d+/))||1;
   return {city:nextCity.city, country:nextCountry, startDate:startDate, duration:duration};
@@ -3266,7 +3282,6 @@ const DOC_TYPES=[
   {id:'visa', icon:'check-square', label:'Visa', fields:[{k:'type',lbl:'Type / pays'},{k:'expiry',lbl:'Validité'},{k:'notes',lbl:'Notes',area:true}]},
   {id:'insurance', icon:'heart-pulse', label:'Assurance', fields:[{k:'provider',lbl:'Assureur'},{k:'policy',lbl:'N° de police'},{k:'notes',lbl:'Contact urgence / notes',area:true}]},
   {id:'tickets', icon:'plane', label:'Billets', fields:[{k:'flights',lbl:'Vols (résumé)',area:true},{k:'notes',lbl:'Notes',area:true}]},
-  {id:'reservations', icon:'bed', label:'Réservations', fields:[{k:'summary',lbl:'Résumé réservations',area:true},{k:'notes',lbl:'Notes',area:true}]},
 ];
 function renderDocuments(){
   var openDoc=S.openDocType||null;
@@ -3381,7 +3396,7 @@ function renderMore(){
     +'<button onclick="archiveCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">Archiver '+getC().name+'</button>'
     +'<div class="more-row" onclick="showArchivedCountriesScreen()" style="padding:8px 4px 0"><span class="more-row-icon" data-icon="archive" data-icon-size="19"></span><span class="more-row-label">Pays archivés</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
-    +'<div class="info-card"><button onclick="backToTripSelector()" style="width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">↩ Changer de voyage</button></div>'
+    +'<div class="info-card"><div class="more-row" onclick="backToTripSelector()" style="padding:2px 0;cursor:pointer"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
@@ -3443,9 +3458,6 @@ function renderGuide(c){
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/></div></div>'
-    +'<div class="info-card"><div class="ic-header"><span data-icon="bus" data-icon-size="16"></span> Transport & SIM</div>'
-    +'<div class="info-row"><span class="ir-key">Transport</span><input class="ir-input" type="text" placeholder="ex: Train (JR Pass), métro" value="'+escHtml(p.transport)+'" oninput="editCountryField(\''+c.id+'\',\'practical.transport\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">SIM / Internet</span><input class="ir-input" type="text" placeholder="ex: eSIM Airalo" value="'+escHtml(p.sim)+'" oninput="editCountryField(\''+c.id+'\',\'practical.sim\',this.value)"/></div></div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span class="ee-del" style="color:var(--accent)" onclick="addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span></div>'+tipRows+'</div>'
     +'</div>';
 }
@@ -4022,7 +4034,7 @@ function bindDragEvents() {
 
 // ── COUNTDOWN ────────────────────────────────────────────────
 function renderCountdown() {
-  var DEPART = new Date('2026-09-10T00:00:00');
+  var DEPART = getTripDepartDate();
   var now = new Date();
   var diff = DEPART - now;
   if(diff < 0) return '<div class="countdown-bar"><span class="cd-emoji" data-icon="plane" data-icon-size="22"></span><div class="cd-info"><div class="cd-label">Voyage en cours !</div><div class="cd-main"><span class="cd-days">J+'+Math.abs(Math.floor(diff/86400000))+'</span><span class="cd-unit">jours</span></div><div class="cd-date">Départ : 10 septembre 2026</div></div></div>';
@@ -4045,7 +4057,7 @@ function renderCountdown() {
 function startCountdownTick() {
   clearInterval(window._cdInterval);
   window._cdInterval = setInterval(function(){
-    var DEPART = new Date('2026-09-10T00:00:00');
+    var DEPART = getTripDepartDate();
     var diff = DEPART - new Date();
     if(diff < 0) return;
     var totalSecs = Math.floor(diff/1000);
@@ -4666,6 +4678,7 @@ function enterTrip(trip) {
   const freshState = loadState();
   Object.keys(S).forEach(k => delete S[k]);
   Object.assign(S, freshState);
+  S.tab = 'home';
   rebuildCountriesFromState();
 
   applyTripCountryFilter(trip);
@@ -4919,6 +4932,44 @@ document.getElementById('auth-retry-btn').addEventListener('click', () => {
   document.getElementById('auth-step-sent').style.display = 'none';
   document.getElementById('auth-step-email').style.display = 'block';
   document.getElementById('auth-email-input').value = '';
+});
+
+document.getElementById('auth-show-password-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('auth-step-email').style.display = 'none';
+  document.getElementById('auth-step-password').style.display = 'block';
+});
+
+document.getElementById('auth-show-magic-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('auth-step-password').style.display = 'none';
+  document.getElementById('auth-step-email').style.display = 'block';
+});
+
+document.getElementById('auth-pw-signin-btn').addEventListener('click', async () => {
+  const email = document.getElementById('auth-pw-email-input').value.trim();
+  const password = document.getElementById('auth-pw-password-input').value;
+  if (!email || !password) {
+    alert('Merci de renseigner ton email et ton mot de passe.');
+    return;
+  }
+  if (!sb) {
+    showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page.");
+    return;
+  }
+
+  const btn = document.getElementById('auth-pw-signin-btn');
+  btn.disabled = true;
+  btn.textContent = 'Connexion...';
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false;
+  btn.textContent = 'Se connecter';
+
+  if (error) {
+    alert('Erreur de connexion : ' + (error.message === 'Invalid login credentials' ? 'email ou mot de passe incorrect.' : error.message));
+  }
 });
 
 </script>
