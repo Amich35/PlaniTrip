@@ -4529,8 +4529,10 @@ async function initAuth() {
 
     sb.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        if (CURRENT_TRIP) return; // déjà dans un trip : ignorer le re-déclenchement (ex: retour d'onglet)
         onAuthenticated(session.user);
       } else if (event === 'SIGNED_OUT') {
+        CURRENT_TRIP = null;
         showAuthScreen();
       }
     });
@@ -4653,6 +4655,13 @@ function enterTrip(trip) {
   rebuildCountriesFromState();
 
   applyTripCountryFilter(trip);
+
+  if (COUNTRIES.length === 0) {
+    console.warn('[PlaniTrip] Aucun pays visible, réinitialisation de sécurité.');
+    S.deletedCountryIds = [];
+    rebuildCountriesFromState();
+    save();
+  }
 
   if (!COUNTRIES.find(c => c.id === S.country)) {
     S.country = COUNTRIES[0] ? COUNTRIES[0].id : null;
