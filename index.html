@@ -628,6 +628,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .auth-card .btn-primary{width:100%;padding:14px;border:none;border-radius:14px;background:#2D6A4F;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
 .auth-card .btn-primary:disabled{opacity:0.6;}
 .auth-card .btn-secondary{width:100%;padding:14px;border:1px solid #E5E3DE;border-radius:14px;background:transparent;color:#1D1D1F;font-size:15px;font-weight:500;cursor:pointer;margin-top:14px;}
+.auth-pw-wrap{position:relative;margin-bottom:14px;}
+.auth-pw-wrap .auth-input{margin-bottom:0;padding-right:44px;}
+.auth-pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:16px;cursor:pointer;padding:6px;opacity:0.55;}
+.auth-pw-toggle.active{opacity:1;}
+.auth-remember-row{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#3A3A3C;margin-bottom:16px;cursor:pointer;}
+.auth-remember-row input{width:16px;height:16px;accent-color:#2D6A4F;cursor:pointer;}
 
 .ct-card{max-width:360px;}
 .ct-dates-row{display:flex;gap:10px;margin-bottom:14px;}
@@ -659,12 +665,75 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   </div>
   <div id="auth-fatal-error" class="auth-error" style="display:none;"></div>
   <div class="auth-card">
-    <div id="auth-step-email">
+
+    <!-- Connexion (par défaut) -->
+    <div id="auth-step-password">
+      <label class="auth-label">Adresse email</label>
+      <input type="email" id="auth-pw-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
+      <label class="auth-label">Mot de passe</label>
+      <div class="auth-pw-wrap">
+        <input type="password" id="auth-pw-password-input" class="auth-input" placeholder="••••••••" autocomplete="current-password">
+        <button type="button" class="auth-pw-toggle" data-target="auth-pw-password-input">👁</button>
+      </div>
+      <label class="auth-remember-row"><input type="checkbox" id="auth-remember-checkbox" checked> <span>Rester connecté</span></label>
+      <div id="auth-pw-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
+      <button id="auth-pw-signin-btn" class="btn-primary">Se connecter</button>
+      <p class="auth-hint" style="margin-top:14px;text-align:center"><a href="#" id="auth-show-forgot-link" style="color:var(--ink-muted);text-decoration:none">Mot de passe oublié ?</a></p>
+      <p class="auth-hint" style="margin-top:6px;text-align:center">Pas encore de compte ? <a href="#" id="auth-show-signup-link" style="color:var(--accent);text-decoration:none;font-weight:600">Créer un compte</a></p>
+      <p class="auth-hint" style="margin-top:14px;text-align:center"><a href="#" id="auth-show-password-link" style="color:var(--ink-subtle);text-decoration:none;font-size:12px">Recevoir un lien magique à la place</a></p>
+    </div>
+
+    <!-- Création de compte -->
+    <div id="auth-step-signup" style="display:none;">
+      <label class="auth-label">Adresse email</label>
+      <input type="email" id="auth-su-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
+      <label class="auth-label">Mot de passe</label>
+      <div class="auth-pw-wrap">
+        <input type="password" id="auth-su-password-input" class="auth-input" placeholder="8 caractères minimum" autocomplete="new-password">
+        <button type="button" class="auth-pw-toggle" data-target="auth-su-password-input">👁</button>
+      </div>
+      <label class="auth-label">Confirmer le mot de passe</label>
+      <div class="auth-pw-wrap">
+        <input type="password" id="auth-su-password2-input" class="auth-input" placeholder="••••••••" autocomplete="new-password">
+        <button type="button" class="auth-pw-toggle" data-target="auth-su-password2-input">👁</button>
+      </div>
+      <div id="auth-su-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
+      <button id="auth-su-submit-btn" class="btn-primary">Créer mon compte</button>
+      <p class="auth-hint" style="margin-top:14px;text-align:center">Déjà un compte ? <a href="#" id="auth-signup-back-link" style="color:var(--accent);text-decoration:none;font-weight:600">Se connecter</a></p>
+    </div>
+
+    <!-- Email de confirmation envoyé (inscription) -->
+    <div id="auth-step-signup-sent" style="display:none;">
+      <div class="auth-icon-success">✉️</div>
+      <h3>Vérifie ta boîte mail</h3>
+      <p class="auth-hint">On t'a envoyé un email pour confirmer ton adresse. Une fois confirmée, connecte-toi avec ton mot de passe.</p>
+      <button id="auth-signup-sent-back-btn" class="btn-secondary">Retour à la connexion</button>
+    </div>
+
+    <!-- Mot de passe oublié -->
+    <div id="auth-step-forgot" style="display:none;">
+      <label class="auth-label">Adresse email</label>
+      <input type="email" id="auth-forgot-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
+      <div id="auth-forgot-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
+      <button id="auth-forgot-submit-btn" class="btn-primary">Envoyer le lien de réinitialisation</button>
+      <p class="auth-hint" style="margin-top:14px;text-align:center"><a href="#" id="auth-forgot-back-link" style="color:var(--accent);text-decoration:none;font-weight:600">‹ Retour à la connexion</a></p>
+    </div>
+
+    <!-- Lien de réinitialisation envoyé -->
+    <div id="auth-step-forgot-sent" style="display:none;">
+      <div class="auth-icon-success">✉️</div>
+      <h3>Email envoyé</h3>
+      <p class="auth-hint">Clique sur le lien reçu pour choisir un nouveau mot de passe.</p>
+      <button id="auth-forgot-sent-back-btn" class="btn-secondary">Retour à la connexion</button>
+    </div>
+
+    <!-- Lien magique (secondaire) -->
+    <div id="auth-step-email" style="display:none;">
       <label class="auth-label">Adresse email</label>
       <input type="email" id="auth-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
       <button id="auth-send-link-btn" class="btn-primary">Recevoir le lien magique</button>
       <p class="auth-hint">Pas de mot de passe. On vous envoie un lien de connexion sécurisé.</p>
-      <p class="auth-hint" style="margin-top:14px"><a href="#" id="auth-show-password-link" style="color:var(--accent);text-decoration:none;font-weight:600">J'ai un compte avec mot de passe</a></p>
+      <p class="auth-hint" style="margin-top:14px;text-align:center"><a href="#" id="auth-show-magic-link" style="color:var(--accent);text-decoration:none;font-weight:600">‹ Retour à la connexion par mot de passe</a></p>
     </div>
     <div id="auth-step-sent" style="display:none;">
       <div class="auth-icon-success">✉️</div>
@@ -672,14 +741,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <p class="auth-hint">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
       <button id="auth-retry-btn" class="btn-secondary">Utiliser une autre adresse</button>
     </div>
-    <div id="auth-step-password" style="display:none;">
-      <label class="auth-label">Adresse email</label>
-      <input type="email" id="auth-pw-email-input" class="auth-input" placeholder="vous@exemple.com" autocomplete="email">
-      <label class="auth-label">Mot de passe</label>
-      <input type="password" id="auth-pw-password-input" class="auth-input" placeholder="••••••••" autocomplete="current-password">
-      <button id="auth-pw-signin-btn" class="btn-primary">Se connecter</button>
-      <p class="auth-hint" style="margin-top:14px"><a href="#" id="auth-show-magic-link" style="color:var(--accent);text-decoration:none;font-weight:600">Recevoir un lien magique à la place</a></p>
-    </div>
+
   </div>
 </div>
 
@@ -4553,6 +4615,8 @@ async function logoutUser(){
     CURRENT_TRIP = null;
     localStorage.removeItem('planitrip_last_trip_id');
     document.getElementById('main-app').style.display = 'none';
+    if (typeof hideAllAuthSteps === 'function') hideAllAuthSteps();
+    document.getElementById('auth-step-password').style.display = 'block';
     showAuthScreen();
   }, 'Déconnexion');
 }
@@ -4893,7 +4957,16 @@ async function initAuth() {
       showFatalAuthError("Impossible de charger le service de connexion (bloqueur de pub ou réseau ?). Réessaie de recharger la page.");
       return;
     }
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const customAuthStorage = {
+      getItem: (key) => localStorage.getItem(key) || sessionStorage.getItem(key),
+      setItem: (key, value) => {
+        const remember = localStorage.getItem('planitrip_remember_me') !== 'false';
+        if (remember) { localStorage.setItem(key, value); sessionStorage.removeItem(key); }
+        else { sessionStorage.setItem(key, value); localStorage.removeItem(key); }
+      },
+      removeItem: (key) => { localStorage.removeItem(key); sessionStorage.removeItem(key); }
+    };
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storage: customAuthStorage } });
 
     const { data: { session }, error } = await sb.auth.getSession();
     if (error) {
@@ -5485,29 +5558,81 @@ document.getElementById('auth-retry-btn').addEventListener('click', () => {
   document.getElementById('auth-email-input').value = '';
 });
 
+document.querySelectorAll('.auth-pw-toggle').forEach(function(btn){
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.getAttribute('data-target'));
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.classList.toggle('active', !showing);
+  });
+});
+
+function hideAllAuthSteps(){
+  ['auth-step-password','auth-step-signup','auth-step-signup-sent','auth-step-forgot','auth-step-forgot-sent','auth-step-email','auth-step-sent'].forEach(function(id){
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
 document.getElementById('auth-show-password-link').addEventListener('click', (e) => {
   e.preventDefault();
-  document.getElementById('auth-step-email').style.display = 'none';
-  document.getElementById('auth-step-password').style.display = 'block';
+  hideAllAuthSteps();
+  document.getElementById('auth-step-email').style.display = 'block';
 });
 
 document.getElementById('auth-show-magic-link').addEventListener('click', (e) => {
   e.preventDefault();
-  document.getElementById('auth-step-password').style.display = 'none';
-  document.getElementById('auth-step-email').style.display = 'block';
+  hideAllAuthSteps();
+  document.getElementById('auth-step-password').style.display = 'block';
+});
+
+document.getElementById('auth-show-signup-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  hideAllAuthSteps();
+  document.getElementById('auth-step-signup').style.display = 'block';
+});
+document.getElementById('auth-signup-back-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  hideAllAuthSteps();
+  document.getElementById('auth-step-password').style.display = 'block';
+});
+document.getElementById('auth-signup-sent-back-btn').addEventListener('click', () => {
+  hideAllAuthSteps();
+  document.getElementById('auth-step-password').style.display = 'block';
+});
+
+document.getElementById('auth-show-forgot-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  hideAllAuthSteps();
+  document.getElementById('auth-step-forgot').style.display = 'block';
+});
+document.getElementById('auth-forgot-back-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  hideAllAuthSteps();
+  document.getElementById('auth-step-password').style.display = 'block';
+});
+document.getElementById('auth-forgot-sent-back-btn').addEventListener('click', () => {
+  hideAllAuthSteps();
+  document.getElementById('auth-step-password').style.display = 'block';
 });
 
 document.getElementById('auth-pw-signin-btn').addEventListener('click', async () => {
   const email = document.getElementById('auth-pw-email-input').value.trim();
   const password = document.getElementById('auth-pw-password-input').value;
+  const errEl = document.getElementById('auth-pw-error');
+  errEl.style.display = 'none';
+
   if (!email || !password) {
-    alert('Merci de renseigner ton email et ton mot de passe.');
+    errEl.textContent = 'Merci de renseigner ton email et ton mot de passe.';
+    errEl.style.display = 'block';
     return;
   }
   if (!sb) {
     showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page.");
     return;
   }
+
+  const remember = document.getElementById('auth-remember-checkbox').checked;
+  localStorage.setItem('planitrip_remember_me', remember ? 'true' : 'false');
 
   const btn = document.getElementById('auth-pw-signin-btn');
   btn.disabled = true;
@@ -5519,8 +5644,75 @@ document.getElementById('auth-pw-signin-btn').addEventListener('click', async ()
   btn.textContent = 'Se connecter';
 
   if (error) {
-    alert('Erreur de connexion : ' + (error.message === 'Invalid login credentials' ? 'email ou mot de passe incorrect.' : error.message));
+    errEl.textContent = error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message;
+    errEl.style.display = 'block';
   }
+});
+
+document.getElementById('auth-su-submit-btn').addEventListener('click', async () => {
+  const email = document.getElementById('auth-su-email-input').value.trim();
+  const pw1 = document.getElementById('auth-su-password-input').value;
+  const pw2 = document.getElementById('auth-su-password2-input').value;
+  const errEl = document.getElementById('auth-su-error');
+  errEl.style.display = 'none';
+
+  if (!email || !email.includes('@')) {
+    errEl.textContent = 'Merci d\'entrer une adresse email valide.'; errEl.style.display = 'block'; return;
+  }
+  if (!pw1 || pw1.length < 8) {
+    errEl.textContent = 'Le mot de passe doit faire au moins 8 caractères.'; errEl.style.display = 'block'; return;
+  }
+  if (pw1 !== pw2) {
+    errEl.textContent = 'Les deux mots de passe ne correspondent pas.'; errEl.style.display = 'block'; return;
+  }
+  if (!sb) { showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page."); return; }
+
+  const btn = document.getElementById('auth-su-submit-btn');
+  btn.disabled = true; btn.textContent = 'Création...';
+
+  const { error } = await sb.auth.signUp({
+    email, password: pw1,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+
+  btn.disabled = false; btn.textContent = 'Créer mon compte';
+
+  if (error) {
+    errEl.textContent = error.message.includes('already registered') ? 'Un compte existe déjà avec cet email.' : error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  hideAllAuthSteps();
+  document.getElementById('auth-step-signup-sent').style.display = 'block';
+});
+
+document.getElementById('auth-forgot-submit-btn').addEventListener('click', async () => {
+  const email = document.getElementById('auth-forgot-email-input').value.trim();
+  const errEl = document.getElementById('auth-forgot-error');
+  errEl.style.display = 'none';
+
+  if (!email || !email.includes('@')) {
+    errEl.textContent = 'Merci d\'entrer une adresse email valide.'; errEl.style.display = 'block'; return;
+  }
+  if (!sb) { showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page."); return; }
+
+  const btn = document.getElementById('auth-forgot-submit-btn');
+  btn.disabled = true; btn.textContent = 'Envoi...';
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+
+  btn.disabled = false; btn.textContent = 'Envoyer le lien de réinitialisation';
+
+  if (error) {
+    errEl.textContent = error.message; errEl.style.display = 'block';
+    return;
+  }
+
+  hideAllAuthSteps();
+  document.getElementById('auth-step-forgot-sent').style.display = 'block';
 });
 
 </script>
