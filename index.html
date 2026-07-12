@@ -943,6 +943,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 <script>
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
+let IN_PASSWORD_RECOVERY = false;
 // ── GPS COORDINATES ────────────────────────────────────────────
 // Format: [lat, lng, "Place name for search fallback"]
 const COORDS = {
@@ -5044,8 +5045,6 @@ async function initAuth() {
     } else {
       showAuthScreen();
     }
-
-let IN_PASSWORD_RECOVERY = false;
 
     sb.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
