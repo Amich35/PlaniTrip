@@ -3516,8 +3516,12 @@ function renderCarnetScreen(){
 }
 
 function renderMore(){
+  var myPseudo = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || '';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Plus</div>'
+    +'<div class="info-card" style="padding:6px">'
+    +'<div class="more-row" onclick="showMyAccountScreen()"><span class="more-row-icon" data-icon="user" data-icon-size="19"></span><span class="more-row-label">'+(myPseudo ? escHtml(myPseudo) : 'Mon compte')+'</span><span class="more-row-chevron">›</span></div>'
+    +'</div>'
     +'<div class="info-card" style="padding:6px">'
     +'<div class="more-row" onclick="setTab(\'documents\')"><span class="more-row-icon" data-icon="file-text" data-icon-size="19"></span><span class="more-row-label">Documents</span><span class="more-row-chevron">›</span></div>'
     +'<div class="more-row" onclick="setTab(\'journal\')"><span class="more-row-icon" data-icon="notebook-pen" data-icon-size="19"></span><span class="more-row-label">Carnet de voyage</span><span class="more-row-chevron">›</span></div>'
@@ -4485,6 +4489,74 @@ function renderArchivedCountriesScreen(){
 var _acmScopeAll = true;
 var _acmScopeCountries = [];
 
+function showMyAccountScreen(){
+  S.tab='my-account'; save(); renderContent();
+}
+
+function getInitials(str){
+  if(!str) return '?';
+  var base = str.split('@')[0];
+  var parts = base.replace(/[._-]+/g,' ').trim().split(/\s+/);
+  if(parts.length>=2) return (parts[0][0]+parts[1][0]).toUpperCase();
+  return base.slice(0,2).toUpperCase();
+}
+function avatarCircle(label, size){
+  size = size || 44;
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:var(--accent-pale);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:'+(size*0.38)+'px;flex-shrink:0">'+getInitials(label)+'</div>';
+}
+
+function renderMyAccountScreen(){
+  var email = (CURRENT_USER && CURRENT_USER.email) || '';
+  var pseudo = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || '';
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Mon compte</div>'
+    +'<div style="display:flex;justify-content:center;margin-bottom:16px">'+avatarCircle(pseudo||email, 72)+'</div>'
+    +'<div class="info-card">'
+    +'<div class="ic-header">Email</div>'
+    +'<div style="font-size:14px;color:var(--ink-muted);margin-bottom:14px">'+escHtml(email)+'</div>'
+    +'<div class="ic-header">Pseudo</div>'
+    +'<input type="text" id="my-account-pseudo-input" class="auth-input" placeholder="ex: André" value="'+escHtml(pseudo)+'" style="margin-bottom:6px">'
+    +'<p class="auth-hint" style="margin:0 0 10px">Ce pseudo apparaîtra à la place de ton email pour tes compagnons de voyage (ex: dans les dépenses ajoutées).</p>'
+    +'<div id="my-account-error" class="auth-error" style="display:none;margin-bottom:8px"></div>'
+    +'<button id="my-account-save-btn" class="btn-primary" onclick="saveMyPseudo()">Enregistrer</button>'
+    +'</div>'
+    +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
+    +'</div>';
+}
+
+async function saveMyPseudo(){
+  var input = document.getElementById('my-account-pseudo-input');
+  var errEl = document.getElementById('my-account-error');
+  errEl.style.display='none';
+  var pseudo = input.value.trim();
+  if (!sb) { errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
+
+  var btn = document.getElementById('my-account-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+
+  const { data, error } = await sb.auth.updateUser({ data: { pseudo: pseudo } });
+
+  btn.disabled = false; btn.textContent = 'Enregistrer';
+
+  if (error) {
+    errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block'; return;
+  }
+  if (data && data.user) CURRENT_USER = data.user;
+  renderContent();
+}
+
+async function logoutUser(){
+  showConfirm('Te déconnecter ?', async function(){
+    if (sb) await sb.auth.signOut();
+    CURRENT_USER = null;
+    CURRENT_TRIP = null;
+    localStorage.removeItem('planitrip_last_trip_id');
+    document.getElementById('main-app').style.display = 'none';
+    showAuthScreen();
+  }, 'Déconnexion');
+}
+
 function showAccessManagementScreen(){
   S.tab='access-management'; save();
   _acmScopeAll = true; _acmScopeCountries = [];
@@ -4555,15 +4627,16 @@ function renderAccessManagementScreen(){
   var tripCountries = effectiveTripCountries();
 
   var ownerLabel = isOwner ? 'Toi (propriétaire)' : 'Propriétaire du voyage';
-  var ownerRow = '<div class="more-row"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">'+ownerLabel+'</span><span style="font-size:12px;color:var(--ink-muted)">Tous les pays</span></div>';
+  var ownerPseudo = isOwner ? ((CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || CURRENT_USER.email) : ownerLabel;
+  var ownerRow = '<div class="more-row" style="padding:8px 4px">'+avatarCircle(ownerPseudo,36)+'<span class="more-row-label" style="margin-left:10px">'+ownerLabel+'</span><span style="font-size:12px;color:var(--ink-muted)">Tous les pays</span></div>';
 
   var collabRows = CURRENT_COLLABORATORS.map(function(c){
     var scopeLabel = (c.scope && c.scope.indexOf('all')>-1) ? 'Tous les pays' : ((c.scope||[]).join(', ')||'Aucun pays');
     var statusLabel = c.user_id ? '' : ' · en attente';
     var label = c.invited_email || c.user_id;
     var removeBtn = isOwner ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
-    return '<div class="more-row"><span class="more-row-icon" data-icon="user" data-icon-size="19"></span>'
-      +'<div style="flex:1;min-width:0"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(label)+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
+    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(label,36)
+      +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(label)+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
       +removeBtn+'</div>';
   }).join('');
 
@@ -4629,6 +4702,7 @@ function renderContent(){
   else if(S.tab==='journal')html=renderCarnetScreen();
   else if(S.tab==='archived-countries')html=renderArchivedCountriesScreen();
   else if(S.tab==='access-management')html=renderAccessManagementScreen();
+  else if(S.tab==='my-account')html=renderMyAccountScreen();
   else html=renderMore();
   document.getElementById('mainContent').innerHTML=html;
   document.querySelectorAll('.day-badge[data-actkey]').forEach(function(btn){
