@@ -5035,12 +5035,21 @@ async function initAuth() {
     };
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storage: customAuthStorage } });
 
+    if (window.location.hash.includes('type=recovery') || window.location.href.includes('type=recovery')) {
+      IN_PASSWORD_RECOVERY = true;
+    }
+
     const { data: { session }, error } = await sb.auth.getSession();
     if (error) {
       showFatalAuthError("Erreur de connexion : " + error.message);
       return;
     }
-    if (session) {
+    if (IN_PASSWORD_RECOVERY) {
+      CURRENT_USER = session ? session.user : null;
+      showAuthScreen();
+      hideAllAuthSteps();
+      document.getElementById('auth-step-set-password').style.display = 'block';
+    } else if (session) {
       onAuthenticated(session.user);
     } else {
       showAuthScreen();
