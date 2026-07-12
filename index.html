@@ -625,13 +625,13 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .auth-hint{font-size:12.5px;color:#6E6E73;line-height:1.5;margin:12px 0 0 0;text-align:center;}
 .auth-icon-success{font-size:36px;text-align:center;margin-bottom:10px;}
 .auth-card h3{text-align:center;font-size:18px;color:#1D1D1F;margin:0 0 6px 0;}
-.auth-card .btn-primary{width:100%;padding:14px;border:none;border-radius:14px;background:#2D6A4F;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
-.auth-card .btn-primary:disabled{opacity:0.6;}
+.btn-primary{width:100%;padding:14px;border:none;border-radius:14px;background:#2D6A4F;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+.btn-primary:disabled{opacity:0.6;}
 .auth-card .btn-secondary{width:100%;padding:14px;border:1px solid #E5E3DE;border-radius:14px;background:transparent;color:#1D1D1F;font-size:15px;font-weight:500;cursor:pointer;margin-top:14px;}
 .auth-pw-wrap{position:relative;margin-bottom:14px;}
 .auth-pw-wrap .auth-input{margin-bottom:0;padding-right:44px;}
-.auth-pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:16px;cursor:pointer;padding:6px;opacity:0.55;}
-.auth-pw-toggle.active{opacity:1;}
+.auth-pw-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;padding:8px;opacity:0.5;display:flex;align-items:center;justify-content:center;color:#3A3A3C;}
+.auth-pw-toggle.active{opacity:0.9;}
 .auth-remember-row{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#3A3A3C;margin-bottom:16px;cursor:pointer;}
 .auth-remember-row input{width:16px;height:16px;accent-color:#2D6A4F;cursor:pointer;}
 
@@ -673,7 +673,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <label class="auth-label">Mot de passe</label>
       <div class="auth-pw-wrap">
         <input type="password" id="auth-pw-password-input" class="auth-input" placeholder="••••••••" autocomplete="current-password">
-        <button type="button" class="auth-pw-toggle" data-target="auth-pw-password-input">👁</button>
+        <button type="button" class="auth-pw-toggle" data-target="auth-pw-password-input"><span data-icon="eye" data-icon-size="18"></span></button>
       </div>
       <label class="auth-remember-row"><input type="checkbox" id="auth-remember-checkbox" checked> <span>Rester connecté</span></label>
       <div id="auth-pw-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
@@ -690,12 +690,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <label class="auth-label">Mot de passe</label>
       <div class="auth-pw-wrap">
         <input type="password" id="auth-su-password-input" class="auth-input" placeholder="8 caractères minimum" autocomplete="new-password">
-        <button type="button" class="auth-pw-toggle" data-target="auth-su-password-input">👁</button>
+        <button type="button" class="auth-pw-toggle" data-target="auth-su-password-input"><span data-icon="eye" data-icon-size="18"></span></button>
       </div>
       <label class="auth-label">Confirmer le mot de passe</label>
       <div class="auth-pw-wrap">
         <input type="password" id="auth-su-password2-input" class="auth-input" placeholder="••••••••" autocomplete="new-password">
-        <button type="button" class="auth-pw-toggle" data-target="auth-su-password2-input">👁</button>
+        <button type="button" class="auth-pw-toggle" data-target="auth-su-password2-input"><span data-icon="eye" data-icon-size="18"></span></button>
       </div>
       <div id="auth-su-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
       <button id="auth-su-submit-btn" class="btn-primary">Créer mon compte</button>
@@ -734,12 +734,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <label class="auth-label">Nouveau mot de passe</label>
       <div class="auth-pw-wrap">
         <input type="password" id="auth-sp-password-input" class="auth-input" placeholder="8 caractères minimum" autocomplete="new-password">
-        <button type="button" class="auth-pw-toggle" data-target="auth-sp-password-input">👁</button>
+        <button type="button" class="auth-pw-toggle" data-target="auth-sp-password-input"><span data-icon="eye" data-icon-size="18"></span></button>
       </div>
       <label class="auth-label">Confirmer le mot de passe</label>
       <div class="auth-pw-wrap">
         <input type="password" id="auth-sp-password2-input" class="auth-input" placeholder="••••••••" autocomplete="new-password">
-        <button type="button" class="auth-pw-toggle" data-target="auth-sp-password2-input">👁</button>
+        <button type="button" class="auth-pw-toggle" data-target="auth-sp-password2-input"><span data-icon="eye" data-icon-size="18"></span></button>
       </div>
       <div id="auth-sp-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
       <button id="auth-sp-submit-btn" class="btn-primary">Enregistrer et continuer</button>
@@ -2487,6 +2487,22 @@ function showSuggestions(ck) {
   });
 }
 
+function addPhotoSpot(countryId){
+  var inp = document.getElementById('newphotospot_'+countryId);
+  if(!inp) return;
+  var val = inp.value.trim();
+  if(!val) return;
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return;
+  if(!c.photo) c.photo = [];
+  c.photo.push({n: val, t: 'Spot photo ajouté par vous'});
+  if(!S.countryEdits[countryId]) S.countryEdits[countryId] = {};
+  S.countryEdits[countryId].photo = c.photo;
+  inp.value = '';
+  save();
+  renderContent();
+}
+
 function addActivity(cityKey) {
   const inp = document.getElementById('newact_'+cityKey);
   if(!inp) return;
@@ -3003,7 +3019,9 @@ function renderItinerary(c, embedded){
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(29,29,31,0.2);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif"><span data-icon="plus" data-icon-size="14"></span> Ajouter une ville</button>'
     +cityTrashSectionHTML(c.id)
     +'</div>'
-    +'<div class="section" style="padding-bottom:20px"><div class="section-header"><div class="section-title">Spots photo</div></div><div class="photo-grid">'+photoHTML+'</div></div>';
+    +'<div class="section" style="padding-bottom:20px"><div class="section-header"><div class="section-title">Spots photo</div></div><div class="photo-grid">'+photoHTML+'</div>'
+    +'<div class="add-act-form" style="margin-top:10px"><div class="add-act-row"><input class="add-act-input" id="newphotospot_'+c.id+'" type="text" placeholder="Nom du spot (ex: Chichen Itza)…" autocomplete="off"/><button class="add-act-btn" onclick="addPhotoSpot(\''+c.id+'\')">&#65291;</button></div></div>'
+    +'</div>';
 }
 
 function renderBudget(c){
@@ -4301,6 +4319,25 @@ function startCountdownTick() {
 }
 
 // ── MAP VIEW ────────────────────────────────────────────────
+function getCountryMapCenter(c){
+  var known = {
+    'Mexique':[19.43,-99.13],'France':[46.6,2.5],'Égypte':[26.8,30.8],'Italie':[42.5,12.5],'Espagne':[40.2,-3.7],
+    'Royaume-Uni':[52.5,-1.5],'États-Unis':[39.8,-98.5],'Grèce':[39.0,22.0],'Portugal':[39.5,-8.0],'Allemagne':[51.1,10.4],
+    'Pérou':[-9.2,-75.0],'Brésil':[-14.2,-51.9],'Argentine':[-38.4,-63.6],'Chili':[-35.6,-71.5],'Maroc':[31.8,-7.1],
+    'Tunisie':[33.9,9.5],'Turquie':[38.9,35.2],'Chine':[35.0,105.0],'Inde':[22.0,79.0],'Népal':[28.4,84.1],
+    'Sri Lanka':[7.9,80.7],'Australie':[-25.3,133.8],'Nouvelle-Zélande':[-41.0,174.9],'Canada':[56.1,-106.3],'Islande':[64.9,-19.0],
+    'Norvège':[60.5,8.5],'Suisse':[46.8,8.2],'Autriche':[47.5,14.6],'Croatie':[45.1,15.2],'Kenya':[-0.2,37.9],
+    'Tanzanie':[-6.4,34.9],'Afrique du Sud':[-30.6,22.9],'Jordanie':[31.2,36.8],'Émirats arabes unis':[24.0,54.0],'Russie':[61.5,105.3],
+    'Cuba':[21.5,-77.8],'Colombie':[4.6,-74.3],'Équateur':[-1.8,-78.2],'Bolivie':[-16.3,-63.6],'Costa Rica':[9.7,-83.8],
+    'Madagascar':[-18.8,46.9],'Singapour':[1.35,103.8],'Malaisie':[4.2,101.9],'Corée du Sud':[35.9,127.8],'Taïwan':[23.7,121.0],
+    'Mongolie':[46.9,103.8],'Pays-Bas':[52.1,5.3],'Belgique':[50.5,4.5],'Irlande':[53.4,-8.2],'Suède':[62.0,15.0],
+    'Danemark':[56.3,9.5],'Finlande':[64.0,26.0],'Pologne':[51.9,19.1],'Hongrie':[47.2,19.5],'Israël':[31.5,34.8],
+    'Japon':[36.2,138.3],'Cambodge':[12.6,105.0],'Thaïlande':[15.9,101.0],'Laos':[19.9,102.6],'Vietnam':[14.1,108.3],
+    'Indonésie':[-2.5,118.0],'Philippines':[12.9,121.8]
+  };
+  return known[c.name] || null;
+}
+
 function renderMap(c) {
   var allPoints = [];
   var prefix = c.id + '_';
@@ -4352,8 +4389,10 @@ function renderMap(c) {
       return;
     }
     if(window._leafletMap){ window._leafletMap.remove(); window._leafletMap=null; }
-    var centerLat = points.length ? points[0].lat : 35.68;
-    var centerLng = points.length ? points[0].lng : 139.69;
+    var countryCenter = getCountryMapCenter(c);
+    var centerLat = points.length ? points[0].lat : (countryCenter ? countryCenter[0] : 20);
+    var centerLng = points.length ? points[0].lng : (countryCenter ? countryCenter[1] : 0);
+    var centerZoom = points.length ? 10 : (countryCenter ? 6 : 2);
     var navH = document.querySelector('.bottom-nav') ? document.querySelector('.bottom-nav').offsetHeight : 72;
     var headerH = document.querySelector('.top-bar') ? document.querySelector('.top-bar').offsetHeight : 60;
     var stripH = document.querySelector('.country-strip') ? document.querySelector('.country-strip').offsetHeight : 44;
@@ -4361,7 +4400,7 @@ function renderMap(c) {
     var availH = window.innerHeight - navH - headerH - stripH - mapHeaderH - 8;
     mapEl.style.height = Math.max(availH, 300) + 'px';
     mapEl.innerHTML='';
-    var map = L.map('leaflet-map', {zoomControl:true, attributionControl:true}).setView([centerLat, centerLng], 10);
+    var map = L.map('leaflet-map', {zoomControl:true, attributionControl:true}).setView([centerLat, centerLng], centerZoom);
     window._leafletMap = map;
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',attribution:'© OpenStreetMap contributors © CARTO'}).addTo(map);
     var markerIcon = L.divIcon({
@@ -4767,6 +4806,12 @@ function updateTopBarSub(){
   }
   el.textContent = name + dateLabel + ' · ' + countryCount + (countryCount>1?' pays':' pays');
 }
+function syncActiveNavTab(){
+  var activeId = (S.tab==='country') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='archived-countries'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
+  var el = document.getElementById('tab-'+activeId);
+  if(el) el.classList.add('active');
+}
 function renderContent(){
   const c=getC();let html='';
   if(S.tab==='home')html=renderHome();
@@ -4800,6 +4845,7 @@ function renderContent(){
   setTimeout(renderIcons, 10);
   setTimeout(function(){ loadPlaceImages(document.getElementById('mainContent')); }, 30);
   updateTopBarSub();
+  syncActiveNavTab();
 }
 
 // ── ICON LIBRARY — 24×24, 2px stroke, round cap/join, no fill ──
@@ -4842,6 +4888,8 @@ const ICON_PATHS = {
   archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  'eye-off': '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.24 3.14M6.61 6.61A17 17 0 0 0 2 12s3.5 8 10 8a9 9 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" y1="2" x2="22" y2="22"/>',
 };
 function svgIcon(name, size){
   size=size||22;
@@ -4997,8 +5045,11 @@ async function initAuth() {
       showAuthScreen();
     }
 
+let IN_PASSWORD_RECOVERY = false;
+
     sb.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        IN_PASSWORD_RECOVERY = true;
         CURRENT_USER = session ? session.user : null;
         showAuthScreen();
         hideAllAuthSteps();
@@ -5006,6 +5057,7 @@ async function initAuth() {
         return;
       }
       if (event === 'SIGNED_IN' && session) {
+        if (IN_PASSWORD_RECOVERY) return; // en cours de définition de mot de passe : ne pas naviguer
         if (CURRENT_TRIP) return; // déjà dans un trip : ignorer le re-déclenchement (ex: retour d'onglet)
         onAuthenticated(session.user);
       } else if (event === 'SIGNED_OUT') {
@@ -5524,6 +5576,7 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
 
 loadCountryFlags();
 initAuth();
+setTimeout(renderIcons, 10);
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
   console.log('[PlaniTrip auth] clic sur "Recevoir le lien magique"');
@@ -5589,6 +5642,7 @@ document.querySelectorAll('.auth-pw-toggle').forEach(function(btn){
     const showing = input.type === 'text';
     input.type = showing ? 'password' : 'text';
     btn.classList.toggle('active', !showing);
+    btn.innerHTML = svgIcon(showing ? 'eye' : 'eye-off', 18);
   });
 });
 
@@ -5767,6 +5821,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   }
 
   if (data && data.user) CURRENT_USER = data.user;
+  IN_PASSWORD_RECOVERY = false;
   onAuthenticated(CURRENT_USER);
 });
 
