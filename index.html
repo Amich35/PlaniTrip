@@ -4939,9 +4939,11 @@ function applyTripCountryFilter(trip) {
       const id = countryName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) + '_' + Date.now() + Math.floor(Math.random()*1000);
       const flagEmoji = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[countryName]) || '🌍';
       const currencyGuess = (window.COUNTRY_CURRENCIES && window.COUNTRY_CURRENCIES[countryName]) || '';
+      const rateGuess = (window.COUNTRY_RATES && window.COUNTRY_RATES[countryName]) || 1;
+      const langGuess = (window.COUNTRY_LANGUAGES && window.COUNTRY_LANGUAGES[countryName]) || '';
       const newCountry = {
         id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
-        currency: currencyGuess, rate: '', visa: 'À vérifier selon ta nationalité — consulte France Diplomatie ou les autorités officielles du pays.', lang: '', budget_daily: 50,
+        currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier selon ta nationalité — consulte France Diplomatie ou les autorités officielles du pays.', lang: langGuess, budget_daily: 50,
         alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[]}
       };
       COUNTRIES.push(newCountry);
@@ -4950,6 +4952,20 @@ function applyTripCountryFilter(trip) {
     } else {
       const idx = S.deletedCountryIds.indexOf(exists.id);
       if (idx !== -1) S.deletedCountryIds.splice(idx, 1);
+      // Rattrapage : compléter les champs restés vides (créés avant l'ajout du pré-remplissage)
+      const builtInIds = ['jp','kh','th','la','vn','id','ph'];
+      if (!builtInIds.includes(exists.id)) {
+        if (!exists.rateNum && window.COUNTRY_RATES && window.COUNTRY_RATES[countryName]) {
+          exists.rateNum = window.COUNTRY_RATES[countryName];
+          if (!exists.rate) exists.rate = '1€ = ' + exists.rateNum + ' ' + ((exists.currency||'').match(/\(([A-Z]+)\)/)||[,''])[1];
+        }
+        if (!exists.lang && window.COUNTRY_LANGUAGES && window.COUNTRY_LANGUAGES[countryName]) {
+          exists.lang = window.COUNTRY_LANGUAGES[countryName];
+        }
+        if (!exists.currency && window.COUNTRY_CURRENCIES && window.COUNTRY_CURRENCIES[countryName]) {
+          exists.currency = window.COUNTRY_CURRENCIES[countryName];
+        }
+      }
     }
   });
 
@@ -5119,6 +5135,8 @@ let CT_COUNTRIES = [];
 let CT_ALL_COUNTRY_NAMES = [];
 window.COUNTRY_FLAGS = {};
 window.COUNTRY_CURRENCIES = {};
+window.COUNTRY_RATES = {};
+window.COUNTRY_LANGUAGES = {};
 
 async function loadCountryFlags() {
   if (Object.keys(window.COUNTRY_FLAGS).length) return;
@@ -5133,6 +5151,18 @@ async function loadCountryFlags() {
     window.COUNTRY_CURRENCIES = await res2.json();
   } catch (e) {
     console.error('[PlaniTrip] impossible de charger country_currencies.json', e);
+  }
+  try {
+    const res3 = await fetch('country_rates.json');
+    window.COUNTRY_RATES = await res3.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger country_rates.json', e);
+  }
+  try {
+    const res4 = await fetch('country_languages.json');
+    window.COUNTRY_LANGUAGES = await res4.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger country_languages.json', e);
   }
 }
 
