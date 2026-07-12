@@ -727,6 +727,24 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <button id="auth-forgot-sent-back-btn" class="btn-secondary">Retour à la connexion</button>
     </div>
 
+    <!-- Définir un nouveau mot de passe (après clic sur le lien reçu) -->
+    <div id="auth-step-set-password" style="display:none;">
+      <h3 style="text-align:center;margin-bottom:4px">Choisis un mot de passe</h3>
+      <p class="auth-hint" style="text-align:center;margin-bottom:16px">Il te servira à te connecter directement la prochaine fois.</p>
+      <label class="auth-label">Nouveau mot de passe</label>
+      <div class="auth-pw-wrap">
+        <input type="password" id="auth-sp-password-input" class="auth-input" placeholder="8 caractères minimum" autocomplete="new-password">
+        <button type="button" class="auth-pw-toggle" data-target="auth-sp-password-input">👁</button>
+      </div>
+      <label class="auth-label">Confirmer le mot de passe</label>
+      <div class="auth-pw-wrap">
+        <input type="password" id="auth-sp-password2-input" class="auth-input" placeholder="••••••••" autocomplete="new-password">
+        <button type="button" class="auth-pw-toggle" data-target="auth-sp-password2-input">👁</button>
+      </div>
+      <div id="auth-sp-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
+      <button id="auth-sp-submit-btn" class="btn-primary">Enregistrer et continuer</button>
+    </div>
+
     <!-- Lien magique (secondaire) -->
     <div id="auth-step-email" style="display:none;">
       <label class="auth-label">Adresse email</label>
@@ -4980,6 +4998,13 @@ async function initAuth() {
     }
 
     sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        CURRENT_USER = session ? session.user : null;
+        showAuthScreen();
+        hideAllAuthSteps();
+        document.getElementById('auth-step-set-password').style.display = 'block';
+        return;
+      }
       if (event === 'SIGNED_IN' && session) {
         if (CURRENT_TRIP) return; // déjà dans un trip : ignorer le re-déclenchement (ex: retour d'onglet)
         onAuthenticated(session.user);
@@ -5568,7 +5593,7 @@ document.querySelectorAll('.auth-pw-toggle').forEach(function(btn){
 });
 
 function hideAllAuthSteps(){
-  ['auth-step-password','auth-step-signup','auth-step-signup-sent','auth-step-forgot','auth-step-forgot-sent','auth-step-email','auth-step-sent'].forEach(function(id){
+  ['auth-step-password','auth-step-signup','auth-step-signup-sent','auth-step-forgot','auth-step-forgot-sent','auth-step-set-password','auth-step-email','auth-step-sent'].forEach(function(id){
     document.getElementById(id).style.display = 'none';
   });
 }
@@ -5713,6 +5738,36 @@ document.getElementById('auth-forgot-submit-btn').addEventListener('click', asyn
 
   hideAllAuthSteps();
   document.getElementById('auth-step-forgot-sent').style.display = 'block';
+});
+
+document.getElementById('auth-sp-submit-btn').addEventListener('click', async () => {
+  const pw1 = document.getElementById('auth-sp-password-input').value;
+  const pw2 = document.getElementById('auth-sp-password2-input').value;
+  const errEl = document.getElementById('auth-sp-error');
+  errEl.style.display = 'none';
+
+  if (!pw1 || pw1.length < 8) {
+    errEl.textContent = 'Le mot de passe doit faire au moins 8 caractères.'; errEl.style.display = 'block'; return;
+  }
+  if (pw1 !== pw2) {
+    errEl.textContent = 'Les deux mots de passe ne correspondent pas.'; errEl.style.display = 'block'; return;
+  }
+  if (!sb) { showFatalAuthError("Le service de connexion n'est pas disponible. Recharge la page."); return; }
+
+  const btn = document.getElementById('auth-sp-submit-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+
+  const { data, error } = await sb.auth.updateUser({ password: pw1 });
+
+  btn.disabled = false; btn.textContent = 'Enregistrer et continuer';
+
+  if (error) {
+    errEl.textContent = error.message; errEl.style.display = 'block';
+    return;
+  }
+
+  if (data && data.user) CURRENT_USER = data.user;
+  onAuthenticated(CURRENT_USER);
 });
 
 </script>
