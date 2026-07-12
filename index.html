@@ -301,6 +301,10 @@ a{color:var(--ink);}
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;z-index:100;background:rgba(248,246,242,0.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:var(--border);display:flex;padding:var(--sp8) 0 calc(12px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 rgba(29,29,31,0.056);}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:none;padding:var(--sp8) var(--sp4);min-height:44px;transition:opacity 0.15s;}
 .nav-btn .nav-icon{font-size:22px;line-height:1;color:#545454;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1);} .nav-btn.active .nav-icon{transform:scale(1.1);color:#2E7D5B;}
+.page-icon-badge{width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;}
+.page-icon-badge svg{stroke:#fff;}
+.nav-btn.active .nav-icon{background:var(--accent);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+.nav-btn.active .nav-icon svg{stroke:#fff;width:18px;height:18px;}
 .nav-btn .nav-lbl{font-size:9px;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-muted);font-weight:500;}
 .nav-btn.active .nav-lbl{color:var(--accent);font-weight:600;}
 
@@ -576,7 +580,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
 .icon svg{stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;}
 .nav-icon svg{width:22px;height:22px;}
-.nav-icon svg{stroke:currentColor;} .nav-btn.active .nav-icon svg{stroke:#2E7D5B;}
+.nav-icon svg{stroke:currentColor;}
 .icon-sm svg{width:16px;height:16px;}
 .icon-md svg{width:20px;height:20px;}
 .icon-lg svg{width:24px;height:24px;}
@@ -2473,6 +2477,28 @@ function saveCountryEdit(countryId){
   };
   save();
 }
+function fmtDateRangeFr(startISO, endISO){
+  if(!startISO && !endISO) return '';
+  if(startISO && !endISO) return new Date(startISO+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  if(!startISO && endISO) return new Date(endISO+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  var s = new Date(startISO+'T00:00:00'), e = new Date(endISO+'T00:00:00');
+  var sameMonth = s.getMonth()===e.getMonth() && s.getFullYear()===e.getFullYear();
+  if(sameMonth) return s.getDate()+'–'+e.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  return s.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+}
+function editCountryDateRange(countryId, startVal, endVal){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return;
+  if(startVal!==null) c.dateStart = startVal;
+  if(endVal!==null) c.dateEnd = endVal;
+  c.dates = fmtDateRangeFr(c.dateStart, c.dateEnd);
+  if(!S.countryEdits[countryId]) S.countryEdits[countryId] = {};
+  S.countryEdits[countryId].dateStart = c.dateStart;
+  S.countryEdits[countryId].dateEnd = c.dateEnd;
+  S.countryEdits[countryId].dates = c.dates;
+  save();
+  renderContent();
+}
 function editCountryField(countryId, field, value){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
@@ -2995,8 +3021,69 @@ const COUNTRY_HERO_QUERY={
   id:'Uluwatu Temple Bali cliff',
   ph:'El Nido Palawan lagoon Philippines',
 };
+// Banque de requêtes emblématiques par nom de pays (pour les voyages hors Asie, créés dynamiquement)
+const COUNTRY_HERO_QUERY_BY_NAME={
+  'France':'Eiffel Tower Paris France',
+  'Mexique':'Chichen Itza pyramid Mexico',
+  'Égypte':'Pyramids of Giza Egypt',
+  'Italie':'Colosseum Rome Italy',
+  'Espagne':'Sagrada Familia Barcelona Spain',
+  'Royaume-Uni':'Big Ben London England',
+  'États-Unis':'Statue of Liberty New York',
+  'Grèce':'Santorini blue domes Greece',
+  'Portugal':'Belem Tower Lisbon Portugal',
+  'Allemagne':'Neuschwanstein Castle Germany',
+  'Pérou':'Machu Picchu Peru',
+  'Brésil':'Christ the Redeemer Rio de Janeiro',
+  'Argentine':'Perito Moreno Glacier Patagonia Argentina',
+  'Chili':'Easter Island moai statues Chile',
+  'Maroc':'Chefchaouen blue city Morocco',
+  'Tunisie':'Sidi Bou Said Tunisia',
+  'Turquie':'Cappadocia hot air balloons Turkey',
+  'Chine':'Great Wall of China',
+  'Inde':'Taj Mahal India',
+  'Népal':'Mount Everest Himalaya Nepal',
+  'Sri Lanka':'Sigiriya rock fortress Sri Lanka',
+  'Australie':'Sydney Opera House Australia',
+  'Nouvelle-Zélande':'Milford Sound New Zealand',
+  'Canada':'Banff National Park Canada',
+  'Islande':'Jokulsarlon glacier lagoon Iceland',
+  'Norvège':'Lofoten Islands Norway fjord',
+  'Suisse':'Matterhorn Zermatt Switzerland',
+  'Autriche':'Hallstatt village Austria',
+  'Croatie':'Dubrovnik old town Croatia',
+  'Kenya':'Maasai Mara safari Kenya',
+  'Tanzanie':'Mount Kilimanjaro Tanzania',
+  'Afrique du Sud':'Table Mountain Cape Town',
+  'Jordanie':'Petra treasury Jordan',
+  'Émirats arabes unis':'Burj Khalifa Dubai',
+  'Russie':'Saint Basil Cathedral Moscow',
+  'Cuba':'Havana classic cars Cuba',
+  'Colombie':'Cartagena colorful streets Colombia',
+  'Équateur':'Galapagos Islands Ecuador',
+  'Bolivie':'Salar de Uyuni salt flat Bolivia',
+  'Costa Rica':'Arenal Volcano Costa Rica',
+  'Madagascar':'Avenue of the Baobabs Madagascar',
+  'Singapour':'Marina Bay Sands Singapore',
+  'Malaisie':'Petronas Towers Kuala Lumpur',
+  'Corée du Sud':'Gyeongbokgung Palace Seoul',
+  'Taïwan':'Taipei 101 Taiwan',
+  'Mongolie':'Gobi Desert yurts Mongolia',
+  'Pays-Bas':'Windmills Kinderdijk Netherlands',
+  'Belgique':'Grand Place Brussels Belgium',
+  'Irlande':'Cliffs of Moher Ireland',
+  'Suède':'Stockholm old town Sweden',
+  'Danemark':'Nyhavn Copenhagen Denmark',
+  'Finlande':'Northern Lights Lapland Finland',
+  'Pologne':'Krakow old town Poland',
+  'Hongrie':'Parliament Building Budapest',
+  'Israël':'Jerusalem Old City',
+};
+function getCountryHeroQuery(c){
+  return COUNTRY_HERO_QUERY[c.id] || COUNTRY_HERO_QUERY_BY_NAME[c.name] || null;
+}
 function getCountryImageQuery(c){
-  return COUNTRY_HERO_QUERY[c.id] || (c.name+' landmark travel');
+  return getCountryHeroQuery(c) || (c.name+' famous landmark');
 }
 
 // ── COUNTRY DETAIL SHELL (cover header + Guide/Lieux/Carte sub-tabs) ──
@@ -3191,11 +3278,11 @@ function renderCountriesScreen(){
   }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div class="section-title" style="margin-bottom:12px">Pays</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span class="page-icon-badge">'+svgIcon('globe',20)+'</span><div class="section-title" style="margin-bottom:0">Pays</div></div>'
     +'<input class="search-input" id="countrySearchInput" style="margin-bottom:10px" type="text" placeholder="Rechercher un pays ou une ville…" value="'+escHtml(S.countryFilterQuery||'')+'" oninput="filterCountries(this.value)"/>'
     +'<div class="cf-tabs">'+tabsHTML+'</div>'
     +'<div class="country-card-list">'+cardsHTML+'</div>'
-    +'<button onclick="openCountryModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un pays</button>'
+    +(filter==='all' ? '<button onclick="openAddCountryToTripModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un pays</button>' : '')
     +'</div>';
 }
 function filterCountries(q){ S.countryFilterQuery=q; renderContent(); var i=document.getElementById('countrySearchInput'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
@@ -3280,17 +3367,18 @@ const DOC_TYPES=[
   {id:'passport', icon:'file-text', label:'Passeport', fields:[{k:'number',lbl:"Numéro"},{k:'expiry',lbl:"Date d'expiration"},{k:'notes',lbl:'Notes',area:true}]},
   {id:'visa', icon:'check-square', label:'Visa', fields:[{k:'type',lbl:'Type / pays'},{k:'expiry',lbl:'Validité'},{k:'notes',lbl:'Notes',area:true}]},
   {id:'insurance', icon:'heart-pulse', label:'Assurance', fields:[{k:'provider',lbl:'Assureur'},{k:'policy',lbl:'N° de police'},{k:'notes',lbl:'Contact urgence / notes',area:true}]},
-  {id:'tickets', icon:'plane', label:'Billets', fields:[{k:'flights',lbl:'Vols (résumé)',area:true},{k:'notes',lbl:'Notes',area:true}]},
+  {id:'tickets', icon:'plane', label:'Billets', fields:[{k:'notes',lbl:'Notes',area:true}]},
 ];
 function renderDocuments(){
   var openDoc=S.openDocType||null;
   var cards=DOC_TYPES.map(function(d){
     var data=S.documents[d.id]||{};
-    var filled=d.fields.some(function(f){return data[f.k];});
+    var filled=d.fields.some(function(f){return data[f.k];}) || (d.id==='tickets' && data.flightsList && data.flightsList.length>0);
     var isOpen=openDoc===d.id;
     var body='';
     if(isOpen){
-      body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+d.fields.map(function(f){
+      var flightsBlock = d.id==='tickets' ? renderFlightsList(data.flightsList||[]) : '';
+      body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+flightsBlock+d.fields.map(function(f){
         var val=escHtml(data[f.k]||'');
         if(f.area) return '<textarea class="ef-input" style="min-height:70px;width:100%" placeholder="'+f.lbl+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)">'+val+'</textarea>';
         return '<input class="ef-input" style="width:100%" type="text" placeholder="'+f.lbl+'" value="'+val+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)"/>';
@@ -3303,6 +3391,55 @@ function renderDocuments(){
 }
 function toggleDocOpen(id){ S.openDocType = S.openDocType===id ? null : id; renderContent(); }
 function saveDocField(docId, key, val){ if(!S.documents[docId]) S.documents[docId]={}; S.documents[docId][key]=val; save(); }
+
+function renderFlightsList(flights){
+  var cards = flights.map(function(f, i){
+    var dateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'Date non renseignée';
+    var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
+    return '<div class="more-row" style="align-items:flex-start;padding:9px 0">'
+      +'<span style="margin-top:2px">'+svgIcon('plane',16)+'</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(f.from||'?')+' → '+escHtml(f.to||'?')+'</div>'
+      +'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+dateLabel+'</div>'
+      +linkHtml
+      +'</div>'
+      +'<button onclick="removeFlight('+i+')" style="border:none;background:none;color:var(--red-muted);font-size:16px;cursor:pointer;flex-shrink:0">×</button>'
+      +'</div>';
+  }).join('');
+
+  return '<div class="info-card" style="padding:10px 12px">'
+    +'<div class="ic-header" style="margin-bottom:4px">Vols</div>'
+    +(cards || '<div style="font-size:12.5px;color:var(--ink-muted);padding:4px 0 8px">Aucun vol ajouté.</div>')
+    +'<div style="display:flex;gap:6px;margin-top:6px">'
+    +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" style="flex:1;min-width:0">'
+    +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" style="flex:1;min-width:0">'
+    +'</div>'
+    +'<input id="newFlightDate" type="date" class="ef-input" style="width:100%;margin-top:6px">'
+    +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" style="width:100%;margin-top:6px">'
+    +'<button onclick="addFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">+ Ajouter un vol</button>'
+    +'</div>';
+}
+
+function addFlight(){
+  var from = document.getElementById('newFlightFrom').value.trim();
+  var to = document.getElementById('newFlightTo').value.trim();
+  var date = document.getElementById('newFlightDate').value;
+  var link = document.getElementById('newFlightLink').value.trim();
+  if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
+  if(!S.documents.tickets) S.documents.tickets = {};
+  if(!S.documents.tickets.flightsList) S.documents.tickets.flightsList = [];
+  S.documents.tickets.flightsList.push({from:from, to:to, date:date, link:link});
+  save();
+  renderContent();
+}
+
+function removeFlight(index){
+  showConfirm('Retirer ce vol ?', function(){
+    S.documents.tickets.flightsList.splice(index,1);
+    save();
+    renderContent();
+  }, 'Retirer');
+}
 
 // ── CARNET DE VOYAGE (JOURNAL) ──────────────────────────────
 function handleJournalPhotoPick(input){
@@ -3389,7 +3526,7 @@ function renderMore(){
     +'<div class="more-row" onclick="showAccessManagementScreen()" style="padding:6px 0"><span class="more-row-label">'+(1+CURRENT_COLLABORATORS.length)+' voyageur'+(CURRENT_COLLABORATORS.length?'s':'')+' sur ce voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="globe" data-icon-size="16"></span> Gestion des pays</div>'
-    +'<button onclick="openCountryModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
+    +'<button onclick="openAddCountryToTripModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
     +'<button onclick="archiveCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">Archiver '+getC().name+'</button>'
     +'<div class="more-row" onclick="showArchivedCountriesScreen()" style="padding:8px 4px 0"><span class="more-row-icon" data-icon="archive" data-icon-size="19"></span><span class="more-row-label">Pays archivés</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
@@ -3447,7 +3584,7 @@ function renderGuide(c){
       :'<div class="info-card"><div class="status-sub">Configure une clé API (dans Plus → Réglages avancés) pour auto-remplir ce guide à partir du nom du pays.</div></div>')
     +'<div class="info-card"><div class="ic-header"><span data-icon="info" data-icon-size="16"></span> Présentation</div>'
     +'<input class="ir-input-block" type="text" placeholder="Accroche courte (ex: Temples, pixels & Mont Fuji)" value="'+escHtml(c.tagline)+'" oninput="editCountryField(\''+c.id+'\',\'tagline\',this.value)"/>'
-    +'<div class="info-row"><span class="ir-key">Dates</span><input class="ir-input" type="text" placeholder="ex: 10–24 sept" value="'+escHtml(c.dates)+'" oninput="editCountryField(\''+c.id+'\',\'dates\',this.value)"/></div>'
+    +'<div class="info-row" style="flex-direction:column;align-items:stretch;gap:6px"><span class="ir-key">Dates</span><div style="display:flex;gap:8px"><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/></div></div>'
     +'<div class="info-row"><span class="ir-key">Jours au programme</span><input class="ir-input" type="number" style="max-width:60px" value="'+c.days+'" oninput="editCountryField(\''+c.id+'\',\'days\',this.value)"/></div></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Monnaie & Visa</div>'
     +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
@@ -4030,11 +4167,23 @@ function bindDragEvents() {
 }
 
 // ── COUNTDOWN ────────────────────────────────────────────────
+function fmtTripDate(d){ return d.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}); }
+function getTripDurationLabel(){
+  if (typeof CURRENT_TRIP === 'undefined' || !CURRENT_TRIP || !CURRENT_TRIP.start_date || !CURRENT_TRIP.end_date) return '';
+  var start = new Date(CURRENT_TRIP.start_date+'T00:00:00');
+  var end = new Date(CURRENT_TRIP.end_date+'T00:00:00');
+  var diffDays = Math.round((end-start)/86400000);
+  if (diffDays <= 0) return '';
+  if (diffDays >= 60) return ' · ~'+Math.round(diffDays/30)+' mois';
+  return ' · '+diffDays+' jours';
+}
 function renderCountdown() {
   var DEPART = getTripDepartDate();
   var now = new Date();
   var diff = DEPART - now;
-  if(diff < 0) return '<div class="countdown-bar"><span class="cd-emoji" data-icon="plane" data-icon-size="22"></span><div class="cd-info"><div class="cd-label">Voyage en cours !</div><div class="cd-main"><span class="cd-days">J+'+Math.abs(Math.floor(diff/86400000))+'</span><span class="cd-unit">jours</span></div><div class="cd-date">Départ : 10 septembre 2026</div></div></div>';
+  var countryCount = COUNTRIES.length;
+  var durationLabel = getTripDurationLabel();
+  if(diff < 0) return '<div class="countdown-bar"><span class="cd-emoji" data-icon="plane" data-icon-size="22"></span><div class="cd-info"><div class="cd-label">Voyage en cours !</div><div class="cd-main"><span class="cd-days">J+'+Math.abs(Math.floor(diff/86400000))+'</span><span class="cd-unit">jours</span></div><div class="cd-date">Départ : '+fmtTripDate(DEPART)+'</div></div></div>';
   var totalSecs = Math.floor(diff/1000);
   var days = Math.floor(totalSecs/86400);
   var hrs  = Math.floor((totalSecs%86400)/3600);
@@ -4043,7 +4192,7 @@ function renderCountdown() {
   return '<div class="countdown-bar"><span class="cd-emoji" data-icon="plane" data-icon-size="22"></span><div class="cd-info">'
     +'<div class="cd-label">Départ dans</div>'
     +'<div class="cd-main"><span class="cd-days">'+days+'</span><span class="cd-unit">jours</span></div>'
-    +'<div class="cd-date">10 septembre 2026 · 7 pays · ~6 mois</div>'
+    +'<div class="cd-date">'+fmtTripDate(DEPART)+' · '+countryCount+' pays'+durationLabel+'</div>'
     +'<div class="cd-segments">'
     +'<div class="cd-seg"><div class="cd-seg-val" id="cd-h">'+String(hrs).padStart(2,'0')+'</div><div class="cd-seg-lbl">heures</div></div>'
     +'<div class="cd-seg"><div class="cd-seg-val" id="cd-m">'+String(mins).padStart(2,'0')+'</div><div class="cd-seg-lbl">min</div></div>'
@@ -4450,6 +4599,19 @@ function renderAccessManagementScreen(){
 
 
 // ── LUCIDE ICONS ──────────────────────────────────────────────
+function updateTopBarSub(){
+  var el = document.getElementById('topBarSub');
+  if(!el) return;
+  if(typeof CURRENT_TRIP === 'undefined' || !CURRENT_TRIP){ return; }
+  var name = CURRENT_TRIP.name || 'Voyage';
+  var countryCount = (typeof COUNTRIES !== 'undefined') ? COUNTRIES.length : 0;
+  var dateLabel = '';
+  if (CURRENT_TRIP.start_date) {
+    var d = new Date(CURRENT_TRIP.start_date+'T00:00:00');
+    dateLabel = ' · Départ ' + d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}).replace('.','');
+  }
+  el.textContent = name + dateLabel + ' · ' + countryCount + (countryCount>1?' pays':' pays');
+}
 function renderContent(){
   const c=getC();let html='';
   if(S.tab==='home')html=renderHome();
@@ -4481,6 +4643,7 @@ function renderContent(){
   bindDragEvents();
   setTimeout(renderIcons, 10);
   setTimeout(function(){ loadPlaceImages(document.getElementById('mainContent')); }, 30);
+  updateTopBarSub();
 }
 
 // ── ICON LIBRARY — 24×24, 2px stroke, round cap/join, no fill ──
@@ -4775,9 +4938,10 @@ function applyTripCountryFilter(trip) {
     if (!exists) {
       const id = countryName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) + '_' + Date.now() + Math.floor(Math.random()*1000);
       const flagEmoji = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[countryName]) || '🌍';
+      const currencyGuess = (window.COUNTRY_CURRENCIES && window.COUNTRY_CURRENCIES[countryName]) || '';
       const newCountry = {
         id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
-        currency: '', rate: '', visa: '', lang: '', budget_daily: 50,
+        currency: currencyGuess, rate: '', visa: 'À vérifier selon ta nationalité — consulte France Diplomatie ou les autorités officielles du pays.', lang: '', budget_daily: 50,
         alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[]}
       };
       COUNTRIES.push(newCountry);
@@ -4954,6 +5118,7 @@ document.getElementById('ts-new-trip-btn').addEventListener('click', () => {
 let CT_COUNTRIES = [];
 let CT_ALL_COUNTRY_NAMES = [];
 window.COUNTRY_FLAGS = {};
+window.COUNTRY_CURRENCIES = {};
 
 async function loadCountryFlags() {
   if (Object.keys(window.COUNTRY_FLAGS).length) return;
@@ -4962,6 +5127,12 @@ async function loadCountryFlags() {
     window.COUNTRY_FLAGS = await res.json();
   } catch (e) {
     console.error('[PlaniTrip] impossible de charger country_flags.json', e);
+  }
+  try {
+    const res2 = await fetch('country_currencies.json');
+    window.COUNTRY_CURRENCIES = await res2.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger country_currencies.json', e);
   }
 }
 
@@ -5004,6 +5175,56 @@ function renderCtCountries() {
     });
     list.appendChild(chip);
   });
+}
+
+async function openAddCountryToTripModal() {
+  await loadCountryList();
+  await loadCountryFlags();
+  const modal = document.getElementById('ct-country-modal');
+  const optionsEl = document.getElementById('ct-country-options');
+  const searchInput = document.getElementById('ct-country-search');
+  searchInput.value = '';
+
+  const currentNames = effectiveTripCountries();
+
+  function renderOptions(filter) {
+    const f = (filter || '').toLowerCase();
+    const available = CT_ALL_COUNTRY_NAMES.filter(c => !currentNames.includes(c));
+    const filtered = f ? available.filter(c => c.toLowerCase().includes(f)) : available;
+    optionsEl.innerHTML = '';
+    filtered.forEach(c => {
+      const opt = document.createElement('div');
+      opt.className = 'ct-country-option';
+      opt.textContent = c;
+      opt.addEventListener('click', async () => {
+        modal.style.display = 'none';
+        await addCountryToCurrentTrip(c);
+      });
+      optionsEl.appendChild(opt);
+    });
+    if (filtered.length === 0) {
+      optionsEl.innerHTML = '<div class="ct-country-option" style="color:#6E6E73;">Aucun résultat</div>';
+    }
+  }
+
+  searchInput.oninput = () => renderOptions(searchInput.value);
+  renderOptions('');
+  modal.style.display = 'flex';
+}
+
+async function addCountryToCurrentTrip(countryName) {
+  if (!sb || !CURRENT_TRIP) return;
+  const updatedCountries = effectiveTripCountries().concat([countryName]);
+  const { error } = await sb.from('trips').update({ countries: updatedCountries }).eq('id', CURRENT_TRIP.id);
+  if (error) {
+    alert('Erreur : ' + error.message);
+    return;
+  }
+  CURRENT_TRIP.countries = updatedCountries;
+  rebuildCountriesFromState();
+  applyTripCountryFilter(CURRENT_TRIP);
+  save();
+  renderContent();
 }
 
 async function openCountryModal() {
