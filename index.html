@@ -2521,6 +2521,11 @@ function addActivity(cityKey) {
   renderContent();
   // Enrich with Claude API
   enrichActivityWithAI(cityKey, newIdx, val);
+  if(sb && CURRENT_TRIP){
+    var parts = cityKey.split('_');
+    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+    sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(){});
+  }
 }
 
 async function autofillCountryWithAI(countryId){
@@ -2640,6 +2645,10 @@ function addCityToCountry(countryId){
   S.openCities[countryId+'_'+newCity.city]=true;
   renderContent();
   if(S.apiKey) suggestActivitiesWithAI(countryId, newCity.city);
+  if(sb && CURRENT_TRIP){
+    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+    sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}).then(function(){});
+  }
 }
 async function suggestActivitiesWithAI(countryId, cityName){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
@@ -3038,7 +3047,8 @@ function renderBudget(c){
   }).join('') || '<div class="bh-person"><div class="bhp-name">Aucune dépense</div></div>';
   let expRows=exps.map(function(e){
     var whoLabel = e.personLabel || e.person || '?';
-    return '<div class="expense-entry"><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+    var catIcon = getExpenseCategoryIcon(e.category);
+    return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
   }).join('');
   var selCity = c.cities.find(function(ci){return ci.city===S.expCity;});
   var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
@@ -3048,6 +3058,7 @@ function renderBudget(c){
     +'<div class="budget-hero"><div class="bh-label">Total dépensé</div><div class="bh-amount">'+fmtEUR(total)+'</div><div class="bh-sub">sur '+fmtEUR(budget)+' prévu · '+pct+'% consommé</div><div class="bh-bar"><div class="bh-fill" style="width:'+pct+'%"></div></div><div class="bh-persons">'+personsHTML+'</div></div>'
     +'<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
     +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
+    +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
     +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+c.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('')+'</select></div>'
     +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
     +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
@@ -3448,7 +3459,8 @@ function renderBudgetOverview(){
     var expRows = exps.map(function(e){
       var c = COUNTRIES.find(function(co){return co.id===e.country;});
       var whoLabel = e.personLabel || e.person || '?';
-      return '<div class="expense-entry"><span class="ee-who">'+getInitials(whoLabel)+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+      var catIcon = getExpenseCategoryIcon(e.category);
+      return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
     }).join('');
     var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
     var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
@@ -3458,6 +3470,7 @@ function renderBudgetOverview(){
     body = '<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
       +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';renderContent()">'+countryOptions+'</select></div>'
       +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
+      +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
       +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
       +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
       +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
@@ -3471,6 +3484,27 @@ function renderBudgetOverview(){
     +'<div class="cf-tabs">'+tabsHTML+'</div>'
     +body
     +'</div>';
+}
+const EXPENSE_CATEGORIES = [
+  {id:'food', label:'Repas & restaurants', icon:'utensils'},
+  {id:'lodging', label:'Hébergement', icon:'bed'},
+  {id:'transport', label:'Transport (local)', icon:'car'},
+  {id:'flight', label:'Vols / trajets longue distance', icon:'plane'},
+  {id:'activity', label:'Activités & visites', icon:'compass'},
+  {id:'shopping', label:'Shopping / souvenirs', icon:'shopping-bag'},
+  {id:'health', label:'Santé / pharmacie', icon:'heart-pulse'},
+  {id:'comm', label:'Communication (SIM, wifi)', icon:'wifi'},
+  {id:'nightlife', label:'Sorties / vie nocturne', icon:'moon'},
+  {id:'other', label:'Autre', icon:'ellipsis'},
+];
+function getExpenseCategoryOptions(selected){
+  return EXPENSE_CATEGORIES.map(function(cat){
+    return '<option value="'+cat.id+'"'+(selected===cat.id?' selected':'')+'>'+cat.label+'</option>';
+  }).join('');
+}
+function getExpenseCategoryIcon(catId){
+  var cat = EXPENSE_CATEGORIES.find(function(c){return c.id===catId;});
+  return cat ? cat.icon : 'ellipsis';
 }
 function getExpensePersonOptions(){
   var people = [];
@@ -3494,8 +3528,10 @@ function addExpGlobal(){
   var city = cityEl?cityEl.value:'';
   var activityEl = document.getElementById('eActivity');
   var activity = activityEl?activityEl.value:'';
+  var categoryEl = document.getElementById('eCategory');
+  var category = categoryEl?categoryEl.value:(S.expCategory||'other');
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:country,city:city,activity:activity,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  S.expenses.push({id:Date.now(),country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';save();renderContent();
 }
 
@@ -3787,8 +3823,10 @@ function addExp(cid){
   const city=cityEl?cityEl.value:'';
   const activityEl=document.getElementById('eActivity');
   const activity=activityEl?activityEl.value:'';
+  const categoryEl=document.getElementById('eCategory');
+  const category=categoryEl?categoryEl.value:(S.expCategory||'other');
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:cid,city:city,activity:activity,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  S.expenses.push({id:Date.now(),country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
   S.expDesc='';S.expAmt='';S.expActivity='';save();renderContent();
 }
 function delExp(id){S.expenses=S.expenses.filter(function(e){return e.id!==id;});save();renderContent();}
@@ -4920,6 +4958,10 @@ const ICON_PATHS = {
   camera: '<path d="M3 9a2 2 0 0 1 2-2h1.5l1-1.5h9l1 1.5H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.5" r="3.5"/>',
   landmark: '<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 21 8 3 8"/>',
   utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h1a2 2 0 0 0 2-2V2"/><line x1="4.5" y1="2" x2="4.5" y2="22"/><path d="M18 2c-2 0-3 2-3 5v4c0 1.1.9 2 2 2h2v9"/>',
+  car: '<path d="M19 17h2v-2.76a3 3 0 0 0-.34-1.39l-1.58-3.06A3 3 0 0 0 16.42 8H5.58a3 3 0 0 0-2.66 1.79L1.34 12.85A3 3 0 0 0 1 14.24V17h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  'shopping-bag': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  wifi: '<path d="M5 13a10 10 0 0 1 14 0"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   leaf: '<path d="M11 20A7 7 0 0 1 4 13c0-8 7-11 16-11 0 9-3 16-11 16z"/><path d="M4 13c3-1 6-3 8-6"/>',
   archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
@@ -5249,6 +5291,26 @@ async function loadCollaborators() {
   else console.error('[PlaniTrip] erreur chargement collaborateurs:', error);
 }
 
+async function loadCitiesActivities(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data:citiesData} = await sb.from('cities').select('*').eq('trip_id',CURRENT_TRIP.id);
+  var {data:actsData} = await sb.from('activities').select('*').eq('trip_id',CURRENT_TRIP.id);
+  (citiesData||[]).forEach(function(row){
+    if(!S.addedCities[row.country_id]) S.addedCities[row.country_id]=[];
+    if(!S.addedCities[row.country_id].find(function(ci){return ci.city===row.city;})){
+      S.addedCities[row.country_id].push({city:row.city, sub:'', acts:[], addedBy:row.added_by_label});
+    }
+  });
+  (actsData||[]).forEach(function(row){
+    var ck=row.country_id+'_'+row.city;
+    if(!S.customActs[ck]) S.customActs[ck]=[];
+    if(!S.customActs[ck].find(function(a){return a.n===row.name;})){
+      S.customActs[ck].push({n:row.name, m:row.tip||'', tags:[], custom:true, addedBy:row.added_by_label});
+    }
+  });
+  save();
+}
+
 async function enterTrip(trip, resetTab) {
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
@@ -5271,6 +5333,8 @@ async function enterTrip(trip, resetTab) {
   rebuildCountriesFromState();
 
   await loadCollaborators();
+  await loadCitiesActivities();
+  rebuildCountriesFromState();
   applyTripCountryFilter(trip);
 
   if (COUNTRIES.length === 0) {
