@@ -2158,7 +2158,7 @@ function openDetail(actKey, actName, cityKey) {
   if(!hasAnyDetail){
     if(S.apiKey){
       html = '<div class="detail-section" id="detailAiStatus"><div class="detail-text">Génération des détails avec l\'IA…</div></div>';
-      fetchActDetailWithAI(actKey, actName, cityKey);
+      fetchActivityDetailAI(cityKey, actName, actKey);
     } else {
       html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée pour cette activité. Configure une clé API (Plus → Réglages avancés) pour la générer automatiquement avec l\'IA.</div></div>';
     }
@@ -2197,8 +2197,15 @@ function parseAiJson(text){
   return JSON.parse(clean);
 }
 
-async function fetchActDetailWithAI(actKey, actName, cityKey){
-  if(!S.apiKey) return;
+async function fetchActivityDetailAI(cityKey, actName, detailKey, customIdx){
+  if(!S.apiKey){
+    if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
+      S.customActs[cityKey][customIdx].m = '';
+      S.customActs[cityKey][customIdx]._loading = false;
+      save(); renderContent();
+    }
+    return;
+  }
   var country = COUNTRIES.find(function(c){ return cityKey && cityKey.startsWith(c.id+'_'); });
   var countryName = country ? country.name : '';
   var cityName = cityKey ? cityKey.slice((country?country.id+'_':'').length) : '';
@@ -2212,8 +2219,8 @@ async function fetchActDetailWithAI(actKey, actName, cityKey){
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
 `Tu es un expert de voyage. Cherche sur le web des informations actuelles et fiables pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires d'ouverture, tarifs d'entree actuels, et localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin de ta reponse, sans markdown:
-{"tag":"categorie courte","emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels trouves sur le web","costs":["cout 1 actuel","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise trouvee sur le web","lat":0.0,"lng":0.0}
-lat/lng = coordonnees GPS aussi precises que possible.`
+{"m":"description courte 1 phrase","tag":"categorie courte","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels trouves sur le web","costs":["cout 1 actuel","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise trouvee sur le web","lat":0.0,"lng":0.0}
+lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi photo, food, temple, must, nature.`
         }]
       })
     });
@@ -2222,20 +2229,30 @@ lat/lng = coordonnees GPS aussi precises que possible.`
     if(!text) throw new Error('empty');
     const info = deepSanitize(parseAiJson(text));
     if(!window._customDetails) window._customDetails={};
-    window._customDetails[actKey] = {
+    window._customDetails[detailKey] = {
       emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'',
       hours: info.hours||'', costs: info.costs||[], tips: info.tips||[],
       address: info.address||'', lat: info.lat||null, lng: info.lng||null,
       _aiGenerated: true
     };
     S.customDetails = window._customDetails;
-    if(info.lat && info.lng) COORDS[actKey] = [info.lat, info.lng, actName];
-    save();
-    // Re-open to refresh with the new data, only if the modal is still showing this activity
-    if(document.getElementById('detailTitle').textContent === actName){
-      openDetail(actKey, actName, cityKey);
+    if(info.lat && info.lng) COORDS[detailKey] = [info.lat, info.lng, actName];
+    if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
+      var act = S.customActs[cityKey][customIdx];
+      act.m = info.m || act.m;
+      act.tags = info.tags || act.tags;
+      act._loading = false;
     }
+    save();
+    if(document.getElementById('detailTitle') && document.getElementById('detailTitle').textContent === actName){
+      openDetail(detailKey, actName, cityKey);
+    }
+    renderContent();
   }catch(e){
+    if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
+      S.customActs[cityKey][customIdx]._loading = false;
+      save(); renderContent();
+    }
     var statusEl = document.getElementById('detailAiStatus');
     if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
   }
@@ -2566,7 +2583,7 @@ function addActivity(cityKey) {
   save();
   renderContent();
   // Enrich with Claude API
-  enrichActivityWithAI(cityKey, newIdx, val);
+  fetchActivityDetailAI(cityKey, val, cityKey+'_c'+newIdx, newIdx);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
@@ -2761,66 +2778,7 @@ Les tags possibles sont: photo, food, temple, must, nature.`
   }catch(e){}
 }
 
-async function enrichActivityWithAI(cityKey, idx, actName) {
-  // Also try to geolocate via place name
-  const country = COUNTRIES.find(function(c){ return cityKey.startsWith(c.id+'_'); });
-  const countryName = country ? country.name : '';
-  const cityName = cityKey.slice((country?country.id+'_':'').length);
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key': (S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1200,
-        tools:[{type:'web_search_20250305', name:'web_search'}],
-        messages:[{role:'user', content:
-`Tu es un expert de voyage. Cherche sur le web des informations actuelles pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires, tarifs actuels, localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:\n{"m":"description courte 1 phrase","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels","costs":["cout actuel 1","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise","lat":0.0,"lng":0.0}\nlat/lng = coordonnees GPS aussi precises que possible.`
-        }]
-      })
-    });
-    const data = await resp.json();
-    const text = extractAiText(data);
-    if(!text) return;
-    const info = deepSanitize(parseAiJson(text));
-    if(!S.customActs[cityKey] || !S.customActs[cityKey][idx]) return;
-    const act = S.customActs[cityKey][idx];
-    act.m = info.m || act.m;
-    act.tags = info.tags || act.tags;
-    act._loading = false;
-    // Store detail
-    const detailKey = cityKey+'_c'+idx;
-    if(!window._customDetails) window._customDetails={};
-    window._customDetails[detailKey] = {
-      emoji: info.emoji||'📍',
-      tag: actName,
-      history: info.history||'',
-      hours: info.hours||'',
-      costs: info.costs||[],
-      tips: info.tips||[],
-      address: info.address||'',
-      lat: info.lat||null,
-      lng: info.lng||null,
-      _aiGenerated: true
-    };
-    S.customDetails = window._customDetails;
-    // Store GPS
-    if(info.lat && info.lng){
-      COORDS[detailKey] = [info.lat, info.lng, actName];
-    }
-    save();
-    renderContent();
-  } catch(e) {
-    if(S.customActs[cityKey] && S.customActs[cityKey][idx]){
-      S.customActs[cityKey][idx].m = '';
-      S.customActs[cityKey][idx]._loading = false;
-      save(); renderContent();
-    }
-  }
-}
-
-function deleteActivity(cityKey, index, isCustom) {
+async function deleteActivity(cityKey, index, isCustom) {
   showConfirm('Supprimer cette activité ?', function(){
     if(!S.trash) S.trash={};
     if(!S.trash[cityKey]) S.trash[cityKey]=[];
