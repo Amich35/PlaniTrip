@@ -4981,7 +4981,7 @@ async function deleteMyAccount(){
   showConfirm('Supprimer définitivement ton compte ? Tu seras déconnecté immédiatement.', async function(){
     var btn = document.getElementById('delete-account-btn');
     if(btn){ btn.disabled=true; btn.textContent='Suppression...'; }
-    const { error } = await sb.from('profiles').update({ status: 'deleted', deleted_at: new Date().toISOString() }).eq('id', CURRENT_USER.id);
+    const { error } = await sb.from('profiles').upsert({ id: CURRENT_USER.id, email: CURRENT_USER.email, status: 'deleted', deleted_at: new Date().toISOString() });
     if(error){
       errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block';
       if(btn){ btn.disabled=false; btn.textContent='Supprimer mon compte'; }
@@ -5540,7 +5540,7 @@ async function checkUserTrips(user) {
     } else if (uniqueTrips.length === 1) {
       await loadCountryFlags();
       try {
-        enterTrip(uniqueTrips[0], false);
+        enterTrip(uniqueTrips[0], true);
       } catch (renderErr) {
         console.error('[PlaniTrip trips] erreur d\'affichage (trip conservé):', renderErr);
         alert("Une erreur d'affichage est survenue, mais ton voyage est bien là. Recharge la page — si le problème persiste, préviens André.");
@@ -5551,7 +5551,7 @@ async function checkUserTrips(user) {
       const lastTrip = uniqueTrips.find(t => t.id === lastTripId);
       if (lastTrip) {
         await loadCountryFlags();
-        try { enterTrip(lastTrip, false); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
+        try { enterTrip(lastTrip, true); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
         return;
       }
       showTripSelectorScreen(uniqueTrips);
