@@ -354,16 +354,20 @@ a{color:var(--ink);}
 .country-card-list{display:flex;flex-direction:column;gap:10px;}
 .country-card{display:flex;align-items:center;gap:12px;background:var(--parchment);border-radius:var(--r22);padding:12px;box-shadow:var(--shadow-sm);cursor:pointer;transition:transform 0.1s;}
 .country-card:active{transform:scale(0.98);}
-.cc-thumb{width:56px;height:56px;border-radius:var(--r12);background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
+.cc-thumb{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
 .cc-thumb-flag{font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));}
 .cc-thumb.has-photo .cc-thumb-flag{display:none;}
 .cc-body{flex:1;min-width:0;}
 .cc-name{font-size:14.5px;font-weight:600;color:var(--ink);}
 .cc-sub{font-size:11.5px;color:var(--ink-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cc-status{flex-shrink:0;font-size:10px;font-weight:600;padding:4px 9px;border-radius:20px;white-space:nowrap;}
+.cc-status{flex-shrink:0;font-size:10px;font-weight:600;padding:4px 9px 4px 7px;border-radius:20px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
+.cc-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .cc-status-current{background:var(--accent-pale);color:var(--accent-deep);}
+.cc-status-current .cc-status-dot{background:#22C55E;}
 .cc-status-upcoming{background:var(--status-upcoming-pale);color:var(--status-upcoming);}
+.cc-status-upcoming .cc-status-dot{background:var(--status-upcoming);}
 .cc-status-done{background:var(--status-done-pale);color:var(--status-done);}
+.cc-status-done .cc-status-dot{background:#9CA3AF;}
 
 /* ── COUNTRY DETAIL SHELL ── */
 .country-detail-header{position:relative;min-height:220px;background-size:cover;background-position:center;display:flex;flex-direction:column;justify-content:flex-end;padding:16px;color:#fff;overflow:hidden;}
@@ -3441,32 +3445,35 @@ function renderCountriesScreen(){
   const totalDays=COUNTRIES.reduce(function(s,c){return s+c.days;},0);
   const tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
   const tripPct=totalDays>0?Math.round((tripDay/totalDays)*100):0;
+  var tripRecap=COUNTRIES.length+' pays · '+totalDays+' jours';
   var dayHero;
   if(ts.elapsedDays<0){
     dayHero='<div class="home-hero" data-img-query="Mount Fuji Chureito Pagoda Japan" style="margin-bottom:16px">'
       +photoEditBtn('Mount Fuji Chureito Pagoda Japan')
-      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Départ dans '+Math.abs(ts.elapsedDays)+' jours</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé</div></div></div>';
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+ts.currentCountry.flag+' Départ dans '+Math.abs(ts.elapsedDays)+' jours</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé · '+tripRecap+'</div></div></div>';
   } else {
     dayHero='<div class="home-hero" data-img-query="Mount Fuji Chureito Pagoda Japan" style="margin-bottom:16px">'
       +photoEditBtn('Mount Fuji Chureito Pagoda Japan')
-      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+' · '+tripPct+'% du voyage</div></div></div>';
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
   }
 
   var list = COUNTRIES;
 
   var cardsHTML = list.map(function(c){
     var status = getCountryStatus(c.id);
-    var citiesPreview = c.cities.slice(0,3).map(function(ci){return ci.city;}).join(', ');
+    var citiesPreview = c.cities.length<=2
+      ? c.cities.map(function(ci){return ci.city;}).join(', ')
+      : c.cities.slice(0,2).map(function(ci){return ci.city;}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
     return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span>'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
-      +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'…</div></div>'
-      +'<span class="cc-status cc-status-'+status+'">'+_countryStatusLabel(status)+'</span>'
+      +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
+      +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
       +'</div>';
   }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span class="page-icon-badge">'+svgIcon('globe',20)+'</span><div class="section-title" style="margin-bottom:0">Pays</div></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="page-icon-badge" style="width:30px;height:30px">'+svgIcon('globe',16)+'</span><div class="section-title" style="margin-bottom:0;font-size:20px">Pays</div></div>'
     +dayHero
     +'<div class="country-card-list">'+cardsHTML+'</div>'
     +'<button onclick="openAddCountryToTripModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un pays</button>'
