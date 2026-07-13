@@ -245,7 +245,7 @@ a{color:var(--ink);}
 .bh-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:4px;}
 .bh-amount{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:44px;font-weight:700;color:#fff;line-height:1;letter-spacing:-1px;}
 .bh-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px;}
-.bh-bar{height:4px;background:rgba(255,255,255,0.12);border-radius:2px;margin:14px 0 10px;}
+.bh-bar{height:4px;background:#E5E5E5;border:1px solid #D1D1D1;border-radius:2px;margin:14px 0 10px;box-sizing:border-box;}
 .bh-fill{height:100%;border-radius:2px;background:var(--accent);transition:width 0.5s;}
 .bh-persons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
 .bh-person{background:rgba(255,255,255,0.07);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.1);}
@@ -532,6 +532,23 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 /* ── ALERT refined ── */
 .alert-strip{background:rgba(196,131,58,0.08);border-radius:var(--r12);border-left:3px solid var(--accent);padding:var(--sp12) var(--sp12);margin-bottom:var(--sp8);display:flex;gap:var(--sp8);align-items:flex-start;}
 .alert-text{font-size:12px;color:var(--accent-deep);line-height:1.5;}
+/* ── ALERT CARDS v2 (redesign) ── */
+.alert-card-v2{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:92px;box-sizing:border-box;padding:14px 16px 14px 20px;border-radius:18px;background:#FFFFFF;box-shadow:0 4px 18px rgba(0,0,0,0.06);margin-bottom:14px;overflow:hidden;cursor:pointer;transition:transform 120ms ease;text-decoration:none;-webkit-tap-highlight-color:transparent;}
+.alert-card-v2:active{transform:scale(0.98);}
+.alert-card-v2::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 4px 4px 0;}
+.alert-card-v2[data-type="info"]::before{background:#3B82F6;}
+.alert-card-v2[data-type="warning"]::before{background:#FB923C;}
+.alert-card-v2[data-type="danger"]::before{background:#EF4444;}
+.alert-card-v2[data-type="success"]::before{background:#22C55E;}
+.alert-icon-circle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.alert-card-v2[data-type="info"] .alert-icon-circle{background:#EFF8FF;color:#2563EB;}
+.alert-card-v2[data-type="warning"] .alert-icon-circle{background:#FFF7ED;color:#EA580C;}
+.alert-card-v2[data-type="danger"] .alert-icon-circle{background:#FEF2F2;color:#DC2626;}
+.alert-card-v2[data-type="success"] .alert-icon-circle{background:#F0FDF4;color:#16A34A;}
+.alert-body{flex:1;min-width:0;}
+.alert-title-v2{font-size:18px;font-weight:600;color:#111827;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.alert-subtitle-v2{font-size:15px;font-weight:400;color:#6B7280;margin-top:2px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.alert-chevron-v2{color:#9CA3AF;flex-shrink:0;}
 
 /* ── PROGRESS ROW ── */
 .progress-row{display:flex;align-items:center;gap:var(--sp12);padding:var(--sp12) 0;border-bottom:1px solid rgba(29,29,31,0.049);cursor:pointer;transition:background 0.1s;}
@@ -2965,10 +2982,14 @@ function renderItinerary(c, embedded){
   const alertsHTML=c.alerts.map(function(a){
     var text = typeof a === 'object' ? a.t : a;
     var url  = typeof a === 'object' ? a.url : null;
-    var content = url
-      ? '<a href="'+url+'" target="_blank" style="color:var(--ink);text-decoration:underline;text-decoration-color:rgba(29,29,31,0.280);text-underline-offset:3px;font-weight:500;">'+text+'</a>'
-      : text;
-    return '<div class="alert-strip"><span class="alert-icon">⚠️</span><span class="alert-text">'+content+'</span></div>';
+    var meta = parseAlert(text);
+    var tag = url ? 'a' : 'div';
+    var hrefAttr = url ? ' href="'+url+'" target="_blank" rel="noopener"' : '';
+    return '<'+tag+' class="alert-card-v2" data-type="'+meta.type+'"'+hrefAttr+'>'
+      +'<span class="alert-icon-circle">'+svgIcon(meta.icon,28)+'</span>'
+      +'<span class="alert-body"><span class="alert-title-v2">'+escHtml(meta.title)+'</span>'+(meta.subtitle?'<span class="alert-subtitle-v2">'+escHtml(meta.subtitle)+'</span>':'')+'</span>'
+      +'<span class="alert-chevron-v2">'+svgIcon('chevron-right',20)+'</span>'
+      +'</'+tag+'>';
   }).join('');
   const _GRADIENTS = {
     'Fushimi Inari':'linear-gradient(135deg,#8B1A1A 0%,#2D6A4F 100%)',
@@ -5052,7 +5073,7 @@ function renderContent(){
 // Style: Lucide-inspired, iOS/SF Symbols feel. Inactive #545454, active #2E7D5B (set via CSS).
 const ICON_PATHS = {
   house: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
-  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
   map: '<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>',
   star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   wallet: '<path d="M20 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-3"/><path d="M20 12h-4a2 2 0 0 0 0 4h4v-4z"/><path d="M3 7l0 -1a2 2 0 0 1 2 -2h11"/>',
@@ -5094,7 +5115,43 @@ const ICON_PATHS = {
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
   'eye-off': '<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a17 17 0 0 1-2.24 3.14M6.61 6.61A17 17 0 0 0 2 12s3.5 8 10 8a9 9 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" y1="2" x2="22" y2="22"/>',
+  'triangle-alert': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  'cloud-lightning': '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m13 12-3 5h4l-3 5"/>',
+  sparkles: '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
 };
+function parseAlert(text){
+  var special = {
+    'Fermeture sommet Fuji après le 10 sept': {title:'Fermeture du sommet Fuji', subtitle:'Après le 10 septembre', type:'warning', icon:'triangle-alert'},
+    'Silver Week 19–23 sept : réservez tôt': {title:'Silver Week', subtitle:'19–23 septembre • Réservez tôt', type:'warning', icon:'calendar'},
+    'Risque typhon : emporter un imperméable': {title:'Risque de typhon', subtitle:'Prévoir un imperméable', type:'danger', icon:'cloud-lightning'}
+  };
+  if(special[text]) return special[text];
+
+  var title = text, subtitle = '';
+  if(text.indexOf(' : ')>-1){
+    var parts = text.split(' : ');
+    title = parts[0]; subtitle = parts.slice(1).join(' : ');
+  } else if(text.indexOf(' après ')>-1){
+    var idx = text.indexOf(' après ');
+    title = text.slice(0,idx); subtitle = 'Après'+text.slice(idx+7);
+  } else if(text.indexOf(',')>-1 && text.length>36){
+    var ci = text.indexOf(',');
+    title = text.slice(0,ci); subtitle = text.slice(ci+1).trim();
+  }
+  title = title.trim(); subtitle = subtitle.trim();
+
+  var low = text.toLowerCase();
+  var type='info', icon='info';
+  if(/typhon|s[ée]isme|tremblement|tsunami|cyclone|inond|dangereux|risque[s]? [ée]lev[ée]/.test(low)){
+    type='danger'; icon = /typhon|cyclone|pluie|orage/.test(low) ? 'cloud-lightning' : 'triangle-alert';
+  } else if(/r[ée]serv|silver week|golden week|afflu|complet|ferm|pic de prix|haute saison|attention|file d.attente/.test(low)){
+    type='warning'; icon = /week/.test(low) ? 'calendar' : 'triangle-alert';
+  } else if(/conseil|meilleure p[ée]riode|astuce|bon plan|recommand/.test(low)){
+    type='success'; icon='sparkles';
+  }
+  return {title:title, subtitle:subtitle, type:type, icon:icon};
+}
 function svgIcon(name, size){
   size=size||22;
   var inner=ICON_PATHS[name]||'';
