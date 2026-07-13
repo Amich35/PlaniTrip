@@ -3448,7 +3448,7 @@ function renderCountriesScreen(){
   const totalDays=COUNTRIES.reduce(function(s,c){return s+c.days;},0);
   const tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
   const tripPct=totalDays>0?Math.round((tripDay/totalDays)*100):0;
-  var tripRecap=COUNTRIES.length+' pays · '+totalDays+' jours';
+  var tripRecap=COUNTRIES.length+' pays';
   var dayHero;
   if(ts.elapsedDays<0){
     dayHero='<div class="home-hero" data-img-query="Mount Fuji Chureito Pagoda Japan" style="margin-bottom:16px">'
@@ -3968,6 +3968,7 @@ function renderMore(){
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
     +'</div>'
+    +'<button onclick="logoutUser()" style="width:100%;padding:12px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Déconnexion</button>'
     +'</div>';
 }
 
@@ -4030,13 +4031,24 @@ function renderGuide(c){
     +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub">Configure une clé API (dans Plus → Réglages avancés) pour auto-remplir ce guide à partir du nom du pays.</div></div>')
     +'<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</div>'
-    +'<div class="info-row" style="flex-direction:column;align-items:stretch;gap:6px"><span class="ir-key">Arrivée / départ</span><div style="display:flex;gap:8px"><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/></div></div></div>'
-    +'<div class="info-card"><div class="ic-header" style="display:flex;align-items:center;gap:6px"><span data-icon="pencil" data-icon-size="14" style="color:var(--ink-subtle)"></span> Général<span style="font-size:11px;font-weight:400;color:var(--ink-subtle);margin-left:auto">Touche un champ pour le modifier</span></div>'
-    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Taux indicatif</span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div></div>'
+    +'<div style="display:flex;gap:12px">'
+    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">'
+    +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Arrivée<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
+    +'<input class="ir-input" type="date" style="width:100%;text-align:center" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/>'
+    +(c.dateStart?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',\'\',null)">Effacer</span>':'')
+    +'</div>'
+    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">'
+    +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Départ<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
+    +'<input class="ir-input" type="date" style="width:100%;text-align:center" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/>'
+    +(c.dateEnd?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',null,\'\')">Effacer</span>':'')
+    +'</div>'
+    +'</div></div>'
+    +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Devise<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Taux indicatif<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Visa<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Langue<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Budget / jour<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</div>'+emergRows+'</div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_tips\')"><span><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span><span style="transform:rotate('+(tipsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(tipsOpen?tipRows:'')+'</div>'
