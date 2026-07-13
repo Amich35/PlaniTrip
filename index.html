@@ -4955,7 +4955,46 @@ function renderMyAccountScreen(){
     +'<button id="my-account-save-btn" class="btn-primary" onclick="saveMyPseudo()">Enregistrer</button>'
     +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
+    +'<div class="info-card" style="border:1px solid rgba(231,111,81,0.25)">'
+    +'<div class="ic-header" style="color:var(--red-muted)">Zone dangereuse</div>'
+    +'<p class="auth-hint" style="margin:0 0 10px">Supprimer ton compte te déconnectera immédiatement et te retirera l\'accès à tous tes voyages. Cette action peut être annulée par André dans les 30 jours si besoin.</p>'
+    +'<p class="auth-hint" style="margin:0 0 6px">Tape <strong>SUPPRIMER</strong> pour confirmer :</p>'
+    +'<input type="text" id="delete-account-confirm-input" class="auth-input" placeholder="SUPPRIMER" style="margin-bottom:10px" oninput="checkDeleteConfirm()">'
+    +'<div id="delete-account-error" class="auth-error" style="display:none;margin-bottom:8px"></div>'
+    +'<button id="delete-account-btn" disabled onclick="deleteMyAccount()" style="width:100%;padding:10px;border-radius:var(--r12);border:none;background:var(--red-muted);color:#fff;cursor:not-allowed;opacity:0.4;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Supprimer mon compte</button>'
+    +'</div>'
     +'</div>';
+}
+function checkDeleteConfirm(){
+  var input = document.getElementById('delete-account-confirm-input');
+  var btn = document.getElementById('delete-account-btn');
+  if(!input || !btn) return;
+  var ok = input.value.trim() === 'SUPPRIMER';
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '0.4';
+  btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+}
+async function deleteMyAccount(){
+  var errEl = document.getElementById('delete-account-error');
+  errEl.style.display='none';
+  if(!sb || !CURRENT_USER){ errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
+  showConfirm('Supprimer définitivement ton compte ? Tu seras déconnecté immédiatement.', async function(){
+    var btn = document.getElementById('delete-account-btn');
+    if(btn){ btn.disabled=true; btn.textContent='Suppression...'; }
+    const { error } = await sb.from('profiles').update({ status: 'deleted', deleted_at: new Date().toISOString() }).eq('id', CURRENT_USER.id);
+    if(error){
+      errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block';
+      if(btn){ btn.disabled=false; btn.textContent='Supprimer mon compte'; }
+      return;
+    }
+    if (sb) await sb.auth.signOut();
+    CURRENT_USER = null; CURRENT_TRIP = null; LAST_HANDLED_USER_ID = null;
+    localStorage.removeItem('planitrip_last_trip_id');
+    document.getElementById('main-app').style.display = 'none';
+    if (typeof hideAllAuthSteps === 'function') hideAllAuthSteps();
+    document.getElementById('auth-step-password').style.display = 'block';
+    showAuthScreen();
+  }, 'Supprimer');
 }
 
 async function saveMyPseudo(){
@@ -5449,9 +5488,23 @@ function showAuthScreen() {
   document.getElementById('main-app').style.display = 'none';
 }
 
-function onAuthenticated(user) {
+async function onAuthenticated(user) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'none';
+  if (sb) {
+    try {
+      var { data: profile } = await sb.from('profiles').select('status').eq('id', user.id).maybeSingle();
+      if (profile && profile.status === 'deleted') {
+        await sb.auth.signOut();
+        CURRENT_USER = null; CURRENT_TRIP = null; LAST_HANDLED_USER_ID = null;
+        localStorage.removeItem('planitrip_last_trip_id');
+        showAuthScreen();
+        alert("Ce compte a été supprimé.");
+        return;
+      }
+      sb.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id).then(function(){});
+    } catch(e) { console.warn('[PlaniTrip] profile check failed:', e); }
+  }
   checkUserTrips(user);
 }
 
