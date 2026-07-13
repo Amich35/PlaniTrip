@@ -2638,8 +2638,15 @@ function fmtDateRangeFr(startISO, endISO){
 function editCountryDateRange(countryId, startVal, endVal){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
-  if(startVal!==null) c.dateStart = startVal;
-  if(endVal!==null) c.dateEnd = endVal;
+  var newStart = startVal!==null ? startVal : c.dateStart;
+  var newEnd = endVal!==null ? endVal : c.dateEnd;
+  if(newStart && newEnd && newEnd < newStart){
+    alert("La date de départ doit être postérieure à la date d'arrivée.");
+    renderContent();
+    return;
+  }
+  c.dateStart = newStart;
+  c.dateEnd = newEnd;
   c.dates = fmtDateRangeFr(c.dateStart, c.dateEnd);
   if(!S.countryEdits[countryId]) S.countryEdits[countryId] = {};
   S.countryEdits[countryId].dateStart = c.dateStart;
@@ -2678,11 +2685,13 @@ function addGuideListItem(countryId, listField, promptLabel){
   renderContent();
 }
 function removeGuideListItem(countryId, listField, idx){
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return;
-  if(listField==='tips'){ c.practical.tips.splice(idx,1); }
-  saveCountryEdit(countryId);
-  renderContent();
+  showConfirm('Supprimer ce conseil ?', function(){
+    var c = COUNTRIES.find(function(co){return co.id===countryId;});
+    if(!c) return;
+    if(listField==='tips'){ c.practical.tips.splice(idx,1); }
+    saveCountryEdit(countryId);
+    renderContent();
+  }, 'Supprimer');
 }
 
 function addCityToCountry(countryId){
@@ -3476,7 +3485,7 @@ function renderCountriesScreen(){
   }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="page-icon-badge" style="width:30px;height:30px">'+svgIcon('globe',16)+'</span><div class="section-title" style="margin-bottom:0;font-size:20px">Pays</div></div>'
+    +'<div class="section-title" style="margin-bottom:12px">Pays</div>'
     +dayHero
     +'<div class="country-card-list">'+cardsHTML+'</div>'
     +'<button onclick="openAddCountryToTripModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un pays</button>'
@@ -3835,7 +3844,10 @@ function renderFlightsList(flights){
     +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" style="flex:1;min-width:0">'
     +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" style="flex:1;min-width:0">'
     +'</div>'
-    +'<input id="newFlightDate" type="date" class="ef-input" style="width:100%;margin-top:6px">'
+    +'<div style="display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:8px">'
+    +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date du vol<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
+    +'<input id="newFlightDate" type="date" class="ef-input" style="width:100%;text-align:center">'
+    +'</div>'
     +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" style="width:100%;margin-top:6px">'
     +'<button onclick="addFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">+ Ajouter un vol</button>'
     +'</div>';
@@ -4107,9 +4119,11 @@ function addExp(cid){
   S.expDesc='';S.expAmt='';S.expActivity='';S.expSplitOverrides={};save();renderContent();
 }
 function delExp(id){
-  S.expenses=S.expenses.filter(function(e){return e.id!==id;});
-  if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(){});
-  save();renderContent();
+  showConfirm('Supprimer cette dépense ?', function(){
+    S.expenses=S.expenses.filter(function(e){return e.id!==id;});
+    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(){});
+    save();renderContent();
+  }, 'Supprimer');
 }
 function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
 function closeShare(){document.getElementById('shareModal').classList.remove('open');}
