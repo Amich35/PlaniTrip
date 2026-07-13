@@ -4988,6 +4988,34 @@ function restoreCountry(countryName) {
 function showArchivedCountriesScreen(){
   S.tab='archived-countries'; save(); renderContent();
 }
+function deleteCountryPermanently(name){
+  showConfirm('Supprimer définitivement '+name+' ? Toutes ses données (villes, activités, dépenses, favoris, checklist) seront perdues. Cette action est irréversible.', function(){
+    var archivedId = null;
+    Object.keys(S.archivedCountryData||{}).forEach(function(k){
+      if(S.archivedCountryData[k].name === name) archivedId = k;
+    });
+    if(archivedId) delete S.archivedCountryData[archivedId];
+    var idx = (S.customCountries||[]).findIndex(function(cc){return cc.name===name;});
+    if(idx>-1) S.customCountries.splice(idx,1);
+    save();
+
+    if (sb && CURRENT_TRIP){
+      var archivedCountries = (CURRENT_TRIP.archived_countries || []).filter(function(n){return n !== name;});
+      sb.from('trips').update({ archived_countries: archivedCountries }).eq('id', CURRENT_TRIP.id).then(function(res){
+        if (res.error) console.error('[PlaniTrip] erreur suppression pays:', res.error);
+        else CURRENT_TRIP.archived_countries = archivedCountries;
+      });
+      if(archivedId){
+        sb.from('cities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
+        sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
+        sb.from('budget_entries').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
+        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
+        sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
+      }
+    }
+    renderContent();
+  }, 'Supprimer définitivement');
+}
 
 async function backToTripSelector() {
   if (!sb || !CURRENT_USER) return;
@@ -5003,7 +5031,8 @@ function renderArchivedCountriesScreen(){
     ? names.map(function(name){
         var flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[name]) || '🌍';
         return '<div class="more-row"><span style="font-size:18px;margin-right:8px">'+flag+'</span><span class="more-row-label">'+escHtml(name)+'</span>'
-          +'<button onclick="restoreCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button></div>';
+          +'<button onclick="restoreCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button>'
+          +'<button onclick="deleteCountryPermanently(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer</button></div>';
       }).join('')
     : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Aucun pays archivé.</div>';
 
