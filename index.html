@@ -3531,7 +3531,13 @@ function addExpGlobal(){
   var categoryEl = document.getElementById('eCategory');
   var category = categoryEl?categoryEl.value:(S.expCategory||'other');
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  var newId=Date.now();
+  var newDate=new Date().toISOString().slice(0,10);
+  S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:newDate});
+  if(sb && CURRENT_TRIP){
+    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
+    sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,entry_date:newDate}).then(function(){});
+  }
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';save();renderContent();
 }
 
@@ -3826,10 +3832,20 @@ function addExp(cid){
   const categoryEl=document.getElementById('eCategory');
   const category=categoryEl?categoryEl.value:(S.expCategory||'other');
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  var newId2=Date.now();
+  var newDate2=new Date().toISOString().slice(0,10);
+  S.expenses.push({id:newId2,country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:newDate2});
+  if(sb && CURRENT_TRIP){
+    var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
+    sb.from('budget_entries').insert({id:newId2,trip_id:CURRENT_TRIP.id,country_id:cid,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,entry_date:newDate2}).then(function(){});
+  }
   S.expDesc='';S.expAmt='';S.expActivity='';save();renderContent();
 }
-function delExp(id){S.expenses=S.expenses.filter(function(e){return e.id!==id;});save();renderContent();}
+function delExp(id){
+  S.expenses=S.expenses.filter(function(e){return e.id!==id;});
+  if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(){});
+  save();renderContent();
+}
 function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
 function closeShare(){document.getElementById('shareModal').classList.remove('open');}
 
@@ -4107,6 +4123,7 @@ function deleteCity(countryId, cityName){
   if(expenseMatches.length){
     var expIdsToRemove = expenseMatches.map(function(e){return e.id;});
     S.expenses = S.expenses.filter(function(e){return expIdsToRemove.indexOf(e.id)===-1;});
+    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().in('id', expIdsToRemove).then(function(){});
   }
   if(S.cityOrder) delete S.cityOrder[countryId];
 
@@ -5311,6 +5328,16 @@ async function loadCitiesActivities(){
   save();
 }
 
+async function loadBudgetEntries(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
+  (data||[]).forEach(function(row){
+    if(!S.expenses.find(function(e){return e.id===row.id;})){
+      S.expenses.push({id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,date:row.entry_date});
+    }
+  });
+  save();
+}
 async function enterTrip(trip, resetTab) {
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
@@ -5334,6 +5361,7 @@ async function enterTrip(trip, resetTab) {
 
   await loadCollaborators();
   await loadCitiesActivities();
+  await loadBudgetEntries();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
 
