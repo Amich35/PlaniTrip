@@ -3048,7 +3048,7 @@ function renderBudget(c){
   let expRows=exps.map(function(e){
     var whoLabel = e.personLabel || e.person || '?';
     var catIcon = getExpenseCategoryIcon(e.category);
-    return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+    return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
   }).join('');
   var selCity = c.cities.find(function(ci){return ci.city===S.expCity;});
   var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
@@ -3065,6 +3065,7 @@ function renderBudget(c){
     +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(c.rateNum||0)+')"/>'
     +(c.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(c))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*c.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+c.rateNum+')"/>'):'')
     +'</div>'
+    +renderParticipantsRow()
     +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
     +'<button class="ef-btn" onclick="addExp(\''+c.id+'\')">+ Ajouter</button></div></div>'
     +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Dépenses</div>'+expRows+'</div>':'')
@@ -3435,8 +3436,8 @@ function renderBudgetOverview(){
   var totalSpent = S.expenses.reduce(function(s,e){return s+e.amount;},0);
   var totalBudget = COUNTRIES.reduce(function(s,c){return s+c.budget_daily*c.days;},0);
   var pct = totalBudget>0 ? Math.min(100, Math.round((totalSpent/totalBudget)*100)) : 0;
-  var tabsHTML = ['resume','depenses'].map(function(t){
-    var lbl = t==='resume'?'Résumé':'Dépenses';
+  var tabsHTML = ['resume','depenses','remb'].map(function(t){
+    var lbl = t==='resume'?'Résumé':(t==='depenses'?'Dépenses':'Remboursements');
     return '<button class="cf-tab'+(sub===t?' active':'')+'" onclick="setBudgetSubTab(\''+t+'\')">'+lbl+'</button>';
   }).join('');
 
@@ -3456,14 +3457,14 @@ function renderBudgetOverview(){
       +renderProgressRing(pct, 72, 7, '#95D5B2')
       +'</div></div>'
       +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>';
-  } else {
+  } else if(sub==='depenses') {
     var countryOptions = COUNTRIES.map(function(c){return '<option value="'+c.id+'"'+(S.expCountry===c.id?' selected':'')+'>'+c.flag+' '+c.name+'</option>';}).join('');
     var exps = S.expenses.slice().reverse();
     var expRows = exps.map(function(e){
       var c = COUNTRIES.find(function(co){return co.id===e.country;});
       var whoLabel = e.personLabel || e.person || '?';
       var catIcon = getExpenseCategoryIcon(e.category);
-      return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+      return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
     }).join('');
     var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
     var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
@@ -3480,9 +3481,35 @@ function renderBudgetOverview(){
       +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
       +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
       +'</div>'
+      +renderParticipantsRow()
       +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
       +'<button class="ef-btn" onclick="addExpGlobal()">+ Ajouter</button></div></div>'
       +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Toutes les dépenses</div>'+expRows+'</div>':'<div class="fav-empty">Aucune dépense enregistrée.</div>');
+  } else if(sub==='remb'){
+    var balances = computeBalances();
+    var txns = simplifyDebts(balances);
+    var myLabel2 = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var balanceCards = balances.map(function(b){
+      var isPos = b.balance>0.01, isNeg = b.balance<-0.01;
+      var color = isPos?'var(--accent)':(isNeg?'var(--red-muted)':'var(--ink-subtle)');
+      var bg = isPos?'var(--accent-pale)':(isNeg?'var(--red-pale)':'var(--sand-deep)');
+      var lbl = isPos?'doit recevoir':(isNeg?'doit':'est à jour');
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:'+bg+';margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;gap:10px"><span style="width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(b.person)+'</span><span style="font-size:14px;font-weight:600;color:var(--ink)">'+escHtml(b.person===myLabel2?'Toi':b.person)+'</span></div>'
+        +'<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:'+color+'">'+fmtEUR(Math.abs(b.balance))+'</div><div style="font-size:11px;color:var(--ink-subtle)">'+lbl+'</div></div>'
+        +'</div>';
+    }).join('');
+    var txnRows = txns.length ? txns.map(function(t){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;font-size:13px;box-shadow:var(--shadow-sm)">'
+        +'<span style="font-weight:600">'+escHtml(t.from===myLabel2?'Toi':t.from)+'</span>'
+        +'<span style="color:var(--ink-subtle)">doit rembourser</span>'
+        +'<span style="font-weight:700;color:var(--accent)">'+fmtEUR(t.amount)+'</span>'
+        +'<span style="color:var(--ink-subtle)">à</span>'
+        +'<span style="font-weight:600">'+escHtml(t.to===myLabel2?'toi':t.to)+'</span>'
+        +'</div>';
+    }).join('') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
+    body = '<div class="info-card" style="margin-bottom:14px"><div class="ic-header">Soldes</div>'+balanceCards+'</div>'
+      +'<div class="info-card"><div class="ic-header">Remboursements suggérés</div>'+txnRows+'</div>';
   }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
@@ -3512,18 +3539,40 @@ function getExpenseCategoryIcon(catId){
   var cat = EXPENSE_CATEGORIES.find(function(c){return c.id===catId;});
   return cat ? cat.icon : 'ellipsis';
 }
-function getExpensePersonOptions(){
+function getExpenseCategoryLabel(catId){
+  var cat = EXPENSE_CATEGORIES.find(function(c){return c.id===catId;});
+  return cat ? cat.label : 'Autre';
+}
+function getPeopleList(){
   var people = [];
   var myLabel = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
   people.push(myLabel);
   (CURRENT_COLLABORATORS||[]).forEach(function(c){
     if(c.invited_email) people.push(c.invited_email);
   });
-  people.push('Commun');
+  return people;
+}
+function getExpensePersonOptions(){
+  var people = getPeopleList();
   if(!S.expPerson || people.indexOf(S.expPerson)===-1) S.expPerson = people[0];
   return people.map(function(p){
     return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(p)+'</option>';
   }).join('');
+}
+function toggleExpParticipant(p){
+  if(!S.expParticipants) S.expParticipants = getPeopleList().slice();
+  var idx = S.expParticipants.indexOf(p);
+  if(idx>-1) S.expParticipants.splice(idx,1); else S.expParticipants.push(p);
+  save(); renderContent();
+}
+function renderParticipantsRow(){
+  var people = getPeopleList();
+  if(!S.expParticipants || !S.expParticipants.length) S.expParticipants = people.slice();
+  return '<div class="ef-row" style="flex-wrap:wrap;gap:6px">'+people.map(function(p){
+    var checked = S.expParticipants.indexOf(p)>-1;
+    var pEsc = escHtml(p).replace(/'/g,"\\'");
+    return '<span onclick="toggleExpParticipant(\''+pEsc+'\')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:14px;cursor:pointer;background:'+(checked?'var(--accent-pale)':'var(--sand-deep)')+';color:'+(checked?'var(--accent)':'var(--ink-subtle)')+'">'+getInitials(p)+'</span>';
+  }).join('')+'</div>';
 }
 function parseAmt(v){ if(v===undefined||v===null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
 function getCurrencySymbol(c){ var m=(c&&c.currency||'').match(/\(([^)]+)\)/); return m?m[1]:((c&&c.currency)||''); }
@@ -3546,6 +3595,37 @@ function syncExpAmt(which, rateNum){
     }
   }
 }
+function computeBalances(){
+  var people = getPeopleList();
+  var paid = {}, share = {};
+  people.forEach(function(p){paid[p]=0;share[p]=0;});
+  S.expenses.forEach(function(e){
+    var parts = (e.participants && e.participants.length) ? e.participants.filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
+    if(!parts.length) parts = people.slice();
+    var per = e.amount / parts.length;
+    parts.forEach(function(p){ share[p] = (share[p]||0) + per; });
+    var payer = e.personLabel || e.person;
+    if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + e.amount;
+  });
+  return people.map(function(p){
+    return {person:p, paid:paid[p]||0, share:share[p]||0, balance:(paid[p]||0)-(share[p]||0)};
+  });
+}
+function simplifyDebts(balances){
+  var creditors = balances.filter(function(b){return b.balance>0.01;}).map(function(b){return {person:b.person,amt:b.balance};}).sort(function(a,b){return b.amt-a.amt;});
+  var debtors = balances.filter(function(b){return b.balance<-0.01;}).map(function(b){return {person:b.person,amt:-b.balance};}).sort(function(a,b){return b.amt-a.amt;});
+  var txns = [];
+  var i=0,j=0;
+  while(i<debtors.length && j<creditors.length){
+    var d=debtors[i], c=creditors[j];
+    var amt = Math.min(d.amt, c.amt);
+    if(amt>0.01) txns.push({from:d.person, to:c.person, amount:amt});
+    d.amt -= amt; c.amt -= amt;
+    if(d.amt<=0.01) i++;
+    if(c.amt<=0.01) j++;
+  }
+  return txns;
+}
 function setBudgetSubTab(t){ S.budgetSubTab=t; save(); renderContent(); }
 function addExpGlobal(){
   var desc=document.getElementById('eDesc').value.trim();
@@ -3557,13 +3637,14 @@ function addExpGlobal(){
   var activity = activityEl?activityEl.value:'';
   var categoryEl = document.getElementById('eCategory');
   var category = categoryEl?categoryEl.value:(S.expCategory||'other');
-  if(!desc||isNaN(amt)||amt<=0)return;
+  if(isNaN(amt)||amt<=0)return;
   var newId=Date.now();
   var newDate=new Date().toISOString().slice(0,10);
-  S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:newDate});
+  var participants = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
+  S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,date:newDate});
   if(sb && CURRENT_TRIP){
     var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-    sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,entry_date:newDate}).then(function(){});
+    sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,entry_date:newDate}).then(function(){});
   }
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';save();renderContent();
 }
@@ -3858,13 +3939,14 @@ function addExp(cid){
   const activity=activityEl?activityEl.value:'';
   const categoryEl=document.getElementById('eCategory');
   const category=categoryEl?categoryEl.value:(S.expCategory||'other');
-  if(!desc||isNaN(amt)||amt<=0)return;
+  if(isNaN(amt)||amt<=0)return;
   var newId2=Date.now();
   var newDate2=new Date().toISOString().slice(0,10);
-  S.expenses.push({id:newId2,country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:newDate2});
+  var participants2 = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
+  S.expenses.push({id:newId2,country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants2,date:newDate2});
   if(sb && CURRENT_TRIP){
     var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-    sb.from('budget_entries').insert({id:newId2,trip_id:CURRENT_TRIP.id,country_id:cid,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,entry_date:newDate2}).then(function(){});
+    sb.from('budget_entries').insert({id:newId2,trip_id:CURRENT_TRIP.id,country_id:cid,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants2,entry_date:newDate2}).then(function(){});
   }
   S.expDesc='';S.expAmt='';S.expActivity='';save();renderContent();
 }
@@ -5360,7 +5442,7 @@ async function loadBudgetEntries(){
   var {data} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
   (data||[]).forEach(function(row){
     if(!S.expenses.find(function(e){return e.id===row.id;})){
-      S.expenses.push({id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,date:row.entry_date});
+      S.expenses.push({id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,date:row.entry_date});
     }
   });
   save();
