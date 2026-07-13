@@ -962,6 +962,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 <script>
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
+let LAST_HANDLED_USER_ID = null;
 let IN_PASSWORD_RECOVERY = false;
 // ── GPS COORDINATES ────────────────────────────────────────────
 // Format: [lat, lng, "Place name for search fallback"]
@@ -5412,6 +5413,7 @@ async function initAuth() {
       hideAllAuthSteps();
       document.getElementById('auth-step-set-password').style.display = 'block';
     } else if (session) {
+      LAST_HANDLED_USER_ID = session.user.id;
       onAuthenticated(session.user);
     } else {
       showAuthScreen();
@@ -5428,10 +5430,12 @@ async function initAuth() {
       }
       if (event === 'SIGNED_IN' && session) {
         if (IN_PASSWORD_RECOVERY) return; // en cours de définition de mot de passe : ne pas naviguer
-        if (CURRENT_TRIP) return; // déjà dans un trip : ignorer le re-déclenchement (ex: retour d'onglet)
+        if (CURRENT_TRIP && LAST_HANDLED_USER_ID === session.user.id) return; // vrai retour d'onglet : même session déjà chargée, on ignore
+        LAST_HANDLED_USER_ID = session.user.id;
         onAuthenticated(session.user);
       } else if (event === 'SIGNED_OUT') {
         CURRENT_TRIP = null;
+        LAST_HANDLED_USER_ID = null;
         showAuthScreen();
       }
     });
