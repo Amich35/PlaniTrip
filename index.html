@@ -956,7 +956,10 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     </div>
     <div class="pl-body">
       <div class="pl-name" id="plName"></div>
-      <div class="pl-tip" id="plTip"></div>
+      <input class="ir-input-block" id="plTipInput" type="text" placeholder="Sous-titre du spot" style="margin-top:6px" oninput="onPlTipInput(this.value)"/>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="deleteCurrentPhotoSpot()" style="flex:1;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Supprimer ce spot</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3065,7 +3068,7 @@ function renderItinerary(c, embedded){
     var query = _PLACE_QUERY_OVERRIDES[p.n] || (p.n+' '+c.name);
     var safeN = p.n.replace(/'/g,"\\'");
     var safeT = p.t.replace(/'/g,"\\'");
-    return '<div class="photo-spot-card" style="background-image:'+grad+'" data-img-query="'+escHtml(query)+'" onclick="openPhotoSpot(\''+safeN+'\',\''+safeT+'\',\''+escHtml(query)+'\')">'+photoEditBtn(query,'position:absolute;top:8px;right:8px;')+'<div class="psc-content"><div class="psc-name">'+p.n+'</div><div class="psc-tip">'+p.t+'</div></div></div>';
+    return '<div class="photo-spot-card" style="background-image:'+grad+'" data-img-query="'+escHtml(query)+'" onclick="openPhotoSpot(\''+safeN+'\',\''+safeT+'\',\''+escHtml(query)+'\',\''+c.id+'\','+pi+')">'+photoEditBtn(query,'position:absolute;top:8px;right:8px;')+'<div class="psc-content"><div class="psc-name">'+p.n+'</div><div class="psc-tip">'+p.t+'</div></div></div>';
   }).join('');
   const wc=WEATHER_COORDS[c.id];
   const weatherSection='<div class="section"><div class="section-header">'
@@ -3286,7 +3289,7 @@ function renderCountryDetailShell(c, innerHtml){
     return s+baseDone+customDone;
   },0);
   var subTabs = [
-    {id:'guide', label:'Guide'},
+    {id:'guide', label:'Infos pratiques'},
     {id:'lieux', label:'Lieux'},
     {id:'carte', label:'Carte'},
   ];
@@ -4015,7 +4018,6 @@ function renderGuide(c){
   const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   const tipsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_tips']);
   const clOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_checklist']);
-  renderGuideWeatherTrigger(c.id);
   const emergRows=p.emergency.map(function(e){return '<div class="info-row"><span class="ir-key">'+e.k+'</span><span class="ir-val" style="color:var(--red-muted)">'+e.v+'</span></div>';}).join('');
   const clItems=p.checklist.map(function(item,i){
     const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
@@ -4023,30 +4025,26 @@ function renderGuide(c){
   }).join('');
   const clDone=p.checklist.filter(function(_,i){return !!S.checklist[c.id+'_cl_'+i];}).length;
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
-  return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Guide</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
+  return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
     +aiBadge
     +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub">Configure une clé API (dans Plus → Réglages avancés) pour auto-remplir ce guide à partir du nom du pays.</div></div>')
-    +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Monnaie & Visa</div>'
-    +'<div class="info-row" style="flex-direction:column;align-items:stretch;gap:6px"><span class="ir-key">Dates (arrivée / départ)</span><div style="display:flex;gap:8px"><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/></div></div>'
+    +'<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</div>'
+    +'<div class="info-row" style="flex-direction:column;align-items:stretch;gap:6px"><span class="ir-key">Arrivée / départ</span><div style="display:flex;gap:8px"><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/><input class="ir-input" type="date" style="flex:1" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/></div></div></div>'
+    +'<div class="info-card"><div class="ic-header" style="display:flex;align-items:center;gap:6px"><span data-icon="pencil" data-icon-size="14" style="color:var(--ink-subtle)"></span> Général<span style="font-size:11px;font-weight:400;color:var(--ink-subtle);margin-left:auto">Touche un champ pour le modifier</span></div>'
     +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Taux indicatif</span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div></div>'
+    +'<div class="info-card"><div class="ic-header"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</div>'+emergRows+'</div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_tips\')"><span><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span><span style="transform:rotate('+(tipsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(tipsOpen?tipRows:'')+'</div>'
-    +'<div class="info-card"><div class="ic-header"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</div>'+emergRows+'</div>'
     +renderConverterCard(c)
-    +'<div class="info-card"><div class="ic-header"><span data-icon="sun" data-icon-size="16"></span> Météo · '+c.name+'</div><div id="guide-weather-body-'+c.id+'"><div class="status-sub">Chargement…</div></div></div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_checklist\')"><span><span data-icon="check-square" data-icon-size="16"></span> Checklist avant départ</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;color:var(--accent)">'+clDone+'/'+p.checklist.length+'</span><span style="transform:rotate('+(clOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +'<div class="bh-bar" style="margin:4px 0 '+(clOpen?'10px':'0')+'"><div class="bh-fill" style="width:'+clPct+'%"></div></div>'
     +(clOpen?clItems:'')+'</div>'
     +'</div>';
-}
-window._guideWeatherPending = window._guideWeatherPending || {};
-function renderGuideWeatherTrigger(countryId){
-  setTimeout(function(){ loadHomeWeather(countryId, 'guide-weather-body-'+countryId); }, 50);
 }
 
 function getRate(c){ return (S.customRates && S.customRates[c.id]) || c.rateNum || 1; }
@@ -4262,10 +4260,15 @@ function doSearch(q){
   }).join('');
 }
 
-function openPhotoSpot(name, tip, query){
+var _currentSpotCountryId = null;
+var _currentSpotIndex = -1;
+function openPhotoSpot(name, tip, query, countryId, index){
   _currentSpotQuery = query;
+  _currentSpotCountryId = countryId;
+  _currentSpotIndex = index;
   document.getElementById('plName').textContent = name;
-  document.getElementById('plTip').textContent = tip;
+  var tipInput = document.getElementById('plTipInput');
+  if(tipInput) tipInput.value = tip;
   var imgEl = document.getElementById('plImg');
   imgEl.style.backgroundImage = '';
   imgEl.innerHTML = svgIcon('camera', 32);
@@ -4276,6 +4279,28 @@ function openPhotoSpot(name, tip, query){
       imgEl.textContent = '';
     }
   });
+}
+function onPlTipInput(val){
+  if(!_currentSpotCountryId || _currentSpotIndex<0) return;
+  var c = COUNTRIES.find(function(co){return co.id===_currentSpotCountryId;});
+  if(!c || !c.photo || !c.photo[_currentSpotIndex]) return;
+  c.photo[_currentSpotIndex].t = val;
+  if(!S.countryEdits[_currentSpotCountryId]) S.countryEdits[_currentSpotCountryId] = {};
+  S.countryEdits[_currentSpotCountryId].photo = c.photo;
+  save();
+}
+function deleteCurrentPhotoSpot(){
+  if(!_currentSpotCountryId || _currentSpotIndex<0) return;
+  showConfirm('Supprimer ce spot photo ?', function(){
+    var c = COUNTRIES.find(function(co){return co.id===_currentSpotCountryId;});
+    if(!c || !c.photo) return;
+    c.photo.splice(_currentSpotIndex, 1);
+    if(!S.countryEdits[_currentSpotCountryId]) S.countryEdits[_currentSpotCountryId] = {};
+    S.countryEdits[_currentSpotCountryId].photo = c.photo;
+    save();
+    closePhotoSpot();
+    renderContent();
+  }, 'Supprimer');
 }
 function closePhotoSpot(){ document.getElementById('photoLightbox').classList.remove('open'); }
 
@@ -5299,6 +5324,7 @@ const ICON_PATHS = {
   'cloud-lightning': '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m13 12-3 5h4l-3 5"/>',
   sparkles: '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
 };
 function parseAlert(text){
   var special = {
