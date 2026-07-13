@@ -4865,7 +4865,6 @@ function restoreCountry(countryName) {
     if(S.archivedCountryData[k].name === countryName) entry = S.archivedCountryData[k];
   });
   if(entry){
-    if(!COUNTRIES.find(function(c){return c.id===entry.id;})) COUNTRIES.push(entry);
     var idx = S.deletedCountryIds.indexOf(entry.id);
     if(idx!==-1) S.deletedCountryIds.splice(idx,1);
     delete S.archivedCountryData[entry.id];
@@ -4874,6 +4873,7 @@ function restoreCountry(countryName) {
       if(!S.customCountries) S.customCountries=[];
       if(!S.customCountries.find(function(cc){return cc.id===entry.id;})) S.customCountries.push(entry);
     }
+    rebuildCountriesFromState();
   }
   save();
 
