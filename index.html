@@ -1979,6 +1979,15 @@ function toggleFavorite(k){
   if(!S.favorites) S.favorites={};
   S.favorites[k]=!S.favorites[k];
   save();
+  if(sb && CURRENT_TRIP){
+    var countryId = k.split('_')[0];
+    if(S.favorites[k]){
+      var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+      sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(){});
+    } else {
+      sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(){});
+    }
+  }
   renderContent();
 }
 function toggleCity(k){S.openCities[k]=!S.openCities[k];save();const el=document.querySelector('[data-city="'+k+'"]');if(el)el.classList.toggle('open',!!S.openCities[k]);}
@@ -4910,6 +4919,7 @@ function renderArchivedCountriesScreen(){
 
 var _acmScopeAll = true;
 var _acmScopeCountries = [];
+var _acmSuccessMsg = '';
 
 function showMyAccountScreen(){
   S.tab='my-account'; save(); renderContent();
@@ -5002,7 +5012,9 @@ async function addCollaboratorSubmit(){
   var input = document.getElementById('acm-email-input');
   var email = (input.value||'').trim().toLowerCase();
   var errEl = document.getElementById('acm-error');
+  var successEl = document.getElementById('acm-success');
   errEl.style.display='none';
+  if(successEl) successEl.style.display='none';
   if(!email || !email.includes('@')){
     errEl.textContent = 'Merci de renseigner un email valide.'; errEl.style.display='block'; return;
   }
@@ -5029,11 +5041,22 @@ async function addCollaboratorSubmit(){
     role: 'editor'
   });
 
-  btn.disabled = false; btn.textContent = 'Inviter';
-
   if(error){
+    btn.disabled = false; btn.textContent = 'Inviter';
     errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block'; return;
   }
+
+  var tripName = (CURRENT_TRIP && CURRENT_TRIP.name) || 'ce voyage';
+  var inviterName = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || '';
+  try {
+    var { error: fnError } = await sb.functions.invoke('send-invite', {
+      body: { to_email: email, trip_name: tripName, inviter_name: inviterName }
+    });
+    if(fnError){ console.warn('[PlaniTrip] send-invite:', fnError); }
+  } catch(e){ console.warn('[PlaniTrip] send-invite failed:', e); }
+
+  btn.disabled = false; btn.textContent = 'Inviter';
+  _acmSuccessMsg = 'Invitation envoyée à ' + email;
   input.value=''; _acmScopeAll=true; _acmScopeCountries=[];
   await loadCollaborators();
   renderContent();
@@ -5082,8 +5105,10 @@ function renderAccessManagementScreen(){
       +'</div>'
       +(_acmScopeAll ? '' : '<div style="max-height:220px;overflow-y:auto;margin-bottom:6px">'+countryChecks+'</div>')
       +'<div id="acm-error" class="auth-error" style="display:none;margin:6px 0"></div>'
+      +(_acmSuccessMsg?('<div id="acm-success" style="margin:6px 0;padding:9px 12px;border-radius:10px;background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600">'+escHtml(_acmSuccessMsg)+'</div>'):'')
       +'<button id="acm-add-btn" class="btn-primary" onclick="addCollaboratorSubmit()">Inviter</button>'
       +'</div>';
+    if(_acmSuccessMsg) setTimeout(function(){ _acmSuccessMsg=''; },4000);
   }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
@@ -5581,6 +5606,15 @@ async function loadBudgetEntries(){
   });
   save();
 }
+async function loadFavorites(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data} = await sb.from('favorites').select('key').eq('trip_id',CURRENT_TRIP.id);
+  if(!S.favorites) S.favorites={};
+  (data||[]).forEach(function(row){
+    if(S.favorites[row.key]===undefined) S.favorites[row.key]=true;
+  });
+  save();
+}
 async function enterTrip(trip, resetTab) {
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
@@ -5605,6 +5639,7 @@ async function enterTrip(trip, resetTab) {
   await loadCollaborators();
   await loadCitiesActivities();
   await loadBudgetEntries();
+  await loadFavorites();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
 
