@@ -301,11 +301,12 @@ a{color:var(--ink);}
 
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;z-index:100;background:rgba(248,246,242,0.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:var(--border);display:flex;padding:var(--sp8) 0 calc(12px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 rgba(29,29,31,0.056);}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:none;padding:var(--sp8) var(--sp4);min-height:44px;transition:opacity 0.15s;}
-.nav-btn .nav-icon{font-size:22px;line-height:1;color:#545454;transition:color 0.2s;} .nav-btn.active .nav-icon{color:#2E7D5B;}
+.nav-btn .nav-icon{font-size:22px;line-height:1;color:#545454;transition:color 0.2s,background 0.2s;width:32px;height:32px;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center;margin:0 auto;box-sizing:border-box;} .nav-btn.active .nav-icon{color:#2E7D5B;}
 .page-icon-badge{width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;}
 .page-icon-badge svg{stroke:#fff;}
-.nav-btn.active .nav-icon{background:var(--accent);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
-.nav-btn.active .nav-icon svg{stroke:#fff;width:18px;height:18px;color:#fff;}
+.nav-btn.active .nav-icon{background:var(--accent);}
+.nav-btn .nav-icon svg{width:18px;height:18px;}
+.nav-btn.active .nav-icon svg{stroke:#fff;color:#fff;}
 .nav-btn .nav-lbl{font-size:9px;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-muted);font-weight:500;}
 .nav-btn.active .nav-lbl{color:var(--accent);font-weight:600;}
 
@@ -3333,7 +3334,7 @@ function renderHome(){
   var heroQuery=getCountryImageQuery(ts.currentCountry);
   var hero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'">'
     +photoEditBtn(heroQuery)
-    +'<div class="home-hero-overlay"><div class="home-hero-greeting">Bonjour !</div><div class="home-hero-sub">'+ts.currentCountry.flag+' '+ts.currentCountry.name+' · Profitez de votre aventure 🌴</div></div></div>';
+    +'<div class="home-hero-overlay"><div class="home-hero-greeting">Bonjour !</div><div class="home-hero-sub">'+ts.currentCountry.flag+' '+ts.currentCountry.name+' · Profitez de votre aventure</div></div></div>';
 
   // Jour card
   var dayCard;
@@ -3475,8 +3476,9 @@ function renderBudgetOverview(){
       var budget = c.budget_daily*c.days;
       var p = budget>0 ? Math.min(100, Math.round((spent/budget)*100)) : 0;
       return '<div class="budget-country-row" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')">'
-        +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span><span class="bcr-amt">'+fmtEUR(spent)+' / '+fmtEUR(budget)+'</span><span class="bcr-pct">'+p+'%</span></div>'
-        +'<div class="bh-bar" style="margin-top:6px;margin-left:36px;width:calc(100% - 50px)"><div class="bh-fill" style="width:'+p+'%"></div></div>'
+        +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0"><span class="bcr-amt">'+fmtEUR(spent)+' / '+fmtEUR(budget)+'</span><div class="bh-bar" style="margin-top:7px;width:100%;height:7px;border-radius:3.5px"><div class="bh-fill" style="width:'+p+'%;border-radius:3.5px"></div></div></div>'
+        +'<span class="bcr-pct">'+p+'%</span></div>'
         +'</div>';
     }).join('');
     body = '<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
