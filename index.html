@@ -245,7 +245,7 @@ a{color:var(--ink);}
 .bh-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:4px;}
 .bh-amount{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:44px;font-weight:700;color:#fff;line-height:1;letter-spacing:-1px;}
 .bh-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px;}
-.bh-bar{height:4px;background:#E5E5E5;border:1px solid #D1D1D1;border-radius:2px;margin:14px 0 10px;box-sizing:border-box;}
+.bh-bar{height:4px;background:rgba(0,0,0,0.08);border-radius:2px;margin:14px 0 10px;}
 .bh-fill{height:100%;border-radius:2px;background:var(--accent);transition:width 0.5s;}
 .bh-persons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
 .bh-person{background:rgba(255,255,255,0.07);border-radius:10px;padding:12px;border:1px solid rgba(255,255,255,0.1);}
@@ -3086,7 +3086,7 @@ function renderBudget(c){
     +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(c.rateNum||0)+')"/>'
     +(c.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(c))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*c.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+c.rateNum+')"/>'):'')
     +'</div>'
-    +renderParticipantsRow()
+    +renderSplitRows(S.expAmt)
     +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
     +'<button class="ef-btn" onclick="addExp(\''+c.id+'\')">+ Ajouter</button></div></div>'
     +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Dépenses</div>'+expRows+'</div>':'')
@@ -3470,7 +3470,7 @@ function renderBudgetOverview(){
       var p = budget>0 ? Math.min(100, Math.round((spent/budget)*100)) : 0;
       return '<div class="budget-country-row" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')">'
         +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span><span class="bcr-amt">'+fmtEUR(spent)+' / '+fmtEUR(budget)+'</span><span class="bcr-pct">'+p+'%</span></div>'
-        +'<div class="bh-bar" style="margin-top:6px;margin-left:36px"><div class="bh-fill" style="width:'+p+'%"></div></div>'
+        +'<div class="bh-bar" style="margin-top:6px;margin-left:36px;width:58%"><div class="bh-fill" style="width:'+p+'%"></div></div>'
         +'</div>';
     }).join('');
     body = '<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
@@ -3502,7 +3502,7 @@ function renderBudgetOverview(){
       +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
       +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
       +'</div>'
-      +renderParticipantsRow()
+      +renderSplitRows(S.expAmt)
       +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
       +'<button class="ef-btn" onclick="addExpGlobal()">+ Ajouter</button></div></div>'
       +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Toutes les dépenses</div>'+expRows+'</div>':'<div class="fav-empty">Aucune dépense enregistrée.</div>');
@@ -3580,20 +3580,80 @@ function getExpensePersonOptions(){
     return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(p)+'</option>';
   }).join('');
 }
-function toggleExpParticipant(p){
+var SPLIT_PEOPLE_CACHE = [];
+function fmtSplitNum(n){
+  if(n===undefined||n===null||isNaN(n)) n=0;
+  return (Math.round(n*100)/100).toFixed(2).replace('.',',');
+}
+function computeFinalSplits(total, participants, overrides){
+  var result = {};
+  participants.forEach(function(p){
+    if(overrides && overrides[p]!==undefined && overrides[p]!==''){
+      var v = parseAmt(overrides[p]);
+      if(!isNaN(v)) result[p]=v;
+    }
+  });
+  var overrideSum = 0;
+  Object.keys(result).forEach(function(p){ overrideSum += result[p]; });
+  var autoParticipants = participants.filter(function(p){ return !result.hasOwnProperty(p); });
+  var remaining = Math.round(((total||0)-overrideSum)*100)/100;
+  if(autoParticipants.length){
+    var share = Math.floor((remaining/autoParticipants.length)*100)/100;
+    var assigned = 0;
+    autoParticipants.forEach(function(p, i){
+      if(i===autoParticipants.length-1){ result[p] = Math.round((remaining-assigned)*100)/100; }
+      else { result[p]=share; assigned+=share; }
+    });
+  }
+  return result;
+}
+function toggleSplitParticipant(idx){
+  var p = SPLIT_PEOPLE_CACHE[idx];
   if(!S.expParticipants) S.expParticipants = getPeopleList().slice();
-  var idx = S.expParticipants.indexOf(p);
-  if(idx>-1) S.expParticipants.splice(idx,1); else S.expParticipants.push(p);
+  var i2 = S.expParticipants.indexOf(p);
+  if(i2>-1){ S.expParticipants.splice(i2,1); if(S.expSplitOverrides) delete S.expSplitOverrides[p]; }
+  else S.expParticipants.push(p);
   save(); renderContent();
 }
-function renderParticipantsRow(){
+function onSplitInput(idx, val){
+  var p = SPLIT_PEOPLE_CACHE[idx];
+  if(!S.expSplitOverrides) S.expSplitOverrides = {};
+  S.expSplitOverrides[p] = val;
+  refreshSplitAmounts();
+  save();
+}
+function refreshSplitAmounts(){
+  var eAmtEl = document.getElementById('eAmt');
+  var amt = eAmtEl ? (parseAmt(eAmtEl.value)||0) : 0;
+  var computed = computeFinalSplits(amt, S.expParticipants||[], S.expSplitOverrides||{});
+  SPLIT_PEOPLE_CACHE.forEach(function(p, idx){
+    if((S.expParticipants||[]).indexOf(p)===-1) return;
+    var el = document.getElementById('splitAmt_'+idx);
+    if(el && document.activeElement!==el){ el.value = fmtSplitNum(computed[p]!==undefined?computed[p]:0); }
+  });
+}
+function renderSplitRows(totalAmtStr){
   var people = getPeopleList();
+  SPLIT_PEOPLE_CACHE = people;
   if(!S.expParticipants || !S.expParticipants.length) S.expParticipants = people.slice();
-  return '<div class="ef-row" style="flex-wrap:wrap;gap:6px">'+people.map(function(p){
+  if(!S.expSplitOverrides) S.expSplitOverrides = {};
+  var amt = parseAmt(totalAmtStr)||0;
+  var computed = computeFinalSplits(amt, S.expParticipants, S.expSplitOverrides);
+  var rows = people.map(function(p, idx){
     var checked = S.expParticipants.indexOf(p)>-1;
-    var pEsc = escHtml(p).replace(/'/g,"\\'");
-    return '<span onclick="toggleExpParticipant(\''+pEsc+'\')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:14px;cursor:pointer;background:'+(checked?'var(--accent-pale)':'var(--sand-deep)')+';color:'+(checked?'var(--accent)':'var(--ink-subtle)')+'">'+getInitials(p)+'</span>';
-  }).join('')+'</div>';
+    var val = checked ? fmtSplitNum(computed[p]!==undefined?computed[p]:0) : '0,00';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;'+(idx<people.length-1?'border-bottom:1px solid var(--sand-deep);':'')+'">'
+      +'<span onclick="toggleSplitParticipant('+idx+')" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0">'
+      +'<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:#fff;font-size:11px">'+(checked?'✓':'')+'</span>'
+      +'<span style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p)+'</span></span>'
+      +(checked
+        ? ('<span style="display:flex;align-items:center;gap:2px;flex-shrink:0"><input id="splitAmt_'+idx+'" type="text" inputmode="decimal" value="'+val+'" style="width:60px;text-align:right;border:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink);padding:0" oninput="onSplitInput('+idx+',this.value)"/><span style="font-size:13px;color:var(--ink-subtle)">€</span></span>')
+        : '<span style="font-size:13px;color:var(--ink-subtle);flex-shrink:0">0,00 €</span>')
+      +'</div>';
+  }).join('');
+  return '<div class="ef-row" style="flex-direction:column;align-items:stretch;padding:2px 0 0">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 6px"><span style="font-size:13px;font-weight:600;color:var(--ink-subtle)">Diviser</span><span style="font-size:12px;color:var(--ink-subtle)">Également par défaut</span></div>'
+    +'<div style="background:var(--parchment);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-sm)">'+rows+'</div></div>';
 }
 function parseAmt(v){ if(v===undefined||v===null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
 function getCurrencySymbol(c){ var m=(c&&c.currency||'').match(/\(([^)]+)\)/); return m?m[1]:((c&&c.currency)||''); }
@@ -3615,16 +3675,23 @@ function syncExpAmt(which, rateNum){
       S.expAmt=veur;
     }
   }
+  refreshSplitAmounts();
 }
 function computeBalances(){
   var people = getPeopleList();
   var paid = {}, share = {};
   people.forEach(function(p){paid[p]=0;share[p]=0;});
   S.expenses.forEach(function(e){
-    var parts = (e.participants && e.participants.length) ? e.participants.filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
-    if(!parts.length) parts = people.slice();
-    var per = e.amount / parts.length;
-    parts.forEach(function(p){ share[p] = (share[p]||0) + per; });
+    var sharesMap;
+    if(e.splits && typeof e.splits==='object' && Object.keys(e.splits).length){
+      sharesMap = e.splits;
+    } else {
+      var parts = (e.participants && e.participants.length) ? e.participants.filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
+      if(!parts.length) parts = people.slice();
+      var per = e.amount / parts.length;
+      sharesMap = {}; parts.forEach(function(p){ sharesMap[p]=per; });
+    }
+    Object.keys(sharesMap).forEach(function(p){ if(people.indexOf(p)>-1) share[p] = (share[p]||0) + sharesMap[p]; });
     var payer = e.personLabel || e.person;
     if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + e.amount;
   });
@@ -3662,12 +3729,13 @@ function addExpGlobal(){
   var newId=Date.now();
   var newDate=new Date().toISOString().slice(0,10);
   var participants = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
-  S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,date:newDate});
+  var splits = computeFinalSplits(amt, participants, S.expSplitOverrides||{});
+  S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,splits:splits,date:newDate});
   if(sb && CURRENT_TRIP){
     var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-    sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,entry_date:newDate}).then(function(){});
+    sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,splits:splits,entry_date:newDate}).then(function(){});
   }
-  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';save();renderContent();
+  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};save();renderContent();
 }
 
 // ── DOCUMENTS ────────────────────────────────────────────────
@@ -3964,12 +4032,13 @@ function addExp(cid){
   var newId2=Date.now();
   var newDate2=new Date().toISOString().slice(0,10);
   var participants2 = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
-  S.expenses.push({id:newId2,country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants2,date:newDate2});
+  var splits2 = computeFinalSplits(amt, participants2, S.expSplitOverrides||{});
+  S.expenses.push({id:newId2,country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants2,splits:splits2,date:newDate2});
   if(sb && CURRENT_TRIP){
     var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-    sb.from('budget_entries').insert({id:newId2,trip_id:CURRENT_TRIP.id,country_id:cid,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants2,entry_date:newDate2}).then(function(){});
+    sb.from('budget_entries').insert({id:newId2,trip_id:CURRENT_TRIP.id,country_id:cid,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants2,splits:splits2,entry_date:newDate2}).then(function(){});
   }
-  S.expDesc='';S.expAmt='';S.expActivity='';save();renderContent();
+  S.expDesc='';S.expAmt='';S.expActivity='';S.expSplitOverrides={};save();renderContent();
 }
 function delExp(id){
   S.expenses=S.expenses.filter(function(e){return e.id!==id;});
@@ -5499,7 +5568,7 @@ async function loadBudgetEntries(){
   var {data} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
   (data||[]).forEach(function(row){
     if(!S.expenses.find(function(e){return e.id===row.id;})){
-      S.expenses.push({id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,date:row.entry_date});
+      S.expenses.push({id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date});
     }
   });
   save();
