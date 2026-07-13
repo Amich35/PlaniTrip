@@ -5615,7 +5615,26 @@ async function loadFavorites(){
   });
   save();
 }
+async function verifyTripAccess(tripId){
+  if(!sb) return true;
+  try{
+    var res = await sb.from('trips').select('id').eq('id', tripId).maybeSingle();
+    if(res.error){ return true; } // erreur réseau/autre : on ne bloque pas, offline-first
+    return !!res.data;
+  }catch(e){
+    return true;
+  }
+}
 async function enterTrip(trip, resetTab) {
+  var accessOk = await verifyTripAccess(trip.id);
+  if(!accessOk){
+    try{ localStorage.removeItem('planitrip_trip_' + trip.id); }catch(e){}
+    try{ if(localStorage.getItem('planitrip_last_trip_id')===trip.id) localStorage.removeItem('planitrip_last_trip_id'); }catch(e){}
+    CURRENT_TRIP = null;
+    alert("Tu n'as plus accès à ce voyage. Contacte le propriétaire si c'est une erreur.");
+    if(CURRENT_USER) checkUserTrips(CURRENT_USER);
+    return;
+  }
   CURRENT_TRIP = trip;
   const namespacedKey = 'planitrip_trip_' + trip.id;
 
