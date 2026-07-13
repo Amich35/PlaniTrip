@@ -3061,8 +3061,11 @@ function renderBudget(c){
     +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
     +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+c.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('')+'</select></div>'
     +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
-    +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
-    +'<select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
+    +'<div class="ef-row">'
+    +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(c.rateNum||0)+')"/>'
+    +(c.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(c))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*c.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+c.rateNum+')"/>'):'')
+    +'</div>'
+    +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
     +'<button class="ef-btn" onclick="addExp(\''+c.id+'\')">+ Ajouter</button></div></div>'
     +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Dépenses</div>'+expRows+'</div>':'')
     +'</div>';
@@ -3473,8 +3476,11 @@ function renderBudgetOverview(){
       +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
       +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
       +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
-      +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
-      +'<select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
+      +'<div class="ef-row">'
+      +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
+      +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
+      +'</div>'
+      +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
       +'<button class="ef-btn" onclick="addExpGlobal()">+ Ajouter</button></div></div>'
       +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Toutes les dépenses</div>'+expRows+'</div>':'<div class="fav-empty">Aucune dépense enregistrée.</div>');
   }
@@ -3519,10 +3525,31 @@ function getExpensePersonOptions(){
     return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(p)+'</option>';
   }).join('');
 }
+function parseAmt(v){ if(v===undefined||v===null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
+function getCurrencySymbol(c){ var m=(c&&c.currency||'').match(/\(([^)]+)\)/); return m?m[1]:((c&&c.currency)||''); }
+function syncExpAmt(which, rateNum){
+  var eEur=document.getElementById('eAmt');
+  var eLoc=document.getElementById('eAmtLocal');
+  rateNum=parseFloat(rateNum)||0;
+  if(which==='eur'){
+    S.expAmt=eEur.value;
+    if(rateNum && eLoc){
+      var v=parseAmt(eEur.value);
+      eLoc.value=isNaN(v)?'':(Math.round(v*rateNum*100)/100);
+    }
+  } else {
+    if(rateNum && eLoc && eEur){
+      var vl=parseAmt(eLoc.value);
+      var veur=isNaN(vl)?'':(Math.round(vl/rateNum*100)/100);
+      eEur.value=veur;
+      S.expAmt=veur;
+    }
+  }
+}
 function setBudgetSubTab(t){ S.budgetSubTab=t; save(); renderContent(); }
 function addExpGlobal(){
   var desc=document.getElementById('eDesc').value.trim();
-  var amt=parseFloat(document.getElementById('eAmt').value);
+  var amt=parseAmt(document.getElementById('eAmt').value);
   var country = (document.getElementById('expCountrySel')||{}).value || S.expCountry || getC().id;
   var cityEl = document.getElementById('eCity');
   var city = cityEl?cityEl.value:'';
@@ -3824,7 +3851,7 @@ function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=pa
 function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=n; save(); renderContent(); var i=document.getElementById('convRate_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function addExp(cid){
   const desc=document.getElementById('eDesc').value.trim();
-  const amt=parseFloat(document.getElementById('eAmt').value);
+  const amt=parseAmt(document.getElementById('eAmt').value);
   const cityEl=document.getElementById('eCity');
   const city=cityEl?cityEl.value:'';
   const activityEl=document.getElementById('eActivity');
