@@ -2163,7 +2163,13 @@ function openDetail(actKey, actName, cityKey) {
       html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée pour cette activité. Configure une clé API (Plus → Réglages avancés) pour la générer automatiquement avec l\'IA.</div></div>';
     }
   }
-  if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir</div>';
+  if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
+  if(d.duration || d.bestTime) {
+    html += '<div class="detail-section"><div class="detail-section-title">⏱️ Visite</div>'
+      + (d.duration?'<div class="detail-text">Durée conseillée : '+d.duration+'</div>':'')
+      + (d.bestTime?'<div class="detail-text">'+d.bestTime+'</div>':'')
+      +'</div>';
+  }
   if(d.history) html += '<div class="detail-section"><div class="detail-section-title">📖 Histoire & contexte</div><div class="detail-text">'+d.history+'</div></div>';
   if(d.hours) html += '<div class="detail-section"><div class="detail-section-title">🕐 Horaires</div><div class="detail-text">'+d.hours+'</div></div>';
   if(d.costs && d.costs.length) {
@@ -2171,9 +2177,16 @@ function openDetail(actKey, actName, cityKey) {
       + d.costs.map(c=>'<span class="detail-chip cost">'+c+'</span>').join('')
       +'</div></div>';
   }
+  if(d.bookingRequired) html += '<div class="detail-section"><div class="detail-section-title">🎟️ Réservation</div><div class="detail-text">'+d.bookingRequired+'</div></div>';
   if(d.tips && d.tips.length) {
     html += '<div class="detail-section"><div class="detail-section-title">💡 Conseils & astuces</div>'
       + d.tips.map(t=>'<div class="detail-text" style="padding:4px 0;border-bottom:1px solid rgba(29,29,31,0.056)">'+t+'</div>').join('')
+      +'</div>';
+  }
+  if(d.website || d.mapsUrl) {
+    html += '<div class="detail-section"><div class="detail-section-title">🔗 Liens</div>'
+      + (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel ↗</a>':'')
+      + (d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps ↗</a>':'')
       +'</div>';
   }
   document.getElementById('detailSections').innerHTML = html;
@@ -2218,8 +2231,10 @@ async function fetchActivityDetailAI(cityKey, actName, detailKey, customIdx){
         max_tokens:1200,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es un expert de voyage. Cherche sur le web des informations actuelles et fiables pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires d'ouverture, tarifs d'entree actuels, et localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin de ta reponse, sans markdown:
-{"m":"description courte 1 phrase","tag":"categorie courte","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels trouves sur le web","costs":["cout 1 actuel","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise trouvee sur le web","lat":0.0,"lng":0.0}
+`Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables, a jour et immediatement exploitables — pas un texte marketing. Privilegie les sources officielles (site officiel du lieu, offices de tourisme). Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
+
+Cherche sur le web des informations actuelles pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires d'ouverture, tarifs d'entree actuels, et localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin de ta reponse, sans markdown:
+{"m":"description courte 1 phrase","tag":"categorie courte","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels trouves sur le web","costs":["cout 1 actuel","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise trouvee sur le web","lat":0.0,"lng":0.0,"duration":"duree de visite conseillee, ex: 1h30","best_time":"meilleur moment pour visiter, ex: tot le matin pour eviter l'affluence","website":"site officiel si disponible sinon Inconnu","maps_url":"lien Google Maps si trouvable sinon Inconnu","booking_required":"Oui, Non ou Recommande"}
 lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi photo, food, temple, must, nature.`
         }]
       })
@@ -2233,7 +2248,13 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
       emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'',
       hours: info.hours||'', costs: info.costs||[], tips: info.tips||[],
       address: info.address||'', lat: info.lat||null, lng: info.lng||null,
-      _aiGenerated: true
+      duration: (info.duration && info.duration!=='Inconnu') ? info.duration : '',
+      bestTime: (info.best_time && info.best_time!=='Inconnu') ? info.best_time : '',
+      website: (info.website && info.website!=='Inconnu') ? info.website : '',
+      mapsUrl: (info.maps_url && info.maps_url!=='Inconnu') ? info.maps_url : '',
+      bookingRequired: info.booking_required || '',
+      _aiGenerated: true,
+      _aiGeneratedAt: new Date().toISOString()
     };
     S.customDetails = window._customDetails;
     if(info.lat && info.lng) COORDS[detailKey] = [info.lat, info.lng, actName];
@@ -2605,8 +2626,10 @@ async function autofillCountryWithAI(countryId){
         max_tokens:1100,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es un expert voyage. Cherche sur le web des informations actuelles et fiables pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"]}
+`Tu es le Travel Data Engine de PlaniTrip. Ton objectif n'est pas de rediger un guide touristique mais de produire des donnees structurees, fiables, a jour et immediatement exploitables. Chaque information doit etre concise et factuelle. Privilegie les sources officielles (gouvernements, offices de tourisme) lorsqu'elles existent. Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
+
+Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
+{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"ex: UTC+9","electricity":"ex: Type A - 100V","best_period":"ex: Mars a Mai","payment":"moyens de paiement usuels en 1 phrase","safety":"niveau de securite en 1 phrase courte","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"]}
 budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement).`
         }]
       })
@@ -2621,10 +2644,16 @@ budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 chose
     c.visa = info.visa || c.visa;
     c.lang = info.lang || c.lang;
     c.budget_daily = info.budget_daily || c.budget_daily;
+    c.timezone = (info.timezone && info.timezone!=='Inconnu') ? info.timezone : c.timezone;
+    c.electricity = (info.electricity && info.electricity!=='Inconnu') ? info.electricity : c.electricity;
+    c.bestPeriod = (info.best_period && info.best_period!=='Inconnu') ? info.best_period : c.bestPeriod;
+    c.payment = (info.payment && info.payment!=='Inconnu') ? info.payment : c.payment;
+    c.safety = (info.safety && info.safety!=='Inconnu') ? info.safety : c.safety;
     c.practical.tips = info.tips || c.practical.tips;
     c.practical.emergency = info.emergency || c.practical.emergency;
     c.practical.checklist = (info.checklist && info.checklist.length) ? info.checklist : c.practical.checklist;
     c._aiGenerated = true;
+    c._aiGeneratedAt = new Date().toISOString();
     saveCountryEdit(c.id);
     if(badge) badge.textContent='';
     renderContent();
@@ -2637,7 +2666,8 @@ function saveCountryEdit(countryId){
   if(!c) return;
   S.countryEdits[countryId] = {
     tagline:c.tagline, currency:c.currency, rate:c.rate, visa:c.visa, lang:c.lang,
-    budget_daily:c.budget_daily, dates:c.dates, days:c.days, _aiGenerated:c._aiGenerated||false,
+    budget_daily:c.budget_daily, dates:c.dates, days:c.days, _aiGenerated:c._aiGenerated||false, _aiGeneratedAt:c._aiGeneratedAt||null,
+    timezone:c.timezone||'', electricity:c.electricity||'', bestPeriod:c.bestPeriod||'', payment:c.payment||'', safety:c.safety||'',
     practical:{tips:c.practical.tips, emergency:c.practical.emergency, checklist:c.practical.checklist}
   };
   save();
@@ -2758,9 +2788,11 @@ async function suggestActivitiesWithAI(countryId, cityName){
         max_tokens:900,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es un expert voyage. Cherche sur le web les activites/lieux incontournables actuels pour la ville de "${cityName}" (${c.name}). Puis suggere les 5 meilleurs et reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"activities":[{"n":"nom du lieu","m":"description courte 1 phrase","tags":["photo"]}]}
-Les tags possibles sont: photo, food, temple, must, nature.`
+`Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables et immediatement exploitables — pas un texte marketing. Ne deduis jamais une information absente ; si une coordonnee GPS est incertaine, ne l'inclus pas plutot que de l'inventer.
+
+Cherche sur le web les activites/lieux incontournables actuels pour la ville de "${cityName}" (${c.name}). Puis suggere les 5 meilleurs et reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
+{"activities":[{"n":"nom du lieu","m":"description courte 1 phrase incluant si pertinent la duree de visite et le prix","tags":["photo"],"lat":0.0,"lng":0.0}]}
+Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnees GPS precises du lieu.`
         }]
       })
     });
@@ -2771,7 +2803,9 @@ Les tags possibles sont: photo, food, temple, must, nature.`
     if(!info.activities || !info.activities.length) return;
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
+      var idx = S.customActs[ck].length;
       S.customActs[ck].push({n:a.n, m:a.m||'', tags:a.tags||['must']});
+      if(a.lat && a.lng) COORDS[ck+'_c'+idx] = [a.lat, a.lng, a.n];
     });
     save();
     renderContent();
@@ -4038,7 +4072,14 @@ function renderGuide(c){
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Taux indicatif<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Visa<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Langue<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Budget / jour<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Budget / jour<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Décalage horaire<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: UTC+9" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Électricité<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Type A - 100V" value="'+escHtml(c.electricity||'')+'" oninput="editCountryField(\''+c.id+'\',\'electricity\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Meilleure période<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Mars à Mai" value="'+escHtml(c.bestPeriod||'')+'" oninput="editCountryField(\''+c.id+'\',\'bestPeriod\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Paiement<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Carte acceptée partout" value="'+escHtml(c.payment||'')+'" oninput="editCountryField(\''+c.id+'\',\'payment\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Sécurité<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Vigilance normale" value="'+escHtml(c.safety||'')+'" oninput="editCountryField(\''+c.id+'\',\'safety\',this.value)"/></div>'
+    +(c._aiGeneratedAt?'<div class="status-sub" style="margin-top:4px">Généré par IA le '+new Date(c._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+'</div>':'')
+    +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</div>'+emergRows+'</div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_tips\')"><span><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span><span style="transform:rotate('+(tipsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(tipsOpen?tipRows:'')+'</div>'
