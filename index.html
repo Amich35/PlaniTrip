@@ -301,11 +301,11 @@ a{color:var(--ink);}
 
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;z-index:100;background:rgba(248,246,242,0.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:var(--border);display:flex;padding:var(--sp8) 0 calc(12px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 rgba(29,29,31,0.056);}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:none;padding:var(--sp8) var(--sp4);min-height:44px;transition:opacity 0.15s;}
-.nav-btn .nav-icon{font-size:22px;line-height:1;color:#545454;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1);} .nav-btn.active .nav-icon{transform:scale(1.1);color:#2E7D5B;}
+.nav-btn .nav-icon{font-size:22px;line-height:1;color:#545454;transition:color 0.2s;} .nav-btn.active .nav-icon{color:#2E7D5B;}
 .page-icon-badge{width:38px;height:38px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;}
 .page-icon-badge svg{stroke:#fff;}
 .nav-btn.active .nav-icon{background:var(--accent);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
-.nav-btn.active .nav-icon svg{stroke:#fff;width:18px;height:18px;}
+.nav-btn.active .nav-icon svg{stroke:#fff;width:18px;height:18px;color:#fff;}
 .nav-btn .nav-lbl{font-size:9px;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-muted);font-weight:500;}
 .nav-btn.active .nav-lbl{color:var(--accent);font-weight:600;}
 
@@ -533,21 +533,21 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .alert-strip{background:rgba(196,131,58,0.08);border-radius:var(--r12);border-left:3px solid var(--accent);padding:var(--sp12) var(--sp12);margin-bottom:var(--sp8);display:flex;gap:var(--sp8);align-items:flex-start;}
 .alert-text{font-size:12px;color:var(--accent-deep);line-height:1.5;}
 /* ── ALERT CARDS v2 (redesign) ── */
-.alert-card-v2{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:92px;box-sizing:border-box;padding:14px 16px 14px 20px;border-radius:18px;background:#FFFFFF;box-shadow:0 4px 18px rgba(0,0,0,0.06);margin-bottom:14px;overflow:hidden;cursor:pointer;transition:transform 120ms ease;text-decoration:none;-webkit-tap-highlight-color:transparent;}
+.alert-card-v2{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:64px;box-sizing:border-box;padding:10px 12px 10px 16px;border-radius:18px;background:#FFFFFF;box-shadow:0 4px 18px rgba(0,0,0,0.06);margin-bottom:10px;overflow:hidden;cursor:pointer;transition:transform 120ms ease;text-decoration:none;-webkit-tap-highlight-color:transparent;}
 .alert-card-v2:active{transform:scale(0.98);}
 .alert-card-v2::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 4px 4px 0;}
 .alert-card-v2[data-type="info"]::before{background:#3B82F6;}
 .alert-card-v2[data-type="warning"]::before{background:#FB923C;}
 .alert-card-v2[data-type="danger"]::before{background:#EF4444;}
 .alert-card-v2[data-type="success"]::before{background:#22C55E;}
-.alert-icon-circle{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.alert-icon-circle{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .alert-card-v2[data-type="info"] .alert-icon-circle{background:#EFF8FF;color:#2563EB;}
 .alert-card-v2[data-type="warning"] .alert-icon-circle{background:#FFF7ED;color:#EA580C;}
 .alert-card-v2[data-type="danger"] .alert-icon-circle{background:#FEF2F2;color:#DC2626;}
 .alert-card-v2[data-type="success"] .alert-icon-circle{background:#F0FDF4;color:#16A34A;}
 .alert-body{flex:1;min-width:0;}
-.alert-title-v2{font-size:18px;font-weight:600;color:#111827;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.alert-subtitle-v2{font-size:15px;font-weight:400;color:#6B7280;margin-top:2px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.alert-title-v2{font-size:14px;font-weight:500;color:var(--ink);line-height:1.3;letter-spacing:-0.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.alert-subtitle-v2{font-size:11px;font-weight:400;color:var(--ink-subtle);margin-top:2px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .alert-chevron-v2{color:#9CA3AF;flex-shrink:0;}
 
 /* ── PROGRESS ROW ── */
@@ -2986,9 +2986,9 @@ function renderItinerary(c, embedded){
     var tag = url ? 'a' : 'div';
     var hrefAttr = url ? ' href="'+url+'" target="_blank" rel="noopener"' : '';
     return '<'+tag+' class="alert-card-v2" data-type="'+meta.type+'"'+hrefAttr+'>'
-      +'<span class="alert-icon-circle">'+svgIcon(meta.icon,28)+'</span>'
+      +'<span class="alert-icon-circle">'+svgIcon(meta.icon,19)+'</span>'
       +'<span class="alert-body"><span class="alert-title-v2">'+escHtml(meta.title)+'</span>'+(meta.subtitle?'<span class="alert-subtitle-v2">'+escHtml(meta.subtitle)+'</span>':'')+'</span>'
-      +'<span class="alert-chevron-v2">'+svgIcon('chevron-right',20)+'</span>'
+      +'<span class="alert-chevron-v2">'+svgIcon('chevron-right',16)+'</span>'
       +'</'+tag+'>';
   }).join('');
   const _GRADIENTS = {
@@ -3126,14 +3126,20 @@ function getTripStatus(){
   // Estimate current city within the country by cumulative city "sub" day counts
   var currentCity=null;
   if(currentCountry && currentCountry.cities.length){
-    var cCum=0;
-    for(var j=0;j<currentCountry.cities.length;j++){
-      var city=currentCountry.cities[j];
-      var nDays=parseInt((city.sub||'').match(/\d+/))||1;
-      if(dayInCountry>=cCum+1 && dayInCountry<=cCum+nDays){ currentCity=city; break; }
-      cCum+=nDays;
+    var orderedIdx = getCityOrder(currentCountry.id);
+    var orderedCities = orderedIdx.map(function(idx){ return currentCountry.cities[idx]; });
+    if(dayInCountry<1){
+      currentCity = orderedCities[0];
+    } else {
+      var cCum=0;
+      for(var j=0;j<orderedCities.length;j++){
+        var city=orderedCities[j];
+        var nDays=parseInt((city.sub||'').match(/\d+/))||1;
+        if(dayInCountry>=cCum+1 && dayInCountry<=cCum+nDays){ currentCity=city; break; }
+        cCum+=nDays;
+      }
+      if(!currentCity) currentCity=orderedCities[orderedCities.length-1];
     }
-    if(!currentCity) currentCity=currentCountry.cities[currentCountry.cities.length-1];
   }
   return {elapsedDays:elapsedDays, currentCountry:currentCountry, dayInCountry:dayInCountry, nextTransport:nextTransport, currentCity:currentCity};
 }
@@ -3470,7 +3476,7 @@ function renderBudgetOverview(){
       var p = budget>0 ? Math.min(100, Math.round((spent/budget)*100)) : 0;
       return '<div class="budget-country-row" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')">'
         +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span><span class="bcr-amt">'+fmtEUR(spent)+' / '+fmtEUR(budget)+'</span><span class="bcr-pct">'+p+'%</span></div>'
-        +'<div class="bh-bar" style="margin-top:6px;margin-left:36px;width:58%"><div class="bh-fill" style="width:'+p+'%"></div></div>'
+        +'<div class="bh-bar" style="margin-top:6px;margin-left:36px;width:calc(100% - 50px)"><div class="bh-fill" style="width:'+p+'%"></div></div>'
         +'</div>';
     }).join('');
     body = '<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
@@ -5164,7 +5170,7 @@ const ICON_PATHS = {
   info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
-  ellipsis: '<circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/>',
+  ellipsis: '<circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
   share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
   // Supplementary — same style, not in the original 24 but needed for full content coverage
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
