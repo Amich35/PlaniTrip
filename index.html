@@ -4054,7 +4054,10 @@ function renderGuide(c){
     +'<input class="ir-input" type="date" style="width:100%;text-align:center" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/>'
     +(c.dateEnd?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',null,\'\')">Effacer</span>':'')
     +'</div>'
-    +'</div></div>'
+    +'</div>'
+    +'<div class="info-row" style="margin-top:4px"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Jours au programme<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="number" style="max-width:60px" value="'+c.days+'" oninput="editCountryField(\''+c.id+'\',\'days\',this.value)"/></div>'
+    +'<div class="status-sub" style="margin-top:2px">Recalculé automatiquement si tu renseignes les deux dates — modifiable ici si besoin.</div>'
+    +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Devise<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Taux indicatif<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
