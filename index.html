@@ -228,6 +228,7 @@ a{color:var(--ink);}
 
 .info-card{background:var(--parchment);border:var(--border);border-radius:var(--r22);padding:var(--sp16);margin-bottom:var(--sp8);box-shadow:var(--shadow-sm);}
 .ic-header{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-muted);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.ic-chevron{margin-left:auto;font-size:15px;color:var(--ink-subtle);letter-spacing:0;text-transform:none;}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(29,29,31,0.056);font-size:13px;}
 .info-row:last-child{border-bottom:none;padding-bottom:0;}
 .ir-key{color:var(--ink-muted);}
@@ -824,7 +825,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <button class="search-icon-btn" onclick="openSearch()"><span class="icon" id="ni-search"></span></button>
-      <button class="access-pill" onclick="openShare()" style="display:flex;align-items:center;gap:6px;"><span class="icon icon-sm" id="ni-share"></span> Partager</button>
+      <button class="access-pill" onclick="showAccessManagementScreen()" style="display:flex;align-items:center;gap:6px;"><span class="icon icon-sm" id="ni-share"></span> Voyageurs</button>
     </div>
   </div>
   <div class="content" id="mainContent"></div>
@@ -3028,21 +3029,29 @@ function renderItinerary(c, embedded){
 function renderBudget(c){
   const exps=S.expenses.filter(function(e){return e.country===c.id;});
   const total=exps.reduce(function(s,e){return s+e.amount;},0);
-  const andre=exps.filter(function(e){return e.person==='André';}).reduce(function(s,e){return s+e.amount;},0);
-  const comp=exps.filter(function(e){return e.person==='Compagnon';}).reduce(function(s,e){return s+e.amount;},0);
   const budget=c.budget_daily*c.days;
   const pct=Math.min(100,Math.round((total/budget)*100));
+  const byPerson={};
+  exps.forEach(function(e){ var p=e.personLabel||e.person||'?'; byPerson[p]=(byPerson[p]||0)+e.amount; });
+  const personsHTML = Object.keys(byPerson).map(function(p){
+    return '<div class="bh-person"><div class="bhp-name">'+escHtml(p)+'</div><div class="bhp-amount">'+fmtEUR(byPerson[p])+'</div></div>';
+  }).join('') || '<div class="bh-person"><div class="bhp-name">Aucune dépense</div></div>';
   let expRows=exps.map(function(e){
-    return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+    var whoLabel = e.personLabel || e.person || '?';
+    return '<div class="expense-entry"><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
   }).join('');
+  var selCity = c.cities.find(function(ci){return ci.city===S.expCity;});
+  var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
+  var personOptions = getExpensePersonOptions();
   return '<div class="section" style="padding-bottom:20px">'
     +'<div class="section-header" style="margin-bottom:14px"><div class="section-title">Budget</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
-    +'<div class="budget-hero"><div class="bh-label">Total dépensé</div><div class="bh-amount">'+fmtEUR(total)+'</div><div class="bh-sub">sur '+fmtEUR(budget)+' prévu · '+pct+'% consommé</div><div class="bh-bar"><div class="bh-fill" style="width:'+pct+'%"></div></div><div class="bh-persons"><div class="bh-person"><div class="bhp-name">André</div><div class="bhp-amount">'+fmtEUR(andre)+'</div></div><div class="bh-person"><div class="bhp-name">Compagnon</div><div class="bhp-amount">'+fmtEUR(comp)+'</div></div></div></div>'
+    +'<div class="budget-hero"><div class="bh-label">Total dépensé</div><div class="bh-amount">'+fmtEUR(total)+'</div><div class="bh-sub">sur '+fmtEUR(budget)+' prévu · '+pct+'% consommé</div><div class="bh-bar"><div class="bh-fill" style="width:'+pct+'%"></div></div><div class="bh-persons">'+personsHTML+'</div></div>'
     +'<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
     +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
-    +'<div class="ef-row"><select class="ef-select" id="eCity"><option value="">Ville (optionnel)</option>'+c.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'">'+escHtml(ci.city)+'</option>';}).join('')+'</select></div>'
+    +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+c.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('')+'</select></div>'
+    +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
     +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
-    +'<select class="ef-select" onchange="S.expPerson=this.value"><option value="André" '+(S.expPerson==='André'?'selected':'')+'>André</option><option value="Compagnon" '+(S.expPerson==='Compagnon'?'selected':'')+'>Compagnon</option><option value="Commun" '+(S.expPerson==='Commun'?'selected':'')+'>Commun</option></select>'
+    +'<select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
     +'<button class="ef-btn" onclick="addExp(\''+c.id+'\')">+ Ajouter</button></div></div>'
     +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Dépenses</div>'+expRows+'</div>':'')
     +'</div>';
@@ -3261,6 +3270,15 @@ async function loadHomeWeather(countryId){
   el.innerHTML='<div class="status-main">'+icon+' '+tmax+'° <span style="font-weight:400;color:var(--ink-muted)">/ '+tmin+'°</span></div><div class="status-sub">'+desc+'</div>';
 }
 
+function icHeaderChevron(icon, label){
+  return '<span data-icon="'+icon+'" data-icon-size="16"></span> '+label+'<span class="ic-chevron">›</span>';
+}
+function openDocumentType(docId){
+  S.tab='documents';
+  S.openDocType=docId;
+  save();
+  renderContent();
+}
 function renderHome(){
   const ts=getTripStatus();
   const doneActs=Object.values(S.done).filter(Boolean).length;
@@ -3293,7 +3311,7 @@ function renderHome(){
   var nextStageCard;
   if(nextStage){
     var dateStr=nextStage.startDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
-    nextStageCard='<div class="info-card" style="cursor:pointer" onclick="openCountryDetail(\''+nextStage.country.id+'\',\'lieux\')"><div class="ic-header"><span data-icon="compass" data-icon-size="16"></span> Prochaine étape</div>'
+    nextStageCard='<div class="info-card" style="cursor:pointer" onclick="openCountryDetail(\''+nextStage.country.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('compass','Prochaine étape')+'</div>'
       +'<div class="status-main">'+nextStage.country.flag+' '+nextStage.city+'</div>'
       +'<div class="status-sub">À partir du '+dateStr+' · '+nextStage.duration+' jours</div></div>';
   } else {
@@ -3302,7 +3320,7 @@ function renderHome(){
 
   // Budget card
   var budgetPct=totalBudget>0?Math.min(100,Math.round((spent/totalBudget)*100)):0;
-  var budgetCard='<div class="info-card" style="cursor:pointer" onclick="setTab(\'budget\')"><div class="ic-header"><span data-icon="wallet" data-icon-size="16"></span> Budget</div>'
+  var budgetCard='<div class="info-card" style="cursor:pointer" onclick="setTab(\'budget\')"><div class="ic-header">'+icHeaderChevron('wallet','Budget')+'</div>'
     +'<div style="display:flex;align-items:center;gap:14px;margin-top:2px">'
     +'<div style="flex:1"><div class="status-main">'+fmtEUR(spent)+' <span style="font-size:12px;font-weight:400;color:var(--ink-muted)">sur '+fmtEUR(totalBudget)+'</span></div>'
     +'<div class="bh-bar" style="margin-top:8px"><div class="bh-fill" style="width:'+budgetPct+'%"></div></div></div>'
@@ -3324,7 +3342,7 @@ function renderHome(){
   } else {
     flightLabel='Dernier pays du voyage'; flightSub='Aucun transport suivant prévu';
   }
-  var flightCard='<div class="info-card"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Vol / Trajet</div><div class="status-main">'+flightLabel+'</div><div class="status-sub">'+flightSub+'</div></div>';
+  var flightCard='<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Vol / Trajet')+'</div><div class="status-main">'+flightLabel+'</div><div class="status-sub">'+flightSub+'</div></div>';
 
   // Hébergement card
   var accomLabel, accomSub;
@@ -3334,7 +3352,7 @@ function renderHome(){
     accomLabel=ts.currentCity.city;
     accomSub=accomInfo.link?('Logement enregistré'+(accomInfo.nights?' · '+accomInfo.nights+' nuits':'')):'Aucun logement enregistré — à ajouter dans Lieux';
   } else { accomLabel='—'; accomSub='Ville non déterminée'; }
-  var accomCard='<div class="info-card" style="cursor:pointer" onclick="openCountryDetail(\''+ts.currentCountry.id+'\',\'lieux\')"><div class="ic-header"><span data-icon="bed" data-icon-size="16"></span> Hébergement</div><div class="status-main">'+accomLabel+'</div><div class="status-sub">'+accomSub+'</div></div>';
+  var accomCard='<div class="info-card" style="cursor:pointer" onclick="openCountryDetail(\''+ts.currentCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('bed','Hébergement')+'</div><div class="status-main">'+accomLabel+'</div><div class="status-sub">'+accomSub+'</div></div>';
 
   // Météo card (live fetch)
   var weatherCard='<div class="info-card"><div class="ic-header"><span data-icon="sun" data-icon-size="16"></span> Météo · '+ts.currentCountry.name+'</div><div id="home-weather-body"><div class="status-sub">Chargement…</div></div></div>';
@@ -3429,16 +3447,21 @@ function renderBudgetOverview(){
     var exps = S.expenses.slice().reverse();
     var expRows = exps.map(function(e){
       var c = COUNTRIES.find(function(co){return co.id===e.country;});
-      return '<div class="expense-entry"><span class="ee-who">'+(e.person==='André'?'A':e.person==='Compagnon'?'C':'=')+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+      var whoLabel = e.personLabel || e.person || '?';
+      return '<div class="expense-entry"><span class="ee-who">'+getInitials(whoLabel)+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc)+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
     }).join('');
     var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
     var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
+    var selCity = selCountry.cities.find(function(ci){return ci.city===S.expCity;});
+    var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
+    var personOptions = getExpensePersonOptions();
     body = '<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
-      +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';renderContent()">'+countryOptions+'</select></div>'
+      +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';renderContent()">'+countryOptions+'</select></div>'
       +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
-      +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
+      +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
+      +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
       +'<div class="ef-row"><input class="ef-input" type="number" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="S.expAmt=this.value"/>'
-      +'<select class="ef-select" onchange="S.expPerson=this.value"><option value="André" '+(S.expPerson==='André'?'selected':'')+'>André</option><option value="Compagnon" '+(S.expPerson==='Compagnon'?'selected':'')+'>Compagnon</option><option value="Commun" '+(S.expPerson==='Commun'?'selected':'')+'>Commun</option></select>'
+      +'<select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
       +'<button class="ef-btn" onclick="addExpGlobal()">+ Ajouter</button></div></div>'
       +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Toutes les dépenses</div>'+expRows+'</div>':'<div class="fav-empty">Aucune dépense enregistrée.</div>');
   }
@@ -3449,6 +3472,19 @@ function renderBudgetOverview(){
     +body
     +'</div>';
 }
+function getExpensePersonOptions(){
+  var people = [];
+  var myLabel = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+  people.push(myLabel);
+  (CURRENT_COLLABORATORS||[]).forEach(function(c){
+    if(c.invited_email) people.push(c.invited_email);
+  });
+  people.push('Commun');
+  if(!S.expPerson || people.indexOf(S.expPerson)===-1) S.expPerson = people[0];
+  return people.map(function(p){
+    return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(p)+'</option>';
+  }).join('');
+}
 function setBudgetSubTab(t){ S.budgetSubTab=t; save(); renderContent(); }
 function addExpGlobal(){
   var desc=document.getElementById('eDesc').value.trim();
@@ -3456,9 +3492,11 @@ function addExpGlobal(){
   var country = (document.getElementById('expCountrySel')||{}).value || S.expCountry || getC().id;
   var cityEl = document.getElementById('eCity');
   var city = cityEl?cityEl.value:'';
+  var activityEl = document.getElementById('eActivity');
+  var activity = activityEl?activityEl.value:'';
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:country,city:city,desc:desc,amount:amt,person:S.expPerson,date:new Date().toISOString().slice(0,10)});
-  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';save();renderContent();
+  S.expenses.push({id:Date.now(),country:country,city:city,activity:activity,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';save();renderContent();
 }
 
 // ── DOCUMENTS ────────────────────────────────────────────────
@@ -3747,9 +3785,11 @@ function addExp(cid){
   const amt=parseFloat(document.getElementById('eAmt').value);
   const cityEl=document.getElementById('eCity');
   const city=cityEl?cityEl.value:'';
+  const activityEl=document.getElementById('eActivity');
+  const activity=activityEl?activityEl.value:'';
   if(!desc||isNaN(amt)||amt<=0)return;
-  S.expenses.push({id:Date.now(),country:cid,city:city,desc:desc,amount:amt,person:S.expPerson});
-  S.expDesc='';S.expAmt='';save();renderContent();
+  S.expenses.push({id:Date.now(),country:cid,city:city,activity:activity,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,date:new Date().toISOString().slice(0,10)});
+  S.expDesc='';S.expAmt='';S.expActivity='';save();renderContent();
 }
 function delExp(id){S.expenses=S.expenses.filter(function(e){return e.id!==id;});save();renderContent();}
 function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
@@ -4800,12 +4840,7 @@ function updateTopBarSub(){
   if(typeof CURRENT_TRIP === 'undefined' || !CURRENT_TRIP){ return; }
   var name = CURRENT_TRIP.name || 'Voyage';
   var countryCount = (typeof COUNTRIES !== 'undefined') ? COUNTRIES.length : 0;
-  var dateLabel = '';
-  if (CURRENT_TRIP.start_date) {
-    var d = new Date(CURRENT_TRIP.start_date+'T00:00:00');
-    dateLabel = ' · Départ ' + d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}).replace('.','');
-  }
-  el.textContent = name + dateLabel + ' · ' + countryCount + (countryCount>1?' pays':' pays');
+  el.textContent = name + ' · ' + countryCount + ' pays';
 }
 function syncActiveNavTab(){
   var activeId = (S.tab==='country') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='archived-countries'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
@@ -4904,7 +4939,7 @@ function renderIcons() {
     'ni-favorites': svgIcon('star'),
     'ni-budget': svgIcon('wallet'),
     'ni-more': svgIcon('ellipsis'),
-    'ni-share': svgIcon('share', 16),
+    'ni-share': svgIcon('users', 16),
     'ni-search': svgIcon('search', 18),
   };
   Object.keys(icons).forEach(function(id){
