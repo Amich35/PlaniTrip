@@ -2992,7 +2992,7 @@ function renderItinerary(c, embedded){
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
         var dayAssigned=S.actDay[k]||'';
-        var daySelector=days.length>1?('<select style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 6px;background:var(--sand);color:var(--ink-muted);margin-top:4px;" onchange="assignDay(\''+k+'\',\''+ck+'\',this.value)"><option value="">Jour ?</option>'+days.filter(function(d){return d!=='Tous';}).map(function(d){return '<option value="'+d+'"'+(dayAssigned===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select>'):'';
+        var daySelector=days.length>1?('<select style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 6px;background:var(--sand);color:var(--ink-muted);margin-top:4px;" onclick="event.stopPropagation()" onchange="event.stopPropagation();assignDay(\''+k+'\',\''+ck+'\',this.value)"><option value="">Jour ?</option>'+days.filter(function(d){return d!=='Tous';}).map(function(d){return '<option value="'+d+'"'+(dayAssigned===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select>'):'';
         return '<div class="act-card'+(done?' done':'')+'">'
           +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
           +'<div class="act-check" onclick="toggleAct(\''+k+'\')">'+( done?'✓':'')+'</div>'
@@ -3268,15 +3268,20 @@ function renderToday(){
     +'<div class="home-hero-sub">'+(ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div>'
     +'</div></div>';
 
-  // ── Encart résumé du jour (jour X/Y, météo, budget, activités) ──
-  var summaryHTML = '<div class="info-card" style="display:flex;align-items:center;justify-content:space-around;text-align:center;padding:14px 10px;margin-bottom:16px">'
-    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)">'+tripDay+'/'+totalDays+'</div><div style="font-size:11px;color:var(--ink-subtle)">Jour</div></div>'
-    +'<div style="width:1px;height:28px;background:var(--sand-deep)"></div>'
-    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)" id="today-hero-temp">···</div><div style="font-size:11px;color:var(--ink-subtle)">Météo</div></div>'
-    +'<div style="width:1px;height:28px;background:var(--sand-deep)"></div>'
-    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)">'+fmtEUR(todaySpent)+'/'+fmtEUR(budgetDaily)+'</div><div style="font-size:11px;color:var(--ink-subtle)">Budget</div></div>'
-    +'<div style="width:1px;height:28px;background:var(--sand-deep)"></div>'
-    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)">'+todayActs.length+'</div><div style="font-size:11px;color:var(--ink-subtle)">Activité'+(todayActs.length>1?'s':'')+'</div></div>'
+  // ── Encart résumé du jour (jour X/Y, météo, budget, activités) — badges modernes ──
+  var budgetColor = (budgetDaily>0 && todaySpent>budgetDaily) ? 'var(--red-muted)' : 'var(--ink)';
+  function summaryBadge(icon, value, sub){
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px">'
+      +'<span style="color:var(--accent)">'+svgIcon(icon,17)+'</span>'
+      +'<span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+value+'</span>'
+      +'<span style="font-size:10px;color:var(--ink-subtle);letter-spacing:0.2px">'+sub+'</span>'
+      +'</div>';
+  }
+  var summaryHTML = '<div style="display:flex;background:var(--parchment);border-radius:var(--r22);box-shadow:var(--shadow-sm);margin-bottom:16px;overflow:hidden">'
+    +summaryBadge('calendar', tripDay+'/'+totalDays, 'Jour')
+    +summaryBadge('sun', '<span id="today-hero-temp">···</span>', 'Météo')
+    +summaryBadge('coins', fmtEUR(todaySpent)+'/'+fmtEUR(budgetDaily), 'Budget')
+    +summaryBadge('map-pin', todayActs.length, 'Activité'+(todayActs.length>1?'s':''))
     +'</div>';
 
   // ── Carte Aujourd'hui ──
@@ -3291,7 +3296,7 @@ function renderToday(){
     actsCard = '<div class="info-card" style="text-align:center;padding:24px 16px">'
       +'<div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('calendar',28)+'</div>'
       +'<div style="font-size:14px;color:var(--ink-muted);margin-bottom:14px">Aucune activité prévue aujourd\'hui.</div>'
-      +(c?'<button onclick="openCountryDetail(\''+c.id+'\',\'lieux\')'+(emptyBtnCity?';setTimeout(function(){ var ck=\''+c.id+'_'+emptyBtnCity.replace(/'/g,"\\'")+'\'; if(!S.openCities[ck]){toggleCity(ck);renderContent();} var el=document.querySelector(\'[data-city="\'+ck+\'"]\'); if(el) el.scrollIntoView({behavior:"smooth"}); },150)':'')+'" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir '+(emptyBtnCity?emptyBtnCity:'les lieux')+'</button>':'')
+      +(c?'<button onclick="'+(emptyBtnCity?('S.openCities[\''+c.id+'_'+emptyBtnCity.replace(/'/g,"\\'")+'\']=true;'):'')+'openCountryDetail(\''+c.id+'\',\'lieux\')" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir '+(emptyBtnCity?escHtml(emptyBtnCity):'les lieux')+'</button>':'')
       +'</div>';
   }
 
@@ -3407,7 +3412,14 @@ function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   var cityDays = cityObj ? (parseInt((cityObj.sub||'').match(/\d+/))||1) : 1;
   var countryStart = getCountryStartDay(countryId);
   var cityStart = getCityStartDayInCountry(countryId, cityName);
-  var dayOffsetInCity = totalActs>0 ? Math.floor(actIdx * cityDays / totalActs) : 0;
+  var dayOffsetInCity;
+  var assignedDay = S.actDay && S.actDay[actKey]; // ex: "J2", assigné via le sélecteur "Jour ?" dans Lieux
+  var m = assignedDay && assignedDay.match(/^J(\d+)$/);
+  if(m){
+    dayOffsetInCity = parseInt(m[1],10) - 1;
+  } else {
+    dayOffsetInCity = totalActs>0 ? Math.floor(actIdx * cityDays / totalActs) : 0;
+  }
   if(dayOffsetInCity>=cityDays) dayOffsetInCity = cityDays-1;
   if(dayOffsetInCity<0) dayOffsetInCity = 0;
   var totalOffset = countryStart + cityStart + dayOffsetInCity;
