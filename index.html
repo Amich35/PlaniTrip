@@ -2863,8 +2863,22 @@ async function deleteActivity(cityKey, index, isCustom) {
     if(!S.trash) S.trash={};
     if(!S.trash[cityKey]) S.trash[cityKey]=[];
     if(isCustom) {
+      var totalBefore = (S.customActs[cityKey]||[]).length;
       var act = (S.customActs[cityKey]||[]).splice(index,1)[0];
       if(act){ act._wasCustom=true; S.trash[cityKey].push(act); }
+      // Réindexer tous les états liés (fait, favori, date, fiche détaillée) pour éviter
+      // qu'une activité suivante n'hérite de l'état de celle qu'on vient de supprimer.
+      if(!window._customDetails) window._customDetails={};
+      var maps = [S.done, S.favorites, S.actDate, window._customDetails];
+      for(var ni=index+1; ni<totalBefore; ni++){
+        var oldKey = cityKey+'_c'+ni, newKey = cityKey+'_c'+(ni-1);
+        maps.forEach(function(m){
+          if(m.hasOwnProperty(oldKey)){ m[newKey]=m[oldKey]; delete m[oldKey]; }
+          else { delete m[newKey]; }
+        });
+        if(COORDS[oldKey]){ COORDS[newKey]=COORDS[oldKey]; delete COORDS[oldKey]; } else { delete COORDS[newKey]; }
+      }
+      S.customDetails = window._customDetails;
     } else {
       if(!S.deletedActs) S.deletedActs={};
       S.deletedActs[cityKey+'_'+index]=true;
@@ -4739,6 +4753,9 @@ function deleteCity(countryId, cityName){
   var doneKeys={}; Object.keys(S.done).forEach(function(k){ if(k.indexOf(ck+'_')===0) doneKeys[k]=S.done[k]; });
   var deletedActsKeys={}; Object.keys(S.deletedActs).forEach(function(k){ if(k.indexOf(ck+'_')===0) deletedActsKeys[k]=S.deletedActs[k]; });
   var actDayKeys={}; Object.keys(S.actDay).forEach(function(k){ if(k.indexOf(ck+'_')===0) actDayKeys[k]=S.actDay[k]; });
+  var favoriteKeys={}; Object.keys(S.favorites).forEach(function(k){ if(k.indexOf(ck+'_')===0) favoriteKeys[k]=S.favorites[k]; });
+  var actDateKeys={}; if(S.actDate) Object.keys(S.actDate).forEach(function(k){ if(k.indexOf(ck+'_')===0) actDateKeys[k]=S.actDate[k]; });
+  var detailKeys={}; if(window._customDetails) Object.keys(window._customDetails).forEach(function(k){ if(k.indexOf(ck+'_')===0) detailKeys[k]=window._customDetails[k]; });
   var journalMatches = S.journal.filter(function(e){ return e.location && e.location.toLowerCase().indexOf(cityName.toLowerCase())>-1; });
   var expenseMatches = S.expenses.filter(function(e){ return e.country===countryId && e.city===cityName; });
 
@@ -4754,6 +4771,9 @@ function deleteCity(countryId, cityName){
     trashActs: (S.trash&&S.trash[ck])||null,
     days: S.days[ck]||null,
     actDay: actDayKeys,
+    favorites: favoriteKeys,
+    actDate: actDateKeys,
+    details: detailKeys,
     activeDay: S.activeDay[ck]||null,
     wasOpen: !!S.openCities[ck],
     journalEntries: journalMatches,
@@ -4765,6 +4785,10 @@ function deleteCity(countryId, cityName){
   Object.keys(doneKeys).forEach(function(k){ delete S.done[k]; });
   Object.keys(deletedActsKeys).forEach(function(k){ delete S.deletedActs[k]; });
   Object.keys(actDayKeys).forEach(function(k){ delete S.actDay[k]; });
+  Object.keys(favoriteKeys).forEach(function(k){ delete S.favorites[k]; });
+  Object.keys(actDateKeys).forEach(function(k){ delete S.actDate[k]; });
+  Object.keys(detailKeys).forEach(function(k){ delete window._customDetails[k]; });
+  S.customDetails = window._customDetails;
   delete S.days[ck];
   delete S.activeDay[ck];
   delete S.openCities[ck];
@@ -4798,6 +4822,9 @@ function restoreCity(trashId){
   Object.keys(t.done).forEach(function(k){ S.done[k]=t.done[k]; });
   Object.keys(t.deletedActs).forEach(function(k){ S.deletedActs[k]=t.deletedActs[k]; });
   Object.keys(t.actDay).forEach(function(k){ S.actDay[k]=t.actDay[k]; });
+  if(t.favorites) Object.keys(t.favorites).forEach(function(k){ S.favorites[k]=t.favorites[k]; });
+  if(t.actDate) { if(!S.actDate) S.actDate={}; Object.keys(t.actDate).forEach(function(k){ S.actDate[k]=t.actDate[k]; }); }
+  if(t.details) { if(!window._customDetails) window._customDetails={}; Object.keys(t.details).forEach(function(k){ window._customDetails[k]=t.details[k]; }); S.customDetails=window._customDetails; }
   if(t.days) S.days[ck]=t.days;
   if(t.activeDay) S.activeDay[ck]=t.activeDay;
   if(t.wasOpen) S.openCities[ck]=true;
