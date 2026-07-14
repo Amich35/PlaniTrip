@@ -1,4 +1,4 @@
-const CACHE_NAME = 'planitrip-v3';
+const CACHE_NAME = 'planitrip-v4';
 const ASSETS = [
   'index.html',
   'manifest.json'
