@@ -252,6 +252,8 @@ a{color:var(--ink);}
 .bhp-name{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);}
 .bhp-amount{font-size:20px;font-weight:500;color:#fff;margin-top:2px;}
 .expense-form{background:var(--parchment);border:var(--border);border-radius:var(--r16);padding:var(--sp16);margin-bottom:var(--sp12);box-shadow:var(--shadow-sm);}
+.budget-fab{position:fixed;right:20px;bottom:calc(78px + env(safe-area-inset-bottom, 0px));width:54px;height:54px;border-radius:50%;background:var(--accent);color:#fff;border:none;box-shadow:0 6px 18px rgba(45,106,79,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;}
+.budget-fab:active{transform:scale(0.94);}
 .ef-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-muted);margin-bottom:10px;}
 .ef-row{display:flex;gap:6px;margin-bottom:6px;}
 .ef-input{flex:1;padding:9px 12px;border-radius:var(--r8);font-size:13px;border:1px solid rgba(29,29,31,0.140);background:var(--sand);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
@@ -1914,6 +1916,15 @@ function rebuildCountriesFromState(){
     var c=COUNTRIES.find(function(co){return co.id===cid;});
     if(c) Object.assign(c, S.countryEdits[cid]);
   });
+  // Remplissage automatique du décalage horaire (pays du catalogue Asie comme pays custom), si pas déjà rempli/édité
+  if(window.COUNTRY_TIMEZONES){
+    COUNTRIES.forEach(function(c){
+      if(!c.timezone && window.COUNTRY_TIMEZONES[c.name]){
+        var tz = window.COUNTRY_TIMEZONES[c.name];
+        c.timezone = (tz!=='0h') ? (tz+' par rapport à la France') : 'Identique à la France';
+      }
+    });
+  }
   // Restore user-added cities (appended after the built-in ones, never overwriting them)
   Object.keys(S.addedCities||{}).forEach(function(cid){
     var c=COUNTRIES.find(function(co){return co.id===cid;});
@@ -2644,7 +2655,7 @@ async function autofillCountryWithAI(countryId){
 `Tu es le Travel Data Engine de PlaniTrip. Ton objectif n'est pas de rediger un guide touristique mais de produire des donnees structurees, fiables, a jour et immediatement exploitables. Chaque information doit etre concise et factuelle. Privilegie les sources officielles (gouvernements, offices de tourisme) lorsqu'elles existent. Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
 
 Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","electricity":"ex: Type A - 100V","safety":"niveau de securite en 1 phrase courte","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"]}
+{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"]}
 budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement).`
         }]
       })
@@ -2660,8 +2671,6 @@ budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 chose
     c.lang = info.lang || c.lang;
     c.budget_daily = info.budget_daily || c.budget_daily;
     c.timezone = (info.timezone && info.timezone!=='Inconnu') ? info.timezone : c.timezone;
-    c.electricity = (info.electricity && info.electricity!=='Inconnu') ? info.electricity : c.electricity;
-    c.safety = (info.safety && info.safety!=='Inconnu') ? info.safety : c.safety;
     c.practical.tips = info.tips || c.practical.tips;
     c.practical.emergency = info.emergency || c.practical.emergency;
     c.practical.checklist = (info.checklist && info.checklist.length) ? info.checklist : c.practical.checklist;
@@ -2680,7 +2689,7 @@ function saveCountryEdit(countryId){
   S.countryEdits[countryId] = {
     tagline:c.tagline, currency:c.currency, rate:c.rate, visa:c.visa, lang:c.lang,
     budget_daily:c.budget_daily, dates:c.dates, days:c.days, dateStart:c.dateStart||'', dateEnd:c.dateEnd||'', _aiGenerated:c._aiGenerated||false, _aiGeneratedAt:c._aiGeneratedAt||null,
-    timezone:c.timezone||'', electricity:c.electricity||'', bestPeriod:c.bestPeriod||'', payment:c.payment||'', safety:c.safety||'',
+    timezone:c.timezone||'',
     practical:{tips:c.practical.tips, emergency:c.practical.emergency, checklist:c.practical.checklist}
   };
   save();
@@ -3249,7 +3258,13 @@ function getCityActivitiesForToday(c, city, todayStr){
 }
 function renderToday(){
   var ts = getTripStatus();
-  var todayStr = new Date().toISOString().slice(0,10);
+  var hasDepartDate = !!(typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date);
+  var refOffset = Math.max(0, ts.elapsedDays); // avant le départ : on prévisualise le Jour 1
+  var DEPART = getTripDepartDate();
+  var refDate = new Date(DEPART); refDate.setDate(refDate.getDate()+refOffset);
+  var todayStr = refDate.toISOString().slice(0,10);
+  var tomorrowDate = new Date(refDate); tomorrowDate.setDate(tomorrowDate.getDate()+1);
+  var tomorrowStrRef = tomorrowDate.toISOString().slice(0,10);
   var c = ts.currentCountry;
   var totalDays=COUNTRIES.reduce(function(s,cc){return s+cc.days;},0);
   var tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
@@ -3267,25 +3282,36 @@ function renderToday(){
 
   // ── Hero simple (sans indicateurs) ──
   var heroQuery = c ? getCountryImageQuery(c) : 'travel';
+  var heroSubText;
+  if(!hasDepartDate){
+    heroSubText = 'Date de départ à renseigner';
+  } else if(ts.elapsedDays<0){
+    heroSubText = 'Départ dans '+Math.abs(ts.elapsedDays)+' jour'+(Math.abs(ts.elapsedDays)>1?'s':'');
+  } else {
+    heroSubText = (ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  }
   var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:12px">'
     +photoEditBtn(heroQuery)
     +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.flag+' '+c.name:'Ton voyage')+'</div>'
-    +'<div class="home-hero-sub">'+(ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div>'
+    +'<div class="home-hero-sub">'+heroSubText+'</div>'
     +'</div></div>';
 
   // ── Encart résumé du jour (jour X/Y, météo, budget, activités) — badges modernes ──
   var budgetColor = (budgetDaily>0 && todaySpent>budgetDaily) ? 'var(--red-muted)' : 'var(--ink)';
-  function summaryBadge(icon, value, sub){
+  function summaryBadge(icon, value, sub, valColor){
     return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px">'
       +'<span style="color:var(--accent)">'+svgIcon(icon,17)+'</span>'
-      +'<span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+value+'</span>'
+      +'<span style="font-size:13.5px;font-weight:700;color:'+(valColor||'var(--ink)')+'">'+value+'</span>'
       +'<span style="font-size:10px;color:var(--ink-subtle);letter-spacing:0.2px">'+sub+'</span>'
       +'</div>';
   }
+  var budgetPct = budgetDaily>0 ? Math.min(100, Math.round((todaySpent/budgetDaily)*100)) : 0;
+  var budgetValueHTML = '<span style="color:'+budgetColor+'">'+fmtEUR(todaySpent)+'</span><span style="color:var(--ink-subtle);font-weight:500;font-size:11px"> / '+fmtEUR(budgetDaily)+'</span>'
+    +'<div style="width:36px;height:3px;border-radius:2px;background:var(--sand-deep);margin:3px auto 0;overflow:hidden"><div style="height:100%;width:'+budgetPct+'%;background:'+budgetColor+'"></div></div>';
   var summaryHTML = '<div style="display:flex;background:var(--parchment);border-radius:var(--r22);box-shadow:var(--shadow-sm);margin-bottom:16px;overflow:hidden">'
     +summaryBadge('calendar', tripDay+'/'+totalDays, 'Jour')
     +summaryBadge('sun', '<span id="today-hero-temp">···</span>', 'Météo')
-    +summaryBadge('coins', fmtEUR(todaySpent)+'/'+fmtEUR(budgetDaily), 'Budget')
+    +summaryBadge('coins', budgetValueHTML, 'Budget')
     +summaryBadge('map-pin', todayActs.length, 'Activité'+(todayActs.length>1?'s':''))
     +'</div>';
 
@@ -3325,7 +3351,7 @@ function renderToday(){
   // ── Carte Demain ──
   var tomorrowCard = '';
   if(c){
-    var tomorrowElapsed = ts.elapsedDays+1;
+    var tomorrowElapsed = refOffset+1;
     var cumulative=0, tmCountry=null;
     for(var ti=0; ti<COUNTRIES.length; ti++){
       var cc=COUNTRIES[ti];
@@ -3339,13 +3365,13 @@ function renderToday(){
         +(transp?'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(transp[2])+'</div>':'')
         +'</div>';
     } else if(tmCountry){
-      var tomorrowStr = new Date(Date.now()+86400000).toISOString().slice(0,10);
       var tmActs = [];
-      tmCountry.cities.forEach(function(city){ tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStr)); });
-      if(tmActs.length){
-        tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Demain</div>'
-          +'<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActs[0]&&tmActs[0].city?' à '+escHtml(tmActs[0].city):'')+'</div></div>';
-      }
+      tmCountry.cities.forEach(function(city){ tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStrRef)); });
+      tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Demain</div>'
+        +(tmActs.length
+          ? '<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActs[0]&&tmActs[0].city?' à '+escHtml(tmActs[0].city):'')+'</div>'
+          : '<div class="status-sub">Rien de prévu pour l\'instant.</div>')
+        +'</div>';
     }
   }
 
@@ -3384,7 +3410,7 @@ async function fillTodayHeroWeather(countryId){
   if(!el || !document.body.contains(el)) return;
   if(data && data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[0]!==undefined){
     var t = Math.round(data.daily.temperature_2m_max[0]);
-    el.textContent = '☀️ '+t+'°C';
+    el.textContent = t+'°C';
   } else {
     el.textContent = '';
   }
@@ -3761,56 +3787,74 @@ function renderBudgetOverview(){
   var totalSpent = S.expenses.reduce(function(s,e){return s+e.amount;},0);
   var totalBudget = COUNTRIES.reduce(function(s,c){return s+c.budget_daily*c.days;},0);
   var pct = totalBudget>0 ? Math.min(100, Math.round((totalSpent/totalBudget)*100)) : 0;
-  var tabsHTML = ['resume','depenses','remb'].map(function(t){
-    var lbl = t==='resume'?'Résumé':(t==='depenses'?'Dépenses':'Remboursements');
+  var tabsHTML = ['resume','remb'].map(function(t){
+    var lbl = t==='resume'?'Dépenses':'Remboursements';
     return '<button class="cf-tab'+(sub===t?' active':'')+'" onclick="setBudgetSubTab(\''+t+'\')">'+lbl+'</button>';
   }).join('');
 
   var body='';
+  var fabHTML = '<button class="budget-fab" onclick="openAddExpenseModal()" title="Ajouter une dépense">'+svgIcon('plus',24)+'</button>';
+
   if(sub==='resume'){
+    if(S.budgetCountryView){
+      var cv = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
+      if(!cv){ S.budgetCountryView=null; }
+    }
+    if(S.budgetCountryView){
+      var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
+      var cSpent = S.expenses.filter(function(e){return e.country===c2.id;}).reduce(function(s,e){return s+e.amount;},0);
+      var cBudget = c2.budget_daily*c2.days;
+      var cExps = S.expenses.filter(function(e){return e.country===c2.id;}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var byDate = {};
+      var dateOrder = [];
+      cExps.forEach(function(e){
+        if(!byDate[e.date]){ byDate[e.date]=[]; dateOrder.push(e.date); }
+        byDate[e.date].push(e);
+      });
+      var groupsHTML = dateOrder.map(function(d){
+        var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+        var rows = byDate[d].map(function(e){
+          var whoLabel = e.personLabel || e.person || '?';
+          var catIcon = getExpenseCategoryIcon(e.category);
+          return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(whoLabel)+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+        }).join('');
+        return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
+      }).join('');
+      body = '<div class="more-row" onclick="S.budgetCountryView=null;renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+        +'<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
+        +'<div style="flex:1"><div class="bh-label">'+c2.flag+' '+c2.name+'</div><div class="bh-amount">'+fmtEUR(cSpent)+'</div><div class="bh-sub">sur '+fmtEUR(cBudget)+' prévu</div></div>'
+        +renderProgressRing(cBudget>0?Math.min(100,Math.round((cSpent/cBudget)*100)):0, 72, 7, '#95D5B2')
+        +'</div></div>'
+        +(cExps.length ? groupsHTML : '<div class="fav-empty">Aucune dépense enregistrée pour ce pays.</div>')
+        +fabHTML;
+    } else {
     var rows = COUNTRIES.map(function(c){
       var spent = S.expenses.filter(function(e){return e.country===c.id;}).reduce(function(s,e){return s+e.amount;},0);
       var budget = c.budget_daily*c.days;
       var p = budget>0 ? Math.min(100, Math.round((spent/budget)*100)) : 0;
-      return '<div class="budget-country-row" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')">'
+      return '<div class="budget-country-row" onclick="S.budgetCountryView=\''+c.id+'\';renderContent();">'
         +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0"><span class="bcr-amt">'+fmtEUR(spent)+' / '+fmtEUR(budget)+'</span><div class="bh-bar" style="margin-top:7px;width:100%;height:7px;border-radius:3.5px"><div class="bh-fill" style="width:'+p+'%;border-radius:3.5px"></div></div></div>'
         +'<span class="bcr-pct">'+p+'%</span></div>'
         +'</div>';
     }).join('');
+    var paidBalances = computeBalances();
+    var myLabel3 = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px">'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(b.person)+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(b.person===myLabel3?'Toi':b.person)+'</span></div>'
+        +'<span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span>'
+        +'</div>';
+    }).join('');
+    var paidCard = paidRows ? '<div class="info-card"><div class="ic-header">Payé par</div>'+paidRows+'</div>' : '';
     body = '<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
       +'<div style="flex:1"><div class="bh-label">Dépenses totales</div><div class="bh-amount">'+fmtEUR(totalSpent)+'</div><div class="bh-sub">sur '+fmtEUR(totalBudget)+' prévu</div></div>'
       +renderProgressRing(pct, 72, 7, '#95D5B2')
       +'</div></div>'
-      +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>';
-  } else if(sub==='depenses') {
-    var countryOptions = COUNTRIES.map(function(c){return '<option value="'+c.id+'"'+(S.expCountry===c.id?' selected':'')+'>'+c.flag+' '+c.name+'</option>';}).join('');
-    var exps = S.expenses.slice().reverse();
-    var expRows = exps.map(function(e){
-      var c = COUNTRIES.find(function(co){return co.id===e.country;});
-      var whoLabel = e.personLabel || e.person || '?';
-      var catIcon = getExpenseCategoryIcon(e.category);
-      return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span style="font-size:14px;margin-right:4px">'+(c?c.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
-    }).join('');
-    var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
-    var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
-    var selCity = selCountry.cities.find(function(ci){return ci.city===S.expCity;});
-    var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
-    var personOptions = getExpensePersonOptions();
-    body = '<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
-      +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';renderContent()">'+countryOptions+'</select></div>'
-      +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
-      +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
-      +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
-      +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
-      +'<div class="ef-row">'
-      +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
-      +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
-      +'</div>'
-      +renderSplitRows(S.expAmt)
-      +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
-      +'<button class="ef-btn" onclick="addExpGlobal()">+ Ajouter</button></div></div>'
-      +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Toutes les dépenses</div>'+expRows+'</div>':'<div class="fav-empty">Aucune dépense enregistrée.</div>');
+      +paidCard
+      +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
+      +fabHTML;
+    }
   } else if(sub==='remb'){
     var balances = computeBalances();
     var txns = simplifyDebts(balances);
@@ -4019,7 +4063,40 @@ function simplifyDebts(balances){
   }
   return txns;
 }
-function setBudgetSubTab(t){ S.budgetSubTab=t; save(); renderContent(); }
+function setBudgetSubTab(t){ S.budgetSubTab=t; S.budgetCountryView=null; save(); renderContent(); }
+function renderExpenseFormModal(){
+  var countryOptions = COUNTRIES.map(function(c){return '<option value="'+c.id+'"'+(S.expCountry===c.id?' selected':'')+'>'+c.flag+' '+c.name+'</option>';}).join('');
+  var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
+  var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
+  var selCity = selCountry.cities.find(function(ci){return ci.city===S.expCity;});
+  var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
+  var personOptions = getExpensePersonOptions();
+  return '<div class="modal-title" style="font-size:18px;margin-bottom:14px">Ajouter une dépense</div>'
+    +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';refreshExpenseModal()">'+countryOptions+'</select></div>'
+    +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
+    +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
+    +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';refreshExpenseModal()"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
+    +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
+    +'<div class="ef-row">'
+    +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
+    +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
+    +'</div>'
+    +renderSplitRows(S.expAmt)
+    +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
+    +'<button class="ef-btn" onclick="addExpGlobal();closeAddExpenseModal();">+ Ajouter</button></div>'
+    +'<button class="modal-cancel-btn" onclick="closeAddExpenseModal()">Annuler</button>';
+}
+function openAddExpenseModal(){
+  if(!S.expCountry) S.expCountry = getC().id;
+  document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
+  document.getElementById('addExpenseModal').classList.add('open');
+}
+function closeAddExpenseModal(){
+  document.getElementById('addExpenseModal').classList.remove('open');
+}
+function refreshExpenseModal(){
+  document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
+}
 function addExpGlobal(){
   var desc=document.getElementById('eDesc').value.trim();
   var amt=parseAmt(document.getElementById('eAmt').value);
@@ -4273,6 +4350,7 @@ function renderGuide(c){
   const isEmpty = !c.currency && !c.visa && !c.tagline;
   const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   const tipsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_tips']);
+  const emergOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_emerg']);
   const clOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_checklist']);
   const emergRows=p.emergency.map(function(e,i){return '<div class="info-row"><span class="ir-key">'+e.k+'</span><span style="display:flex;align-items:center;gap:8px"><span class="ir-val" style="color:var(--red-muted)">'+e.v+'</span><span class="ee-del" onclick="removeGuideListItem(\''+c.id+'\',\'emergency\','+i+')">×</span></span></div>';}).join('');
   const clItems=p.checklist.map(function(item,i){
@@ -4289,12 +4367,18 @@ function renderGuide(c){
     +'<div style="display:flex;gap:12px">'
     +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">'
     +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Arrivée<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
-    +'<input class="ir-input" type="date" style="width:100%;text-align:center" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/>'
+    +'<div style="position:relative;width:100%">'
+    +(c.dateStart?'':'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:13px;color:var(--ink-subtle);background:var(--sand);border-radius:var(--r8)">Choisir une date</span>')
+    +'<input class="ir-input" type="date" style="width:100%;text-align:center;position:relative;'+(c.dateStart?'':'opacity:0')+'" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/>'
+    +'</div>'
     +(c.dateStart?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',\'\',null)">Effacer</span>':'')
     +'</div>'
     +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">'
     +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Départ<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
-    +'<input class="ir-input" type="date" style="width:100%;text-align:center" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/>'
+    +'<div style="position:relative;width:100%">'
+    +(c.dateEnd?'':'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:13px;color:var(--ink-subtle);background:var(--sand);border-radius:var(--r8)">Choisir une date</span>')
+    +'<input class="ir-input" type="date" style="width:100%;text-align:center;position:relative;'+(c.dateEnd?'':'opacity:0')+'" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/>'
+    +'</div>'
     +(c.dateEnd?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',null,\'\')">Effacer</span>':'')
     +'</div>'
     +'</div>'
@@ -4308,12 +4392,9 @@ function renderGuide(c){
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Langue<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Budget / jour<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
     +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Décalage horaire<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Électricité<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Type A - 100V" value="'+escHtml(c.electricity||'')+'" oninput="editCountryField(\''+c.id+'\',\'electricity\',this.value)"/></div>'
-
-    +'<div class="info-row"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Sécurité<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="text" placeholder="ex: Vigilance normale" value="'+escHtml(c.safety||'')+'" oninput="editCountryField(\''+c.id+'\',\'safety\',this.value)"/></div>'
     +(c._aiGeneratedAt?'<div class="status-sub" style="margin-top:4px">Généré par IA le '+new Date(c._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+'</div>':'')
     +'</div>'
-    +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</span><span class="ee-del" style="color:var(--accent)" onclick="addGuideListItem(\''+c.id+'\',\'emergency\',null)">+</span></div>'+emergRows+'</div>'
+    +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_emerg\')"><span><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'emergency\',null)">+</span><span style="transform:rotate('+(emergOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'+(emergOpen?emergRows:'')+'</div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_tips\')"><span><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span><span style="transform:rotate('+(tipsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(tipsOpen?tipRows:'')+'</div>'
     +renderConverterCard(c)
@@ -6834,6 +6915,13 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 </div>
 
 <!-- API key modal -->
+<!-- Add expense modal -->
+<div class="share-modal" id="addExpenseModal">
+  <div class="share-sheet" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="addExpenseModalBody"></div>
+  </div>
+</div>
 <div class="share-modal" id="apiModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
