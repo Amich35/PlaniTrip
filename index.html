@@ -5238,30 +5238,6 @@ if(!S.cityNames) S.cityNames={};
 if(!S.actNames) S.actNames={};
 
 // ── ADD / REMOVE COUNTRY ────────────────────────────────────
-function openCountryModal() {
-  document.getElementById('countryModal').classList.add('open');
-}
-function closeCountryModal() {
-  document.getElementById('countryModal').classList.remove('open');
-}
-function addCountry() {
-  var flag = stripHtml(document.getElementById('new-country-flag').value.trim())||'🌍';
-  var name = stripHtml(document.getElementById('new-country-name').value.trim());
-  var dates = stripHtml(document.getElementById('new-country-dates').value.trim())||'À définir';
-  if(!name) return;
-  var id = name.toLowerCase().replace(/[^a-z]/g,'').slice(0,4)+'_'+Date.now();
-  var newCountry = {
-    id:id, flag:flag, name:name, tagline:'', dates:dates, days:0, color:'#2D2D2D',
-    currency:'', rate:'', visa:'', lang:'', budget_daily:50,
-    alerts:[], weather:[], cities:[], photo:[], practical:{transport:'',sim:'',tips:[],emergency:[],checklist:[]}
-  };
-  COUNTRIES.push(newCountry);
-  S.customCountries.push(newCountry);
-  save();
-  closeCountryModal();
-  setCountry(id);
-  if(S.apiKey) autofillCountryWithAI(id);
-}
 function effectiveTripCountries() {
   if (CURRENT_TRIP && CURRENT_TRIP.countries && CURRENT_TRIP.countries.length > 0) return CURRENT_TRIP.countries;
   return BUILT_IN_COUNTRIES.map(function(c){ return c.name; });
@@ -7014,20 +6990,6 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   </div>
 </div>
 <!-- Country management modal -->
-<div class="country-modal" id="countryModal">
-  <div class="country-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" style="font-size:18px;margin-bottom:4px">Ajouter un pays</div>
-    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px">Le pays sera ajouté à la fin de la liste.</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input class="country-input" id="new-country-flag" placeholder="Emoji drapeau" style="max-width:80px"/>
-      <input class="country-input" id="new-country-name" placeholder="Nom du pays" style="flex:1;margin-bottom:0"/>
-    </div>
-    <input class="country-input" id="new-country-dates" placeholder="Dates ex: avril 2027"/>
-    <button class="modal-cta" onclick="addCountry()">Ajouter</button>
-    <button class="modal-cancel-btn" onclick="closeCountryModal()">Annuler</button>
-  </div>
-</div>
 </div>
 </body>
 </html>
