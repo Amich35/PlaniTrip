@@ -2628,7 +2628,7 @@ function addPhotoSpot(countryId){
 function addActivity(cityKey) {
   const inp = document.getElementById('newact_'+cityKey);
   if(!inp) return;
-  const val = inp.value.trim();
+  const val = stripHtml(inp.value.trim());
   if(!val) return;
   if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
   const newIdx = S.customActs[cityKey].length;
@@ -3174,42 +3174,6 @@ function renderItinerary(c, embedded){
     +'</div>';
 }
 
-function renderBudget(c){
-  const exps=S.expenses.filter(function(e){return e.country===c.id;});
-  const total=exps.reduce(function(s,e){return s+e.amount;},0);
-  const budget=c.budget_daily*c.days;
-  const pct=Math.min(100,Math.round((total/budget)*100));
-  const byPerson={};
-  exps.forEach(function(e){ var p=e.personLabel||e.person||'?'; byPerson[p]=(byPerson[p]||0)+e.amount; });
-  const personsHTML = Object.keys(byPerson).map(function(p){
-    return '<div class="bh-person"><div class="bhp-name">'+escHtml(p)+'</div><div class="bhp-amount">'+fmtEUR(byPerson[p])+'</div></div>';
-  }).join('') || '<div class="bh-person"><div class="bhp-name">Aucune dépense</div></div>';
-  let expRows=exps.map(function(e){
-    var whoLabel = e.personLabel || e.person || '?';
-    var catIcon = getExpenseCategoryIcon(e.category);
-    return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+(e.city?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.city)+'</span>':'')+(e.activity?' <span style="color:var(--ink-subtle);font-size:11px">· '+escHtml(e.activity)+'</span>':'')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
-  }).join('');
-  var selCity = c.cities.find(function(ci){return ci.city===S.expCity;});
-  var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
-  var personOptions = getExpensePersonOptions();
-  return '<div class="section" style="padding-bottom:20px">'
-    +'<div class="section-header" style="margin-bottom:14px"><div class="section-title">Budget</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
-    +'<div class="budget-hero"><div class="bh-label">Total dépensé</div><div class="bh-amount">'+fmtEUR(total)+'</div><div class="bh-sub">sur '+fmtEUR(budget)+' prévu · '+pct+'% consommé</div><div class="bh-bar"><div class="bh-fill" style="width:'+pct+'%"></div></div><div class="bh-persons">'+personsHTML+'</div></div>'
-    +'<div class="expense-form"><div class="ef-label">Ajouter une dépense</div>'
-    +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
-    +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
-    +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';renderContent()"><option value="">Ville (optionnel)</option>'+c.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('')+'</select></div>'
-    +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
-    +'<div class="ef-row">'
-    +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(c.rateNum||0)+')"/>'
-    +(c.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(c))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*c.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+c.rateNum+')"/>'):'')
-    +'</div>'
-    +renderSplitRows(S.expAmt)
-    +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
-    +'<button class="ef-btn" onclick="addExp(\''+c.id+'\')">+ Ajouter</button></div></div>'
-    +(exps.length?'<div class="expense-list-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Dépenses</div>'+expRows+'</div>':'')
-    +'</div>';
-}
 
 // ── TRIP STATUS: current day / next transport / tonight's accommodation ──
 var TRANSPORTS=[['jp','kh','Avion'],['kh','th','Bus'],['th','la','Train'],['la','vn','Avion'],['vn','id','Avion'],['id','ph','Avion']];
@@ -4101,12 +4065,12 @@ function renderExpenseFormModal(){
   var personOptions = getExpensePersonOptions();
   return '<div class="modal-title" style="font-size:18px;margin-bottom:14px">Ajouter une dépense</div>'
     +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';refreshExpenseModal()">'+countryOptions+'</select></div>'
-    +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+S.expDesc+'" oninput="S.expDesc=this.value"/></div>'
+    +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+escHtml(S.expDesc||'')+'" oninput="S.expDesc=this.value"/></div>'
     +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
     +'<div class="ef-row"><select class="ef-select" id="eCity" onchange="S.expCity=this.value;S.expActivity=\'\';refreshExpenseModal()"><option value="">Ville (optionnel)</option>'+cityOptions+'</select></div>'
     +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
     +'<div class="ef-row">'
-    +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+S.expAmt+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
+    +'<input class="ef-input" type="text" inputmode="decimal" placeholder="Montant €" id="eAmt" style="max-width:95px" value="'+escHtml(S.expAmt||'')+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/>'
     +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
     +'</div>'
     +renderSplitRows(S.expAmt)
@@ -4458,27 +4422,6 @@ function renderConverterCard(c){
 function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
 function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmt_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=n; save(); renderContent(); var i=document.getElementById('convRate_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
-function addExp(cid){
-  const desc=document.getElementById('eDesc').value.trim();
-  const amt=parseAmt(document.getElementById('eAmt').value);
-  const cityEl=document.getElementById('eCity');
-  const city=cityEl?cityEl.value:'';
-  const activityEl=document.getElementById('eActivity');
-  const activity=activityEl?activityEl.value:'';
-  const categoryEl=document.getElementById('eCategory');
-  const category=categoryEl?categoryEl.value:(S.expCategory||'other');
-  if(isNaN(amt)||amt<=0)return;
-  var newId2=Date.now();
-  var newDate2=new Date().toISOString().slice(0,10);
-  var participants2 = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
-  var splits2 = computeFinalSplits(amt, participants2, S.expSplitOverrides||{});
-  S.expenses.push({id:newId2,country:cid,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants2,splits:splits2,date:newDate2});
-  if(sb && CURRENT_TRIP){
-    var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-    sb.from('budget_entries').insert({id:newId2,trip_id:CURRENT_TRIP.id,country_id:cid,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants2,splits:splits2,entry_date:newDate2}).then(function(){});
-  }
-  S.expDesc='';S.expAmt='';S.expActivity='';S.expSplitOverrides={};save();renderContent();
-}
 function delExp(id){
   showConfirm('Supprimer cette dépense ?', function(){
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
@@ -5227,7 +5170,7 @@ function startEditCity(ck, currentName) {
   if(!header) return;
   var orig = currentName;
   header.innerHTML = '<div class="editable-wrap">'
-    +'<input class="edit-inline" id="edit-city-'+ck+'" value="'+orig+'" />'
+    +'<input class="edit-inline" id="edit-city-'+ck+'" value="'+escHtml(orig)+'" />'
     +'<button class="edit-confirm" onclick="confirmEditCity(\''+ck+'\')">✓</button>'
     +'<button class="edit-cancel" onclick="renderContent()">✕</button>'
     +'</div>';
@@ -5238,7 +5181,7 @@ function startEditCity(ck, currentName) {
 function confirmEditCity(ck) {
   var inp = document.getElementById('edit-city-'+ck);
   if(!inp) return;
-  var newName = inp.value.trim();
+  var newName = stripHtml(inp.value.trim());
   if(!newName) return;
   if(!S.cityNames) S.cityNames={};
   S.cityNames[ck] = newName;
@@ -5249,7 +5192,7 @@ function startEditAct(actKey, currentName) {
   var el = document.querySelector('[data-detail="'+actKey+'"] .act-name');
   if(!el) return;
   el.innerHTML = '<div class="editable-wrap">'
-    +'<input class="edit-inline" id="edit-act-'+actKey+'" value="'+currentName+'" />'
+    +'<input class="edit-inline" id="edit-act-'+actKey+'" value="'+escHtml(currentName)+'" />'
     +'<button class="edit-confirm" onclick="confirmEditAct(\''+actKey+'\')">✓</button>'
     +'</div>';
   var inp = document.getElementById('edit-act-'+actKey);
@@ -5259,7 +5202,7 @@ function startEditAct(actKey, currentName) {
 function confirmEditAct(actKey) {
   var inp = document.getElementById('edit-act-'+actKey);
   if(!inp) return;
-  var newName = inp.value.trim();
+  var newName = stripHtml(inp.value.trim());
   if(!newName) return;
   if(!S.actNames) S.actNames={};
   S.actNames[actKey] = newName;
