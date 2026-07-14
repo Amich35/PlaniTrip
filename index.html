@@ -2450,7 +2450,21 @@ function handlePhotoFileSelected(e){
   var file = e.target.files && e.target.files[0];
   if(!file || !_photoModalTarget) return;
   var reader = new FileReader();
-  reader.onload = function(){ setCustomPhoto(_photoModalTarget, reader.result); };
+  reader.onload = function(evt){
+    var img = new Image();
+    img.onload = function(){
+      var maxW = 900; // photos de couverture/spot affichées plus grandes que le carnet, on garde un peu plus de résolution
+      var scale = Math.min(1, maxW/img.width);
+      var canvas = document.createElement('canvas');
+      canvas.width = img.width*scale;
+      canvas.height = img.height*scale;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var compressed = canvas.toDataURL('image/jpeg', 0.7);
+      setCustomPhoto(_photoModalTarget, compressed);
+    };
+    img.src = evt.target.result;
+  };
   reader.readAsDataURL(file);
   e.target.value='';
 }
