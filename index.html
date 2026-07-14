@@ -3246,7 +3246,11 @@ function renderToday(){
   var ts = getTripStatus();
   var todayStr = new Date().toISOString().slice(0,10);
   var c = ts.currentCountry;
-  if(c) setTimeout(function(){ loadHomeWeather(c.id, 'today-weather-body'); }, 50);
+  var totalDays=COUNTRIES.reduce(function(s,cc){return s+cc.days;},0);
+  var tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
+  if(c){
+    setTimeout(function(){ fillTodayHeroWeather(c.id); }, 50);
+  }
   var todayActs = [];
   if(c){
     c.cities.forEach(function(city){
@@ -3255,32 +3259,99 @@ function renderToday(){
   }
   var todaySpent = S.expenses.filter(function(e){return e.date===todayStr;}).reduce(function(s,e){return s+e.amount;},0);
   var budgetDaily = c ? c.budget_daily : 0;
-  var budgetPct = budgetDaily>0 ? Math.min(100, Math.round((todaySpent/budgetDaily)*100)) : 0;
-  var activeAlerts = c ? (c.alerts||[]).slice(0,2) : [];
-  var alertsHTML = activeAlerts.map(function(a){
-    var text = typeof a==='object' ? a.t : a;
-    var meta = parseAlert(text);
-    return '<div class="info-row"><span class="ir-key" style="color:'+(meta.type==='danger'?'var(--red-muted)':'var(--ink)')+'">'+escHtml(meta.title)+'</span></div>';
-  }).join('');
 
-  var actsHTML = todayActs.length ? todayActs.map(function(a){
-    return '<div class="check-item'+(a.done?' checked':'')+'" onclick="toggleAct(\''+a.key+'\')"><div class="ci-box">'+(a.done?'✓':'')+'</div><span class="ci-text">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
-  }).join('') : '<div class="status-sub">Aucune activité datée pour aujourd\'hui. Assigne des dates dans Lieux pour les voir apparaître ici.</div>';
-
+  // ── Hero avec indicateurs discrets ──
   var heroQuery = c ? getCountryImageQuery(c) : 'travel';
+  var badges = '<span id="today-hero-temp" style="opacity:0.85">···</span>'
+    +' &nbsp;·&nbsp; 💶 '+fmtEUR(todaySpent)+' / '+fmtEUR(budgetDaily)
+    +' &nbsp;·&nbsp; 📍 '+todayActs.length+' activité'+(todayActs.length>1?'s':'');
   var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
     +photoEditBtn(heroQuery)
-    +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.flag+' '+c.name:'Ton voyage')+'</div><div class="home-hero-sub">'+(ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div></div></div>';
+    +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.flag+' '+c.name:'Ton voyage')+' · Jour '+tripDay+' / '+totalDays+'</div>'
+    +'<div class="home-hero-sub">'+(ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div>'
+    +'<div class="home-hero-sub" style="margin-top:4px;font-size:12px;opacity:0.9">'+badges+'</div>'
+    +'</div></div>';
+
+  // ── Carte Aujourd'hui ──
+  var actsCard;
+  if(todayActs.length){
+    var actsHTML = todayActs.map(function(a){
+      return '<div class="check-item'+(a.done?' checked':'')+'" onclick="toggleAct(\''+a.key+'\')"><div class="ci-box">'+(a.done?'✓':'')+'</div><span class="ci-text">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
+    }).join('');
+    actsCard = '<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Aujourd\'hui</div>'+actsHTML+'</div>';
+  } else {
+    actsCard = '<div class="info-card" style="text-align:center;padding:24px 16px">'
+      +'<div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('calendar',28)+'</div>'
+      +'<div style="font-size:14px;color:var(--ink-muted);margin-bottom:14px">Aucune activité prévue aujourd\'hui.</div>'
+      +(c?'<button onclick="openCountryDetail(\''+c.id+'\',\'lieux\')" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir les lieux</button>':'')
+      +'</div>';
+  }
+
+  // ── Carte Alertes (compacte) ──
+  var activeAlerts = c ? (c.alerts||[]).slice(0,2) : [];
+  var alertsCard = '';
+  if(activeAlerts.length){
+    var alertRows = activeAlerts.map(function(a){
+      var text = typeof a==='object' ? a.t : a;
+      var meta = parseAlert(text);
+      var color = meta.type==='danger'?'var(--red-muted)':(meta.type==='warning'?'#EA580C':meta.type==='success'?'var(--accent)':'#2563EB');
+      var bg = meta.type==='danger'?'var(--red-pale)':(meta.type==='warning'?'#FFF7ED':meta.type==='success'?'var(--accent-pale)':'#EFF8FF');
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:'+bg+';margin-bottom:6px">'
+        +'<span style="color:'+color+'">'+svgIcon(meta.icon,16)+'</span>'
+        +'<div><div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(meta.title)+'</div>'+(meta.subtitle?'<div style="font-size:11px;color:var(--ink-subtle)">'+escHtml(meta.subtitle)+'</div>':'')+'</div>'
+        +'</div>';
+    }).join('');
+    alertsCard = '<div class="info-card"><div class="ic-header"><span data-icon="triangle-alert" data-icon-size="16"></span> À surveiller</div>'+alertRows+'</div>';
+  }
+
+  // ── Carte Demain (prochain transport) ──
+  var tomorrowCard = '';
+  if(ts.nextTransport){
+    var toCountry = COUNTRIES.find(function(cc){return cc.id===ts.nextTransport[1];});
+    if(toCountry){
+      tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochaine étape</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+toCountry.flag+' Départ vers '+toCountry.name+'</div>'
+        +'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(ts.nextTransport[2])+'</div>'
+        +'</div>';
+    }
+  }
+
+  // ── Carte À ne pas oublier (3 premiers items non cochés) ──
+  var forgetCard = '';
+  if(c && c.practical && c.practical.checklist && c.practical.checklist.length){
+    var uncheckedItems = [];
+    c.practical.checklist.forEach(function(item,i){
+      var k=c.id+'_cl_'+i;
+      if(!S.checklist[k]) uncheckedItems.push({k:k, item:item});
+    });
+    if(uncheckedItems.length){
+      var forgetHTML = uncheckedItems.slice(0,3).map(function(u){
+        return '<div class="check-item" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box"></div><span class="ci-text">'+escHtml(u.item)+'</span></div>';
+      }).join('');
+      forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+forgetHTML+'</div>';
+    }
+  }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
     +heroHTML
-    +'<div class="info-card"><div class="ic-header">Activités du jour</div>'+actsHTML+'</div>'
-    +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span>Budget du jour</span><span style="font-size:12px;font-weight:700;color:var(--accent)">'+fmtEUR(todaySpent)+' / '+fmtEUR(budgetDaily)+'</span></div>'
-    +'<div class="bh-bar" style="margin-top:6px"><div class="bh-fill" style="width:'+budgetPct+'%"></div></div></div>'
-    +(activeAlerts.length?'<div class="info-card"><div class="ic-header">Alertes</div>'+alertsHTML+'</div>':'')
-    +'<div class="info-card"><div class="ic-header"><span data-icon="sun" data-icon-size="16"></span> Météo</div><div id="today-weather-body"><div class="status-sub">Chargement…</div></div></div>'
+    +actsCard
+    +alertsCard
+    +tomorrowCard
+    +forgetCard
     +'</div>';
+}
+async function fillTodayHeroWeather(countryId){
+  var el = document.getElementById('today-hero-temp');
+  if(!el) return;
+  var data = await fetchWeather(countryId);
+  if(!el || !document.body.contains(el)) return;
+  if(data && data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[0]!==undefined){
+    var t = Math.round(data.daily.temperature_2m_max[0]);
+    el.textContent = '☀️ '+t+'°C';
+  } else {
+    el.textContent = '';
+  }
 }
 function getCountryStartDay(countryId){
   var cum=0;
