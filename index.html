@@ -2257,6 +2257,9 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
       _aiGeneratedAt: new Date().toISOString()
     };
     S.customDetails = window._customDetails;
+    if(sb && CURRENT_TRIP){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:detailKey, data:window._customDetails[detailKey], updated_at:new Date().toISOString()}).then(function(){});
+    }
     if(info.lat && info.lng) COORDS[detailKey] = [info.lat, info.lng, actName];
     if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
       var act = S.customActs[cityKey][customIdx];
@@ -2666,11 +2669,14 @@ function saveCountryEdit(countryId){
   if(!c) return;
   S.countryEdits[countryId] = {
     tagline:c.tagline, currency:c.currency, rate:c.rate, visa:c.visa, lang:c.lang,
-    budget_daily:c.budget_daily, dates:c.dates, days:c.days, _aiGenerated:c._aiGenerated||false, _aiGeneratedAt:c._aiGeneratedAt||null,
+    budget_daily:c.budget_daily, dates:c.dates, days:c.days, dateStart:c.dateStart||'', dateEnd:c.dateEnd||'', _aiGenerated:c._aiGenerated||false, _aiGeneratedAt:c._aiGeneratedAt||null,
     timezone:c.timezone||'', electricity:c.electricity||'', bestPeriod:c.bestPeriod||'', payment:c.payment||'', safety:c.safety||'',
     practical:{tips:c.practical.tips, emergency:c.practical.emergency, checklist:c.practical.checklist}
   };
   save();
+  if(sb && CURRENT_TRIP){
+    sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()}).then(function(){});
+  }
 }
 function fmtDateRangeFr(startISO, endISO){
   if(!startISO && !endISO) return '';
@@ -2694,20 +2700,15 @@ function editCountryDateRange(countryId, startVal, endVal){
   c.dateStart = newStart;
   c.dateEnd = newEnd;
   c.dates = fmtDateRangeFr(c.dateStart, c.dateEnd);
-  if(!S.countryEdits[countryId]) S.countryEdits[countryId] = {};
-  S.countryEdits[countryId].dateStart = c.dateStart;
-  S.countryEdits[countryId].dateEnd = c.dateEnd;
-  S.countryEdits[countryId].dates = c.dates;
   if(c.dateStart && c.dateEnd){
     var d1 = new Date(c.dateStart+'T00:00:00');
     var d2 = new Date(c.dateEnd+'T00:00:00');
     var diffDays = Math.round((d2-d1)/86400000)+1;
     if(diffDays>0){
       c.days = diffDays;
-      S.countryEdits[countryId].days = diffDays;
     }
   }
-  save();
+  saveCountryEdit(countryId);
   renderContent();
 }
 function editCountryField(countryId, field, value){
@@ -5748,7 +5749,7 @@ function applyTripCountryFilter(trip) {
       const langGuess = (window.COUNTRY_LANGUAGES && window.COUNTRY_LANGUAGES[countryName]) || '';
       const newCountry = {
         id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
-        currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier selon ta nationalité — consulte France Diplomatie ou les autorités officielles du pays.', lang: langGuess, budget_daily: 50,
+        currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier — France Diplomatie', lang: langGuess, budget_daily: 50,
         alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[]}
       };
       COUNTRIES.push(newCountry);
@@ -5845,6 +5846,27 @@ async function loadJournalEntries(){
   });
   save();
 }
+async function loadCountrySettings(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data} = await sb.from('country_settings').select('*').eq('trip_id',CURRENT_TRIP.id);
+  if(!S.countryEdits) S.countryEdits={};
+  (data||[]).forEach(function(row){
+    // La version locale (si présente) reste prioritaire pour éviter d'écraser une saisie en cours ;
+    // sinon on récupère celle du serveur (créée par un autre voyageur).
+    if(!S.countryEdits[row.country_id]) S.countryEdits[row.country_id] = row.data;
+  });
+  save();
+}
+async function loadActivityDetails(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data} = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
+  if(!window._customDetails) window._customDetails={};
+  (data||[]).forEach(function(row){
+    if(!window._customDetails[row.detail_key]) window._customDetails[row.detail_key] = row.data;
+  });
+  S.customDetails = window._customDetails;
+  save();
+}
 async function verifyTripAccess(tripId){
   if(!sb) return true;
   try{
@@ -5891,6 +5913,8 @@ async function enterTrip(trip, resetTab) {
   await loadFavorites();
   await loadChecklist();
   await loadJournalEntries();
+  await loadCountrySettings();
+  await loadActivityDetails();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
 
