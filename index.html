@@ -5882,7 +5882,8 @@ checkForSharedDataOnLoad();
   var indicator = document.getElementById('pullRefreshIndicator');
   var label = document.getElementById('pullRefreshLabel');
   var spinner = document.getElementById('pullRefreshSpinner');
-  var THRESHOLD = 70;
+  var DEAD_ZONE = 40;   // ignore les premiers px de mouvement (évite un déclenchement au moindre scroll)
+  var MAX_PULL = 300;   // distance de doigt nécessaire pour atteindre l'indicateur max
   var startY = 0, pulling = false, triggered = false, refreshing = false;
 
   mainEl.addEventListener('touchstart', function(e){
@@ -5898,16 +5899,19 @@ checkForSharedDataOnLoad();
 
   mainEl.addEventListener('touchmove', function(e){
     if(!pulling || refreshing) return;
-    var dy = e.touches[0].clientY - startY;
+    if(mainEl.scrollTop > 0){ indicator.style.height='0px'; triggered=false; pulling=false; return; }
+    var rawDy = e.touches[0].clientY - startY;
+    var dy = rawDy - DEAD_ZONE;
     if(dy <= 0){ indicator.style.height='0px'; triggered=false; return; }
-    var h = Math.min(dy*0.5, 70);
+    var progress = Math.min(dy / (MAX_PULL - DEAD_ZONE), 1);
+    var h = progress * 70;
     indicator.style.height = h+'px';
-    if(h >= THRESHOLD*0.7 && !triggered){
+    if(progress >= 1 && !triggered){
       triggered = true;
       label.textContent = 'Relâche pour rafraîchir';
       spinner.style.transform = 'rotate(180deg)';
       spinner.style.transition = 'transform 0.2s';
-    } else if(h < THRESHOLD*0.7 && triggered){
+    } else if(progress < 1 && triggered){
       triggered = false;
       label.textContent = 'Tire pour rafraîchir';
       spinner.style.transform = 'rotate(0deg)';
