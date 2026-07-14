@@ -3464,14 +3464,16 @@ function renderCountriesScreen(){
   const tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
   const tripPct=totalDays>0?Math.round((tripDay/totalDays)*100):0;
   var tripRecap=COUNTRIES.length+' pays';
+  var heroCountry = ts.currentCountry || COUNTRIES[0];
+  var heroQuery = heroCountry ? getCountryImageQuery(heroCountry) : 'travel landscape';
   var dayHero;
   if(ts.elapsedDays<0){
-    dayHero='<div class="home-hero" data-img-query="Mount Fuji Chureito Pagoda Japan" style="margin-bottom:16px">'
-      +photoEditBtn('Mount Fuji Chureito Pagoda Japan')
+    dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
+      +photoEditBtn(heroQuery)
       +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+ts.currentCountry.flag+' Départ dans '+Math.abs(ts.elapsedDays)+' jours</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé · '+tripRecap+'</div></div></div>';
   } else {
-    dayHero='<div class="home-hero" data-img-query="Mount Fuji Chureito Pagoda Japan" style="margin-bottom:16px">'
-      +photoEditBtn('Mount Fuji Chureito Pagoda Japan')
+    dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
+      +photoEditBtn(heroQuery)
       +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
   }
 
@@ -3973,23 +3975,12 @@ function renderMore(){
     +'<div class="more-row" onclick="setTab(\'journal\')"><span class="more-row-icon" data-icon="notebook-pen" data-icon-size="19"></span><span class="more-row-label">Carnet de voyage</span><span class="more-row-chevron">›</span></div>'
     +'<div class="more-row" onclick="setTab(\'favorites\')"><span class="more-row-icon" data-icon="star" data-icon-size="19"></span><span class="more-row-label">Favoris</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
-    +'<div class="info-card"><div class="ic-header"><span data-icon="users" data-icon-size="16"></span> Voyageurs</div>'
-    +'<div class="more-row" onclick="showAccessManagementScreen()" style="padding:6px 0"><span class="more-row-label">'+(1+CURRENT_COLLABORATORS.length)+' voyageur'+(CURRENT_COLLABORATORS.length?'s':'')+' sur ce voyage</span><span class="more-row-chevron">›</span></div>'
+    +'<div class="info-card" style="padding:6px">'
+    +'<div class="more-row" onclick="showAccessManagementScreen()"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">Voyageurs</span><span style="font-size:12px;color:var(--ink-muted);margin-right:4px">'+(1+CURRENT_COLLABORATORS.length)+'</span><span class="more-row-chevron">›</span></div>'
+    +'<div class="more-row" onclick="showArchivedCountriesScreen()"><span class="more-row-icon" data-icon="globe" data-icon-size="19"></span><span class="more-row-label">Gérer les pays</span><span class="more-row-chevron">›</span></div>'
+    +'<div class="more-row" onclick="backToTripSelector()"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
-    +'<div class="info-card"><div class="ic-header"><span data-icon="globe" data-icon-size="16"></span> Gestion des pays</div>'
-    +'<button onclick="openAddCountryToTripModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
-    +'<button onclick="archiveCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">Archiver '+getC().name+'</button>'
-    +'<div class="more-row" onclick="showArchivedCountriesScreen()" style="padding:8px 4px 0"><span class="more-row-icon" data-icon="archive" data-icon-size="19"></span><span class="more-row-label">Pays archivés</span><span class="more-row-chevron">›</span></div>'
-    +'</div>'
-    +'<div class="info-card"><div class="more-row" onclick="backToTripSelector()" style="padding:2px 0;cursor:pointer"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div></div>'
-    +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
-    +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
-    +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
-    +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
-    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN personnalisé défini' : 'PIN par défaut (2026) — définis le tien')+'</div>'
-    +'<button onclick="changePinFlow()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> Changer mon PIN</button>'
-    +'</div>'
-    +'<button onclick="logoutUser()" style="width:100%;padding:12px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Déconnexion</button>'
+    +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'</div>';
 }
 
@@ -5051,7 +5042,12 @@ function renderArchivedCountriesScreen(){
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
-    +'<div class="section-title" style="margin-bottom:12px">Pays archivés</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Gérer les pays</div>'
+    +'<div class="info-card">'
+    +'<button onclick="openAddCountryToTripModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
+    +'<button onclick="archiveCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Archiver '+getC().name+'</button>'
+    +'</div>'
+    +'<div class="section-title" style="margin:18px 0 10px;font-size:15px">Pays archivés</div>'
     +'<div class="info-card" style="padding:6px">'+rows+'</div>'
     +'</div>';
 }
@@ -5093,6 +5089,13 @@ function renderMyAccountScreen(){
     +'<button id="my-account-save-btn" class="btn-primary" onclick="saveMyPseudo()">Enregistrer</button>'
     +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
+    +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
+    +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
+    +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
+    +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
+    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN personnalisé défini' : 'PIN par défaut (2026) — définis le tien')+'</div>'
+    +'<button onclick="changePinFlow()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> Changer mon PIN</button>'
+    +'</div>'
     +'<div class="info-card" style="border:1px solid rgba(231,111,81,0.25)">'
     +'<div class="ic-header" style="color:var(--red-muted)">Zone dangereuse</div>'
     +'<p class="auth-hint" style="margin:0 0 10px">Supprimer ton compte te déconnectera immédiatement et te retirera l\'accès à tous tes voyages. Cette action peut être annulée par André dans les 30 jours si besoin.</p>'
