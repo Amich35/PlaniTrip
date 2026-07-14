@@ -2806,6 +2806,10 @@ function addCityToCountry(countryId){
   if(c.cities.find(function(ci){return ci.city===name.trim();})){ alert('Cette ville existe déjà.'); return; }
   var newCity = {city:name.trim(), sub:sub, acts:[]};
   c.cities.push(newCity);
+  if(c.days===0){
+    var subDays = parseInt((sub||'').match(/\d+/));
+    if(subDays) { c.days = subDays; saveCountryEdit(countryId); }
+  }
   if(!S.addedCities[countryId]) S.addedCities[countryId]=[];
   S.addedCities[countryId].push(newCity);
   save();
