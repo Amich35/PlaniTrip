@@ -2992,7 +2992,9 @@ function renderItinerary(c, embedded){
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
         var dayAssigned=S.actDay[k]||'';
-        var daySelector=days.length>1?('<select style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 6px;background:var(--sand);color:var(--ink-muted);margin-top:4px;" onclick="event.stopPropagation()" onchange="event.stopPropagation();assignDay(\''+k+'\',\''+ck+'\',this.value)"><option value="">Jour ?</option>'+days.filter(function(d){return d!=='Tous';}).map(function(d){return '<option value="'+d+'"'+(dayAssigned===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select>'):'';
+        var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
+        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+k+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var daySelector=dateSelector;
         return '<div class="act-card'+(done?' done':'')+'">'
           +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
           +'<div class="act-check" onclick="toggleAct(\''+k+'\')">'+( done?'✓':'')+'</div>'
@@ -3012,10 +3014,13 @@ function renderItinerary(c, embedded){
         if(!ca) return '';
         var ck2=ck+'_c'+origIdx;
         var cdone=!!S.done[ck2];
+        var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
+        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+ck2+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="act-card'+(cdone?' done':'')+'" style="border-style:dashed">'
           +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
           +'<div class="act-check" onclick="toggleAct(\''+ck2+'\')">'+( cdone?'✓':'')+'</div>'
           +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+'</div>'
+          +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+ck2+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+ck+'\','+origIdx+',true)">✕</button></div>'
@@ -3344,22 +3349,22 @@ function renderToday(){
     }
   }
 
-  // ── Carte À ne pas oublier (3 premiers items non cochés) ──
+  // ── Carte À ne pas oublier (priorité aux non cochés, toujours modifiable) ──
   var forgetCard = '';
   if(c && c.practical && c.practical.checklist && c.practical.checklist.length){
-    var uncheckedItems = [];
-    c.practical.checklist.forEach(function(item,i){
+    var allItems = c.practical.checklist.map(function(item,i){
       var k=c.id+'_cl_'+i;
-      if(!S.checklist[k]) uncheckedItems.push({k:k, item:item});
+      return {k:k, item:item, checked:!!S.checklist[k]};
     });
-    if(uncheckedItems.length){
-      var forgetHTML = uncheckedItems.slice(0,3).map(function(u){
-        return '<div class="check-item" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box"></div><span class="ci-text">'+escHtml(u.item)+'</span></div>';
-      }).join('');
-      forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+forgetHTML+'</div>';
-    } else {
-      forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div><div class="status-sub" style="padding:4px 0">Tout est prêt 🎉</div></div>';
-    }
+    var uncheckedCount = allItems.filter(function(u){return !u.checked;}).length;
+    var sorted = allItems.slice().sort(function(a,b){return (a.checked?1:0)-(b.checked?1:0);});
+    var shown = sorted.slice(0,3);
+    var forgetHTML = shown.map(function(u){
+      return '<div class="check-item'+(u.checked?' checked':'')+'" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box">'+(u.checked?'✓':'')+'</div><span class="ci-text">'+escHtml(u.item)+'</span></div>';
+    }).join('');
+    var seeAllLink = c.practical.checklist.length>3 ? '<div style="text-align:right;margin-top:4px"><span style="font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">Voir toute la checklist →</span></div>' : '';
+    var doneMsg = uncheckedCount===0 ? '<div class="status-sub" style="padding:4px 0 8px">Tout est prêt 🎉</div>' : '';
+    forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+doneMsg+forgetHTML+seeAllLink+'</div>';
   }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
