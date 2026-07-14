@@ -852,7 +852,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   </div>
   <div class="content" id="mainContent"></div>
   <nav class="bottom-nav">
-    <button class="nav-btn active" onclick="setTab('countries')" id="tab-countries"><span class="nav-icon icon" id="ni-countries"></span><span class="nav-lbl">Pays</span></button>
+    <button class="nav-btn active" onclick="setTab('today')" id="tab-today"><span class="nav-icon icon" id="ni-today"></span><span class="nav-lbl">Aujourd'hui</span></button>
+    <button class="nav-btn" onclick="setTab('countries')" id="tab-countries"><span class="nav-icon icon" id="ni-countries"></span><span class="nav-lbl">Pays</span></button>
     <button class="nav-btn" onclick="setTab('budget')" id="tab-budget"><span class="nav-icon icon" id="ni-budget"></span><span class="nav-lbl">Budget</span></button>
     <button class="nav-btn" onclick="setTab('more')" id="tab-more"><span class="nav-icon icon" id="ni-more"></span><span class="nav-lbl">Plus</span></button>
   </nav>
@@ -1586,7 +1587,7 @@ function loadState(){
       return parsed;
     }
   }catch(e){}
-  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{}};
+  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{}};
 }
 function save(){
   try{
@@ -2286,6 +2287,7 @@ function closeDetail(){ document.getElementById('detailModal').classList.remove(
 // ── ACCOMMODATION ─────────────────────────────────────────────
 // S.accom = { 'jp_Kyoto': {link:'...', price:'', nights:'', type:''} }
 if(!S.accom) S.accom={};
+if(!S.actDate) S.actDate={};
 
 function saveAccom(ck) {
   const link  = document.getElementById('ac_link_'+ck)?.value||'';
@@ -3216,6 +3218,112 @@ function getTripStatus(){
     }
   }
   return {elapsedDays:elapsedDays, currentCountry:currentCountry, dayInCountry:dayInCountry, nextTransport:nextTransport, currentCity:currentCity};
+}
+function getCityActivitiesForToday(c, city, todayStr){
+  var ck = c.id+'_'+city.city;
+  var totalBase = city.acts.length;
+  var totalCustom = (S.customActs[ck]||[]).length;
+  var order = getOrder(ck, totalBase, totalCustom);
+  var nonDeleted = order.filter(function(slot){
+    if(slot[0]==='b'){ var oi=parseInt(slot.slice(1)); return !S.deletedActs[ck+'_'+oi]; }
+    return true;
+  });
+  var results=[];
+  nonDeleted.forEach(function(slot, idx){
+    var isBase = slot[0]==='b';
+    var oi = parseInt(slot.slice(1));
+    var a = isBase ? city.acts[oi] : (S.customActs[ck]||[])[oi];
+    if(!a) return;
+    var actKey = isBase ? (ck+'_'+oi) : (ck+'_c'+oi);
+    var date = getActivityDate(actKey, c.id, city.city, idx, nonDeleted.length);
+    if(date===todayStr){
+      results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:city.city});
+    }
+  });
+  return results;
+}
+function renderToday(){
+  var ts = getTripStatus();
+  var todayStr = new Date().toISOString().slice(0,10);
+  var c = ts.currentCountry;
+  if(c) setTimeout(function(){ loadHomeWeather(c.id, 'today-weather-body'); }, 50);
+  var todayActs = [];
+  if(c){
+    c.cities.forEach(function(city){
+      todayActs = todayActs.concat(getCityActivitiesForToday(c, city, todayStr));
+    });
+  }
+  var todaySpent = S.expenses.filter(function(e){return e.date===todayStr;}).reduce(function(s,e){return s+e.amount;},0);
+  var budgetDaily = c ? c.budget_daily : 0;
+  var budgetPct = budgetDaily>0 ? Math.min(100, Math.round((todaySpent/budgetDaily)*100)) : 0;
+  var activeAlerts = c ? (c.alerts||[]).slice(0,2) : [];
+  var alertsHTML = activeAlerts.map(function(a){
+    var text = typeof a==='object' ? a.t : a;
+    var meta = parseAlert(text);
+    return '<div class="info-row"><span class="ir-key" style="color:'+(meta.type==='danger'?'var(--red-muted)':'var(--ink)')+'">'+escHtml(meta.title)+'</span></div>';
+  }).join('');
+
+  var actsHTML = todayActs.length ? todayActs.map(function(a){
+    return '<div class="check-item'+(a.done?' checked':'')+'" onclick="toggleAct(\''+a.key+'\')"><div class="ci-box">'+(a.done?'✓':'')+'</div><span class="ci-text">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
+  }).join('') : '<div class="status-sub">Aucune activité datée pour aujourd\'hui. Assigne des dates dans Lieux pour les voir apparaître ici.</div>';
+
+  var heroQuery = c ? getCountryImageQuery(c) : 'travel';
+  var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
+    +photoEditBtn(heroQuery)
+    +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.flag+' '+c.name:'Ton voyage')+'</div><div class="home-hero-sub">'+(ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div></div></div>';
+
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
+    +heroHTML
+    +'<div class="info-card"><div class="ic-header">Activités du jour</div>'+actsHTML+'</div>'
+    +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span>Budget du jour</span><span style="font-size:12px;font-weight:700;color:var(--accent)">'+fmtEUR(todaySpent)+' / '+fmtEUR(budgetDaily)+'</span></div>'
+    +'<div class="bh-bar" style="margin-top:6px"><div class="bh-fill" style="width:'+budgetPct+'%"></div></div></div>'
+    +(activeAlerts.length?'<div class="info-card"><div class="ic-header">Alertes</div>'+alertsHTML+'</div>':'')
+    +'<div class="info-card"><div class="ic-header"><span data-icon="sun" data-icon-size="16"></span> Météo</div><div id="today-weather-body"><div class="status-sub">Chargement…</div></div></div>'
+    +'</div>';
+}
+function getCountryStartDay(countryId){
+  var cum=0;
+  for(var i=0;i<COUNTRIES.length;i++){
+    if(COUNTRIES[i].id===countryId) return cum;
+    cum+=COUNTRIES[i].days;
+  }
+  return 0;
+}
+function getCityStartDayInCountry(countryId, cityName){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return 0;
+  var orderedIdx = getCityOrder(countryId);
+  var orderedCities = orderedIdx.map(function(idx){return c.cities[idx];});
+  var cum=0;
+  for(var i=0;i<orderedCities.length;i++){
+    if(orderedCities[i].city===cityName) return cum;
+    cum += parseInt((orderedCities[i].sub||'').match(/\d+/))||1;
+  }
+  return 0;
+}
+function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
+  if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return null;
+  var cityObj = c.cities.find(function(ci){return ci.city===cityName;});
+  var cityDays = cityObj ? (parseInt((cityObj.sub||'').match(/\d+/))||1) : 1;
+  var countryStart = getCountryStartDay(countryId);
+  var cityStart = getCityStartDayInCountry(countryId, cityName);
+  var dayOffsetInCity = totalActs>0 ? Math.floor(actIdx * cityDays / totalActs) : 0;
+  if(dayOffsetInCity>=cityDays) dayOffsetInCity = cityDays-1;
+  if(dayOffsetInCity<0) dayOffsetInCity = 0;
+  var totalOffset = countryStart + cityStart + dayOffsetInCity;
+  var DEPART = getTripDepartDate();
+  var d = new Date(DEPART);
+  d.setDate(d.getDate()+totalOffset);
+  return d.toISOString().slice(0,10);
+}
+function setActivityDate(actKey, dateVal){
+  if(!S.actDate) S.actDate={};
+  if(dateVal) S.actDate[actKey]=dateVal; else delete S.actDate[actKey];
+  save();
+  renderContent();
 }
 
 // ── COUNTRY STATUS (done / current / upcoming) ──────────────────
@@ -5338,7 +5446,8 @@ function syncActiveNavTab(){
 }
 function renderContent(){
   const c=getC();let html='';
-  if(S.tab==='home')html=renderCountriesScreen();
+  if(S.tab==='home')html=renderToday();
+  else if(S.tab==='today')html=renderToday();
   else if(S.tab==='countries')html=renderCountriesScreen();
   else if(S.tab==='country'){
     var sub=S.countryDetailTab||'guide';
@@ -5465,6 +5574,7 @@ function renderIcons() {
   var icons = {
     'ni-home': svgIcon('house'),
     'ni-countries': svgIcon('globe'),
+    'ni-today': svgIcon('sun'),
     'ni-favorites': svgIcon('star'),
     'ni-budget': svgIcon('wallet'),
     'ni-more': svgIcon('ellipsis'),
@@ -5947,7 +6057,7 @@ async function enterTrip(trip, resetTab) {
   const freshState = loadState();
   Object.keys(S).forEach(k => delete S[k]);
   Object.assign(S, freshState);
-  S.tab = resetTab ? 'countries' : (S.tab || 'countries');
+  S.tab = resetTab ? 'today' : (S.tab || 'today');
   rebuildCountriesFromState();
 
   await loadCollaborators();
