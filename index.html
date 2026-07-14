@@ -3237,7 +3237,7 @@ function getCityActivitiesForToday(c, city, todayStr){
     var actKey = isBase ? (ck+'_'+oi) : (ck+'_c'+oi);
     var date = getActivityDate(actKey, c.id, city.city, idx, nonDeleted.length);
     if(date===todayStr){
-      results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:city.city});
+      results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:city.city, ck:ck});
     }
   });
   return results;
@@ -3260,30 +3260,38 @@ function renderToday(){
   var todaySpent = S.expenses.filter(function(e){return e.date===todayStr;}).reduce(function(s,e){return s+e.amount;},0);
   var budgetDaily = c ? c.budget_daily : 0;
 
-  // ── Hero avec indicateurs discrets ──
+  // ── Hero simple (sans indicateurs) ──
   var heroQuery = c ? getCountryImageQuery(c) : 'travel';
-  var badges = '<span id="today-hero-temp" style="opacity:0.85">···</span>'
-    +' &nbsp;·&nbsp; 💶 '+fmtEUR(todaySpent)+' / '+fmtEUR(budgetDaily)
-    +' &nbsp;·&nbsp; 📍 '+todayActs.length+' activité'+(todayActs.length>1?'s':'');
-  var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
+  var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:12px">'
     +photoEditBtn(heroQuery)
-    +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.flag+' '+c.name:'Ton voyage')+' · Jour '+tripDay+' / '+totalDays+'</div>'
+    +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.flag+' '+c.name:'Ton voyage')+'</div>'
     +'<div class="home-hero-sub">'+(ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div>'
-    +'<div class="home-hero-sub" style="margin-top:4px;font-size:12px;opacity:0.9">'+badges+'</div>'
     +'</div></div>';
+
+  // ── Encart résumé du jour (jour X/Y, météo, budget, activités) ──
+  var summaryHTML = '<div class="info-card" style="display:flex;align-items:center;justify-content:space-around;text-align:center;padding:14px 10px;margin-bottom:16px">'
+    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)">'+tripDay+'/'+totalDays+'</div><div style="font-size:11px;color:var(--ink-subtle)">Jour</div></div>'
+    +'<div style="width:1px;height:28px;background:var(--sand-deep)"></div>'
+    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)" id="today-hero-temp">···</div><div style="font-size:11px;color:var(--ink-subtle)">Météo</div></div>'
+    +'<div style="width:1px;height:28px;background:var(--sand-deep)"></div>'
+    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)">'+fmtEUR(todaySpent)+'/'+fmtEUR(budgetDaily)+'</div><div style="font-size:11px;color:var(--ink-subtle)">Budget</div></div>'
+    +'<div style="width:1px;height:28px;background:var(--sand-deep)"></div>'
+    +'<div><div style="font-size:15px;font-weight:700;color:var(--ink)">'+todayActs.length+'</div><div style="font-size:11px;color:var(--ink-subtle)">Activité'+(todayActs.length>1?'s':'')+'</div></div>'
+    +'</div>';
 
   // ── Carte Aujourd'hui ──
   var actsCard;
   if(todayActs.length){
     var actsHTML = todayActs.map(function(a){
-      return '<div class="check-item'+(a.done?' checked':'')+'" onclick="toggleAct(\''+a.key+'\')"><div class="ci-box">'+(a.done?'✓':'')+'</div><span class="ci-text">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
+      return '<div class="check-item'+(a.done?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="toggleAct(\''+a.key+'\')">'+(a.done?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="openDetail(\''+a.key+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.ck+'\')">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
     }).join('');
     actsCard = '<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Aujourd\'hui</div>'+actsHTML+'</div>';
   } else {
+    var emptyBtnCity = ts.currentCity ? ts.currentCity.city : null;
     actsCard = '<div class="info-card" style="text-align:center;padding:24px 16px">'
       +'<div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('calendar',28)+'</div>'
       +'<div style="font-size:14px;color:var(--ink-muted);margin-bottom:14px">Aucune activité prévue aujourd\'hui.</div>'
-      +(c?'<button onclick="openCountryDetail(\''+c.id+'\',\'lieux\')" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir les lieux</button>':'')
+      +(c?'<button onclick="openCountryDetail(\''+c.id+'\',\'lieux\')'+(emptyBtnCity?';setTimeout(function(){ var ck=\''+c.id+'_'+emptyBtnCity.replace(/'/g,"\\'")+'\'; if(!S.openCities[ck]){toggleCity(ck);renderContent();} var el=document.querySelector(\'[data-city="\'+ck+\'"]\'); if(el) el.scrollIntoView({behavior:"smooth"}); },150)':'')+'" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir '+(emptyBtnCity?emptyBtnCity:'les lieux')+'</button>':'')
       +'</div>';
   }
 
@@ -3304,15 +3312,30 @@ function renderToday(){
     alertsCard = '<div class="info-card"><div class="ic-header"><span data-icon="triangle-alert" data-icon-size="16"></span> À surveiller</div>'+alertRows+'</div>';
   }
 
-  // ── Carte Demain (prochain transport) ──
+  // ── Carte Demain ──
   var tomorrowCard = '';
-  if(ts.nextTransport){
-    var toCountry = COUNTRIES.find(function(cc){return cc.id===ts.nextTransport[1];});
-    if(toCountry){
-      tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochaine étape</div>'
-        +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+toCountry.flag+' Départ vers '+toCountry.name+'</div>'
-        +'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(ts.nextTransport[2])+'</div>'
+  if(c){
+    var tomorrowElapsed = ts.elapsedDays+1;
+    var cumulative=0, tmCountry=null;
+    for(var ti=0; ti<COUNTRIES.length; ti++){
+      var cc=COUNTRIES[ti];
+      if(tomorrowElapsed>=cumulative && tomorrowElapsed<cumulative+cc.days){ tmCountry=cc; break; }
+      cumulative+=cc.days;
+    }
+    if(tmCountry && tmCountry.id!==c.id){
+      var transp = TRANSPORTS.find(function(t){return t[0]===c.id && t[1]===tmCountry.id;});
+      tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Demain</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+tmCountry.flag+' Départ vers '+tmCountry.name+'</div>'
+        +(transp?'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(transp[2])+'</div>':'')
         +'</div>';
+    } else if(tmCountry){
+      var tomorrowStr = new Date(Date.now()+86400000).toISOString().slice(0,10);
+      var tmActs = [];
+      tmCountry.cities.forEach(function(city){ tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStr)); });
+      if(tmActs.length){
+        tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Demain</div>'
+          +'<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActs[0]&&tmActs[0].city?' à '+escHtml(tmActs[0].city):'')+'</div></div>';
+      }
     }
   }
 
@@ -3329,12 +3352,15 @@ function renderToday(){
         return '<div class="check-item" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box"></div><span class="ci-text">'+escHtml(u.item)+'</span></div>';
       }).join('');
       forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+forgetHTML+'</div>';
+    } else {
+      forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div><div class="status-sub" style="padding:4px 0">Tout est prêt 🎉</div></div>';
     }
   }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
     +heroHTML
+    +summaryHTML
     +actsCard
     +alertsCard
     +tomorrowCard
