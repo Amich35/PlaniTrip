@@ -3354,7 +3354,7 @@ function renderToday(){
     +'</div></div>';
 
   // ── Encart résumé du jour (jour X/Y, météo, budget, activités) — badges modernes ──
-  var budgetColor = (budgetDaily>0 && todaySpent>budgetDaily) ? 'var(--red-muted)' : 'var(--ink)';
+  var budgetColor = (budgetDaily>0 && todaySpent>budgetDaily) ? 'var(--red-muted)' : 'var(--accent)';
   function summaryBadge(icon, value, sub, valColor){
     return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px">'
       +'<span style="color:var(--accent)">'+svgIcon(icon,17)+'</span>'
@@ -3870,7 +3870,29 @@ function renderBudgetOverview(){
       var cv = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
       if(!cv){ S.budgetCountryView=null; }
     }
-    if(S.budgetCountryView){
+    if(S.budgetPersonView){
+      var myLabelP = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+      var pExps = S.expenses.filter(function(e){return (e.personLabel||e.person)===S.budgetPersonView;}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var pTotal = pExps.reduce(function(s,e){return s+e.amount;},0);
+      var byDateP = {}; var dateOrderP = [];
+      pExps.forEach(function(e){
+        if(!byDateP[e.date]){ byDateP[e.date]=[]; dateOrderP.push(e.date); }
+        byDateP[e.date].push(e);
+      });
+      var groupsHTMLP = dateOrderP.map(function(d){
+        var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+        var rows = byDateP[d].map(function(e){
+          var c3 = COUNTRIES.find(function(co){return co.id===e.country;});
+          var catIcon = getExpenseCategoryIcon(e.category);
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span style="font-size:14px;margin-right:2px">'+(c3?c3.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+        }).join('');
+        return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
+      }).join('');
+      body = '<div class="more-row" onclick="S.budgetPersonView=null;renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+        +'<div class="budget-hero"><div style="flex:1"><div class="bh-label">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':S.budgetPersonView)+'</div><div class="bh-amount">'+fmtEUR(pTotal)+'</div></div></div>'
+        +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
+        +fabHTML;
+    } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
       var cSpent = S.expenses.filter(function(e){return e.country===c2.id;}).reduce(function(s,e){return s+e.amount;},0);
       var cBudget = c2.budget_daily*c2.days;
@@ -3886,7 +3908,7 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = e.personLabel || e.person || '?';
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(whoLabel)+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(whoLabel)+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
@@ -3911,9 +3933,9 @@ function renderBudgetOverview(){
     var paidBalances = computeBalances();
     var myLabel3 = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px">'
+      return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
         +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(b.person)+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(b.person===myLabel3?'Toi':b.person)+'</span></div>'
-        +'<span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span>'
+        +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
         +'</div>';
     }).join('');
     var paidCard = paidRows ? '<div class="info-card"><div class="ic-header">Payé par</div>'+paidRows+'</div>' : '';
@@ -4141,7 +4163,8 @@ function renderExpenseFormModal(){
   var selCity = selCountry.cities.find(function(ci){return ci.city===S.expCity;});
   var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
   var personOptions = getExpensePersonOptions();
-  return '<div class="modal-title" style="font-size:18px;margin-bottom:14px">Ajouter une dépense</div>'
+  var isEditing = !!S.editingExpenseId;
+  return '<div class="modal-title" style="font-size:18px;margin-bottom:14px">'+(isEditing?'Modifier la dépense':'Ajouter une dépense')+'</div>'
     +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';refreshExpenseModal()">'+countryOptions+'</select></div>'
     +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+escHtml(S.expDesc||'')+'" oninput="S.expDesc=this.value"/></div>'
     +'<div class="ef-row"><select class="ef-select" id="eCategory" onchange="S.expCategory=this.value">'+getExpenseCategoryOptions(S.expCategory)+'</select></div>'
@@ -4154,16 +4177,36 @@ function renderExpenseFormModal(){
     +renderSplitRows(S.expAmt)
     +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||new Date().toISOString().slice(0,10))+'" oninput="S.expDate=this.value" style="width:100%"/></div>'
     +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
-    +'<button class="ef-btn" onclick="addExpGlobal();closeAddExpenseModal();">+ Ajouter</button></div>'
+    +'<button class="ef-btn" onclick="addExpGlobal();closeAddExpenseModal();">'+(isEditing?'✓ Enregistrer':'+ Ajouter')+'</button></div>'
+    +(isEditing?('<button class="modal-cancel-btn" style="color:var(--red-muted)" onclick="var idToDel=S.editingExpenseId;closeAddExpenseModal();delExp(idToDel);">Supprimer cette dépense</button>'):'')
     +'<button class="modal-cancel-btn" onclick="closeAddExpenseModal()">Annuler</button>';
 }
 function openAddExpenseModal(){
+  S.editingExpenseId = null;
   if(!S.expCountry) S.expCountry = getC().id;
+  document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
+  document.getElementById('addExpenseModal').classList.add('open');
+}
+function openEditExpenseModal(expId){
+  var e = S.expenses.find(function(x){return x.id===expId;});
+  if(!e) return;
+  S.editingExpenseId = expId;
+  S.expCountry = e.country;
+  S.expCity = e.city||'';
+  S.expActivity = e.activity||'';
+  S.expCategory = e.category||'other';
+  S.expDesc = e.desc||'';
+  S.expAmt = String(e.amount);
+  S.expPerson = e.personLabel||e.person||'';
+  S.expDate = e.date;
+  S.expParticipants = (e.participants&&e.participants.length) ? e.participants.slice() : getPeopleList();
+  S.expSplitOverrides = e.splits ? Object.assign({}, e.splits) : {};
   document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
   document.getElementById('addExpenseModal').classList.add('open');
 }
 function closeAddExpenseModal(){
   document.getElementById('addExpenseModal').classList.remove('open');
+  S.editingExpenseId = null;
 }
 function refreshExpenseModal(){
   document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
@@ -4179,15 +4222,30 @@ function addExpGlobal(){
   var categoryEl = document.getElementById('eCategory');
   var category = categoryEl?categoryEl.value:(S.expCategory||'other');
   if(isNaN(amt)||amt<=0)return;
-  var newId=Date.now();
   var dateEl = document.getElementById('eDate');
-  var newDate=(dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().slice(0,10);
+  var expDate=(dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().slice(0,10);
   var participants = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
   var splits = computeFinalSplits(amt, participants, S.expSplitOverrides||{});
-  S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,splits:splits,date:newDate});
-  if(sb && CURRENT_TRIP){
-    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-    sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,splits:splits,entry_date:newDate}).then(function(){});
+
+  if(S.editingExpenseId){
+    var existing = S.expenses.find(function(x){return x.id===S.editingExpenseId;});
+    if(existing){
+      existing.country=country; existing.city=city; existing.activity=activity; existing.category=category;
+      existing.desc=desc; existing.amount=amt; existing.person=S.expPerson; existing.personLabel=S.expPerson;
+      existing.participants=participants; existing.splits=splits; existing.date=expDate;
+      if(sb && CURRENT_TRIP){
+        var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
+        sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants,splits:splits,entry_date:expDate}).eq('id',S.editingExpenseId).then(function(){});
+      }
+    }
+    S.editingExpenseId = null;
+  } else {
+    var newId=Date.now();
+    S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,splits:splits,date:expDate});
+    if(sb && CURRENT_TRIP){
+      var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
+      sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,splits:splits,entry_date:expDate}).then(function(){});
+    }
   }
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};S.expDate='';save();renderContent();
 }
