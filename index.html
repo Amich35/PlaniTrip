@@ -2721,6 +2721,10 @@ function saveCountryEdit(countryId){
     sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()}).then(function(){});
   }
 }
+function toLocalISODate(d){
+  var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function fmtDateRangeFr(startISO, endISO){
   if(!startISO && !endISO) return '';
   if(startISO && !endISO) return new Date(startISO+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
@@ -3310,9 +3314,9 @@ function renderToday(){
   var refOffset = Math.max(0, ts.elapsedDays); // avant le départ : on prévisualise le Jour 1
   var DEPART = getTripDepartDate();
   var refDate = new Date(DEPART); refDate.setDate(refDate.getDate()+refOffset);
-  var todayStr = refDate.toISOString().slice(0,10);
+  var todayStr = toLocalISODate(refDate);
   var tomorrowDate = new Date(refDate); tomorrowDate.setDate(tomorrowDate.getDate()+1);
-  var tomorrowStrRef = tomorrowDate.toISOString().slice(0,10);
+  var tomorrowStrRef = toLocalISODate(tomorrowDate);
   var c = ts.currentCountry;
   var firstCountryWithDate = COUNTRIES.find(function(cc){return cc.dateStart;});
   var lastCountryWithDate = null;
@@ -3527,7 +3531,7 @@ function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   var DEPART = getTripDepartDate();
   var d = new Date(DEPART);
   d.setDate(d.getDate()+totalOffset);
-  return d.toISOString().slice(0,10);
+  return toLocalISODate(d);
 }
 function setActivityDate(actKey, dateVal){
   if(!S.actDate) S.actDate={};
@@ -4175,7 +4179,7 @@ function renderExpenseFormModal(){
     +(selCountry.rateNum?('<span style="font-size:13px;color:var(--ink-subtle)">⇄</span><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant '+escHtml(getCurrencySymbol(selCountry))+'" id="eAmtLocal" style="max-width:95px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/>'):'')
     +'</div>'
     +renderSplitRows(S.expAmt)
-    +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||new Date().toISOString().slice(0,10))+'" oninput="S.expDate=this.value" style="width:100%"/></div>'
+    +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||toLocalISODate(new Date()))+'" oninput="S.expDate=this.value" style="width:100%"/></div>'
     +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
     +'<button class="ef-btn" onclick="addExpGlobal();closeAddExpenseModal();">'+(isEditing?'✓ Enregistrer':'+ Ajouter')+'</button></div>'
     +(isEditing?('<button class="modal-cancel-btn" style="color:var(--red-muted)" onclick="var idToDel=S.editingExpenseId;closeAddExpenseModal();delExp(idToDel);">Supprimer cette dépense</button>'):'')
@@ -4223,7 +4227,7 @@ function addExpGlobal(){
   var category = categoryEl?categoryEl.value:(S.expCategory||'other');
   if(isNaN(amt)||amt<=0)return;
   var dateEl = document.getElementById('eDate');
-  var expDate=(dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().slice(0,10);
+  var expDate=(dateEl && dateEl.value) ? dateEl.value : toLocalISODate(new Date());
   var participants = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
   var splits = computeFinalSplits(amt, participants, S.expSplitOverrides||{});
 
@@ -4377,7 +4381,7 @@ function handleJournalPhotoPick(input){
   reader.readAsDataURL(file);
 }
 function addJournalEntry(){
-  var date=document.getElementById('journalDate').value || new Date().toISOString().slice(0,10);
+  var date=document.getElementById('journalDate').value || toLocalISODate(new Date());
   var text=document.getElementById('journalText').value.trim();
   var location=document.getElementById('journalLocation').value.trim();
   if(!text && !location && !window._journalDraftPhoto) return;
@@ -4400,7 +4404,7 @@ function deleteJournalEntry(id){
   }, 'Supprimer');
 }
 function renderCarnetScreen(){
-  var today=new Date().toISOString().slice(0,10);
+  var today=toLocalISODate(new Date());
   var entries=S.journal.slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
   var form='<div class="info-card">'
     +'<div class="ic-header"><span data-icon="notebook-pen" data-icon-size="16"></span> Nouvelle entrée</div>'
