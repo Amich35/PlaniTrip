@@ -4121,7 +4121,7 @@ function toggleSplitParticipant(idx){
   var i2 = S.expParticipants.indexOf(p);
   if(i2>-1){ S.expParticipants.splice(i2,1); if(S.expSplitOverrides) delete S.expSplitOverrides[p]; }
   else S.expParticipants.push(p);
-  save(); renderContent();
+  save(); refreshExpenseModal();
 }
 function onSplitInput(idx, val){
   var p = SPLIT_PEOPLE_CACHE[idx];
@@ -6591,14 +6591,11 @@ async function loadCitiesActivities(){
 async function loadBudgetEntries(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
-  // Le serveur fait autorité : reconstruction depuis Supabase.
-  // On garde les dépenses locales non encore synchronisées (id non présent côté serveur),
-  // et on remplace/ajoute toutes les dépenses du serveur — tous les voyageurs voient les mêmes.
-  var serverMap = {};
   (data||[]).forEach(function(row){
-    serverMap[row.id] = {id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date};
+    if(!S.expenses.find(function(e){return e.id===row.id;})){
+      S.expenses.push({id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date});
+    }
   });
-  S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); }).concat(Object.values(serverMap));
   save();
 }
 async function loadFavorites(){
