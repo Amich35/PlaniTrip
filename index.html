@@ -2495,12 +2495,13 @@ function setCustomPhoto(query, url){
     if(dImg){ dImg.style.backgroundImage='url(\''+url+'\')'; dImg.textContent=''; }
   }
 }
-function resetCustomPhoto(){
+async function resetCustomPhoto(){
   if(!_photoModalTarget) return;
   if(S.customPhotos) delete S.customPhotos[_photoModalTarget];
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('custom_photos').delete().eq('trip_id',CURRENT_TRIP.id).eq('query',_photoModalTarget).then(function(){});
+    // await garantit que la suppression Supabase est effective avant tout refresh possible
+    await sb.from('custom_photos').delete().eq('trip_id',CURRENT_TRIP.id).eq('query',_photoModalTarget);
   }
   closePhotoPicker();
   document.querySelectorAll('[data-img-query="'+_photoModalTarget.replace(/"/g,'&quot;')+'"]').forEach(function(el){
@@ -3774,7 +3775,7 @@ function renderHome(){
       +'<div class="status-sub">Le voyage n\'a pas encore commencé</div></div>';
   } else {
     dayCard='<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Jour '+tripDay+' / '+totalDays+'</div>'
-      +'<div class="status-sub" style="margin-bottom:8px">'+ts.currentCountry.flag+' '+ts.currentCountry.name+'. Jour '+ts.dayInCountry+'</div>'
+      +'<div class="status-sub" style="margin-bottom:8px">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+'</div>'
       +'<div class="bh-bar"><div class="bh-fill" style="width:'+tripPct+'%"></div></div>'
       +'<div class="status-sub" style="margin-top:6px;text-align:right">'+tripPct+'% du voyage</div></div>';
   }
@@ -3853,7 +3854,7 @@ function renderCountriesScreen(){
   } else {
     dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
       +photoEditBtn(heroQuery)
-      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' '+ts.currentCountry.name+'. Jour '+ts.dayInCountry+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
   }
 
   var list = COUNTRIES;
@@ -6589,9 +6590,12 @@ async function loadAccommodations(){
 async function loadCustomPhotos(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('custom_photos').select('*').eq('trip_id',CURRENT_TRIP.id);
-  if(!S.customPhotos) S.customPhotos={};
+  // Le serveur fait toujours autorite sur les photos : on repart de zero a chaque chargement
+  // pour eviter qu'une photo supprimee (reset) ne survive dans le localStorage,
+  // et pour garantir que les photos posees par un autre voyageur sont bien recues.
+  S.customPhotos = {};
   (data||[]).forEach(function(row){
-    if(!S.customPhotos[row.query]) S.customPhotos[row.query] = row.photo_data;
+    S.customPhotos[row.query] = row.photo_data;
   });
   save();
 }
