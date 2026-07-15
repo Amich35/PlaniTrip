@@ -6584,9 +6584,22 @@ async function loadCountrySettings(){
   var {data} = await sb.from('country_settings').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(!S.countryEdits) S.countryEdits={};
   (data||[]).forEach(function(row){
-    // La version locale (si présente) reste prioritaire pour éviter d'écraser une saisie en cours ;
-    // sinon on récupère celle du serveur (créée par un autre voyageur).
-    if(!S.countryEdits[row.country_id]) S.countryEdits[row.country_id] = row.data;
+    if(!S.countryEdits[row.country_id]){
+      // Aucune donnée locale : le serveur fait entièrement autorité
+      S.countryEdits[row.country_id] = row.data;
+    } else if(row.data && typeof row.data === 'object'){
+      var local = S.countryEdits[row.country_id];
+      var server = row.data;
+      // Champs critiques pour les calculs de date (Jour X, Aujourd'hui, Ensuite) :
+      // le serveur prime toujours s'il a une valeur — évite que les collaborateurs
+      // voient des jours ou des dates périmées depuis leur localStorage local.
+      if(server.dateStart) local.dateStart = server.dateStart;
+      if(server.dateEnd)   local.dateEnd   = server.dateEnd;
+      if(server.days)      local.days      = server.days;
+      if(server.dates)     local.dates     = server.dates;
+      // Tous les autres champs (tagline, tips, checklist…) : local prime
+      // pour ne pas écraser une saisie en cours sur l'appareil de l'utilisateur.
+    }
   });
   save();
 }
