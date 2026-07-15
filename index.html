@@ -6008,7 +6008,14 @@ function renderAlertsManageCard(c){
   var rows = list.map(function(a, i){
     var text = typeof a==='object' ? a.t : a;
     var url = typeof a==='object' ? a.url : '';
-    return '<div class="info-row" style="cursor:pointer" onclick="editAlertItem(\''+c.id+'\','+i+')"><span class="ir-key">'+escHtml(text)+(url?' <span style="color:var(--accent)">🔗</span>':'')+'</span><span class="ee-del" onclick="event.stopPropagation();removeAlertItem(\''+c.id+'\','+i+')">×</span></div>';
+    var textHtml = url
+      ? '<strong style="background:rgba(45,106,79,0.10);padding:1px 6px;border-radius:4px;font-weight:700">'+escHtml(text)+'</strong>'
+      : escHtml(text);
+    return '<div class="info-row" style="align-items:center;gap:8px"><span class="ir-key" style="flex:1">'+textHtml+'</span>'
+      +'<span style="display:flex;gap:10px;flex-shrink:0">'
+      +'<span style="font-size:12px;font-weight:600;color:var(--accent);cursor:pointer" onclick="editAlertItem(\''+c.id+'\','+i+')">Modifier</span>'
+      +'<span style="font-size:12px;font-weight:600;color:var(--red-muted);cursor:pointer" onclick="removeAlertItem(\''+c.id+'\','+i+')">Supprimer</span>'
+      +'</span></div>';
   }).join('');
   return '<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_alerts\')"><span><span data-icon="triangle-alert" data-icon-size="16"></span> À surveiller</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addAlertItem(\''+c.id+'\')">+</span><span style="transform:rotate('+(alertsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(alertsOpen?(rows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter une alerte.</div>'):'')
