@@ -2473,12 +2473,13 @@ function useCustomPhotoUrl(){
   if(!url || !_photoModalTarget) return;
   setCustomPhoto(_photoModalTarget, url);
 }
-function setCustomPhoto(query, url){
+async function setCustomPhoto(query, url){
   if(!S.customPhotos) S.customPhotos={};
   S.customPhotos[query]=url;
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()}).then(function(){});
+    // await garantit que Supabase a bien la photo avant tout rechargement possible
+    await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()});
   }
   closePhotoPicker();
   document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
@@ -5891,9 +5892,11 @@ function renderAccessManagementScreen(){
     var scopeLabel = (c.scope && c.scope.indexOf('all')>-1) ? 'Tous les pays' : ((c.scope||[]).join(', ')||'Aucun pays');
     var statusLabel = c.user_id ? '' : ' · en attente';
     var label = c.invited_email || c.user_id;
-    var removeBtn = isOwner ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
+    var isMe = (CURRENT_USER && (c.user_id === CURRENT_USER.id || c.invited_email === CURRENT_USER.email));
+    var displayLabel = isMe ? 'Vous' : label;
+    var removeBtn = isOwner && !isMe ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
     return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(label,36)
-      +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(label)+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
+      +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(displayLabel)+(isMe ? '' : '')+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
       +removeBtn+'</div>';
   }).join('');
 
