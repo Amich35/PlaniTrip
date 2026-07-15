@@ -5566,7 +5566,25 @@ async function backToTripSelector() {
   document.getElementById('main-app').style.display = 'none';
   CURRENT_TRIP = null;
   localStorage.removeItem('planitrip_last_trip_id');
-  await checkUserTrips(CURRENT_USER, true);
+  // Fetch trips directly et affiche toujours le sélecteur, sans passer par
+  // checkUserTrips (qui peut auto-entrer un voyage si l'utilisateur n'en a qu'un).
+  try {
+    const { data: ownedTrips } = await sb.from('trips')
+      .select('id, name, owner_id, countries, archived_countries, start_date, end_date')
+      .eq('owner_id', CURRENT_USER.id);
+    const { data: collabRows } = await sb.from('collaborators')
+      .select('trip_id, trips(id, name, owner_id, countries, archived_countries, start_date, end_date)')
+      .eq('user_id', CURRENT_USER.id);
+    const collabTrips = (collabRows || []).map(function(r){ return r.trips; }).filter(Boolean);
+    const allTrips = [...(ownedTrips || []), ...collabTrips];
+    const uniqueTrips = Array.from(new Map(allTrips.map(function(t){ return [t.id, t]; })).values());
+    await loadCountryFlags();
+    if (uniqueTrips.length === 0) { showCreateTripScreen(); return; }
+    showTripSelectorScreen(uniqueTrips);
+  } catch (e) {
+    console.error('[PlaniTrip] backToTripSelector:', e);
+    showCreateTripScreen('Erreur au chargement des voyages.');
+  }
 }
 
 function renderArchivedCountriesScreen(){
