@@ -98,7 +98,7 @@ a{color:var(--ink);}
 .city-accordion.open .city-panel{display:block;}
 
 /* Activity card with map button */
-.act-card{display:flex;align-items:flex-start;gap:var(--sp8);padding:var(--sp12) var(--sp12);border-radius:var(--r16);margin-top:var(--sp8);background:var(--parchment);border:var(--border);position:relative;overflow:hidden;transition:box-shadow 0.15s,transform 0.15s;}
+.act-card{display:flex;align-items:flex-start;gap:var(--sp8);padding:10px var(--sp12);border-radius:var(--r16);margin-top:6px;background:var(--parchment);border:var(--border);position:relative;overflow:hidden;transition:box-shadow 0.15s,transform 0.15s;}
 .act-card.done{opacity:0.35;} .act-card:not(.done):active{transform:scale(0.99);box-shadow:var(--shadow-sm);}
 .act-card.done .act-name{text-decoration:line-through;}
 .act-check{width:24px;height:24px;border-radius:50%;flex-shrink:0;margin-top:0;border:1.5px solid rgba(29,29,31,0.175);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);background:transparent;}
@@ -106,7 +106,7 @@ a{color:var(--ink);}
 .act-body{flex:1;min-width:0;}
 .act-name{font-size:14px;color:var(--ink);font-weight:500;line-height:1.3;letter-spacing:-0.1px;}
 .act-meta{font-size:11px;color:var(--ink-subtle);margin-top:3px;line-height:1.4;}
-.act-footer{display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
+.act-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px;}
 .act-tags{display:flex;gap:4px;flex-wrap:wrap;flex:1;}
 .tag{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:500;letter-spacing:0.2px;}
 .tag-photo{background:#FDF3E3;color:#7A4F1E;border:1px solid rgba(196,131,58,0.2);}
@@ -3229,6 +3229,10 @@ function renderItinerary(c, embedded){
 // ── TRIP STATUS: current day / next transport / tonight's accommodation ──
 var TRANSPORTS=[['jp','kh','Avion'],['kh','th','Bus'],['th','la','Train'],['la','vn','Avion'],['vn','id','Avion'],['id','ph','Avion']];
 function getTripDepartDate(){
+  var firstCountryWithDate = (typeof COUNTRIES !== 'undefined') ? COUNTRIES.find(function(cc){return cc.dateStart;}) : null;
+  if (firstCountryWithDate) {
+    return new Date(firstCountryWithDate.dateStart + 'T00:00:00');
+  }
   if (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) {
     return new Date(CURRENT_TRIP.start_date + 'T00:00:00');
   }
@@ -3302,7 +3306,7 @@ function getCityActivitiesForToday(c, city, todayStr){
 }
 function renderToday(){
   var ts = getTripStatus();
-  var hasDepartDate = !!(typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date);
+  var hasDepartDate = !!(COUNTRIES.find(function(cc){return cc.dateStart;}) || (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date));
   var refOffset = Math.max(0, ts.elapsedDays); // avant le départ : on prévisualise le Jour 1
   var DEPART = getTripDepartDate();
   var refDate = new Date(DEPART); refDate.setDate(refDate.getDate()+refOffset);
@@ -3310,8 +3314,17 @@ function renderToday(){
   var tomorrowDate = new Date(refDate); tomorrowDate.setDate(tomorrowDate.getDate()+1);
   var tomorrowStrRef = tomorrowDate.toISOString().slice(0,10);
   var c = ts.currentCountry;
-  var totalDays=COUNTRIES.reduce(function(s,cc){return s+cc.days;},0);
-  var tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
+  var firstCountryWithDate = COUNTRIES.find(function(cc){return cc.dateStart;});
+  var lastCountryWithDate = null;
+  for(var li=COUNTRIES.length-1; li>=0; li--){ if(COUNTRIES[li].dateEnd){ lastCountryWithDate=COUNTRIES[li]; break; } }
+  var totalDaysKnown = !!(firstCountryWithDate && lastCountryWithDate);
+  var totalDays = 0;
+  if(totalDaysKnown){
+    var spanStart = new Date(firstCountryWithDate.dateStart+'T00:00:00');
+    var spanEnd = new Date(lastCountryWithDate.dateEnd+'T00:00:00');
+    totalDays = Math.round((spanEnd-spanStart)/86400000)+1;
+  }
+  var tripDay=totalDaysKnown ? Math.max(1, Math.min(totalDays, ts.elapsedDays+1)) : 0;
   if(c){
     setTimeout(function(){ fillTodayHeroWeather(c.id); }, 50);
   }
@@ -3353,7 +3366,7 @@ function renderToday(){
   var budgetValueHTML = '<span style="color:'+budgetColor+'">'+fmtEUR(todaySpent)+'</span><span style="color:var(--ink-subtle);font-weight:500;font-size:11px"> / '+fmtEUR(budgetDaily)+'</span>'
     +'<div style="width:36px;height:3px;border-radius:2px;background:var(--sand-deep);margin:3px auto 0;overflow:hidden"><div style="height:100%;width:'+budgetPct+'%;background:'+budgetColor+'"></div></div>';
   var summaryHTML = '<div style="display:flex;background:var(--parchment);border-radius:var(--r22);box-shadow:var(--shadow-sm);margin-bottom:16px;overflow:hidden">'
-    +summaryBadge('calendar', tripDay+'/'+totalDays, 'Jour')
+    +summaryBadge('calendar', totalDaysKnown?(tripDay+'/'+totalDays):'<span style="font-size:11px">À renseigner</span>', 'Jour')
     +summaryBadge('sun', '<span id="today-hero-temp">···</span>', 'Météo')
     +summaryBadge('coins', budgetValueHTML, 'Budget')
     +summaryBadge('map-pin', todayActs.length, 'Activité'+(todayActs.length>1?'s':''))
@@ -3630,9 +3643,9 @@ function renderCountryDetailShell(c, innerHtml){
     return s+baseDone+customDone;
   },0);
   var subTabs = [
+    {id:'guide', label:'Infos pratiques'},
     {id:'lieux', label:'Lieux'},
     {id:'carte', label:'Carte'},
-    {id:'guide', label:'Infos pratiques'},
   ];
   var tabsHTML = subTabs.map(function(t){
     return '<button class="cdt-subtab'+(sub===t.id?' active':'')+'" onclick="setCountryDetailTab(\''+t.id+'\')">'+t.label+'</button>';
@@ -3811,7 +3824,7 @@ function renderCountriesScreen(){
       ? c.cities.map(function(ci){return ci.city;}).join(', ')
       : c.cities.slice(0,2).map(function(ci){return ci.city;}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
-    return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')">'
+    return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span>'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
       +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
@@ -4203,7 +4216,7 @@ function renderDocuments(){
         return '<input class="ef-input" style="width:100%" type="text" placeholder="'+f.lbl+'" value="'+val+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)"/>';
       }).join('')+'</div>';
     }
-    var statusText = isLocked && !isOpen ? '🔒 Verrouillé' : (filled?'✓ Renseigné':'Non renseigné');
+    var statusText = isLocked && !isOpen ? 'Verrouillé' : (filled?'✓ Renseigné':'Non renseigné');
     var lockBtn = isLockable ? '<span onclick="event.stopPropagation();toggleDocLock(\''+d.id+'\')" style="padding:4px;color:'+(isLocked?'var(--accent)':'var(--ink-subtle)')+'">'+svgIcon(isLocked?'lock':'unlock',16)+'</span>' : '';
     return '<div class="info-card doc-card"><div class="doc-card-head" onclick="toggleDocOpen(\''+d.id+'\')"><span class="doc-card-icon">'+svgIcon(d.icon,20)+'</span><div style="flex:1"><div class="doc-card-title">'+d.label+'</div><div class="status-sub">'+statusText+'</div></div>'+lockBtn+'<span style="color:var(--ink-subtle)">'+(isOpen?'▾':'▸')+'</span></div>'+body+'</div>';
   }).join('');
@@ -5398,7 +5411,7 @@ async function backToTripSelector() {
   document.getElementById('main-app').style.display = 'none';
   CURRENT_TRIP = null;
   localStorage.removeItem('planitrip_last_trip_id');
-  await checkUserTrips(CURRENT_USER);
+  await checkUserTrips(CURRENT_USER, true);
 }
 
 function renderArchivedCountriesScreen(){
@@ -5914,6 +5927,8 @@ function confirmResolve(ok) {
 // ── PIN SYSTEM ────────────────────────────────────────────────
 var _pinEntry = '';
 var _pinCallback = null;
+var _pinMode = 'verify'; // 'verify' | 'setNew' | 'confirmNew'
+var _pinNewValue = '';
 var DEFAULT_PIN = '2026';
 
 function _pinUpdateDots() {
@@ -5934,21 +5949,47 @@ function pinPress(key) {
   _pinUpdateDots();
   document.getElementById('pinError').textContent = '';
   if(_pinEntry.length === 4) {
-    var correct = S.pin || DEFAULT_PIN;
-    if(_pinEntry === correct) {
-      document.getElementById('pinOverlay').classList.remove('open');
+    if(_pinMode === 'verify'){
+      var correct = S.pin || DEFAULT_PIN;
+      if(_pinEntry === correct) {
+        document.getElementById('pinOverlay').classList.remove('open');
+        _pinEntry = '';
+        _pinUpdateDots();
+        if(_pinCallback) { _pinCallback(); _pinCallback = null; }
+      } else {
+        document.getElementById('pinError').textContent = 'Code incorrect';
+        setTimeout(function(){ _pinEntry=''; _pinUpdateDots(); }, 600);
+      }
+    } else if(_pinMode === 'setNew'){
+      _pinNewValue = _pinEntry;
       _pinEntry = '';
+      _pinMode = 'confirmNew';
+      document.getElementById('pinSub').textContent = 'Confirme ton nouveau code';
       _pinUpdateDots();
-      if(_pinCallback) { _pinCallback(); _pinCallback = null; }
-    } else {
-      document.getElementById('pinError').textContent = 'Code incorrect';
-      setTimeout(function(){ _pinEntry=''; _pinUpdateDots(); }, 600);
+    } else if(_pinMode === 'confirmNew'){
+      if(_pinEntry === _pinNewValue){
+        S.pin = _pinEntry;
+        save();
+        document.getElementById('pinOverlay').classList.remove('open');
+        _pinEntry=''; _pinNewValue=''; _pinMode='verify';
+        _pinUpdateDots();
+        renderContent();
+      } else {
+        document.getElementById('pinError').textContent = 'Les deux codes ne correspondent pas, recommence';
+        setTimeout(function(){
+          _pinEntry=''; _pinNewValue=''; _pinMode='setNew';
+          document.getElementById('pinSub').textContent = 'Choisis ton nouveau code à 4 chiffres';
+          _pinUpdateDots();
+        }, 900);
+      }
     }
   }
 }
 
 function requirePin(callback) {
   _pinEntry = '';
+  _pinMode = 'verify';
+  document.getElementById('pinSub').textContent = 'Entre ton code pour accéder aux réglages';
   _pinUpdateDots();
   document.getElementById('pinError').textContent = '';
   document.getElementById('pinOverlay').classList.add('open');
@@ -5956,14 +5997,13 @@ function requirePin(callback) {
 }
 function changePinFlow(){
   requirePin(function(){
-    var newPin = prompt('Nouveau code à 4 chiffres :');
-    if(newPin===null) return;
-    newPin = newPin.trim();
-    if(!/^\d{4}$/.test(newPin)){ alert('Le code doit contenir exactement 4 chiffres.'); return; }
-    S.pin = newPin;
-    save();
-    alert('PIN mis à jour sur cet appareil.');
-    renderContent();
+    _pinEntry = '';
+    _pinNewValue = '';
+    _pinMode = 'setNew';
+    document.getElementById('pinSub').textContent = 'Choisis ton nouveau code à 4 chiffres';
+    document.getElementById('pinError').textContent = '';
+    _pinUpdateDots();
+    document.getElementById('pinOverlay').classList.add('open');
   });
 }
 
@@ -6099,7 +6139,7 @@ async function initAuth() {
       document.getElementById('auth-step-set-password').style.display = 'block';
     } else if (session) {
       LAST_HANDLED_USER_ID = session.user.id;
-      onAuthenticated(session.user);
+      onAuthenticated(session.user, false);
     } else {
       showAuthScreen();
     }
@@ -6117,7 +6157,7 @@ async function initAuth() {
         if (IN_PASSWORD_RECOVERY) return; // en cours de définition de mot de passe : ne pas naviguer
         if (CURRENT_TRIP && LAST_HANDLED_USER_ID === session.user.id) return; // vrai retour d'onglet : même session déjà chargée, on ignore
         LAST_HANDLED_USER_ID = session.user.id;
-        onAuthenticated(session.user);
+        onAuthenticated(session.user, true);
       } else if (event === 'SIGNED_OUT') {
         CURRENT_TRIP = null;
         LAST_HANDLED_USER_ID = null;
@@ -6134,7 +6174,7 @@ function showAuthScreen() {
   document.getElementById('main-app').style.display = 'none';
 }
 
-async function onAuthenticated(user) {
+async function onAuthenticated(user, freshLogin) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'none';
   if (sb) {
@@ -6151,12 +6191,12 @@ async function onAuthenticated(user) {
       sb.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id).then(function(){});
     } catch(e) { console.warn('[PlaniTrip] profile check failed:', e); }
   }
-  checkUserTrips(user);
+  checkUserTrips(user, freshLogin);
 }
 
 // ---- Trips: routing post-connexion ----
 
-async function checkUserTrips(user) {
+async function checkUserTrips(user, freshLogin) {
   CURRENT_USER = user;
   try {
     if (sb) { try { await sb.rpc('claim_pending_invitations'); } catch(e) { console.warn('[PlaniTrip] claim_pending_invitations:', e); } }
@@ -6186,7 +6226,7 @@ async function checkUserTrips(user) {
     } else if (uniqueTrips.length === 1) {
       await loadCountryFlags();
       try {
-        enterTrip(uniqueTrips[0], true);
+        enterTrip(uniqueTrips[0], !!freshLogin);
       } catch (renderErr) {
         console.error('[PlaniTrip trips] erreur d\'affichage (trip conservé):', renderErr);
         alert("Une erreur d'affichage est survenue, mais ton voyage est bien là. Recharge la page — si le problème persiste, préviens André.");
@@ -6197,7 +6237,7 @@ async function checkUserTrips(user) {
       const lastTrip = uniqueTrips.find(t => t.id === lastTripId);
       if (lastTrip) {
         await loadCountryFlags();
-        try { enterTrip(lastTrip, true); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
+        try { enterTrip(lastTrip, !!freshLogin); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
         return;
       }
       showTripSelectorScreen(uniqueTrips);
