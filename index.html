@@ -2799,53 +2799,78 @@ function editCountryField(countryId, field, value){
   saveCountryEdit(countryId);
 }
 function addGuideListItem(countryId, listField, promptLabel){
+  if(listField==='tips'||listField==='checklist'){
+    openGuideItemModal(countryId, listField, null); return;
+  }
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
   if(listField==='emergency'){
     var k = prompt('Nom (ex: Police, Ambulance) :');
-    if(!k || !k.trim()) return;
+    if(!k||!k.trim()) return;
     var v = prompt('Numéro pour '+k.trim()+' :');
-    if(!v || !v.trim()) return;
+    if(!v||!v.trim()) return;
     if(!c.practical.emergency) c.practical.emergency=[];
-    c.practical.emergency.push({k:stripHtml(k.trim()), v:stripHtml(v.trim())});
-    saveCountryEdit(countryId);
-    renderContent();
-    return;
+    c.practical.emergency.push({k:stripHtml(k.trim()),v:stripHtml(v.trim())});
+    saveCountryEdit(countryId); renderContent();
   }
-  var val = prompt(promptLabel);
-  if(!val || !val.trim()) return;
-  if(listField==='tips'){ c.practical.tips.push(stripHtml(val.trim())); }
-  else if(listField==='checklist'){
-    var cat = prompt('Catégorie (Santé / Équipement / Documents / Argent / Vêtements / Autre — laisser vide si aucune) :');
-    var prefix = (cat && cat.trim()) ? '['+cat.trim()+'] ' : '';
-    if(!c.practical.checklist) c.practical.checklist=[];
-    c.practical.checklist.push(prefix+stripHtml(val.trim()));
-  }
-  saveCountryEdit(countryId);
-  renderContent();
 }
 function editGuideListItem(countryId, listField, idx){
+  if(listField==='tips'||listField==='checklist'){
+    openGuideItemModal(countryId, listField, idx); return;
+  }
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
-  if(listField==='tips'){
-    var current = c.practical.tips[idx];
-    var val = prompt('Modifier le conseil :', current);
-    if(!val || !val.trim()) return;
-    c.practical.tips[idx] = stripHtml(val.trim());
-  } else if(listField==='emergency'){
+  if(listField==='emergency'){
     var currentE = c.practical.emergency[idx];
     var k = prompt('Nom (ex: Police, Ambulance) :', currentE.k);
-    if(!k || !k.trim()) return;
+    if(!k||!k.trim()) return;
     var v = prompt('Numéro pour '+k.trim()+' :', currentE.v);
-    if(!v || !v.trim()) return;
-    c.practical.emergency[idx] = {k:stripHtml(k.trim()), v:stripHtml(v.trim())};
-  } else if(listField==='checklist'){
-    var currentItem = c.practical.checklist[idx];
-    var valC = prompt('Modifier l\'item :', currentItem);
-    if(!valC || !valC.trim()) return;
-    c.practical.checklist[idx] = stripHtml(valC.trim());
-  } else return;
-  saveCountryEdit(countryId);
+    if(!v||!v.trim()) return;
+    c.practical.emergency[idx] = {k:stripHtml(k.trim()),v:stripHtml(v.trim())};
+    saveCountryEdit(countryId); renderContent();
+  }
+}
+var _guideModalCountryId=null, _guideModalListField=null, _guideModalIdx=null;
+function openGuideItemModal(countryId, listField, idx){
+  _guideModalCountryId=countryId;
+  _guideModalListField=listField;
+  _guideModalIdx=(idx!==undefined&&idx!==null)?idx:null;
+  var c=COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return;
+  var isEdit=_guideModalIdx!==null;
+  var isTip=listField==='tips';
+  var cats=isTip?TIP_CATEGORIES:_CL_KNOWN_CATS;
+  var currentItem=isEdit
+    ?(isTip?normalizeTipItem(c.practical.tips[_guideModalIdx]):normalizeClItem(c.practical.checklist[_guideModalIdx]))
+    :{t:'',cat:cats[0]};
+  var catOpts=cats.map(function(cat){return '<option value="'+escHtml(cat)+'"'+(currentItem.cat===cat?' selected':'')+'>'+escHtml(cat)+'</option>';}).join('');
+  document.getElementById('guideItemModalTitle').textContent=isEdit?'Modifier':(isTip?'Nouveau conseil':'Nouvel item');
+  document.getElementById('guideItemModalBody').innerHTML=
+    '<div class="ef-row" style="margin-bottom:8px"><select class="ef-select" id="guideModalCatSel" style="width:100%">'+catOpts+'</select></div>'
+    +'<div class="ef-row"><textarea class="ef-input" id="guideModalText" rows="3" placeholder="'+(isTip?'Conseil…':'À préparer…')+'" style="width:100%;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5">'+escHtml(currentItem.t||'')+'</textarea></div>';
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function closeGuideItemModal(){
+  document.getElementById('guideItemModal').classList.remove('open');
+}
+function saveGuideItem(){
+  var text=((document.getElementById('guideModalText')||{}).value||'').trim();
+  var cat=(document.getElementById('guideModalCatSel')||{}).value||'Autre';
+  var c=COUNTRIES.find(function(co){return co.id===_guideModalCountryId;});
+  if(!c||!text){closeGuideItemModal();return;}
+  var newItem={t:stripHtml(text),cat:cat};
+  var isTip=_guideModalListField==='tips';
+  if(isTip){
+    if(!c.practical.tips) c.practical.tips=[];
+    if(_guideModalIdx!==null) c.practical.tips[_guideModalIdx]=newItem;
+    else c.practical.tips.push(newItem);
+  } else {
+    if(!c.practical.checklist) c.practical.checklist=[];
+    if(_guideModalIdx!==null) c.practical.checklist[_guideModalIdx]=newItem;
+    else c.practical.checklist.push(newItem);
+  }
+  saveCountryEdit(_guideModalCountryId);
+  closeGuideItemModal();
   renderContent();
 }
 function removeGuideListItem(countryId, listField, idx){
@@ -4614,10 +4639,10 @@ function toggleAccordion(key){
 var _CL_KNOWN_CATS = ['Santé','Équipement','Documents','Argent','Vêtements','Autre'];
 
 function clItemDisplayText(item){
-  // Supprime le préfixe [Catégorie] s'il s'agit d'une catégorie reconnue uniquement
-  // => évite de stripper [texte](url) quand ce n'est pas un badge
-  return item.replace(/^\[([^\]]+)\]\s*/, function(m, cat){
-    return _CL_KNOWN_CATS.indexOf(cat) > -1 ? '' : m;
+  // Gère format objet {t,cat} (nouveau) et chaîne "[Catégorie] texte" (ancien)
+  if(typeof item==='object'&&item!==null&&item.t!==undefined) return item.t;
+  return String(item||'').replace(/^\[([^\]]+)\]\s*/,function(m,cat){
+    return _CL_KNOWN_CATS.indexOf(cat)>-1?'':m;
   });
 }
 
@@ -4640,9 +4665,33 @@ function parseLinks(text){
 }
 // ────────────────────────────────────────────────────────────────────────────
 
+// ── Catégories Conseils et Checklist ─────────────────────────────────────────
+var TIP_CATEGORIES = ['Incontournable','Transport','Santé','Argent','Restauration','Hébergement','Culture','Sécurité','Bon plan','Autre'];
+var TIP_CAT_COLORS  = {'Incontournable':'#2D6A4F','Transport':'#4D96FF','Santé':'#E76F51','Argent':'#F4A261','Restauration':'#95D5B2','Hébergement':'#6E6E73','Culture':'#9B5DE5','Sécurité':'#c0392b','Bon plan':'#27ae60','Autre':'#6E6E73'};
+var _CL_CAT_COLORS  = {'Santé':'#E76F51','Équipement':'#4D96FF','Documents':'#2D6A4F','Argent':'#F4A261','Vêtements':'#95D5B2','Autre':'#6E6E73'};
+function normalizeTipItem(item){
+  if(typeof item==='object'&&item!==null&&item.t!==undefined) return item;
+  return {t:String(item||''),cat:'Autre'};
+}
+function normalizeClItem(item){
+  if(typeof item==='object'&&item!==null&&item.t!==undefined) return item;
+  var s=String(item||'');
+  var m=s.match(/^\[([^\]]+)\]\s*(.*)/);
+  if(m&&_CL_KNOWN_CATS.indexOf(m[1])>-1) return {t:m[2],cat:m[1]};
+  return {t:s,cat:'Autre'};
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function renderGuide(c){
   const p=c.practical;
-  const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')"><span class="ir-key">'+escHtml(t)+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
+  const tipRows=p.tips.map(function(rawItem,i){
+    var obj=normalizeTipItem(rawItem);
+    var cc=TIP_CAT_COLORS[obj.cat]||'#6E6E73';
+    return '<div class="info-row guide-editable-row" style="cursor:pointer;align-items:flex-start;gap:8px" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')">'  
+      +'<div style="flex:1"><div class="ir-key" style="margin-bottom:2px">'+escHtml(obj.t)+'</div>'
+      +'<div style="font-size:11px;font-weight:600;color:'+cc+'">'+escHtml(obj.cat)+'</div></div>'
+      +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';
+  }).join('');
   const isEmpty = !c.currency && !c.visa && !c.tagline;
   const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   const tipsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_tips']);
@@ -4651,17 +4700,24 @@ function renderGuide(c){
   const emergRows=p.emergency.map(function(e,i){return '<div class="info-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'emergency\','+i+')"><span class="ir-key">'+e.k+'</span><span style="display:flex;align-items:center;gap:8px"><span class="ir-val" style="color:var(--red-muted)">'+e.v+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'emergency\','+i+')">×</span></span></div>';}).join('');
   const CL_CATEGORY_COLORS = {'Santé':'#E76F51','Équipement':'#4D96FF','Documents':'#2D6A4F','Argent':'#F4A261','Vêtements':'#95D5B2','Autre':'#6E6E73'};
   function clCategoryBadge(item){
-    var m = item.match(/^\[([^\]]+)\]/);
-    if(!m) return '';
-    var cat=m[1];
-    if(_CL_KNOWN_CATS.indexOf(cat) === -1) return ''; // évite un badge sur [source](url)
-    var color=CL_CATEGORY_COLORS[cat]||CL_CATEGORY_COLORS['Autre'];
-    return '<span style="font-size:10px;font-weight:700;color:'+color+';background:'+color+'22;border-radius:4px;padding:1px 5px;margin-right:5px">'+escHtml(cat)+'</span>';
+    var cat;
+    if(typeof item==='object'&&item!==null&&item.cat){cat=item.cat;}
+    else{var m2=String(item||'').match(/^\[([^\]]+)\]/);if(!m2)return '';cat=m2[1];}
+    if(_CL_KNOWN_CATS.indexOf(cat)===-1)return '';
+    var color=_CL_CAT_COLORS[cat]||_CL_CAT_COLORS['Autre'];
+    return '<span style="font-size:10px;font-weight:700;color:'+color+';background:'+color+'22;border-radius:4px;padding:1px 5px">'+escHtml(cat)+'</span>';
   }
   function clItemText(item){ return clItemDisplayText(item); }
   const clItems=p.checklist.map(function(item,i){
     const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
-    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'+clCategoryBadge(item)+parseLinks(clItemText(item))+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
+    var badge=clCategoryBadge(item);
+    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0">'
+      +'<div class="ci-box" style="margin-top:2px" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div>'
+      +'<div style="flex:1;cursor:pointer;min-width:0" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'  
+      +'<div class="ci-text">'+parseLinks(clItemText(item))+'</div>'
+      +(badge?'<div style="margin-top:3px">'+badge+'</div>':'')
+      +'</div>'
+      +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
   }).join('');
   const clDone=p.checklist.filter(function(_,i){return !!S.checklist[c.id+'_cl_'+i];}).length;
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
@@ -7434,6 +7490,18 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <button class="modal-cta" onclick="useCustomPhotoUrl()" style="margin-bottom:8px">Utiliser cette URL</button>
     <button class="modal-cancel-btn" id="photoResetBtn" onclick="resetCustomPhoto()" style="display:none;color:var(--red-muted);margin-bottom:4px">↩ Revenir à la photo automatique</button>
     <button class="modal-cancel-btn" onclick="closePhotoPicker()">Annuler</button>
+  </div>
+</div>
+<!-- Guide item modal (conseils + checklist) -->
+<div class="share-modal" id="guideItemModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="guideItemModalTitle" style="font-size:18px">Nouveau conseil</div>
+    <div id="guideItemModalBody"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="modal-cancel-btn" onclick="closeGuideItemModal()" style="flex:1">Annuler</button>
+      <button class="modal-cta" onclick="saveGuideItem()" style="flex:1">Enregistrer</button>
+    </div>
   </div>
 </div>
 <!-- Country management modal -->
