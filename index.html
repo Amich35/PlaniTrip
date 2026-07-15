@@ -2811,7 +2811,8 @@ function addGuideListItem(countryId, listField, promptLabel){
     renderContent();
     return;
   }
-  var val = prompt(promptLabel);
+  var linkHint = (listField==='tips' || listField==='checklist') ? '\n\nPour un lien : [texte](https://url)' : '';
+  var val = prompt(promptLabel + linkHint);
   if(!val || !val.trim()) return;
   if(listField==='tips'){ c.practical.tips.push(stripHtml(val.trim())); }
   else if(listField==='checklist'){
@@ -2828,7 +2829,7 @@ function editGuideListItem(countryId, listField, idx){
   if(!c) return;
   if(listField==='tips'){
     var current = c.practical.tips[idx];
-    var val = prompt('Modifier le conseil :', current);
+    var val = prompt('Modifier le conseil :\n\nPour un lien : [texte](https://url)', current);
     if(!val || !val.trim()) return;
     c.practical.tips[idx] = stripHtml(val.trim());
   } else if(listField==='emergency'){
@@ -2840,7 +2841,7 @@ function editGuideListItem(countryId, listField, idx){
     c.practical.emergency[idx] = {k:stripHtml(k.trim()), v:stripHtml(v.trim())};
   } else if(listField==='checklist'){
     var currentItem = c.practical.checklist[idx];
-    var valC = prompt('Modifier l\'item :', currentItem);
+    var valC = prompt('Modifier l\'item :\n\nPour un lien : [texte](https://url)', currentItem);
     if(!valC || !valC.trim()) return;
     c.practical.checklist[idx] = stripHtml(valC.trim());
   } else return;
@@ -3507,7 +3508,7 @@ function renderToday(){
     var sorted = allItems.slice().sort(function(a,b){return (a.checked?1:0)-(b.checked?1:0);});
     var shown = sorted.slice(0,3);
     var forgetHTML = shown.map(function(u){
-      return '<div class="check-item'+(u.checked?' checked':'')+'" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box">'+(u.checked?'✓':'')+'</div><span class="ci-text">'+escHtml(u.item)+'</span></div>';
+      return '<div class="check-item'+(u.checked?' checked':'')+'" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box">'+(u.checked?'✓':'')+'</div><span class="ci-text">'+parseLinks(clItemDisplayText(u.item))+'</span></div>';
     }).join('');
     var seeAllLink = c.practical.checklist.length>3 ? '<div style="text-align:right;margin-top:4px"><span style="font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">Voir toute la checklist →</span></div>' : '';
     var doneMsg = uncheckedCount===0 ? '<div class="status-sub" style="padding:4px 0 8px">Tout est prêt 🎉</div>' : '';
@@ -4607,9 +4608,39 @@ function toggleAccordion(key){
   S.uiAccordion[key]=!S.uiAccordion[key];
   save(); renderContent();
 }
+// ── Helpers liens cliquables dans tips/checklist ────────────────────────────
+var _CL_KNOWN_CATS = ['Santé','Équipement','Documents','Argent','Vêtements','Autre'];
+
+function clItemDisplayText(item){
+  // Supprime le préfixe [Catégorie] s'il s'agit d'une catégorie reconnue uniquement
+  // => évite de stripper [texte](url) quand ce n'est pas un badge
+  return item.replace(/^\[([^\]]+)\]\s*/, function(m, cat){
+    return _CL_KNOWN_CATS.indexOf(cat) > -1 ? '' : m;
+  });
+}
+
+function parseLinks(text){
+  // Convertit [texte](https://url) en lien cliquable.
+  // Seuls http:// et https:// sont autorisés ; tout le reste est échappé par escHtml.
+  if(!text) return '';
+  var result = '', lastIdx = 0, m;
+  var re = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+  re.lastIndex = 0;
+  while((m = re.exec(text)) !== null){
+    result += escHtml(text.slice(lastIdx, m.index));
+    result += '<a href="'+escHtml(m[2])+'" target="_blank" rel="noopener" '
+            + 'style="color:var(--accent);font-weight:600;text-decoration:underline">'
+            + escHtml(m[1])+'</a>';
+    lastIdx = m.index + m[0].length;
+  }
+  result += escHtml(text.slice(lastIdx));
+  return result;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 function renderGuide(c){
   const p=c.practical;
-  const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')"><span class="ir-key">'+escHtml(t)+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
+  const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')"><span class="ir-key">'+parseLinks(t)+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
   const isEmpty = !c.currency && !c.visa && !c.tagline;
   const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   const tipsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_tips']);
@@ -4620,13 +4651,15 @@ function renderGuide(c){
   function clCategoryBadge(item){
     var m = item.match(/^\[([^\]]+)\]/);
     if(!m) return '';
-    var cat=m[1]; var color=CL_CATEGORY_COLORS[cat]||CL_CATEGORY_COLORS['Autre'];
+    var cat=m[1];
+    if(_CL_KNOWN_CATS.indexOf(cat) === -1) return ''; // évite un badge sur [source](url)
+    var color=CL_CATEGORY_COLORS[cat]||CL_CATEGORY_COLORS['Autre'];
     return '<span style="font-size:10px;font-weight:700;color:'+color+';background:'+color+'22;border-radius:4px;padding:1px 5px;margin-right:5px">'+escHtml(cat)+'</span>';
   }
-  function clItemText(item){ return item.replace(/^\[[^\]]+\]\s*/,''); }
+  function clItemText(item){ return clItemDisplayText(item); }
   const clItems=p.checklist.map(function(item,i){
     const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
-    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'+clCategoryBadge(item)+escHtml(clItemText(item))+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
+    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'+clCategoryBadge(item)+parseLinks(clItemText(item))+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
   }).join('');
   const clDone=p.checklist.filter(function(_,i){return !!S.checklist[c.id+'_cl_'+i];}).length;
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
