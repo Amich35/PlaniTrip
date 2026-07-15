@@ -5416,12 +5416,27 @@ async function deleteMyAccount(){
   var errEl = document.getElementById('delete-account-error');
   errEl.style.display='none';
   if(!sb || !CURRENT_USER){ errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
-  showConfirm('Supprimer définitivement ton compte ? Tu seras déconnecté immédiatement.', async function(){
+  showConfirm('Supprimer définitivement ton compte ? Cette action est irréversible et tu seras déconnecté immédiatement.', async function(){
     var btn = document.getElementById('delete-account-btn');
     if(btn){ btn.disabled=true; btn.textContent='Suppression...'; }
-    const { error } = await sb.from('profiles').upsert({ id: CURRENT_USER.id, email: CURRENT_USER.email, status: 'deleted', deleted_at: new Date().toISOString() });
-    if(error){
-      errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block';
+    try{
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if(!token){ throw new Error('Session introuvable, reconnecte-toi et réessaie.'); }
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/delete-account', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      const result = await resp.json();
+      if(!resp.ok || result.error){
+        throw new Error(result.error || 'Erreur inconnue');
+      }
+    } catch(e){
+      errEl.textContent = 'Erreur : ' + e.message; errEl.style.display='block';
       if(btn){ btn.disabled=false; btn.textContent='Supprimer mon compte'; }
       return;
     }
