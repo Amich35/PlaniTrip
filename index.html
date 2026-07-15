@@ -4143,17 +4143,22 @@ function computeFinalSplits(total, participants, overrides){
 }
 function toggleSplitParticipant(idx){
   var p = SPLIT_PEOPLE_CACHE[idx];
+  if(p===undefined) return;
   if(!S.expParticipants) S.expParticipants = getPeopleList().slice();
   var i2 = S.expParticipants.indexOf(p);
   if(i2>-1){ S.expParticipants.splice(i2,1); if(S.expSplitOverrides) delete S.expSplitOverrides[p]; }
   else S.expParticipants.push(p);
+  var checked = S.expParticipants.indexOf(p)>-1;
+  // MAJ visuelle directe — aucun re-render, juste le cercle et la cellule montant
+  var circle = document.getElementById('splitCircle_'+idx);
+  if(circle){
+    circle.style.background = checked ? 'var(--accent)' : 'var(--sand-deep)';
+    circle.textContent = checked ? '✓' : '';
+  }
+  var cell = document.getElementById('splitAmtCell_'+idx);
+  if(cell) cell.style.display = checked ? 'flex' : 'none';
   save();
-  // MAJ ciblée du container split (préserve les autres champs de la modale)
-  var wrap = document.getElementById('splitRowsWrap');
-  if(wrap){
-    var eAmtEl = document.getElementById('eAmt');
-    wrap.outerHTML = renderSplitRows(eAmtEl ? eAmtEl.value : (S.expAmt||''));
-  } else { refreshExpenseModal(); }
+  refreshSplitAmounts();
 }
 function onSplitInput(idx, val){
   var p = SPLIT_PEOPLE_CACHE[idx];
@@ -4184,11 +4189,11 @@ function renderSplitRows(totalAmtStr){
     var val = checked ? fmtSplitNum(computed[p]!==undefined?computed[p]:0) : '0,00';
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;'+(idx<people.length-1?'border-bottom:1px solid var(--sand-deep);':'')+'">'
       +'<span onclick="toggleSplitParticipant('+idx+')" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0">'
-      +'<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:#fff;font-size:11px">'+(checked?'✓':'')+'</span>'
+      +'<span id="splitCircle_'+idx+'" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:#fff;font-size:11px;transition:background 0.15s">'+(checked?'✓':'')+'</span>'
       +'<span style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p)+'</span></span>'
-      +(checked
-        ? ('<span style="display:flex;align-items:center;gap:2px;flex-shrink:0"><input id="splitAmt_'+idx+'" type="text" inputmode="decimal" value="'+val+'" style="width:60px;text-align:right;border:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink);padding:0" oninput="onSplitInput('+idx+',this.value)"/><span style="font-size:13px;color:var(--ink-subtle)">€</span></span>')
-        : '<span style="font-size:13px;color:var(--ink-subtle);flex-shrink:0">0,00 €</span>')
+      +'<span id="splitAmtCell_'+idx+'" style="display:'+(checked?'flex':'none')+';align-items:center;gap:2px;flex-shrink:0">'
+      +'<input id="splitAmt_'+idx+'" type="text" inputmode="decimal" value="'+val+'" style="width:60px;text-align:right;border:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink);padding:0" oninput="onSplitInput('+idx+',this.value)"/>'
+      +'<span style="font-size:13px;color:var(--ink-subtle)">€</span></span>'
       +'</div>';
   }).join('');
   return '<div id="splitRowsWrap" class="ef-row" style="flex-direction:column;align-items:stretch;padding:2px 0 0">'
