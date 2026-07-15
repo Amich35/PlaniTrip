@@ -2558,9 +2558,19 @@ function removeDay(ck) {
   if(idx>-1) days.splice(idx,1);
   if(S.activeDay[ck]===last) S.activeDay[ck]= days.length>1 ? days[days.length-1] : 'Tous';
   save(); renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
+  }
 }
 function setActiveDay(ck, day) { S.activeDay[ck]=day; save(); renderContent(); }
-function assignDay(actKey, ck, day) { S.actDay[actKey]=day; save(); renderContent(); }
+function assignDay(actKey, ck, day) {
+  S.actDay[actKey]=day;
+  save();
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
+  }
+}
 
 function renderDayTabs(ck) {
   const days = getDays(ck);
@@ -3575,6 +3585,9 @@ function setActivityDate(actKey, dateVal){
   if(dateVal) S.actDate[actKey]=dateVal; else delete S.actDate[actKey];
   save();
   renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()}).then(function(){});
+  }
 }
 
 // ── COUNTRY STATUS (done / current / upcoming) ──────────────────
@@ -6573,7 +6586,14 @@ async function loadActivityDetails(){
   var {data} = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(!window._customDetails) window._customDetails={};
   (data||[]).forEach(function(row){
-    if(!window._customDetails[row.detail_key]) window._customDetails[row.detail_key] = row.data;
+    // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
+    if(row.detail_key === '__planitrip__actDate'){
+      if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
+    } else if(row.detail_key === '__planitrip__actDay'){
+      if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
+    } else {
+      if(!window._customDetails[row.detail_key]) window._customDetails[row.detail_key] = row.data;
+    }
   });
   S.customDetails = window._customDetails;
   save();
