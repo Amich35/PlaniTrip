@@ -2812,8 +2812,7 @@ function addGuideListItem(countryId, listField, promptLabel){
     renderContent();
     return;
   }
-  var linkHint = (listField==='tips' || listField==='checklist') ? '\n\nPour un lien : [texte](https://url)' : '';
-  var val = prompt(promptLabel + linkHint);
+  var val = prompt(promptLabel);
   if(!val || !val.trim()) return;
   if(listField==='tips'){ c.practical.tips.push(stripHtml(val.trim())); }
   else if(listField==='checklist'){
@@ -2830,7 +2829,7 @@ function editGuideListItem(countryId, listField, idx){
   if(!c) return;
   if(listField==='tips'){
     var current = c.practical.tips[idx];
-    var val = prompt('Modifier le conseil :\n\nPour un lien : [texte](https://url)', current);
+    var val = prompt('Modifier le conseil :', current);
     if(!val || !val.trim()) return;
     c.practical.tips[idx] = stripHtml(val.trim());
   } else if(listField==='emergency'){
@@ -2842,7 +2841,7 @@ function editGuideListItem(countryId, listField, idx){
     c.practical.emergency[idx] = {k:stripHtml(k.trim()), v:stripHtml(v.trim())};
   } else if(listField==='checklist'){
     var currentItem = c.practical.checklist[idx];
-    var valC = prompt('Modifier l\'item :\n\nPour un lien : [texte](https://url)', currentItem);
+    var valC = prompt('Modifier l\'item :', currentItem);
     if(!valC || !valC.trim()) return;
     c.practical.checklist[idx] = stripHtml(valC.trim());
   } else return;
@@ -4121,7 +4120,7 @@ function toggleSplitParticipant(idx){
   var i2 = S.expParticipants.indexOf(p);
   if(i2>-1){ S.expParticipants.splice(i2,1); if(S.expSplitOverrides) delete S.expSplitOverrides[p]; }
   else S.expParticipants.push(p);
-  save(); refreshExpenseModal();
+  save(); renderContent();
 }
 function onSplitInput(idx, val){
   var p = SPLIT_PEOPLE_CACHE[idx];
@@ -4643,7 +4642,7 @@ function parseLinks(text){
 
 function renderGuide(c){
   const p=c.practical;
-  const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')"><span class="ir-key">'+parseLinks(t)+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
+  const tipRows=p.tips.map(function(t,i){return '<div class="info-row guide-editable-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')"><span class="ir-key">'+escHtml(t)+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';}).join('');
   const isEmpty = !c.currency && !c.visa && !c.tagline;
   const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
   const tipsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_tips']);
@@ -4716,7 +4715,7 @@ function getRate(c){ return (S.customRates && S.customRates[c.id]) || c.rateNum 
 function renderConverterCard(c){
   var rate = getRate(c);
   var dir = S.convDir && S.convDir[c.id] || 'eur';
-  var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 10;
+  var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
   var fromLabel = dir==='eur' ? 'EUR' : c.currency;
   var toLabel = dir==='eur' ? c.currency : 'EUR';
@@ -7089,6 +7088,24 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     return;
   }
 
+  // Distribuer les dates du voyage équitablement entre les pays
+  if(start && end && CT_COUNTRIES.length > 0){
+    var startD = new Date(start+'T00:00:00');
+    var endD   = new Date(end+'T00:00:00');
+    var totalDays = Math.round((endD - startD)/86400000)+1;
+    var perC = Math.floor(totalDays / CT_COUNTRIES.length);
+    var extras = totalDays - perC * CT_COUNTRIES.length;
+    var settingsRows = CT_COUNTRIES.map(function(cid, i){
+      var offset = i * perC + Math.min(i, extras);
+      var cDays  = perC + (i < extras ? 1 : 0);
+      var cS = new Date(startD); cS.setDate(cS.getDate() + offset);
+      var cE = new Date(cS);    cE.setDate(cE.getDate() + cDays - 1);
+      var ds = cS.toISOString().split('T')[0];
+      var de = cE.toISOString().split('T')[0];
+      return {trip_id: data.id, country_id: cid, data: {dateStart: ds, dateEnd: de, days: cDays, dates: ds+' – '+de}};
+    });
+    try { await sb.from('country_settings').insert(settingsRows); } catch(e){}
+  }
   enterTrip(data, true);
 });
 
