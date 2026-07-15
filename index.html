@@ -2545,18 +2545,35 @@ function addDay(ck) {
   S.activeDay[ck]='J'+num;
   save(); renderContent();
 }
+function removeDay(ck) {
+  const days = getDays(ck);
+  const nonAll = days.filter(d=>d!=='Tous');
+  if(nonAll.length === 0) return;
+  const last = nonAll[nonAll.length-1];
+  // Désassigner les activités qui avaient ce jour
+  Object.keys(S.actDay).forEach(function(k){ if(S.actDay[k]===last && k.indexOf(ck+'_')===0) delete S.actDay[k]; });
+  // Retirer le jour de la liste
+  const idx = days.indexOf(last);
+  if(idx>-1) days.splice(idx,1);
+  if(S.activeDay[ck]===last) S.activeDay[ck]= days.length>1 ? days[days.length-1] : 'Tous';
+  save(); renderContent();
+}
 function setActiveDay(ck, day) { S.activeDay[ck]=day; save(); renderContent(); }
 function assignDay(actKey, ck, day) { S.actDay[actKey]=day; save(); renderContent(); }
 
 function renderDayTabs(ck) {
   const days = getDays(ck);
   const active = S.activeDay[ck]||'Tous';
+  const nonAll = days.filter(d=>d!=='Tous');
   let html = '<div class="day-tabs">';
   days.forEach(function(d){
     const cls = d===active ? 'day-tab active' : 'day-tab';
     html += '<button class="'+cls+'" onclick="setActiveDay(\'' +ck+ '\',\'' +d+ '\')">'+d+'</button>';
   });
-  html += '<button class="day-tab-add" onclick="addDay(\'' +ck+ '\')">＋ Jour</button>';
+  html += '<button class="day-tab-add" onclick="addDay(\'' +ck+ '\')">＋</button>';
+  if(nonAll.length > 0){
+    html += '<button class="day-tab-add" onclick="removeDay(\'' +ck+ '\')" style="background:rgba(192,57,43,0.08);color:var(--red-muted)" title="Supprimer le dernier jour">－</button>';
+  }
   html += '</div>';
   return html;
 }
@@ -2786,7 +2803,12 @@ function addGuideListItem(countryId, listField, promptLabel){
   var val = prompt(promptLabel);
   if(!val || !val.trim()) return;
   if(listField==='tips'){ c.practical.tips.push(stripHtml(val.trim())); }
-  else if(listField==='checklist'){ if(!c.practical.checklist) c.practical.checklist=[]; c.practical.checklist.push(stripHtml(val.trim())); }
+  else if(listField==='checklist'){
+    var cat = prompt('Catégorie (Santé / Équipement / Documents / Argent / Vêtements / Autre — laisser vide si aucune) :');
+    var prefix = (cat && cat.trim()) ? '['+cat.trim()+'] ' : '';
+    if(!c.practical.checklist) c.practical.checklist=[];
+    c.practical.checklist.push(prefix+stripHtml(val.trim()));
+  }
   saveCountryEdit(countryId);
   renderContent();
 }
@@ -2999,10 +3021,24 @@ async function fetchWeather(countryId) {
       const geoRes = await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(country.name)+'&count=1&language=fr');
       const geoJson = await geoRes.json();
       if(geoJson && geoJson.results && geoJson.results[0]){
-        wc = {lat:geoJson.results[0].latitude, lng:geoJson.results[0].longitude};
-        WEATHER_COORDS[countryId] = wc; // mémorisé pour la session, évite de regéocoder à chaque fois
+        wc = {lat:geoJson.results[0].latitude, lng:geoJson.results[0].longitude, name:geoJson.results[0].name};
+        WEATHER_COORDS[countryId] = wc;
       }
     } catch(e){}
+    // Si le nom français n'a rien donné, essai avec le nom en anglais via un second appel
+    if(!wc){
+      try{
+        var nameEn = country.name
+          .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // retire accents
+          .replace(/que$/,'co').replace(/gique$/,'gia').replace(/ie$/,'ia'); // heuristiques simples
+        const geoRes2 = await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(nameEn)+'&count=1&language=en');
+        const geoJson2 = await geoRes2.json();
+        if(geoJson2 && geoJson2.results && geoJson2.results[0]){
+          wc = {lat:geoJson2.results[0].latitude, lng:geoJson2.results[0].longitude, name:geoJson2.results[0].name};
+          WEATHER_COORDS[countryId] = wc;
+        }
+      } catch(e){}
+    }
     if(!wc) return null;
   }
   try {
@@ -3208,7 +3244,7 @@ function renderItinerary(c, embedded){
   const wc=WEATHER_COORDS[c.id];
   const weatherSection='<div class="section"><div class="section-header">'
     +'<div class="section-title">Météo <span class="weather-live-badge">● Live</span></div>'
-    +(wc?'<div class="section-meta">'+wc.name+'</div>':'')
+    +(wc&&wc.name?'<div class="section-meta">'+escHtml(wc.name)+'</div>':'')
     +'</div><div class="weather-row" id="weather-row-'+c.id+'"><span class="weather-loading">Chargement…</span></div></div>';
   setTimeout(function(){loadWeatherSection(c.id);},50);
 
@@ -4260,25 +4296,74 @@ const DOC_TYPES=[
   {id:'visa', icon:'check-square', label:'Visa', fields:[{k:'type',lbl:'Type / pays'},{k:'expiry',lbl:'Validité'},{k:'notes',lbl:'Notes',area:true}]},
   {id:'insurance', icon:'heart-pulse', label:'Assurance', fields:[{k:'provider',lbl:'Assureur'},{k:'policy',lbl:'N° de police'},{k:'notes',lbl:'Contact urgence / notes',area:true}]},
   {id:'tickets', icon:'plane', label:'Billets', fields:[{k:'notes',lbl:'Notes',area:true}]},
+  {id:'vaccines', icon:'syringe', label:'Vaccins', fields:[]},
 ];
+function renderVaccinesBlock(){
+  if(!S.vaccines) S.vaccines=[];
+  var rows = S.vaccines.map(function(v,i){
+    return '<div class="info-row" style="align-items:flex-start;flex-direction:column;gap:2px;padding:8px 0">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;width:100%">'
+      +'<span style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(v.name)+'</span>'
+      +'<div style="display:flex;gap:8px">'
+      +'<span class="ee-del" style="color:var(--accent)" onclick="editVaccine('+i+')">✎</span>'
+      +'<span class="ee-del" onclick="removeVaccine('+i+')">×</span>'
+      +'</div></div>'
+      +(v.maker?'<span style="font-size:12px;color:var(--ink-subtle)">'+escHtml(v.maker)+'</span>':'')
+      +(v.date?'<span style="font-size:12px;color:var(--ink-subtle)">'+escHtml(v.date)+'</span>':'')
+      +'</div>';
+  }).join('');
+  return (rows||'<div class="status-sub">Aucun vaccin renseigné.</div>')
+    +'<button onclick="addVaccine()" style="margin-top:10px;width:100%;padding:9px;border-radius:var(--r12);border:1px dashed rgba(45,106,79,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">+ Ajouter un vaccin</button>';
+}
+function addVaccine(){
+  var name = prompt('Nom du vaccin :');
+  if(!name||!name.trim()) return;
+  var maker = prompt('Fabricant (optionnel) :');
+  var date = prompt('Date (ex: 15/06/2025, optionnel) :');
+  if(!S.vaccines) S.vaccines=[];
+  S.vaccines.push({name:stripHtml(name.trim()), maker:stripHtml((maker||'').trim()), date:stripHtml((date||'').trim())});
+  save(); renderContent();
+}
+function editVaccine(idx){
+  if(!S.vaccines||!S.vaccines[idx]) return;
+  var v = S.vaccines[idx];
+  var name = prompt('Nom du vaccin :', v.name);
+  if(!name||!name.trim()) return;
+  var maker = prompt('Fabricant :', v.maker||'');
+  var date = prompt('Date :', v.date||'');
+  S.vaccines[idx]={name:stripHtml(name.trim()), maker:stripHtml((maker||'').trim()), date:stripHtml((date||'').trim())};
+  save(); renderContent();
+}
+function removeVaccine(idx){
+  showConfirm('Supprimer ce vaccin ?', function(){
+    S.vaccines.splice(idx,1); save(); renderContent();
+  }, 'Supprimer');
+}
 function renderDocuments(){
+  if(!S.vaccines) S.vaccines=[];
   var openDoc=S.openDocType||null;
   var cards=DOC_TYPES.map(function(d){
     var data=S.documents[d.id]||{};
-    var filled=d.fields.some(function(f){return data[f.k];}) || (d.id==='tickets' && data.flightsList && data.flightsList.length>0);
+    var isVaccines = d.id==='vaccines';
+    var filled = isVaccines ? S.vaccines.length>0 : (d.fields.some(function(f){return data[f.k];}) || (d.id==='tickets' && data.flightsList && data.flightsList.length>0));
     var isOpen=openDoc===d.id;
     var isLockable = d.id==='passport';
     var isLocked = isLockable && !!(S.docLocked && S.docLocked[d.id]);
     var body='';
     if(isOpen){
-      var flightsBlock = d.id==='tickets' ? renderFlightsList(data.flightsList||[]) : '';
-      body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+flightsBlock+d.fields.map(function(f){
-        var val=escHtml(data[f.k]||'');
-        if(f.area) return '<textarea class="ef-input" style="min-height:70px;width:100%" placeholder="'+f.lbl+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)">'+val+'</textarea>';
-        return '<input class="ef-input" style="width:100%" type="text" placeholder="'+f.lbl+'" value="'+val+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)"/>';
-      }).join('')+'</div>';
+      if(isVaccines){
+        body='<div style="margin-top:12px">'+renderVaccinesBlock()+'</div>';
+      } else {
+        var flightsBlock = d.id==='tickets' ? renderFlightsList(data.flightsList||[]) : '';
+        body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+flightsBlock+d.fields.map(function(f){
+          var val=escHtml(data[f.k]||'');
+          if(f.area) return '<textarea class="ef-input" style="min-height:70px;width:100%" placeholder="'+f.lbl+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)">'+val+'</textarea>';
+          return '<input class="ef-input" style="width:100%" type="text" placeholder="'+f.lbl+'" value="'+val+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)"/>';
+        }).join('')+'</div>';
+      }
     }
     var statusText = isLocked && !isOpen ? 'Verrouillé' : (filled?'✓ Renseigné':'Non renseigné');
+    if(isVaccines && filled) statusText = S.vaccines.length+' vaccin'+(S.vaccines.length>1?'s':'');
     var lockBtn = isLockable ? '<span onclick="event.stopPropagation();toggleDocLock(\''+d.id+'\')" style="padding:4px;color:'+(isLocked?'var(--accent)':'var(--ink-subtle)')+'">'+svgIcon(isLocked?'lock':'unlock',16)+'</span>' : '';
     return '<div class="info-card doc-card"><div class="doc-card-head" onclick="toggleDocOpen(\''+d.id+'\')"><span class="doc-card-icon">'+svgIcon(d.icon,20)+'</span><div style="flex:1"><div class="doc-card-title">'+d.label+'</div><div class="status-sub">'+statusText+'</div></div>'+lockBtn+'<span style="color:var(--ink-subtle)">'+(isOpen?'▾':'▸')+'</span></div>'+body+'</div>';
   }).join('');
@@ -4508,9 +4593,17 @@ function renderGuide(c){
   const emergOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_emerg']);
   const clOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_checklist']);
   const emergRows=p.emergency.map(function(e,i){return '<div class="info-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'emergency\','+i+')"><span class="ir-key">'+e.k+'</span><span style="display:flex;align-items:center;gap:8px"><span class="ir-val" style="color:var(--red-muted)">'+e.v+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'emergency\','+i+')">×</span></span></div>';}).join('');
+  const CL_CATEGORY_COLORS = {'Santé':'#E76F51','Équipement':'#4D96FF','Documents':'#2D6A4F','Argent':'#F4A261','Vêtements':'#95D5B2','Autre':'#6E6E73'};
+  function clCategoryBadge(item){
+    var m = item.match(/^\[([^\]]+)\]/);
+    if(!m) return '';
+    var cat=m[1]; var color=CL_CATEGORY_COLORS[cat]||CL_CATEGORY_COLORS['Autre'];
+    return '<span style="font-size:10px;font-weight:700;color:'+color+';background:'+color+'22;border-radius:4px;padding:1px 5px;margin-right:5px">'+escHtml(cat)+'</span>';
+  }
+  function clItemText(item){ return item.replace(/^\[[^\]]+\]\s*/,''); }
   const clItems=p.checklist.map(function(item,i){
     const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
-    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'+item+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
+    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'+clCategoryBadge(item)+escHtml(clItemText(item))+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
   }).join('');
   const clDone=p.checklist.filter(function(_,i){return !!S.checklist[c.id+'_cl_'+i];}).length;
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
@@ -5865,7 +5958,7 @@ const ICON_PATHS = {
   sparkles: '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',
   pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
-  lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  syringe: '<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/>',
   unlock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-2"/>',
 };
 function renderAlertsManageCard(c){
