@@ -3774,7 +3774,7 @@ function renderHome(){
       +'<div class="status-sub">Le voyage n\'a pas encore commencé</div></div>';
   } else {
     dayCard='<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Jour '+tripDay+' / '+totalDays+'</div>'
-      +'<div class="status-sub" style="margin-bottom:8px">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+'</div>'
+      +'<div class="status-sub" style="margin-bottom:8px">'+ts.currentCountry.flag+' '+ts.currentCountry.name+'. Jour '+ts.dayInCountry+'</div>'
       +'<div class="bh-bar"><div class="bh-fill" style="width:'+tripPct+'%"></div></div>'
       +'<div class="status-sub" style="margin-top:6px;text-align:right">'+tripPct+'% du voyage</div></div>';
   }
@@ -3853,7 +3853,7 @@ function renderCountriesScreen(){
   } else {
     dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
       +photoEditBtn(heroQuery)
-      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' '+ts.currentCountry.name+'. Jour '+ts.dayInCountry+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
   }
 
   var list = COUNTRIES;
