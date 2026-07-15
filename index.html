@@ -4060,11 +4060,20 @@ function getExpenseCategoryLabel(catId){
   return cat ? cat.label : 'Autre';
 }
 function getPeopleList(){
+  var seen = {};
   var people = [];
+  // 1. L'utilisateur courant en premier
   var myLabel = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
-  people.push(myLabel);
+  seen[myLabel] = true; people.push(myLabel);
+  // 2. Les collaborateurs connus (dédoublonnage : évite le "Toi x2" si invited_email === myLabel)
   (CURRENT_COLLABORATORS||[]).forEach(function(c){
-    if(c.invited_email) people.push(c.invited_email);
+    if(c.invited_email && !seen[c.invited_email]){ seen[c.invited_email]=true; people.push(c.invited_email); }
+  });
+  // 3. Payeurs présents dans les dépenses mais absents de la liste ci-dessus
+  //    (ex: le propriétaire du voyage qui n'est pas dans la table collaborators)
+  (S.expenses||[]).forEach(function(e){
+    var payer = e.personLabel || e.person;
+    if(payer && !seen[payer]){ seen[payer]=true; people.push(payer); }
   });
   return people;
 }
