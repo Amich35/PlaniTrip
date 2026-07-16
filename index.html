@@ -4006,7 +4006,7 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel,'Toi'))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'toi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'toi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
@@ -6224,16 +6224,18 @@ function renderAccessManagementScreen(){
   var isOwner = CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id;
   var tripCountries = effectiveTripCountries();
 
-  var ownerDisplayName, ownerSubtitle;
+  var ownerDisplayName, ownerAvatarName, ownerSubtitle;
   if(isOwner){
     ownerDisplayName = 'Vous';
+    ownerAvatarName = personDisplayName(CURRENT_USER.email); // initiales du vrai nom, pas de "Vous"
     ownerSubtitle = personDisplayName(CURRENT_USER.email)+' (propriétaire)';
   } else {
     var ownerEmail = CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label || 'Propriétaire';
     ownerDisplayName = personDisplayName(ownerEmail);
+    ownerAvatarName = ownerDisplayName;
     ownerSubtitle = 'Propriétaire du voyage';
   }
-  var ownerRow = '<div class="more-row" style="padding:8px 4px">'+avatarCircle(ownerDisplayName,36)
+  var ownerRow = '<div class="more-row" style="padding:8px 4px">'+avatarCircle(ownerAvatarName,36)
     +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(ownerDisplayName)+'</div>'
     +'<div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(ownerSubtitle)+'</div></div></div>';
 
@@ -6243,8 +6245,9 @@ function renderAccessManagementScreen(){
     var label = c.invited_email || c.user_id;
     var isMe = (CURRENT_USER && (c.user_id === CURRENT_USER.id || c.invited_email === CURRENT_USER.email));
     var displayLabel = isMe ? 'Vous' : personDisplayName(label);
+    var avatarName = isMe ? personDisplayName(label) : displayLabel; // initiales du vrai nom, pas de "Vous"
     var removeBtn = isOwner && !isMe ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
-    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(displayLabel,36)
+    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(avatarName,36)
       +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(displayLabel)+(isMe ? '' : '')+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
       +removeBtn+'</div>';
   }).join('');
