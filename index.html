@@ -1903,13 +1903,36 @@ const ACT_DETAILS = {
 };
 
 const S=loadState();
-if(!S.favorites) S.favorites={};
-if(!S.documents) S.documents={};
-if(!S.journal) S.journal=[];
-if(!S.customCountries) S.customCountries=[];
-if(!S.deletedCountryIds) S.deletedCountryIds=[];
-if(!S.countryEdits) S.countryEdits={};
-if(!S.addedCities) S.addedCities={};
+// Regroupe tous les garde-fous d'initialisation de S (certaines clés peuvent manquer
+// sur un état persisté ancien, ou après le rechargement complet effectué par enterTrip()).
+// Appelée au chargement initial ET après chaque Object.assign(S, freshState) dans enterTrip(),
+// pour éviter qu'un champ manquant ne fasse planter l'app au premier usage (ex: S.cityTrash undefined).
+function ensureStateDefaults(){
+  if(!S.favorites) S.favorites={};
+  if(!S.documents) S.documents={};
+  if(!S.journal) S.journal=[];
+  if(!S.customCountries) S.customCountries=[];
+  if(!S.deletedCountryIds) S.deletedCountryIds=[];
+  if(!S.countryEdits) S.countryEdits={};
+  if(!S.addedCities) S.addedCities={};
+  if(!S.accom) S.accom={};
+  if(!S.actDate) S.actDate={};
+  if(!S.customPhotos) S.customPhotos={};
+  if(!S.days) S.days={};
+  if(!S.actDay) S.actDay={};
+  if(!S.activeDay) S.activeDay={};
+  if(!S.customActs) S.customActs={};
+  if(!S.deletedActs) S.deletedActs={};
+  if(!S.trash) S.trash={};
+  if(!S.cityTrash) S.cityTrash=[];
+  if(!S.customRates) S.customRates={};
+  if(!S.order) S.order={};
+  if(!S.travelerBudgets) S.travelerBudgets={};
+  if(!S.customDetails) S.customDetails={};
+  if(!S.cityNames) S.cityNames={};
+  if(!S.actNames) S.actNames={};
+}
+ensureStateDefaults();
 
 function rebuildCountriesFromState(){
   COUNTRIES.length = 0;
@@ -5340,6 +5363,7 @@ function deleteCityConfirm(countryId, cityName){
   }, 'Supprimer');
 }
 function deleteCity(countryId, cityName){
+  if(!S.cityTrash) S.cityTrash=[]; // filet de sécurité si ensureStateDefaults() n'a pas encore tourné
   var c = COUNTRIES.find(function(x){return x.id===countryId;});
   if(!c) return;
   var idx = c.cities.findIndex(function(ci){return ci.city===cityName;});
@@ -7192,6 +7216,9 @@ async function enterTrip(trip, resetTab) {
   const freshState = loadState();
   Object.keys(S).forEach(k => delete S[k]);
   Object.assign(S, freshState);
+  // Réappliquer les valeurs par défaut : un état sauvegardé ancien ou incomplet peut manquer
+  // certains champs plus récents (ex: cityTrash), ce qui ferait planter l'app à l'usage.
+  ensureStateDefaults();
   S.tab = resetTab ? 'today' : (S.tab || 'today');
   rebuildCountriesFromState();
 
