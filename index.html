@@ -2280,7 +2280,7 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     };
     S.customDetails = window._customDetails;
     if(sb && CURRENT_TRIP){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:detailKey, data:window._customDetails[detailKey], updated_at:new Date().toISOString()}).then(function(){});
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:detailKey, data:window._customDetails[detailKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     }
     if(info.lat && info.lng) COORDS[detailKey] = [info.lat, info.lng, actName];
     if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
@@ -2565,7 +2565,7 @@ function removeDay(ck) {
   if(S.activeDay[ck]===last) S.activeDay[ck]= days.length>1 ? days[days.length-1] : 'Tous';
   save(); renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 function setActiveDay(ck, day) { S.activeDay[ck]=day; save(); renderContent(); }
@@ -2574,7 +2574,7 @@ function assignDay(actKey, ck, day) {
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 
@@ -3619,7 +3619,7 @@ function setActivityDate(actKey, dateVal){
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 
@@ -5143,8 +5143,8 @@ function deleteCity(countryId, cityName){
   renderContent();
   syncDeletedActs(); syncCityOrder();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 function restoreCity(trashId){
@@ -5177,8 +5177,8 @@ function restoreCity(trashId){
   renderContent();
   syncDeletedActs(); syncCityOrder();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 function getCityOrder(countryId) {
@@ -5209,17 +5209,17 @@ if(!S.customDetails) S.customDetails={};
 if(!window._customDetails) window._customDetails=S.customDetails||{};
 function syncActOrder(){
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 function syncCityOrder(){
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 function syncDeletedActs(){
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
 function getOrder(ck,totalBase,totalCustom){
@@ -6775,7 +6775,15 @@ async function loadActivityDetails(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(!window._customDetails) window._customDetails={};
+  // Dédoublonnage défensif par detail_key (garde la ligne la plus récente),
+  // au cas où d'anciens doublons subsisteraient malgré la contrainte UNIQUE.
+  var latest = {};
   (data||[]).forEach(function(row){
+    if(!latest[row.detail_key] || row.updated_at > latest[row.detail_key].updated_at){
+      latest[row.detail_key] = row;
+    }
+  });
+  Object.values(latest).forEach(function(row){
     // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
     if(row.detail_key === '__planitrip__actDate'){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
@@ -6788,7 +6796,7 @@ async function loadActivityDetails(){
     } else if(row.detail_key === '__planitrip__deletedActs'){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
     } else {
-      if(!window._customDetails[row.detail_key]) window._customDetails[row.detail_key] = row.data;
+      window._customDetails[row.detail_key] = row.data;
     }
   });
   S.customDetails = window._customDetails;
