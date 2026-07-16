@@ -5406,6 +5406,10 @@ function deleteCity(countryId, cityName){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    // La ville et ses activités personnalisées doivent aussi être supprimées côté serveur,
+    // sinon loadCitiesActivities() (serveur autoritaire) les fait réapparaître au chargement suivant.
+    sb.from('cities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',countryId).eq('city',cityName).then(function(){});
+    sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',countryId).eq('city',cityName).then(function(){});
   }
 }
 function restoreCity(trashId){
