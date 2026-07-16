@@ -2479,7 +2479,7 @@ async function setCustomPhoto(query, url){
   save();
   if(sb && CURRENT_TRIP){
     // await garantit que Supabase a bien la photo avant tout rechargement possible
-    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()},{onConflict:'trip_id,query'}); }catch(e){}
+    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()}); }catch(e){}
   }
   closePhotoPicker();
   document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
@@ -2497,21 +2497,24 @@ async function setCustomPhoto(query, url){
   }
 }
 async function resetCustomPhoto(){
-  if(!_photoModalTarget) return;
-  if(S.customPhotos) delete S.customPhotos[_photoModalTarget];
-  // Vider le cache image pour forcer un refetch depuis Wikipedia (pas la photo custom)
-  if(window._imgCache){ delete window._imgCache[_photoModalTarget]; try{_saveImgCache();}catch(e){} }
+  if(!_photoModalTarget){ console.warn('[PlaniTrip] resetCustomPhoto: aucune cible'); return; }
+  var target = _photoModalTarget;
+  if(S.customPhotos) delete S.customPhotos[target];
+  if(window._imgCache){ delete window._imgCache[target]; try{_saveImgCache();}catch(e){} }
   save();
   if(sb && CURRENT_TRIP){
-    // await garantit que la suppression Supabase est effective avant tout refresh possible
-    try{ await sb.from('custom_photos').delete().eq('trip_id',CURRENT_TRIP.id).eq('query',_photoModalTarget); }catch(e){}
+    try{
+      var delRes = await sb.from('custom_photos').delete().eq('trip_id',CURRENT_TRIP.id).eq('query',target);
+      if(delRes && delRes.error){ console.error('[PlaniTrip] resetCustomPhoto delete error:', delRes.error); alert('Erreur lors de la suppression : '+delRes.error.message); }
+    }catch(e){ console.error('[PlaniTrip] resetCustomPhoto exception:', e); alert('Erreur réseau lors de la suppression.'); }
   }
   closePhotoPicker();
-  document.querySelectorAll('[data-img-query="'+_photoModalTarget.replace(/"/g,'&quot;')+'"]').forEach(function(el){
+  document.querySelectorAll('[data-img-query="'+target.replace(/"/g,'&quot;')+'"]').forEach(function(el){
     el.removeAttribute('data-img-done');
     el.classList.remove('has-photo');
     el.style.backgroundImage='';
   });
+  _photoModalTarget = null;
   renderContent();
   setTimeout(function(){ loadPlaceImages(); },50);
 }
@@ -6766,17 +6769,11 @@ async function loadAccommodations(){
 async function loadCustomPhotos(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('custom_photos').select('*').eq('trip_id',CURRENT_TRIP.id);
-  // Le serveur fait toujours autorite sur les photos : on repart de zero a chaque chargement.
-  // Dédoublonnage défensif par query (garde la ligne la plus récente) au cas où
-  // d'anciens doublons subsisteraient malgré la contrainte UNIQUE.
-  var latest = {};
-  (data||[]).forEach(function(row){
-    if(!latest[row.query] || row.updated_at > latest[row.query].updated_at){
-      latest[row.query] = row;
-    }
-  });
+  // Le serveur fait toujours autorite sur les photos : on repart de zero a chaque chargement
+  // pour eviter qu'une photo supprimee (reset) ne survive dans le localStorage,
+  // et pour garantir que les photos posees par un autre voyageur sont bien recues.
   S.customPhotos = {};
-  Object.values(latest).forEach(function(row){
+  (data||[]).forEach(function(row){
     S.customPhotos[row.query] = row.photo_data;
   });
   save();
