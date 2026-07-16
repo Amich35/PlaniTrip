@@ -3418,7 +3418,8 @@ function renderToday(){
       todayActs = todayActs.concat(getCityActivitiesForToday(c, city, todayStr));
     });
   }
-  var todaySpent = S.expenses.filter(function(e){return e.date===todayStr;}).reduce(function(s,e){return s+e.amount;},0);
+  var myEmailToday = (CURRENT_USER && CURRENT_USER.email) || '';
+  var todaySpent = S.expenses.filter(function(e){return e.date===todayStr && canonicalPerson(e.personLabel||e.person)===myEmailToday && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
   var budgetDaily = c ? c.budget_daily : 0;
 
   // ── Hero simple (sans indicateurs) ──
@@ -3452,7 +3453,7 @@ function renderToday(){
   var summaryHTML = '<div style="display:flex;background:var(--parchment);border-radius:var(--r22);box-shadow:var(--shadow-sm);margin-bottom:16px;overflow:hidden">'
     +summaryBadge('calendar', totalDaysKnown?(tripDay+'/'+totalDays):'<span style="font-size:11px">À renseigner</span>', 'Jour')
     +summaryBadge('sun', '<span id="today-hero-temp">···</span>', 'Météo')
-    +summaryBadge('coins', budgetValueHTML, 'Budget')
+    +summaryBadge('coins', budgetValueHTML, 'Mon budget')
     +summaryBadge('map-pin', todayActs.length, 'Activité'+(todayActs.length>1?'s':''))
     +'</div>';
 
@@ -3975,8 +3976,12 @@ function renderBudgetOverview(){
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
+      var pPct = totalBudget>0 ? Math.min(100, Math.round((pTotal/totalBudget)*100)) : 0;
       body = '<div class="more-row" onclick="S.budgetPersonView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
-        +'<div class="budget-hero"><div style="flex:1"><div class="bh-label">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':personDisplayName(S.budgetPersonView))+'</div><div class="bh-amount">'+fmtEUR(pTotal)+'</div></div></div>'
+        +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
+        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':personDisplayName(S.budgetPersonView))+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(pTotal)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(totalBudget)+' prévu au total</div></div>'
+        +renderProgressRing(pPct, 72, 7, '#95D5B2')
+        +'</div></div>'
         +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
         +fabHTML;
     } else if(S.budgetCountryView){
@@ -4030,14 +4035,13 @@ function renderBudgetOverview(){
     var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var mySpent = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
     var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
-    var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;position:relative;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
-      +'<span style="position:absolute;top:18px;right:18px;color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',18)+'</span>'
+    var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
       +'<div style="display:flex;align-items:flex-end;gap:16px">'
       +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Mes depenses</div>'
       +'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:2px">'+fmtEUR(mySpent)+'</div></div>'
       +'<div style="width:1px;align-self:stretch;background:rgba(255,255,255,0.18)"></div>'
-      +'<div style="flex:1;text-align:right;padding-right:22px"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total groupe</div>'
-      +'<div style="font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-top:6px;color:rgba(255,255,255,0.92)">'+fmtEUR(totalSpent)+'</div></div>'
+      +'<div style="flex:1;text-align:right"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total groupe</div>'
+      +'<div style="display:flex;align-items:center;justify-content:flex-end;gap:2px;margin-top:6px"><span style="font-size:22px;font-weight:700;letter-spacing:-0.5px;color:rgba(255,255,255,0.92)">'+fmtEUR(totalSpent)+'</span><span style="color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',16)+'</span></div></div>'
       +'</div>'
       +'<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+mySharePct+'%;background:#95D5B2;border-radius:2px"></div></div>'
       +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">Tu representes '+mySharePct+'% des depenses du groupe</div>'
