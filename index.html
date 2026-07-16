@@ -4985,19 +4985,31 @@ function renderConverterCard(c){
   var fromLabel = dir==='eur' ? 'EUR' : c.currency;
   var toLabel = dir==='eur' ? c.currency : 'EUR';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
-  return '<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="coins" data-icon-size="16"></span> Convertisseur</span>'
-    +'<button onclick="toggleConvDir(\''+c.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer">⇄ '+fromLabel+' → '+toLabel+'</button></div>'
-    +'<div style="display:flex;align-items:center;gap:10px;margin-top:8px">'
-    +'<input type="number" value="'+amt+'" id="convAmt_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="flex:1;padding:10px 12px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:15px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)"/>'
-    +'<span style="font-size:13px;color:var(--ink-muted);min-width:44px">'+fromLabel+'</span>'
+  var quickAmounts = [5,10,20,50];
+  var quickRow = dir==='eur' ? (
+    '<div style="display:flex;gap:6px;margin-top:12px">'
+    +quickAmounts.map(function(q){
+      return '<button onclick="updateConvAmt(\''+c.id+'\','+q+')" style="flex:1;padding:6px 0;border-radius:10px;border:var(--border);background:var(--sand);color:var(--ink);font-size:12px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'+q+'€</button>';
+    }).join('')
     +'</div>'
-    +'<div style="text-align:center;font-size:13px;color:var(--ink-subtle);margin:6px 0">=</div>'
-    +'<div style="display:flex;align-items:center;gap:10px"><div style="flex:1;padding:10px 12px;font-size:15px;font-weight:700;color:var(--accent)">'+resultStr+'</div><span style="font-size:13px;color:var(--ink-muted);min-width:44px">'+toLabel+'</span></div>'
-    +'<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(29,29,31,0.08);display:flex;align-items:center;gap:8px">'
-    +'<span style="font-size:11px;color:var(--ink-subtle)">Taux : 1€ =</span>'
-    +'<input type="number" value="'+rate+'" id="convRate_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:80px;padding:6px 8px;border-radius:8px;border:var(--border);background:var(--sand);font-size:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif"/>'
-    +'<span style="font-size:11px;color:var(--ink-subtle)">'+c.currency+'</span>'
-    +'</div></div>';
+  ) : '';
+  return '<div class="info-card" style="padding:16px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:5px"><span data-icon="coins" data-icon-size="15"></span> Convertisseur</span>'
+    +'<button onclick="toggleConvDir(\''+c.id+'\')" title="Inverser" style="width:26px;height:26px;border-radius:50%;border:1px solid rgba(45,106,79,0.25);background:transparent;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px">⇄</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-top:2px">1 '+fromLabel+' = <input type="number" value="'+rate+'" id="convRate_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:46px;border:none;background:transparent;color:var(--ink-subtle);font-size:11px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0"/> '+toLabel+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-top:12px">'
+    +'<input type="number" value="'+amt+'" id="convAmt_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="flex:1;padding:10px 12px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:18px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)"/>'
+    +'<span style="font-size:13px;color:var(--ink-muted);min-width:36px">'+fromLabel+'</span>'
+    +'</div>'
+    +'<div style="text-align:center;color:var(--ink-subtle);font-size:13px;margin:2px 0">↓</div>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1;padding:10px 12px;font-size:18px;font-weight:700;color:var(--accent)">'+resultStr+'</div>'
+    +'<span style="font-size:13px;color:var(--ink-muted);min-width:36px">'+toLabel+'</span>'
+    +'</div>'
+    +quickRow
+    +'</div>';
 }
 function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
 function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmt_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
