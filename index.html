@@ -2834,6 +2834,19 @@ function openGuideItemModal(countryId, listField, idx){
     return;
   }
 
+  if(listField==='alert'){
+    var currentA = isEdit ? (c.alerts||[])[_guideModalIdx] : null;
+    var currentAText = currentA ? (typeof currentA==='object' ? currentA.t : currentA) : '';
+    var currentAUrl = currentA && typeof currentA==='object' ? (currentA.url||'') : '';
+    document.getElementById('guideItemModalTitle').textContent=isEdit?'Modifier':'Nouvelle alerte';
+    document.getElementById('guideItemModalBody').innerHTML=
+      '<div class="ef-row" style="margin-bottom:8px"><textarea class="ef-input" id="guideModalAlertText" rows="2" placeholder="ex: Silver Week — réservez tôt" style="width:100%;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5">'+escHtml(currentAText)+'</textarea></div>'
+      +'<div class="ef-row"><input class="ef-input" id="guideModalAlertUrl" type="text" placeholder="Lien associé (optionnel)" style="width:100%" value="'+escHtml(currentAUrl)+'"/></div>';
+    _guideModalSaveFn = saveGuideItem;
+    document.getElementById('guideItemModal').classList.add('open');
+    return;
+  }
+
   var isTip=listField==='tips';
   var cats=isTip?TIP_CATEGORIES:_CL_KNOWN_CATS;
   var currentItem=isEdit
@@ -2862,6 +2875,20 @@ function saveGuideItem(){
     var newE={k:stripHtml(name),v:stripHtml(num)};
     if(_guideModalIdx!==null) c.practical.emergency[_guideModalIdx]=newE;
     else c.practical.emergency.push(newE);
+    saveCountryEdit(_guideModalCountryId);
+    closeGuideItemModal();
+    renderContent();
+    return;
+  }
+
+  if(_guideModalListField==='alert'){
+    var atext=((document.getElementById('guideModalAlertText')||{}).value||'').trim();
+    var aurl=((document.getElementById('guideModalAlertUrl')||{}).value||'').trim();
+    if(!atext){closeGuideItemModal();return;}
+    if(!c.alerts) c.alerts=[];
+    var newA = aurl ? {t:stripHtml(atext), url:stripHtml(aurl)} : {t:stripHtml(atext)};
+    if(_guideModalIdx!==null) c.alerts[_guideModalIdx]=newA;
+    else c.alerts.push(newA);
     saveCountryEdit(_guideModalCountryId);
     closeGuideItemModal();
     renderContent();
@@ -6424,28 +6451,10 @@ function renderAlertsManageCard(c){
     +'</div>';
 }
 function addAlertItem(countryId){
-  var text = prompt('Nouvelle alerte (ex: Silver Week — réservez tôt) :');
-  if(!text || !text.trim()) return;
-  var url = prompt('Lien associé (optionnel, laisser vide si aucun) :');
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return;
-  if(!c.alerts) c.alerts=[];
-  c.alerts.push(url && url.trim() ? {t:stripHtml(text.trim()), url:stripHtml(url.trim())} : {t:stripHtml(text.trim())});
-  saveCountryEdit(countryId);
-  renderContent();
+  openGuideItemModal(countryId, 'alert', null);
 }
 function editAlertItem(countryId, idx){
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c || !c.alerts || !c.alerts[idx]) return;
-  var current = c.alerts[idx];
-  var currentText = typeof current==='object' ? current.t : current;
-  var currentUrl = typeof current==='object' ? (current.url||'') : '';
-  var text = prompt('Modifier l\'alerte :', currentText);
-  if(!text || !text.trim()) return;
-  var url = prompt('Lien associé (optionnel, laisser vide si aucun) :', currentUrl);
-  c.alerts[idx] = url && url.trim() ? {t:stripHtml(text.trim()), url:stripHtml(url.trim())} : {t:stripHtml(text.trim())};
-  saveCountryEdit(countryId);
-  renderContent();
+  openGuideItemModal(countryId, 'alert', idx);
 }
 function removeAlertItem(countryId, idx){
   showConfirm('Supprimer cette alerte ?', function(){
