@@ -6883,55 +6883,39 @@ async function loadBudgetEntries(){
   (data||[]).forEach(function(row){
     serverMap[row.id] = {id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date};
   });
-  var localOnly = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); });
-  S.expenses = localOnly.concat(Object.values(serverMap));
+  S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); }).concat(Object.values(serverMap));
   save();
-  // Réessai automatique : des dépenses créées localement mais jamais confirmées côté serveur
-  // (échec réseau, RLS, etc.) sont ré-envoyées à chaque chargement du voyage.
-  if(localOnly.length && sb && CURRENT_TRIP){
-    for(var i=0;i<localOnly.length;i++){
-      var e2 = localOnly[i];
-      try{
-        var res = await sb.from('budget_entries').insert({
-          id:e2.id, trip_id:CURRENT_TRIP.id, country_id:e2.country, city:e2.city, activity:e2.activity,
-          category:e2.category, description:e2.desc, amount:e2.amount, person_label:e2.personLabel,
-          participants:e2.participants, splits:e2.splits, entry_date:e2.date
-        });
-        if(res && res.error){
-          console.error('[PlaniTrip] retry insert budget_entries échoué:', res.error);
-        }
-      }catch(err){
-        console.error('[PlaniTrip] retry insert budget_entries exception:', err);
-      }
-    }
-  }
 }
 async function loadFavorites(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('favorites').select('key').eq('trip_id',CURRENT_TRIP.id);
-  if(!S.favorites) S.favorites={};
-  (data||[]).forEach(function(row){
-    if(S.favorites[row.key]===undefined) S.favorites[row.key]=true;
-  });
+  // Serveur autoritaire : reconstruction complète — un favori retiré par un autre voyageur
+  // doit disparaître localement aussi, pas seulement les ajouts.
+  S.favorites = {};
+  (data||[]).forEach(function(row){ S.favorites[row.key] = true; });
   save();
 }
 async function loadChecklist(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('checklist_items').select('key').eq('trip_id',CURRENT_TRIP.id);
-  if(!S.checklist) S.checklist={};
-  (data||[]).forEach(function(row){
-    if(S.checklist[row.key]===undefined) S.checklist[row.key]=true;
-  });
+  // Serveur autoritaire : reconstruction complète — un item décoché par un autre voyageur
+  // doit se décocher localement aussi.
+  S.checklist = {};
+  (data||[]).forEach(function(row){ S.checklist[row.key] = true; });
   save();
 }
 async function loadJournalEntries(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('journal_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
+  // Serveur autoritaire : reconstruction complète — une entrée supprimée par un autre
+  // voyageur doit disparaître localement aussi. Les entrées locales pas encore
+  // synchronisées (id absent côté serveur) sont préservées.
+  var serverMap = {};
   (data||[]).forEach(function(row){
-    if(!S.journal.find(function(e){return e.id===row.id;})){
-      S.journal.push({id:row.id, date:row.entry_date, text:row.text_content||'', location:row.location||'', photo:row.photo||null});
-    }
+    serverMap[row.id] = {id:row.id, date:row.entry_date, text:row.text_content||'', location:row.location||'', photo:row.photo||null};
   });
+  var localOnly = (S.journal||[]).filter(function(e){ return !(e.id in serverMap); });
+  S.journal = localOnly.concat(Object.values(serverMap));
   save();
 }
 async function loadCountrySettings(){
@@ -6991,10 +6975,9 @@ async function loadActivityDetails(){
 async function loadAccommodations(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('accommodations').select('*').eq('trip_id',CURRENT_TRIP.id);
-  if(!S.accom) S.accom={};
-  (data||[]).forEach(function(row){
-    if(!S.accom[row.city_key]) S.accom[row.city_key] = row.data;
-  });
+  // Serveur autoritaire : reconstruction complète.
+  S.accom = {};
+  (data||[]).forEach(function(row){ S.accom[row.city_key] = row.data; });
   save();
 }
 async function loadCustomPhotos(){
