@@ -3959,7 +3959,7 @@ function renderBudgetOverview(){
     }
     if(S.budgetPersonView){
       var myLabelP = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
-      var pExps = S.expenses.filter(function(e){return (e.personLabel||e.person)===S.budgetPersonView && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var pExps = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===S.budgetPersonView && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var pTotal = pExps.reduce(function(s,e){return s+e.amount;},0);
       var byDateP = {}; var dateOrderP = [];
       pExps.forEach(function(e){
@@ -3993,7 +3993,7 @@ function renderBudgetOverview(){
       var groupsHTML = dateOrder.map(function(d){
         var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
         var rows = byDate[d].map(function(e){
-          var whoLabel = e.personLabel || e.person || '?';
+          var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
           var catIcon = getExpenseCategoryIcon(e.category);
           return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
@@ -4028,7 +4028,7 @@ function renderBudgetOverview(){
     }).join('');
     // ── Carte "Mes depenses vs Total groupe" : un seul encart moderne, degrade, texte adaptatif ──
     var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
-    var mySpent = S.expenses.filter(function(e){return (e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+    var mySpent = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
     var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
     var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
       +'<div style="display:flex;align-items:flex-end;gap:16px">'
@@ -4124,8 +4124,11 @@ function getExpenseCategoryLabel(catId){
   return cat ? cat.label : 'Autre';
 }
 // PROFILES_MAP : email -> pseudo actuel (résolution d'affichage uniquement).
-// L'identité stable et unique d'une personne dans les dépenses/splits est toujours son EMAIL.
+// REVERSE_ALIAS_MAP : ancien pseudo (ou tout texte utilisé comme identité avant ce système) -> email.
+// Permet de fusionner automatiquement les vieux enregistrements ("Sam" tapé en dur) avec la
+// vraie identité email de la personne, sans avoir à toucher la base de données.
 var PROFILES_MAP = {};
+var REVERSE_ALIAS_MAP = {};
 async function loadProfiles(){
   if(!sb || !CURRENT_TRIP) return;
   var ids = [];
@@ -4137,13 +4140,27 @@ async function loadProfiles(){
   try{
     var {data} = await sb.from('profiles').select('id,email,display_name').in('id', ids);
     (data||[]).forEach(function(row){
-      if(row.email) PROFILES_MAP[row.email] = row.display_name || row.email;
+      if(row.email){
+        PROFILES_MAP[row.email] = row.display_name || row.email;
+        if(row.display_name && row.display_name!==row.email){
+          REVERSE_ALIAS_MAP[row.display_name] = row.email;
+        }
+      }
     });
   }catch(e){}
+  // Alias supplémentaires : email en tant que collaborateur == email lui-même (no-op),
+  // mais aussi le pseudo saisi ponctuellement côté invité (invited_email connu).
 }
 function personDisplayName(emailOrLabel){
   if(!emailOrLabel) return '';
-  return PROFILES_MAP[emailOrLabel] || emailOrLabel;
+  var canon = canonicalPerson(emailOrLabel);
+  return PROFILES_MAP[canon] || canon;
+}
+// Résout un ancien pseudo (utilisé comme identité brute dans une vieille dépense) vers l'email
+// canonique de la personne, si connu. Sinon retourne la valeur telle quelle.
+function canonicalPerson(label){
+  if(!label) return label;
+  return REVERSE_ALIAS_MAP[label] || label;
 }
 function getPeopleList(){
   var seen = {};
@@ -4158,14 +4175,14 @@ function getPeopleList(){
   // 3. Propriétaire du voyage (toujours inclus — même sans dépenses)
   var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
   if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }
-  // 4. Payeurs, participants et splits présents dans les dépenses mais absents de la liste ci-dessus
-  //    (couvre aussi les anciennes entrées encore basées sur un pseudo, pas encore migrées)
+  // 4. Payeurs, participants et splits présents dans les dépenses mais absents de la liste ci-dessus.
+  //    canonicalPerson() fusionne automatiquement un ancien pseudo brut avec l'email réel connu.
   (S.expenses||[]).forEach(function(e){
-    var payer = e.personLabel || e.person;
+    var payer = canonicalPerson(e.personLabel || e.person);
     if(payer && !seen[payer]){ seen[payer]=true; people.push(payer); }
-    (e.participants||[]).forEach(function(p){ if(p && !seen[p]){ seen[p]=true; people.push(p); } });
+    (e.participants||[]).forEach(function(p){ p=canonicalPerson(p); if(p && !seen[p]){ seen[p]=true; people.push(p); } });
     if(e.splits && typeof e.splits==='object'){
-      Object.keys(e.splits).forEach(function(p){ if(p && !seen[p]){ seen[p]=true; people.push(p); } });
+      Object.keys(e.splits).forEach(function(p){ var cp=canonicalPerson(p); if(cp && !seen[cp]){ seen[cp]=true; people.push(cp); } });
     }
   });
   return people;
@@ -4253,7 +4270,7 @@ function renderSplitRows(totalAmtStr){
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;'+(idx<people.length-1?'border-bottom:1px solid var(--sand-deep);':'')+'">'
       +'<span onclick="toggleSplitParticipant('+idx+')" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0">'
       +'<span id="splitCircle_'+idx+'" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:#fff;font-size:11px;transition:background 0.15s">'+(checked?'✓':'')+'</span>'
-      +'<span style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(p)+'</span></span>'
+      +'<span style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(personDisplayName(p))+'</span></span>'
       +'<span id="splitAmtCell_'+idx+'" style="display:'+(checked?'flex':'none')+';align-items:center;gap:2px;flex-shrink:0">'
       +'<input id="splitAmt_'+idx+'" type="text" inputmode="decimal" value="'+val+'" style="width:60px;text-align:right;border:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink);padding:0" oninput="onSplitInput('+idx+',this.value)"/>'
       +'<span style="font-size:13px;color:var(--ink-subtle)">€</span></span>'
@@ -4292,15 +4309,20 @@ function computeBalances(){
   S.expenses.forEach(function(e){
     var sharesMap;
     if(e.splits && typeof e.splits==='object' && Object.keys(e.splits).length){
-      sharesMap = e.splits;
+      // Canonicalise chaque clé de split (fusionne un ancien pseudo brut avec l'email réel)
+      sharesMap = {};
+      Object.keys(e.splits).forEach(function(k){
+        var ck = canonicalPerson(k);
+        sharesMap[ck] = (sharesMap[ck]||0) + e.splits[k];
+      });
     } else {
-      var parts = (e.participants && e.participants.length) ? e.participants.filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
+      var parts = (e.participants && e.participants.length) ? e.participants.map(canonicalPerson).filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
       if(!parts.length) parts = people.slice();
       var per = e.amount / parts.length;
       sharesMap = {}; parts.forEach(function(p){ sharesMap[p]=per; });
     }
     Object.keys(sharesMap).forEach(function(p){ if(people.indexOf(p)>-1) share[p] = (share[p]||0) + sharesMap[p]; });
-    var payer = e.personLabel || e.person;
+    var payer = canonicalPerson(e.personLabel || e.person);
     if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + e.amount;
   });
   return people.map(function(p){
