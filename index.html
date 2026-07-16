@@ -3299,11 +3299,10 @@ function renderItinerary(c, embedded){
     const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+ck+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+ck+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
 
     return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+ck+'" style="position:relative">'
+      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
       +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer">'
       +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
-      +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span>'
-      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="width:22px;height:22px;flex-shrink:0;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
-      +'</div></div>'
+      +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span></div></div>'
       +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
       +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
   }).join('');
