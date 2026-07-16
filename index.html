@@ -3958,7 +3958,7 @@ function renderBudgetOverview(){
       if(!cv){ S.budgetCountryView=null; }
     }
     if(S.budgetPersonView){
-      var myLabelP = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+      var myLabelP = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
       var pExps = S.expenses.filter(function(e){return (e.personLabel||e.person)===S.budgetPersonView && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var pTotal = pExps.reduce(function(s,e){return s+e.amount;},0);
       var byDateP = {}; var dateOrderP = [];
@@ -3976,7 +3976,7 @@ function renderBudgetOverview(){
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
       body = '<div class="more-row" onclick="S.budgetPersonView=null;renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
-        +'<div class="budget-hero"><div style="flex:1"><div class="bh-label">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':S.budgetPersonView)+'</div><div class="bh-amount">'+fmtEUR(pTotal)+'</div></div></div>'
+        +'<div class="budget-hero"><div style="flex:1"><div class="bh-label">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':personDisplayName(S.budgetPersonView))+'</div><div class="bh-amount">'+fmtEUR(pTotal)+'</div></div></div>'
         +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
         +fabHTML;
     } else if(S.budgetCountryView){
@@ -3995,7 +3995,7 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = e.personLabel || e.person || '?';
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(whoLabel)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(whoLabel)+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
@@ -4019,15 +4019,15 @@ function renderBudgetOverview(){
         +'</div>';
     }).join('');
     var paidBalances = computeBalances();
-    var myLabel3 = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var myLabel3 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
       return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
-        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(b.person)+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Toi':b.person)+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Toi':personDisplayName(b.person))+'</span></div>'
         +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
         +'</div>';
     }).join('');
     // ── Carte "Mes depenses vs Total groupe" : un seul encart moderne, degrade, texte adaptatif ──
-    var myLabelDash = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var mySpent = S.expenses.filter(function(e){return (e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
     var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
     var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
@@ -4048,25 +4048,25 @@ function renderBudgetOverview(){
   } else if(sub==='remb'){
     var balances = computeBalances();
     var txns = simplifyDebts(balances);
-    var myLabel2 = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var myLabel2 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var balanceCards = balances.map(function(b){
       var isPos = b.balance>0.01, isNeg = b.balance<-0.01;
       var color = isPos?'var(--accent)':(isNeg?'var(--red-muted)':'var(--ink-subtle)');
       var bg = isPos?'var(--accent-pale)':(isNeg?'var(--red-pale)':'var(--sand-deep)');
       var lbl = isPos?'doit recevoir':(isNeg?'doit':'est à jour');
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:'+bg+';margin-bottom:8px">'
-        +'<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(b.person)+'</span><span style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+escHtml(b.person===myLabel2?'Toi':b.person)+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+escHtml(b.person===myLabel2?'Toi':personDisplayName(b.person))+'</span></div>'
         +'<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:'+color+'">'+fmtEUR(Math.abs(b.balance))+'</div><div style="font-size:11px;color:var(--ink-subtle)">'+lbl+'</div></div>'
         +'</div>';
     }).join('');
     var txnRows = txns.length ? txns.map(function(t){
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;font-size:13px;box-shadow:var(--shadow-sm);flex-wrap:wrap">'
         +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow:hidden">'
-        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;flex-shrink:1">'+escHtml(t.from===myLabel2?'Toi':t.from)+'</span>'
+        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;flex-shrink:1">'+escHtml(t.from===myLabel2?'Toi':personDisplayName(t.from))+'</span>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0;white-space:nowrap">doit</span>'
         +'<span style="font-weight:700;color:var(--accent);flex-shrink:0">'+fmtEUR(t.amount)+'</span>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0">à</span>'
-        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;flex-shrink:1">'+escHtml(t.to===myLabel2?'toi':t.to)+'</span>'
+        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;flex-shrink:1">'+escHtml(t.to===myLabel2?'toi':personDisplayName(t.to))+'</span>'
         +'</div>'
         +'<button onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')" style="border:none;background:var(--accent);color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:10px;cursor:pointer;flex-shrink:0">C\'est payé !</button>'
         +'</div>';
@@ -4076,7 +4076,7 @@ function renderBudgetOverview(){
       var toP = (e.participants&&e.participants[0]) || '?';
       var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;flex-wrap:wrap;gap:4px">'
-        +'<div style="font-size:13px"><span style="font-weight:600">'+escHtml(e.personLabel===myLabel2?'Toi':e.personLabel)+'</span> <span style="color:var(--ink-subtle)">a rembourse</span> <span style="font-weight:600">'+escHtml(toP===myLabel2?'toi':toP)+'</span></div>'
+        +'<div style="font-size:13px"><span style="font-weight:600">'+escHtml(e.personLabel===myLabel2?'Toi':personDisplayName(e.personLabel))+'</span> <span style="color:var(--ink-subtle)">a rembourse</span> <span style="font-weight:600">'+escHtml(toP===myLabel2?'toi':personDisplayName(toP))+'</span></div>'
         +'<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">'
         +'<span style="font-size:13px;font-weight:700;color:var(--accent)">'+fmtEUR(e.amount)+'</span>'
         +'<span style="font-size:11px;color:var(--ink-subtle)">'+dLabel+'</span>'
@@ -4123,20 +4123,43 @@ function getExpenseCategoryLabel(catId){
   var cat = EXPENSE_CATEGORIES.find(function(c){return c.id===catId;});
   return cat ? cat.label : 'Autre';
 }
+// PROFILES_MAP : email -> pseudo actuel (résolution d'affichage uniquement).
+// L'identité stable et unique d'une personne dans les dépenses/splits est toujours son EMAIL.
+var PROFILES_MAP = {};
+async function loadProfiles(){
+  if(!sb || !CURRENT_TRIP) return;
+  var ids = [];
+  if(CURRENT_TRIP.owner_id) ids.push(CURRENT_TRIP.owner_id);
+  (CURRENT_COLLABORATORS||[]).forEach(function(c){ if(c.user_id) ids.push(c.user_id); });
+  if(CURRENT_USER && CURRENT_USER.id) ids.push(CURRENT_USER.id);
+  ids = ids.filter(function(v,i,a){return v && a.indexOf(v)===i;});
+  if(!ids.length) return;
+  try{
+    var {data} = await sb.from('profiles').select('id,email,display_name').in('id', ids);
+    (data||[]).forEach(function(row){
+      if(row.email) PROFILES_MAP[row.email] = row.display_name || row.email;
+    });
+  }catch(e){}
+}
+function personDisplayName(emailOrLabel){
+  if(!emailOrLabel) return '';
+  return PROFILES_MAP[emailOrLabel] || emailOrLabel;
+}
 function getPeopleList(){
   var seen = {};
   var people = [];
-  // 1. L'utilisateur courant en premier
-  var myLabel = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
-  seen[myLabel] = true; people.push(myLabel);
-  // 2. Les collaborateurs connus (dédoublonnage : évite le "Toi x2" si invited_email === myLabel)
+  // 1. L'utilisateur courant en premier — identité = email (stable, jamais le pseudo)
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+  seen[myEmail] = true; people.push(myEmail);
+  // 2. Les collaborateurs connus, par email
   (CURRENT_COLLABORATORS||[]).forEach(function(c){
     if(c.invited_email && !seen[c.invited_email]){ seen[c.invited_email]=true; people.push(c.invited_email); }
   });
   // 3. Propriétaire du voyage (toujours inclus — même sans dépenses)
-  var ownerL = CURRENT_TRIP && CURRENT_TRIP.owner_label;
-  if(ownerL && !seen[ownerL]){ seen[ownerL]=true; people.push(ownerL); }
+  var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
+  if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }
   // 4. Payeurs, participants et splits présents dans les dépenses mais absents de la liste ci-dessus
+  //    (couvre aussi les anciennes entrées encore basées sur un pseudo, pas encore migrées)
   (S.expenses||[]).forEach(function(e){
     var payer = e.personLabel || e.person;
     if(payer && !seen[payer]){ seen[payer]=true; people.push(payer); }
@@ -4151,7 +4174,7 @@ function getExpensePersonOptions(){
   var people = getPeopleList();
   if(!S.expPerson || people.indexOf(S.expPerson)===-1) S.expPerson = people[0];
   return people.map(function(p){
-    return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(p)+'</option>';
+    return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(personDisplayName(p))+'</option>';
   }).join('');
 }
 var SPLIT_PEOPLE_CACHE = [];
@@ -4373,24 +4396,25 @@ function addExpGlobal(){
   var participants = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
   var splits = computeFinalSplits(amt, participants, S.expSplitOverrides||{});
 
+  // person_label = identité EMAIL de la personne sélectionnée dans le dropdown (S.expPerson),
+  // PAS forcément l'utilisateur courant — on peut enregistrer une dépense payée par quelqu'un d'autre.
+  var payerEmail = S.expPerson || (CURRENT_USER && CURRENT_USER.email) || '';
   if(S.editingExpenseId){
     var existing = S.expenses.find(function(x){return x.id===S.editingExpenseId;});
     if(existing){
       existing.country=country; existing.city=city; existing.activity=activity; existing.category=category;
-      existing.desc=desc; existing.amount=amt; existing.person=S.expPerson; existing.personLabel=S.expPerson;
+      existing.desc=desc; existing.amount=amt; existing.person=payerEmail; existing.personLabel=payerEmail;
       existing.participants=participants; existing.splits=splits; existing.date=expDate;
       if(sb && CURRENT_TRIP){
-        var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-        sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants,splits:splits,entry_date:expDate}).eq('id',S.editingExpenseId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
+        sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:payerEmail,participants:participants,splits:splits,entry_date:expDate}).eq('id',S.editingExpenseId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
       }
     }
     S.editingExpenseId = null;
   } else {
     var newId=Date.now();
-    S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,splits:splits,date:expDate});
+    S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:payerEmail,personLabel:payerEmail,participants:participants,splits:splits,date:expDate});
     if(sb && CURRENT_TRIP){
-      var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-      sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,splits:splits,entry_date:expDate}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
+      sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:payerEmail,participants:participants,splits:splits,entry_date:expDate}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
     }
   }
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};S.expDate='';save();renderContent();
@@ -5806,10 +5830,10 @@ async function backToTripSelector() {
   // checkUserTrips (qui peut auto-entrer un voyage si l'utilisateur n'en a qu'un).
   try {
     const { data: ownedTrips } = await sb.from('trips')
-      .select('id, name, owner_id, owner_label, countries, archived_countries, start_date, end_date')
+      .select('id, name, owner_id, owner_label, owner_email, countries, archived_countries, start_date, end_date')
       .eq('owner_id', CURRENT_USER.id);
     const { data: collabRows } = await sb.from('collaborators')
-      .select('trip_id, trips(id, name, owner_id, owner_label, countries, archived_countries, start_date, end_date)')
+      .select('trip_id, trips(id, name, owner_id, owner_label, owner_email, countries, archived_countries, start_date, end_date)')
       .eq('user_id', CURRENT_USER.id);
     const collabTrips = (collabRows || []).map(function(r){ return r.trips; }).filter(Boolean);
     const allTrips = [...(ownedTrips || []), ...collabTrips];
@@ -5868,7 +5892,8 @@ function avatarCircle(label, size){
 
 function renderMyAccountScreen(){
   var email = (CURRENT_USER && CURRENT_USER.email) || '';
-  var pseudo = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || '';
+  // Le pseudo actuel vient désormais de PROFILES_MAP (table profiles), pas de user_metadata.
+  var pseudo = (PROFILES_MAP[email] && PROFILES_MAP[email]!==email) ? PROFILES_MAP[email] : '';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
     +'<div class="section-title" style="margin-bottom:12px">Mon compte</div>'
@@ -5952,30 +5977,38 @@ async function saveMyPseudo(){
   var errEl = document.getElementById('my-account-error');
   errEl.style.display='none';
   var pseudo = input.value.trim();
-  if (!sb) { errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
-
-  var oldLabel = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || '';
+  if (!sb || !CURRENT_USER) { errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
 
   var btn = document.getElementById('my-account-save-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
 
-  const { data, error } = await sb.auth.updateUser({ data: { pseudo: pseudo } });
+  // Le pseudo est stocké dans la table profiles (résolution d'affichage),
+  // jamais dans user_metadata : l'identité stable reste toujours l'email.
+  var { error } = await sb.from('profiles').upsert({
+    id: CURRENT_USER.id, email: CURRENT_USER.email, display_name: pseudo || null, updated_at: new Date().toISOString()
+  });
 
   btn.disabled = false; btn.textContent = 'Enregistrer';
 
   if (error) {
     errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block'; return;
   }
-  if (data && data.user) CURRENT_USER = data.user;
 
-  var newLabel = (CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || CURRENT_USER.email || '';
-  if(oldLabel && newLabel && oldLabel!==newLabel){
-    await migratePersonLabel(oldLabel, newLabel);
+  PROFILES_MAP[CURRENT_USER.email] = pseudo || CURRENT_USER.email;
+
+  // Nettoyage ponctuel : si d'anciennes dépenses de cette personne utilisaient encore
+  // un pseudo comme identité (avant ce correctif), on les fait converger vers l'email.
+  var oldLocalPseudo = (CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || null;
+  if(oldLocalPseudo && oldLocalPseudo !== CURRENT_USER.email){
+    await migratePersonLabel(oldLocalPseudo, CURRENT_USER.email);
+  }
+  if(CURRENT_TRIP && CURRENT_TRIP.owner_id === CURRENT_USER.id){
+    CURRENT_TRIP.owner_email = CURRENT_USER.email;
+    try{ await sb.from('trips').update({owner_email:CURRENT_USER.email}).eq('id', CURRENT_TRIP.id); }catch(err){}
   }
   renderContent();
 }
-// Renomme une étiquette de personne (pseudo) dans toutes les dépenses du voyage courant,
-// et met à jour owner_label si l'utilisateur est le propriétaire du voyage.
+// Renomme une étiquette de personne (ancien pseudo) vers l'email dans toutes les dépenses du voyage courant.
 async function migratePersonLabel(oldLabel, newLabel){
   var toUpdate = [];
   S.expenses.forEach(function(e){
@@ -6000,10 +6033,6 @@ async function migratePersonLabel(oldLabel, newLabel){
       try{
         await sb.from('budget_entries').update({person_label:e2.personLabel, participants:e2.participants, splits:e2.splits}).eq('id', e2.id);
       }catch(err){}
-    }
-    if(CURRENT_TRIP.owner_id === CURRENT_USER.id){
-      CURRENT_TRIP.owner_label = newLabel;
-      try{ await sb.from('trips').update({owner_label:newLabel}).eq('id', CURRENT_TRIP.id); }catch(err){}
     }
   }
 }
@@ -6105,11 +6134,11 @@ function renderAccessManagementScreen(){
 
   var ownerDisplayName, ownerSubtitle;
   if(isOwner){
-    ownerDisplayName = (CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || CURRENT_USER.email || 'Vous';
-    ownerSubtitle = 'Vous (propriétaire)';
+    ownerDisplayName = 'Vous';
+    ownerSubtitle = personDisplayName(CURRENT_USER.email)+' (propriétaire)';
   } else {
-    // Utilise owner_label stocké dans le voyage (auto-sauvé quand le proprio se connecte)
-    ownerDisplayName = CURRENT_TRIP.owner_label || 'Propriétaire';
+    var ownerEmail = CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label || 'Propriétaire';
+    ownerDisplayName = personDisplayName(ownerEmail);
     ownerSubtitle = 'Propriétaire du voyage';
   }
   var ownerRow = '<div class="more-row" style="padding:8px 4px">'+avatarCircle(ownerDisplayName,36)
@@ -6121,9 +6150,9 @@ function renderAccessManagementScreen(){
     var statusLabel = c.user_id ? '' : ' · en attente';
     var label = c.invited_email || c.user_id;
     var isMe = (CURRENT_USER && (c.user_id === CURRENT_USER.id || c.invited_email === CURRENT_USER.email));
-    var displayLabel = isMe ? 'Vous' : label;
+    var displayLabel = isMe ? 'Vous' : personDisplayName(label);
     var removeBtn = isOwner && !isMe ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
-    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(label,36)
+    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(displayLabel,36)
       +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(displayLabel)+(isMe ? '' : '')+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
       +removeBtn+'</div>';
   }).join('');
@@ -6670,12 +6699,12 @@ async function checkUserTrips(user, freshLogin) {
     if (sb) { try { await sb.rpc('claim_pending_invitations'); } catch(e) { console.warn('[PlaniTrip] claim_pending_invitations:', e); } }
     const { data: ownedTrips, error: ownedErr } = await sb
       .from('trips')
-      .select('id, name, owner_id, owner_label, countries, archived_countries, start_date, end_date')
+      .select('id, name, owner_id, owner_label, owner_email, countries, archived_countries, start_date, end_date')
       .eq('owner_id', user.id);
 
     const { data: collabRows, error: collabErr } = await sb
       .from('collaborators')
-      .select('trip_id, trips(id, name, owner_id, owner_label, countries, archived_countries, start_date, end_date)')
+      .select('trip_id, trips(id, name, owner_id, owner_label, owner_email, countries, archived_countries, start_date, end_date)')
       .eq('user_id', user.id);
 
     if (ownedErr || collabErr) {
@@ -6988,6 +7017,7 @@ async function enterTrip(trip, resetTab) {
   await loadActivityDetails();
   await loadAccommodations();
   await loadCustomPhotos();
+  await loadProfiles();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
 
@@ -7002,13 +7032,20 @@ async function enterTrip(trip, resetTab) {
     S.country = COUNTRIES[0] ? COUNTRIES[0].id : null;
     save();
   }
-  // Auto-save owner_label dans trips pour que les collaborateurs voient le pseudo du propriétaire
+  // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
+  // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
   if(CURRENT_USER && trip.owner_id === CURRENT_USER.id){
-    var myLabel = (CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || CURRENT_USER.email || '';
-    if(myLabel && trip.owner_label !== myLabel){
-      trip.owner_label = myLabel;
-      CURRENT_TRIP.owner_label = myLabel;
-      if(sb) sb.from('trips').update({owner_label: myLabel}).eq('id', trip.id).then(function(){});
+    if(trip.owner_email !== CURRENT_USER.email){
+      trip.owner_email = CURRENT_USER.email;
+      CURRENT_TRIP.owner_email = CURRENT_USER.email;
+      if(sb) sb.from('trips').update({owner_email: CURRENT_USER.email}).eq('id', trip.id).then(function(){});
+    }
+    if(sb){
+      sb.from('profiles').select('id').eq('id', CURRENT_USER.id).maybeSingle().then(function(res){
+        if(!res.data){
+          sb.from('profiles').upsert({id:CURRENT_USER.id, email:CURRENT_USER.email, updated_at:new Date().toISOString()}).then(function(){});
+        }
+      });
     }
   }
   localStorage.setItem('planitrip_last_trip_id', trip.id);
