@@ -3995,7 +3995,7 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel,'Toi'))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'toi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
@@ -4151,9 +4151,10 @@ async function loadProfiles(){
   // Alias supplémentaires : email en tant que collaborateur == email lui-même (no-op),
   // mais aussi le pseudo saisi ponctuellement côté invité (invited_email connu).
 }
-function personDisplayName(emailOrLabel){
+function personDisplayName(emailOrLabel, selfLabel){
   if(!emailOrLabel) return '';
   var canon = canonicalPerson(emailOrLabel);
+  if(selfLabel && CURRENT_USER && canon===CURRENT_USER.email) return selfLabel;
   return PROFILES_MAP[canon] || canon;
 }
 // Résout un ancien pseudo (utilisé comme identité brute dans une vieille dépense) vers l'email
@@ -4191,7 +4192,7 @@ function getExpensePersonOptions(){
   var people = getPeopleList();
   if(!S.expPerson || people.indexOf(S.expPerson)===-1) S.expPerson = people[0];
   return people.map(function(p){
-    return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(personDisplayName(p))+'</option>';
+    return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(personDisplayName(p,'Moi'))+'</option>';
   }).join('');
 }
 var SPLIT_PEOPLE_CACHE = [];
@@ -4270,7 +4271,7 @@ function renderSplitRows(totalAmtStr){
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;'+(idx<people.length-1?'border-bottom:1px solid var(--sand-deep);':'')+'">'
       +'<span onclick="toggleSplitParticipant('+idx+')" style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;min-width:0">'
       +'<span id="splitCircle_'+idx+'" style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:#fff;font-size:11px;transition:background 0.15s">'+(checked?'✓':'')+'</span>'
-      +'<span style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(personDisplayName(p))+'</span></span>'
+      +'<span style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(personDisplayName(p,'Moi'))+'</span></span>'
       +'<span id="splitAmtCell_'+idx+'" style="display:'+(checked?'flex':'none')+';align-items:center;gap:2px;flex-shrink:0">'
       +'<input id="splitAmt_'+idx+'" type="text" inputmode="decimal" value="'+val+'" style="width:60px;text-align:right;border:none;background:transparent;font-size:14px;font-weight:600;color:var(--ink);padding:0" oninput="onSplitInput('+idx+',this.value)"/>'
       +'<span style="font-size:13px;color:var(--ink-subtle)">€</span></span>'
