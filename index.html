@@ -3979,9 +3979,10 @@ function renderBudgetOverview(){
       // Exception : mes propres dépenses peuvent se comparer au budget PRÉVU (règle validée).
       // Pour tout le monde d'autre : comparaison avec les dépenses RÉELLES du groupe, jamais une estimation.
       var isSelfView = S.budgetPersonView===myLabelP;
-      var pDenom = isSelfView ? totalBudget : totalSpent;
+      var myTotalBudget = getMyTotalPlannedBudget();
+      var pDenom = isSelfView ? myTotalBudget : totalSpent;
       var pPct = pDenom>0 ? Math.min(100, Math.round((pTotal/pDenom)*100)) : 0;
-      var pSubLabel = isSelfView ? ('sur '+fmtEUR(totalBudget)+' prévu au total') : ('sur '+fmtEUR(totalSpent)+' dépensés au total par le groupe');
+      var pSubLabel = isSelfView ? ('sur '+fmtEUR(myTotalBudget)+' prévu au total') : ('sur '+fmtEUR(totalSpent)+' dépensés au total par le groupe');
       body = '<div class="more-row" onclick="S.budgetPersonView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
         +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':personDisplayName(S.budgetPersonView))+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(pTotal)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">'+pSubLabel+'</div></div>'
@@ -4193,6 +4194,11 @@ function getMyCountryDailyBudget(c){
   var perCountry = (S.travelerBudgets && S.travelerBudgets[c.id]) || {};
   var v = perCountry[myEmail];
   return (v!==undefined && v!==null && !isNaN(v)) ? v : c.budget_daily;
+}
+// Mon budget prévu PERSONNEL, additionné sur tous les pays du voyage — à ne jamais confondre
+// avec getCountryPlannedBudget() qui additionne le budget de TOUS les voyageurs.
+function getMyTotalPlannedBudget(){
+  return COUNTRIES.reduce(function(s,c){ return s + getMyCountryDailyBudget(c)*c.days; }, 0);
 }
 function setMyCountryBudget(countryId, amount){
   var amt = parseFloat(amount);
