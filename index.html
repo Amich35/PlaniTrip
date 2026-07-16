@@ -6883,8 +6883,28 @@ async function loadBudgetEntries(){
   (data||[]).forEach(function(row){
     serverMap[row.id] = {id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date};
   });
-  S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); }).concat(Object.values(serverMap));
+  var localOnly = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); });
+  S.expenses = localOnly.concat(Object.values(serverMap));
   save();
+  // Réessai automatique : des dépenses créées localement mais jamais confirmées côté serveur
+  // (échec réseau, RLS, etc.) sont ré-envoyées à chaque chargement du voyage.
+  if(localOnly.length && sb && CURRENT_TRIP){
+    for(var i=0;i<localOnly.length;i++){
+      var e2 = localOnly[i];
+      try{
+        var res = await sb.from('budget_entries').insert({
+          id:e2.id, trip_id:CURRENT_TRIP.id, country_id:e2.country, city:e2.city, activity:e2.activity,
+          category:e2.category, description:e2.desc, amount:e2.amount, person_label:e2.personLabel,
+          participants:e2.participants, splits:e2.splits, entry_date:e2.date
+        });
+        if(res && res.error){
+          console.error('[PlaniTrip] retry insert budget_entries échoué:', res.error);
+        }
+      }catch(err){
+        console.error('[PlaniTrip] retry insert budget_entries exception:', err);
+      }
+    }
+  }
 }
 async function loadFavorites(){
   if(!sb || !CURRENT_TRIP) return;
