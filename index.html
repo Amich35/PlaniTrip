@@ -4061,15 +4061,15 @@ function renderBudgetOverview(){
         +'</div>';
     }).join('');
     var txnRows = txns.length ? txns.map(function(t){
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;font-size:13px;box-shadow:var(--shadow-sm);flex-wrap:wrap">'
-        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow:hidden">'
-        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;flex-shrink:1">'+escHtml(t.from===myLabel2?'Toi':personDisplayName(t.from))+'</span>'
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;font-size:13px;box-shadow:var(--shadow-sm)">'
+        +'<div style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;overflow:hidden">'
+        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex-shrink:1">'+escHtml(t.from===myLabel2?'Toi':personDisplayName(t.from))+'</span>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0;white-space:nowrap">doit</span>'
-        +'<span style="font-weight:700;color:var(--accent);flex-shrink:0">'+fmtEUR(t.amount)+'</span>'
+        +'<span style="font-weight:700;color:var(--accent);flex-shrink:0;white-space:nowrap">'+fmtEUR(t.amount)+'</span>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0">à</span>'
-        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;flex-shrink:1">'+escHtml(t.to===myLabel2?'toi':personDisplayName(t.to))+'</span>'
+        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex-shrink:1">'+escHtml(t.to===myLabel2?'toi':personDisplayName(t.to))+'</span>'
         +'</div>'
-        +'<button onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')" style="border:none;background:var(--accent);color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:10px;cursor:pointer;flex-shrink:0">C\'est payé !</button>'
+        +'<button onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')" style="border:none;background:var(--accent);color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:10px;cursor:pointer;flex-shrink:0;white-space:nowrap">C\'est payé !</button>'
         +'</div>';
     }).join('') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
     var reimbHistory = S.expenses.filter(function(e){return e.category==='reimbursement';}).sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
