@@ -4251,7 +4251,9 @@ function setMyCountryBudget(countryId, amount){
   if(!S.travelerBudgets[countryId]) S.travelerBudgets[countryId]={};
   S.travelerBudgets[countryId][myEmail] = amt;
   save();
-  renderContent();
+  // Pas de renderContent() ici : un re-render à chaque frappe recrée le champ et coupe la saisie
+  // (perte de focus/curseur, donc impossible de taper plus d'un chiffre). L'écran se rafraîchira
+  // naturellement à la prochaine navigation.
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__travelerBudget_'+countryId,data:S.travelerBudgets[countryId],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
