@@ -4381,7 +4381,7 @@ function addExpGlobal(){
       existing.participants=participants; existing.splits=splits; existing.date=expDate;
       if(sb && CURRENT_TRIP){
         var who2=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-        sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants,splits:splits,entry_date:expDate}).eq('id',S.editingExpenseId).then(function(){});
+        sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who2,participants:participants,splits:splits,entry_date:expDate}).eq('id',S.editingExpenseId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
       }
     }
     S.editingExpenseId = null;
@@ -4390,7 +4390,7 @@ function addExpGlobal(){
     S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:S.expPerson,personLabel:S.expPerson,participants:participants,splits:splits,date:expDate});
     if(sb && CURRENT_TRIP){
       var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||S.expPerson||'';
-      sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,splits:splits,entry_date:expDate}).then(function(){});
+      sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:who,participants:participants,splits:splits,entry_date:expDate}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
     }
   }
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};S.expDate='';save();renderContent();
