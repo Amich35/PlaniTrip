@@ -2804,38 +2804,17 @@ function editCountryField(countryId, field, value){
   saveCountryEdit(countryId);
 }
 function addGuideListItem(countryId, listField, promptLabel){
-  if(listField==='tips'||listField==='checklist'){
+  if(listField==='tips'||listField==='checklist'||listField==='emergency'){
     openGuideItemModal(countryId, listField, null); return;
-  }
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return;
-  if(listField==='emergency'){
-    var k = prompt('Nom (ex: Police, Ambulance) :');
-    if(!k||!k.trim()) return;
-    var v = prompt('Numéro pour '+k.trim()+' :');
-    if(!v||!v.trim()) return;
-    if(!c.practical.emergency) c.practical.emergency=[];
-    c.practical.emergency.push({k:stripHtml(k.trim()),v:stripHtml(v.trim())});
-    saveCountryEdit(countryId); renderContent();
   }
 }
 function editGuideListItem(countryId, listField, idx){
-  if(listField==='tips'||listField==='checklist'){
+  if(listField==='tips'||listField==='checklist'||listField==='emergency'){
     openGuideItemModal(countryId, listField, idx); return;
-  }
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return;
-  if(listField==='emergency'){
-    var currentE = c.practical.emergency[idx];
-    var k = prompt('Nom (ex: Police, Ambulance) :', currentE.k);
-    if(!k||!k.trim()) return;
-    var v = prompt('Numéro pour '+k.trim()+' :', currentE.v);
-    if(!v||!v.trim()) return;
-    c.practical.emergency[idx] = {k:stripHtml(k.trim()),v:stripHtml(v.trim())};
-    saveCountryEdit(countryId); renderContent();
   }
 }
 var _guideModalCountryId=null, _guideModalListField=null, _guideModalIdx=null;
+var _guideModalSaveFn=null;
 function openGuideItemModal(countryId, listField, idx){
   _guideModalCountryId=countryId;
   _guideModalListField=listField;
@@ -2843,6 +2822,18 @@ function openGuideItemModal(countryId, listField, idx){
   var c=COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
   var isEdit=_guideModalIdx!==null;
+
+  if(listField==='emergency'){
+    var currentE = isEdit ? (c.practical.emergency||[])[_guideModalIdx] : {k:'',v:''};
+    document.getElementById('guideItemModalTitle').textContent=isEdit?'Modifier':'Nouveau numéro';
+    document.getElementById('guideItemModalBody').innerHTML=
+      '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalEmergName" type="text" placeholder="Nom (ex: Police, Ambulance)" style="width:100%" value="'+escHtml(currentE.k||'')+'"/></div>'
+      +'<div class="ef-row"><input class="ef-input" id="guideModalEmergNum" type="text" placeholder="Numéro" style="width:100%" value="'+escHtml(currentE.v||'')+'"/></div>';
+    _guideModalSaveFn = saveGuideItem;
+    document.getElementById('guideItemModal').classList.add('open');
+    return;
+  }
+
   var isTip=listField==='tips';
   var cats=isTip?TIP_CATEGORIES:_CL_KNOWN_CATS;
   var currentItem=isEdit
@@ -2853,16 +2844,33 @@ function openGuideItemModal(countryId, listField, idx){
   document.getElementById('guideItemModalBody').innerHTML=
     '<div class="ef-row" style="margin-bottom:8px"><select class="ef-select" id="guideModalCatSel" style="width:100%">'+catOpts+'</select></div>'
     +'<div class="ef-row"><textarea class="ef-input" id="guideModalText" rows="3" placeholder="'+(isTip?'Conseil…':'À préparer…')+'" style="width:100%;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5">'+escHtml(currentItem.t||'')+'</textarea></div>';
+  _guideModalSaveFn = saveGuideItem;
   document.getElementById('guideItemModal').classList.add('open');
 }
 function closeGuideItemModal(){
   document.getElementById('guideItemModal').classList.remove('open');
 }
 function saveGuideItem(){
+  var c=COUNTRIES.find(function(co){return co.id===_guideModalCountryId;});
+  if(!c){closeGuideItemModal();return;}
+
+  if(_guideModalListField==='emergency'){
+    var name=((document.getElementById('guideModalEmergName')||{}).value||'').trim();
+    var num=((document.getElementById('guideModalEmergNum')||{}).value||'').trim();
+    if(!name||!num){closeGuideItemModal();return;}
+    if(!c.practical.emergency) c.practical.emergency=[];
+    var newE={k:stripHtml(name),v:stripHtml(num)};
+    if(_guideModalIdx!==null) c.practical.emergency[_guideModalIdx]=newE;
+    else c.practical.emergency.push(newE);
+    saveCountryEdit(_guideModalCountryId);
+    closeGuideItemModal();
+    renderContent();
+    return;
+  }
+
   var text=((document.getElementById('guideModalText')||{}).value||'').trim();
   var cat=(document.getElementById('guideModalCatSel')||{}).value||'Autre';
-  var c=COUNTRIES.find(function(co){return co.id===_guideModalCountryId;});
-  if(!c||!text){closeGuideItemModal();return;}
+  if(!text){closeGuideItemModal();return;}
   var newItem={t:stripHtml(text),cat:cat};
   var isTip=_guideModalListField==='tips';
   if(isTip){
@@ -2877,6 +2885,25 @@ function saveGuideItem(){
   saveCountryEdit(_guideModalCountryId);
   closeGuideItemModal();
   renderContent();
+}
+// ── Modale Dates du séjour (même style que conseils/checklist) ──
+var _datesModalCountryId=null;
+function openDatesModal(countryId){
+  _datesModalCountryId=countryId;
+  var c=COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return;
+  document.getElementById('guideItemModalTitle').textContent='Dates du séjour';
+  document.getElementById('guideItemModalBody').innerHTML=
+    '<div class="ef-row" style="margin-bottom:8px;gap:8px"><div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%" value="'+escHtml(c.dateStart||'')+'"/></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%" value="'+escHtml(c.dateEnd||'')+'"/></div></div>';
+  _guideModalSaveFn = saveDatesModal;
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function saveDatesModal(){
+  var start=((document.getElementById('guideModalDateStart')||{}).value||'');
+  var end=((document.getElementById('guideModalDateEnd')||{}).value||'');
+  editCountryDateRange(_datesModalCountryId, start, end);
+  closeGuideItemModal();
 }
 function removeGuideListItem(countryId, listField, idx){
   var label = listField==='checklist' ? 'cet item' : (listField==='emergency' ? 'ce numéro' : 'ce conseil');
@@ -4893,26 +4920,11 @@ function renderGuide(c){
     +aiBadge
     +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub" style="line-height:1.5">Deux façons de remplir cette fiche : <strong>à la main</strong> (remplis simplement les champs ci-dessous) ou <strong>avec l\'IA</strong> (recherche web automatique) en configurant une clé API personnelle dans Plus → Réglages avancés.</div></div>')
-    +'<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</div>'
-    +'<div style="display:flex;gap:12px">'
-    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">'
-    +'<span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Arrivée</span>'
-    +'<div style="position:relative;width:100%">'
-    +(c.dateStart?'':'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:13px;color:var(--ink-subtle);background:var(--sand);border-radius:var(--r8)">Choisir une date</span>')
-    +'<input class="ir-input" type="date" style="width:100%;text-align:center;position:relative;'+(c.dateStart?'':'opacity:0')+'" value="'+escHtml(c.dateStart||'')+'" onchange="editCountryDateRange(\''+c.id+'\',this.value,null)"/>'
-    +'</div>'
-    +(c.dateStart?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',\'\',null)">Effacer</span>':'')
-    +'</div>'
-    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px">'
-    +'<span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Départ</span>'
-    +'<div style="position:relative;width:100%">'
-    +(c.dateEnd?'':'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:13px;color:var(--ink-subtle);background:var(--sand);border-radius:var(--r8)">Choisir une date</span>')
-    +'<input class="ir-input" type="date" style="width:100%;text-align:center;position:relative;'+(c.dateEnd?'':'opacity:0')+'" value="'+escHtml(c.dateEnd||'')+'" onchange="editCountryDateRange(\''+c.id+'\',null,this.value)"/>'
-    +'</div>'
-    +(c.dateEnd?'<span style="font-size:11px;color:var(--ink-subtle);cursor:pointer" onclick="editCountryDateRange(\''+c.id+'\',null,\'\')">Effacer</span>':'')
-    +'</div>'
-    +'</div>'
-    +'<div class="info-row" style="margin-top:4px"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Jours au programme<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="number" style="max-width:60px" value="'+c.days+'" oninput="editCountryField(\''+c.id+'\',\'days\',this.value)"/></div>'
+    +'<div class="info-card" onclick="openDatesModal(\''+c.id+'\')" style="cursor:pointer"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
+    +(c.dateStart&&c.dateEnd
+      ? '<div class="status-main">'+fmtDateRangeFr(c.dateStart,c.dateEnd)+'</div>'
+      : '<div class="status-sub">À renseigner — touche pour choisir les dates.</div>')
+    +'<div class="info-row" style="margin-top:8px" onclick="event.stopPropagation()"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Jours au programme<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="number" style="max-width:60px" value="'+c.days+'" oninput="editCountryField(\''+c.id+'\',\'days\',this.value)"/></div>'
     +'<div class="status-sub" style="margin-top:2px">Recalculé automatiquement si tu renseignes les deux dates — modifiable ici si besoin.</div>'
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
@@ -7844,7 +7856,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div id="guideItemModalBody"></div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="modal-cancel-btn" onclick="closeGuideItemModal()" style="flex:1">Annuler</button>
-      <button class="modal-cta" onclick="saveGuideItem()" style="flex:1">Enregistrer</button>
+      <button class="modal-cta" onclick="_guideModalSaveFn()" style="flex:1">Enregistrer</button>
     </div>
   </div>
 </div>
