@@ -5348,6 +5348,8 @@ function moveCountryInStrip(fromIdx, toIdx) {
 function cityTrashSectionHTML(countryId){
   var items = (S.cityTrash||[]).filter(function(t){return t.countryId===countryId;});
   if(!items.length) return '';
+  var akey = 'cityTrash_'+countryId;
+  var isOpen = !!(S.uiAccordion && S.uiAccordion[akey]);
   var rows = items.map(function(t){
     var parts=[];
     if(t.journalEntries&&t.journalEntries.length) parts.push(t.journalEntries.length+' entrée(s) carnet');
@@ -5355,7 +5357,13 @@ function cityTrashSectionHTML(countryId){
     var extra = parts.length ? ' · '+parts.join(' · ') : '';
     return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><button class="trash-restore" onclick="restoreCity('+t.id+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
   }).join('');
-  return '<div class="trash-section" style="margin-top:12px"><div class="trash-label">Villes supprimées</div>'+rows+'</div>';
+  return '<div class="trash-section" style="margin-top:12px">'
+    +'<div onclick="toggleAccordion(\''+akey+'\')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
+    +'<div class="trash-label" style="margin:0">Villes supprimées ('+items.length+')</div>'
+    +'<span style="transform:rotate('+(isOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span>'
+    +'</div>'
+    +(isOpen ? '<div style="margin-top:8px">'+rows+'</div>' : '')
+    +'</div>';
 }
 function deleteCityConfirm(countryId, cityName){
   showConfirm('Supprimer '+cityName+' et toutes ses activités ? Les dépenses et entrées de carnet liées seront aussi mises en corbeille.', function(){
