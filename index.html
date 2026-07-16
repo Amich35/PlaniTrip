@@ -4061,13 +4061,12 @@ function renderBudgetOverview(){
         +'</div>';
     }).join('');
     var txnRows = txns.length ? txns.map(function(t){
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;font-size:13px;box-shadow:var(--shadow-sm)">'
-        +'<div style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;overflow:hidden">'
-        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex-shrink:1">'+escHtml(t.from===myLabel2?'Toi':personDisplayName(t.from))+'</span>'
-        +'<span style="color:var(--ink-subtle);flex-shrink:0;white-space:nowrap">doit</span>'
-        +'<span style="font-weight:700;color:var(--accent);flex-shrink:0;white-space:nowrap">'+fmtEUR(t.amount)+'</span>'
-        +'<span style="color:var(--ink-subtle);flex-shrink:0">à</span>'
-        +'<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex-shrink:1">'+escHtml(t.to===myLabel2?'toi':personDisplayName(t.to))+'</span>'
+      var fromLabel = t.from===myLabel2 ? 'Toi' : personDisplayName(t.from);
+      var toLabel = t.to===myLabel2 ? 'toi' : personDisplayName(t.to);
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;box-shadow:var(--shadow-sm)">'
+        +'<div style="min-width:0;flex:1">'
+        +'<div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600">'+escHtml(fromLabel)+'</span> <span style="color:var(--ink-subtle)">doit</span> <span style="font-weight:700;color:var(--accent)">'+fmtEUR(t.amount)+'</span></div>'
+        +'<div style="font-size:11px;color:var(--ink-subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">à '+escHtml(toLabel)+'</div>'
         +'</div>'
         +'<button onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')" style="border:none;background:var(--accent);color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:10px;cursor:pointer;flex-shrink:0;white-space:nowrap">C\'est payé !</button>'
         +'</div>';
