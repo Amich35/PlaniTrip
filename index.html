@@ -3420,7 +3420,7 @@ function renderToday(){
   }
   var myEmailToday = (CURRENT_USER && CURRENT_USER.email) || '';
   var todaySpent = S.expenses.filter(function(e){return e.date===todayStr && canonicalPerson(e.personLabel||e.person)===myEmailToday && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
-  var budgetDaily = c ? c.budget_daily : 0;
+  var budgetDaily = c ? getMyCountryDailyBudget(c) : 0;
 
   // ── Hero simple (sans indicateurs) ──
   var heroQuery = c ? getCountryImageQuery(c) : 'travel';
@@ -3804,7 +3804,7 @@ function renderHome(){
   const ts=getTripStatus();
   const doneActs=Object.values(S.done).filter(Boolean).length;
   const spent=S.expenses.reduce(function(s,e){return s+e.amount;},0);
-  const totalBudget=COUNTRIES.reduce(function(s,c){return s+c.budget_daily*c.days;},0);
+  const totalBudget=COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
   const totalDays=COUNTRIES.reduce(function(s,c){return s+c.days;},0);
   const tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
   const tripPct=totalDays>0?Math.round((tripDay/totalDays)*100):0;
@@ -3943,7 +3943,7 @@ function renderProgressRing(pct, size, stroke, color){
 function renderBudgetOverview(){
   var sub = S.budgetSubTab||'resume';
   var totalSpent = S.expenses.filter(function(e){return e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
-  var totalBudget = COUNTRIES.reduce(function(s,c){return s+c.budget_daily*c.days;},0);
+  var totalBudget = COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
   var pct = totalBudget>0 ? Math.min(100, Math.round((totalSpent/totalBudget)*100)) : 0;
   var tabsHTML = ['resume','remb'].map(function(t){
     var lbl = t==='resume'?'Dépenses':'Remboursements';
@@ -3992,7 +3992,7 @@ function renderBudgetOverview(){
     } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
       var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
-      var cBudget = c2.budget_daily*c2.days;
+      var cBudget = getCountryPlannedBudget(c2);
       var cExps = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var byDate = {};
       var dateOrder = [];
@@ -4022,7 +4022,7 @@ function renderBudgetOverview(){
     var rows = COUNTRIES.map(function(c){
       // Barre de progression = MES dépenses dans ce pays / budget prévu pour ce pays (pas le groupe entier)
       var mySpentInCountry = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement' && canonicalPerson(e.personLabel||e.person)===myEmailPays;}).reduce(function(s,e){return s+e.amount;},0);
-      var budget = c.budget_daily*c.days;
+      var budget = getCountryPlannedBudget(c);
       var p = budget>0 ? Math.min(100, Math.round((mySpentInCountry/budget)*100)) : 0;
       return '<div class="budget-country-row" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'
         +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span>'
@@ -4173,6 +4173,40 @@ function personDisplayName(emailOrLabel, selfLabel){
 function canonicalPerson(label){
   if(!label) return label;
   return REVERSE_ALIAS_MAP[label] || label;
+}
+// Budget prévu par pays = somme des budgets/jour de CHAQUE voyageur (le sien s'il l'a défini,
+// sinon la valeur par défaut du pays), multipliée par le nombre de jours.
+function getCountryPlannedBudget(c){
+  if(!c) return 0;
+  var people = getPeopleList();
+  var perCountry = (S.travelerBudgets && S.travelerBudgets[c.id]) || {};
+  var dailySum = people.reduce(function(sum, email){
+    var v = perCountry[email];
+    return sum + ((v!==undefined && v!==null && !isNaN(v)) ? v : c.budget_daily);
+  }, 0);
+  return dailySum * c.days;
+}
+// Mon propre budget/jour pour un pays (valeur par défaut si jamais renseigné)
+function getMyCountryDailyBudget(c){
+  if(!c) return 0;
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  var perCountry = (S.travelerBudgets && S.travelerBudgets[c.id]) || {};
+  var v = perCountry[myEmail];
+  return (v!==undefined && v!==null && !isNaN(v)) ? v : c.budget_daily;
+}
+function setMyCountryBudget(countryId, amount){
+  var amt = parseFloat(amount);
+  if(isNaN(amt) || amt<0) return;
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  if(!myEmail) return;
+  if(!S.travelerBudgets) S.travelerBudgets={};
+  if(!S.travelerBudgets[countryId]) S.travelerBudgets[countryId]={};
+  S.travelerBudgets[countryId][myEmail] = amt;
+  save();
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__travelerBudget_'+countryId,data:S.travelerBudgets[countryId],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+  }
 }
 function getPeopleList(){
   var seen = {};
@@ -4865,7 +4899,9 @@ function renderGuide(c){
     +'<div class="info-row"><span class="ir-key">Taux indicatif</span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
+    +'<div class="info-row"><span class="ir-key">Budget / jour <span style="font-size:10.5px;color:var(--ink-subtle);font-weight:400">(défaut)</span></span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+c.budget_daily+'" oninput="editCountryField(\''+c.id+'\',\'budget_daily\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
+    +'<div class="info-row"><span class="ir-key">Mon budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
+    +'<div class="status-sub" style="margin:-4px 0 4px">Le budget prévu du pays est recalculé en additionnant le budget/jour de chaque voyageur (le sien, sinon la valeur par défaut).</div>'
     +'<div class="info-row"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +(c._aiGeneratedAt?'<div class="status-sub" style="margin-top:4px">Généré par IA le '+new Date(c._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+'</div>':'')
     +'</div>'
@@ -5337,6 +5373,7 @@ function moveCity(countryId,currentPos,direction){
 
 // ── REORDER WITH ▲▼ BUTTONS ──────────────────────────────────
 if(!S.order) S.order={};
+if(!S.travelerBudgets) S.travelerBudgets={};
 if(!S.customDetails) S.customDetails={};
 if(!window._customDetails) window._customDetails=S.customDetails||{};
 function syncActOrder(){
@@ -6978,6 +7015,12 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }
     } else if(row.detail_key === '__planitrip__deletedActs'){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
+    } else if(row.detail_key.indexOf('__planitrip__travelerBudget_')===0){
+      var cid = row.detail_key.slice('__planitrip__travelerBudget_'.length);
+      if(row.data && typeof row.data === 'object'){
+        if(!S.travelerBudgets) S.travelerBudgets={};
+        S.travelerBudgets[cid] = row.data;
+      }
     } else {
       window._customDetails[row.detail_key] = row.data;
     }
