@@ -2465,7 +2465,7 @@ function openPhotoPicker(query){
   var urlInput = document.getElementById('photoUrlInput');
   if(urlInput) urlInput.value='';
   var resetBtn = document.getElementById('photoResetBtn');
-  if(resetBtn) resetBtn.style.display = (S.customPhotos && S.customPhotos[query]) ? 'block' : 'none';
+  if(resetBtn) resetBtn.style.display = (S.customPhotos && S.customPhotos[query]) ? 'flex' : 'none';
   document.getElementById('photoModal').classList.add('open');
 }
 function closePhotoPicker(){ document.getElementById('photoModal').classList.remove('open'); }
@@ -3307,7 +3307,7 @@ function renderItinerary(c, embedded){
       trashHTML='<div class="trash-section"><div class="trash-label">Corbeille ('+cityTrash.length+')</div>';
       cityTrash.forEach(function(item,ti){
         const name=item._builtinIndex!==undefined?(city.acts[item._builtinIndex]||{}).n||'Activité supprimée':item.n||'Activité supprimée';
-        trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><button class="trash-restore" onclick="restoreActivity(\''+ck+'\','+ti+')">↩ Restaurer</button></div>';
+        trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><button class="trash-restore" onclick="restoreActivity(\''+ck+'\','+ti+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
       });
       trashHTML+='</div>';
     }
@@ -5353,7 +5353,7 @@ function cityTrashSectionHTML(countryId){
     if(t.journalEntries&&t.journalEntries.length) parts.push(t.journalEntries.length+' entrée(s) carnet');
     if(t.expenses&&t.expenses.length) parts.push(t.expenses.length+' dépense(s)');
     var extra = parts.length ? ' · '+parts.join(' · ') : '';
-    return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><button class="trash-restore" onclick="restoreCity('+t.id+')">↩ Restaurer</button></div>';
+    return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><button class="trash-restore" onclick="restoreCity('+t.id+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
   }).join('');
   return '<div class="trash-section" style="margin-top:12px"><div class="trash-label">Villes supprimées</div>'+rows+'</div>';
 }
@@ -6465,6 +6465,7 @@ function renderContent(){
 // ── ICON LIBRARY — 24×24, 2px stroke, round cap/join, no fill ──
 // Style: Lucide-inspired, iOS/SF Symbols feel. Inactive #545454, active #2E7D5B (set via CSS).
 const ICON_PATHS = {
+  'rotate-ccw': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
   house: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
   map: '<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>',
@@ -7944,7 +7945,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <button class="modal-cta" onclick="triggerPhotoFileInput()" style="margin-bottom:8px">Choisir depuis la galerie</button>
     <input class="modal-field" type="text" id="photoUrlInput" placeholder="ou colle une URL d'image…" style="margin-bottom:8px"/>
     <button class="modal-cta" onclick="useCustomPhotoUrl()" style="margin-bottom:8px">Utiliser cette URL</button>
-    <button class="modal-cancel-btn" id="photoResetBtn" onclick="resetCustomPhoto()" style="display:none;color:var(--red-muted);margin-bottom:4px">↩ Revenir à la photo automatique</button>
+    <button class="modal-cancel-btn" id="photoResetBtn" onclick="resetCustomPhoto()" style="display:none;color:var(--red-muted);margin-bottom:4px;align-items:center;justify-content:center;gap:5px"><span data-icon="rotate-ccw" data-icon-size="13"></span> Revenir à la photo automatique</button>
     <button class="modal-cancel-btn" onclick="closePhotoPicker()">Annuler</button>
   </div>
 </div>
