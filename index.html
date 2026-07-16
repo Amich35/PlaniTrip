@@ -2749,7 +2749,7 @@ function saveCountryEdit(countryId){
   };
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()},{onConflict:'trip_id,country_id'}).then(function(){});
   }
 }
 function toLocalISODate(d){
@@ -6718,12 +6718,20 @@ async function loadCountrySettings(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('country_settings').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(!S.countryEdits) S.countryEdits={};
+  // Dédoublonner par country_id : garder uniquement la ligne la plus récente
+  // (sécurité si la contrainte UNIQUE n'existait pas encore au moment des premiers upserts)
+  var latest = {};
   (data||[]).forEach(function(row){
+    if(!latest[row.country_id] || row.updated_at > latest[row.country_id].updated_at){
+      latest[row.country_id] = row;
+    }
+  });
+  Object.values(latest).forEach(function(row){
+    if(!row.data || typeof row.data !== 'object') return;
     if(!S.countryEdits[row.country_id]){
       S.countryEdits[row.country_id] = row.data;
-    } else if(row.data && typeof row.data === 'object'){
-      // Le serveur fait autorité sur tous les champs : Object.assign écrase
-      // le localStorage local pour garantir la synchronisation entre voyageurs.
+    } else {
+      // Serveur autoritaire : tous les champs serveur écrasent le local
       Object.assign(S.countryEdits[row.country_id], row.data);
     }
   });
