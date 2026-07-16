@@ -5467,6 +5467,10 @@ function restoreCity(trashId){
 }
 function getCityOrder(countryId) {
   if(!S.cityOrder) S.cityOrder={};
+  const c=COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return [];
+  if(S.cityOrder[countryId]&&S.cityOrder[countryId].length===c.cities.length) return S.cityOrder[countryId];
+  return c.cities.map(function(_,i){return i;});
 }
 function moveCity(countryId,currentPos,direction){
   if(!S.cityOrder) S.cityOrder={};
