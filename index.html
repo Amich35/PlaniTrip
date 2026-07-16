@@ -2847,6 +2847,16 @@ function openGuideItemModal(countryId, listField, idx){
     return;
   }
 
+  if(listField==='city'){
+    document.getElementById('guideItemModalTitle').textContent='Nouvelle ville';
+    document.getElementById('guideItemModalBody').innerHTML=
+      '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%"/></div>'
+      +'<div class="ef-row"><input class="ef-input" id="guideModalCitySub" type="text" placeholder="Durée (ex: 3 jours)" style="width:100%" value="2 jours"/></div>';
+    _guideModalSaveFn = saveGuideItem;
+    document.getElementById('guideItemModal').classList.add('open');
+    return;
+  }
+
   var isTip=listField==='tips';
   var cats=isTip?TIP_CATEGORIES:_CL_KNOWN_CATS;
   var currentItem=isEdit
@@ -2878,6 +2888,14 @@ function saveGuideItem(){
     saveCountryEdit(_guideModalCountryId);
     closeGuideItemModal();
     renderContent();
+    return;
+  }
+
+  if(_guideModalListField==='city'){
+    var cname=((document.getElementById('guideModalCityName')||{}).value||'').trim();
+    var csub=((document.getElementById('guideModalCitySub')||{}).value||'').trim();
+    closeGuideItemModal();
+    _createCityFromModal(_guideModalCountryId, cname, csub);
     return;
   }
 
@@ -2958,9 +2976,12 @@ function removeGuideListItem(countryId, listField, idx){
 }
 
 function addCityToCountry(countryId){
-  var name = stripHtml(prompt('Nom de la ville :')||'');
+  openGuideItemModal(countryId, 'city', null);
+}
+function _createCityFromModal(countryId, name, sub){
+  name = stripHtml(name||'');
+  sub = stripHtml(sub||'');
   if(!name || !name.trim()) return;
-  var sub = stripHtml(prompt('Durée (ex: "3 jours") :', '2 jours') || '');
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
   if(c.cities.find(function(ci){return ci.city===name.trim();})){ alert('Cette ville existe déjà.'); return; }
