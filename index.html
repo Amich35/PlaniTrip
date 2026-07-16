@@ -2010,7 +2010,7 @@ function toggleFavorite(k){
   if(sb && CURRENT_TRIP){
     var countryId = k.split('_')[0];
     if(S.favorites[k]){
-      var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
       sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(){});
     } else {
       sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(){});
@@ -2025,7 +2025,7 @@ function toggleCL(k){
   if(sb && CURRENT_TRIP){
     var countryId = k.split('_')[0];
     if(S.checklist[k]){
-      var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
       sb.from('checklist_items').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(){});
     } else {
       sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(){});
@@ -2691,7 +2691,7 @@ function addActivity(cityKey) {
   fetchActivityDetailAI(cityKey, val, cityKey+'_c'+newIdx, newIdx);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
-    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+    var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(){});
   }
 }
@@ -2923,7 +2923,7 @@ function addCityToCountry(countryId){
   renderContent();
   if(S.apiKey) suggestActivitiesWithAI(countryId, newCity.city);
   if(sb && CURRENT_TRIP){
-    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+    var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}).then(function(){});
   }
 }
@@ -4607,7 +4607,7 @@ function addJournalEntry(){
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    var who=(CURRENT_USER&&CURRENT_USER.user_metadata&&CURRENT_USER.user_metadata.pseudo)||(CURRENT_USER&&CURRENT_USER.email)||'';
+    var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('journal_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,entry_date:date,text_content:text,location:location,photo:photo,added_by_label:who}).then(function(){});
   }
 }
@@ -4654,7 +4654,7 @@ function renderCarnetScreen(){
 }
 
 function renderMore(){
-  var myPseudo = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || '';
+  var myPseudo = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email] && PROFILES_MAP[CURRENT_USER.email]!==CURRENT_USER.email) ? PROFILES_MAP[CURRENT_USER.email] : '';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Plus</div>'
     +'<div class="info-card" style="padding:6px">'
@@ -6106,7 +6106,7 @@ async function addCollaboratorSubmit(){
   }
 
   var tripName = (CURRENT_TRIP && CURRENT_TRIP.name) || 'ce voyage';
-  var inviterName = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || '';
+  var inviterName = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email]) || (CURRENT_USER && CURRENT_USER.email) || '';
   try {
     var { error: fnError } = await sb.functions.invoke('send-invite', {
       body: { to_email: email, trip_name: tripName, inviter_name: inviterName }
