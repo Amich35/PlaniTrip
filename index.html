@@ -4011,8 +4011,8 @@ function renderBudgetOverview(){
       }).join('');
       // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
       body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
-        +'<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
-        +'<div style="flex:1"><div class="bh-label">'+c2.flag+' '+c2.name+'</div><div class="bh-amount">'+fmtEUR(cSpent)+'</div><div class="bh-sub">sur '+fmtEUR(cBudget)+' prévu</div></div>'
+        +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
+        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpent)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' prévu</div></div>'
         +renderProgressRing(cBudget>0?Math.min(100,Math.round((cSpent/cBudget)*100)):0, 72, 7, '#95D5B2')
         +'</div></div>'
         +(cExps.length ? groupsHTML : '<div class="fav-empty">Aucune dépense enregistrée pour ce pays.</div>')
