@@ -4970,7 +4970,7 @@ function delExp(id){
   }, 'Supprimer');
 }
 function markAsReimbursed(fromPerson, toPerson, amount){
-  showConfirm('Confirmer que '+(fromPerson)+' a remboursé '+fmtEUR(amount)+' à '+(toPerson)+' ?', function(){
+  showConfirm('Confirmer que '+personDisplayName(fromPerson)+' a remboursé '+fmtEUR(amount)+' à '+personDisplayName(toPerson)+' ?', function(){
     var newId = Date.now();
     var todayStr = toLocalISODate(new Date());
     var entry = {
@@ -4990,7 +4990,7 @@ function editReimbursement(id){
   var e = S.expenses.find(function(x){return x.id===id;});
   if(!e) return;
   var toP = (e.participants&&e.participants[0]) || '?';
-  var val = prompt('Nouveau montant du remboursement de '+e.personLabel+' à '+toP+' :', String(e.amount).replace('.',','));
+  var val = prompt('Nouveau montant du remboursement de '+personDisplayName(e.personLabel)+' à '+personDisplayName(toP)+' :', String(e.amount).replace('.',','));
   if(val===null) return;
   var amt = parseFloat(val.replace(',','.'));
   if(isNaN(amt) || amt<=0){ alert('Montant invalide.'); return; }
