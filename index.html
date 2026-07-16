@@ -3999,22 +3999,12 @@ function renderBudgetOverview(){
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
-      var cPaidRows = getPeopleList().map(function(p){
-        var pAmt = cExps.filter(function(e){return (e.personLabel||e.person)===p;}).reduce(function(s,e){return s+e.amount;},0);
-        return pAmt>0 ? {person:p, amt:pAmt} : null;
-      }).filter(Boolean).sort(function(a,b){return b.amt-a.amt;}).map(function(b){
-        return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
-          +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(b.person)+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person)+'</span></div>'
-          +'<span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.amt)+'</span>'
-          +'</div>';
-      }).join('');
-      var cPaidCard = cPaidRows ? '<div class="info-card"><div class="ic-header">Payé par</div>'+cPaidRows+'</div>' : '';
+      // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
       body = '<div class="more-row" onclick="S.budgetCountryView=null;renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
         +'<div style="flex:1"><div class="bh-label">'+c2.flag+' '+c2.name+'</div><div class="bh-amount">'+fmtEUR(cSpent)+'</div><div class="bh-sub">sur '+fmtEUR(cBudget)+' prévu</div></div>'
         +renderProgressRing(cBudget>0?Math.min(100,Math.round((cSpent/cBudget)*100)):0, 72, 7, '#95D5B2')
         +'</div></div>'
-        +cPaidCard
         +(cExps.length ? groupsHTML : '<div class="fav-empty">Aucune dépense enregistrée pour ce pays.</div>')
         +fabHTML;
     } else {
@@ -4036,19 +4026,20 @@ function renderBudgetOverview(){
         +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
         +'</div>';
     }).join('');
-    // paidCard retiré de la vue par défaut — désormais uniquement dans la vue par pays (voir S.budgetCountryView)
-    // ── Mes dépenses / Dépenses totales : deux cartes côte à côte ──
+    // ── Carte "Mes depenses vs Total groupe" : un seul encart moderne, degrade, texte adaptatif ──
     var myLabelDash = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var mySpent = S.expenses.filter(function(e){return (e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
-    function dashCard(label, amount, onclickAttr){
-      return '<div class="budget-hero"'+(onclickAttr?' onclick="'+onclickAttr+'"':'')+' style="flex:1;padding:14px;margin-bottom:0'+(onclickAttr?';cursor:pointer':'')+'">'
-        +'<div class="bh-label" style="font-size:10px">'+label+'</div>'
-        +'<div class="bh-amount" style="font-size:24px;margin-top:2px">'+fmtEUR(amount)+'</div>'
-        +'</div>';
-    }
-    var dashRow = '<div style="display:flex;gap:10px;margin-bottom:14px">'
-      +dashCard('Mes dépenses', mySpent, "S.budgetPersonView='"+escHtml(myLabelDash).replace(/'/g,"\\'")+"';renderContent();")
-      +dashCard('Dépenses totales', totalSpent)
+    var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
+    var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
+      +'<div style="display:flex;align-items:flex-end;gap:16px">'
+      +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Mes depenses</div>'
+      +'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:2px">'+fmtEUR(mySpent)+'</div></div>'
+      +'<div style="width:1px;align-self:stretch;background:rgba(255,255,255,0.18)"></div>'
+      +'<div style="flex:1;text-align:right"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total groupe</div>'
+      +'<div style="font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-top:6px;color:rgba(255,255,255,0.92)">'+fmtEUR(totalSpent)+'</div></div>'
+      +'</div>'
+      +'<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+mySharePct+'%;background:#95D5B2;border-radius:2px"></div></div>'
+      +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">Tu representes '+mySharePct+'% des depenses du groupe</div>'
       +'</div>';
     body = dashRow
       +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
@@ -4084,14 +4075,19 @@ function renderBudgetOverview(){
     var reimbHistHTML = reimbHistory.length ? reimbHistory.map(function(e){
       var toP = (e.participants&&e.participants[0]) || '?';
       var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px">'
-        +'<div style="font-size:13px"><span style="font-weight:600">'+escHtml(e.personLabel===myLabel2?'Toi':e.personLabel)+'</span> <span style="color:var(--ink-subtle)">a remboursé</span> <span style="font-weight:600">'+escHtml(toP===myLabel2?'toi':toP)+'</span></div>'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-size:13px;font-weight:700;color:var(--accent)">'+fmtEUR(e.amount)+'</span><span style="font-size:11px;color:var(--ink-subtle)">'+dLabel+'</span><span class="ee-del" onclick="delExp('+e.id+')">×</span></div>'
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;flex-wrap:wrap;gap:4px">'
+        +'<div style="font-size:13px"><span style="font-weight:600">'+escHtml(e.personLabel===myLabel2?'Toi':e.personLabel)+'</span> <span style="color:var(--ink-subtle)">a rembourse</span> <span style="font-weight:600">'+escHtml(toP===myLabel2?'toi':toP)+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">'
+        +'<span style="font-size:13px;font-weight:700;color:var(--accent)">'+fmtEUR(e.amount)+'</span>'
+        +'<span style="font-size:11px;color:var(--ink-subtle)">'+dLabel+'</span>'
+        +'<span style="font-size:11.5px;font-weight:600;color:var(--ink-muted);cursor:pointer" onclick="editReimbursement('+e.id+')">Modifier</span>'
+        +'<span style="font-size:11.5px;font-weight:600;color:var(--red-muted);cursor:pointer" onclick="restoreReimbursement('+e.id+')">Restaurer</span>'
+        +'</div>'
         +'</div>';
     }).join('') : '';
     var reimbHistCard = reimbHistHTML ? '<div class="info-card" style="margin-top:14px"><div class="ic-header">Historique des remboursements</div>'+reimbHistHTML+'</div>' : '';
     body = '<div class="info-card" style="margin-bottom:14px"><div class="ic-header">Soldes</div>'+balanceCards+'</div>'
-      +'<div class="info-card"><div class="ic-header">Remboursements suggérés</div>'+txnRows+'</div>'
+      +'<div class="info-card"><div class="ic-header">Remboursements suggeres</div>'+txnRows+'</div>'
       +reimbHistCard;
   }
 
@@ -4875,6 +4871,27 @@ function markAsReimbursed(fromPerson, toPerson, amount){
       sb.from('budget_entries').insert({id:newId, trip_id:CURRENT_TRIP.id, country_id:entry.country, city:null, activity:null, category:'reimbursement', description:'Remboursement', amount:amount, person_label:fromPerson, participants:[toPerson], splits:null, entry_date:todayStr}).then(function(){});
     }
   }, 'Confirmer');
+}
+function editReimbursement(id){
+  var e = S.expenses.find(function(x){return x.id===id;});
+  if(!e) return;
+  var toP = (e.participants&&e.participants[0]) || '?';
+  var val = prompt('Nouveau montant du remboursement de '+e.personLabel+' à '+toP+' :', String(e.amount).replace('.',','));
+  if(val===null) return;
+  var amt = parseFloat(val.replace(',','.'));
+  if(isNaN(amt) || amt<=0){ alert('Montant invalide.'); return; }
+  e.amount = amt;
+  save(); renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('budget_entries').update({amount:amt}).eq('id', id).then(function(){});
+  }
+}
+function restoreReimbursement(id){
+  showConfirm('Annuler ce remboursement ? La dette sera restaurée.', function(){
+    S.expenses = S.expenses.filter(function(e){return e.id!==id;});
+    save(); renderContent();
+    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(){});
+  }, 'Restaurer la dette');
 }
 function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
 function closeShare(){document.getElementById('shareModal').classList.remove('open');}
@@ -5937,6 +5954,8 @@ async function saveMyPseudo(){
   var pseudo = input.value.trim();
   if (!sb) { errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
 
+  var oldLabel = (CURRENT_USER && CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || (CURRENT_USER && CURRENT_USER.email) || '';
+
   var btn = document.getElementById('my-account-save-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
 
@@ -5948,7 +5967,45 @@ async function saveMyPseudo(){
     errEl.textContent = 'Erreur : ' + error.message; errEl.style.display='block'; return;
   }
   if (data && data.user) CURRENT_USER = data.user;
+
+  var newLabel = (CURRENT_USER.user_metadata && CURRENT_USER.user_metadata.pseudo) || CURRENT_USER.email || '';
+  if(oldLabel && newLabel && oldLabel!==newLabel){
+    await migratePersonLabel(oldLabel, newLabel);
+  }
   renderContent();
+}
+// Renomme une étiquette de personne (pseudo) dans toutes les dépenses du voyage courant,
+// et met à jour owner_label si l'utilisateur est le propriétaire du voyage.
+async function migratePersonLabel(oldLabel, newLabel){
+  var toUpdate = [];
+  S.expenses.forEach(function(e){
+    var changed=false;
+    if((e.personLabel||e.person)===oldLabel){ e.personLabel=newLabel; e.person=newLabel; changed=true; }
+    if(e.participants && e.participants.indexOf(oldLabel)>-1){
+      e.participants = e.participants.map(function(p){return p===oldLabel?newLabel:p;});
+      changed=true;
+    }
+    if(e.splits && typeof e.splits==='object' && e.splits.hasOwnProperty(oldLabel)){
+      var amt = e.splits[oldLabel];
+      delete e.splits[oldLabel];
+      e.splits[newLabel] = (e.splits[newLabel]||0) + amt;
+      changed=true;
+    }
+    if(changed) toUpdate.push(e);
+  });
+  save();
+  if(sb && CURRENT_TRIP){
+    for(var i=0;i<toUpdate.length;i++){
+      var e2 = toUpdate[i];
+      try{
+        await sb.from('budget_entries').update({person_label:e2.personLabel, participants:e2.participants, splits:e2.splits}).eq('id', e2.id);
+      }catch(err){}
+    }
+    if(CURRENT_TRIP.owner_id === CURRENT_USER.id){
+      CURRENT_TRIP.owner_label = newLabel;
+      try{ await sb.from('trips').update({owner_label:newLabel}).eq('id', CURRENT_TRIP.id); }catch(err){}
+    }
+  }
 }
 
 async function logoutUser(){
