@@ -3298,7 +3298,6 @@ function renderItinerary(c, embedded){
     +'<div class="cover-content"><div class="cover-eyebrow">'+c.dates+'</div><div class="cover-name">'+c.name+'</div><div class="cover-tagline">'+c.tagline+'</div>'
     +'<div class="cover-pills"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
-    +'<div class="alerts-zone">'+alertsHTML+'</div>'
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'+citiesHTML
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(29,29,31,0.2);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif"><span data-icon="plus" data-icon-size="14"></span> Ajouter une ville</button>'
