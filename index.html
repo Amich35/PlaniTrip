@@ -5194,6 +5194,11 @@ function moveCity(countryId,currentPos,direction){
 if(!S.order) S.order={};
 if(!S.customDetails) S.customDetails={};
 if(!window._customDetails) window._customDetails=S.customDetails||{};
+function syncActOrder(){
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()}).then(function(){});
+  }
+}
 function getOrder(ck,totalBase,totalCustom){
   if(S.order[ck]&&S.order[ck].length===(totalBase+totalCustom))return S.order[ck];
   const base=Array.from({length:totalBase},function(_,i){return 'b'+i;});
@@ -5214,6 +5219,7 @@ function moveActivity(ck,currentIndex,direction){
   newOrder[targetIndex]=tmp;
   S.order[ck]=newOrder;
   save();renderContent();
+  syncActOrder();
 }
 // ── DRAG & DROP (touch + mouse) ──────────────────────────────
 var _drag = { type:null, fromIdx:null, fromCk:null, fromCountry:null, el:null, ghost:null };
@@ -5297,6 +5303,7 @@ function bindDragEvents() {
       var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
       S.order[ck]=order;
       save(); renderContent();
+      syncActOrder();
     }
 
     handle.addEventListener('touchstart',function(e){
@@ -6750,6 +6757,8 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
     } else if(row.detail_key === '__planitrip__actDay'){
       if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
+    } else if(row.detail_key === '__planitrip__actOrder'){
+      if(row.data && typeof row.data === 'object'){ S.order = row.data; }
     } else {
       if(!window._customDetails[row.detail_key]) window._customDetails[row.detail_key] = row.data;
     }
