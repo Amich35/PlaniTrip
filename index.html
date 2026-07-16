@@ -2479,7 +2479,7 @@ async function setCustomPhoto(query, url){
   save();
   if(sb && CURRENT_TRIP){
     // await garantit que Supabase a bien la photo avant tout rechargement possible
-    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()}); }catch(e){}
+    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()},{onConflict:'trip_id,query'}); }catch(e){}
   }
   closePhotoPicker();
   document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
@@ -6766,11 +6766,17 @@ async function loadAccommodations(){
 async function loadCustomPhotos(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('custom_photos').select('*').eq('trip_id',CURRENT_TRIP.id);
-  // Le serveur fait toujours autorite sur les photos : on repart de zero a chaque chargement
-  // pour eviter qu'une photo supprimee (reset) ne survive dans le localStorage,
-  // et pour garantir que les photos posees par un autre voyageur sont bien recues.
-  S.customPhotos = {};
+  // Le serveur fait toujours autorite sur les photos : on repart de zero a chaque chargement.
+  // Dédoublonnage défensif par query (garde la ligne la plus récente) au cas où
+  // d'anciens doublons subsisteraient malgré la contrainte UNIQUE.
+  var latest = {};
   (data||[]).forEach(function(row){
+    if(!latest[row.query] || row.updated_at > latest[row.query].updated_at){
+      latest[row.query] = row;
+    }
+  });
+  S.customPhotos = {};
+  Object.values(latest).forEach(function(row){
     S.customPhotos[row.query] = row.photo_data;
   });
   save();
