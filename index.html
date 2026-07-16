@@ -4177,9 +4177,22 @@ function canonicalPerson(label){
 }
 // Budget prévu par pays = somme des budgets/jour de CHAQUE voyageur (le sien s'il l'a défini,
 // sinon la valeur par défaut du pays), multipliée par le nombre de jours.
+// Un voyageur (par email) a-t-il accès à ce pays selon son scope de collaborateur ?
+// Le propriétaire du voyage a toujours accès à tout. Une personne inconnue (ni owner,
+// ni collaborateur enregistré — ex: fantôme issu d'une vieille dépense) est considérée
+// à accès total par sécurité, pour ne jamais l'exclure silencieusement d'un calcul.
+function personHasCountryScope(email, countryName){
+  if(!email) return false;
+  var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
+  if(email===ownerE) return true;
+  var collab = (CURRENT_COLLABORATORS||[]).find(function(c){ return c.invited_email===email; });
+  if(!collab) return true; // inconnu : ne pas exclure
+  if(!collab.scope || collab.scope.indexOf('all')>-1) return true;
+  return collab.scope.indexOf(countryName)>-1;
+}
 function getCountryPlannedBudget(c){
   if(!c) return 0;
-  var people = getPeopleList();
+  var people = getPeopleList().filter(function(email){ return personHasCountryScope(email, c.name); });
   var perCountry = (S.travelerBudgets && S.travelerBudgets[c.id]) || {};
   var dailySum = people.reduce(function(sum, email){
     var v = perCountry[email];
@@ -4195,10 +4208,13 @@ function getMyCountryDailyBudget(c){
   var v = perCountry[myEmail];
   return (v!==undefined && v!==null && !isNaN(v)) ? v : c.budget_daily;
 }
-// Mon budget prévu PERSONNEL, additionné sur tous les pays du voyage — à ne jamais confondre
-// avec getCountryPlannedBudget() qui additionne le budget de TOUS les voyageurs.
+// Mon budget prévu PERSONNEL, additionné uniquement sur les pays où j'ai accès (mon scope) —
+// à ne jamais confondre avec getCountryPlannedBudget() qui additionne le budget de TOUS les voyageurs.
 function getMyTotalPlannedBudget(){
-  return COUNTRIES.reduce(function(s,c){ return s + getMyCountryDailyBudget(c)*c.days; }, 0);
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  return COUNTRIES.reduce(function(s,c){
+    return personHasCountryScope(myEmail, c.name) ? s + getMyCountryDailyBudget(c)*c.days : s;
+  }, 0);
 }
 function setMyCountryBudget(countryId, amount){
   var amt = parseFloat(amount);
