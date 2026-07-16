@@ -2991,6 +2991,7 @@ async function deleteActivity(cityKey, index, isCustom) {
       S.trash[cityKey].push({_builtinIndex:index, _cityKey:cityKey});
     }
     save(); renderContent();
+    syncDeletedActs();
   }, 'Supprimer');
 }
 if(!S.deletedActs) S.deletedActs={};
@@ -3012,6 +3013,7 @@ function restoreActivity(cityKey, trashIndex) {
   }
   save();
   renderContent();
+  syncDeletedActs();
 }
 
 // ── LIVE WEATHER via Open-Meteo (free, no key needed) ───────
@@ -5139,6 +5141,11 @@ function deleteCity(countryId, cityName){
 
   save();
   renderContent();
+  syncDeletedActs(); syncCityOrder();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()}).then(function(){});
+  }
 }
 function restoreCity(trashId){
   var idx = S.cityTrash.findIndex(function(t){return t.id===trashId;});
@@ -5168,6 +5175,11 @@ function restoreCity(trashId){
   S.cityTrash.splice(idx,1);
   save();
   renderContent();
+  syncDeletedActs(); syncCityOrder();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()}).then(function(){});
+  }
 }
 function getCityOrder(countryId) {
   if(!S.cityOrder) S.cityOrder={};
@@ -5188,6 +5200,7 @@ function moveCity(countryId,currentPos,direction){
   order[targetPos]=tmp;
   S.cityOrder[countryId]=order;
   save();renderContent();
+  syncCityOrder();
 }
 
 // ── REORDER WITH ▲▼ BUTTONS ──────────────────────────────────
@@ -5197,6 +5210,16 @@ if(!window._customDetails) window._customDetails=S.customDetails||{};
 function syncActOrder(){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()}).then(function(){});
+  }
+}
+function syncCityOrder(){
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()}).then(function(){});
+  }
+}
+function syncDeletedActs(){
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()}).then(function(){});
   }
 }
 function getOrder(ck,totalBase,totalCustom){
@@ -5369,6 +5392,7 @@ function bindDragEvents() {
       var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
       S.cityOrder[country]=order;
       save(); renderContent();
+      syncCityOrder();
     }
 
     handle.addEventListener('touchstart',function(e){startDrag(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
@@ -6759,6 +6783,10 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
     } else if(row.detail_key === '__planitrip__actOrder'){
       if(row.data && typeof row.data === 'object'){ S.order = row.data; }
+    } else if(row.detail_key === '__planitrip__cityOrder'){
+      if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }
+    } else if(row.detail_key === '__planitrip__deletedActs'){
+      if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
     } else {
       if(!window._customDetails[row.detail_key]) window._customDetails[row.detail_key] = row.data;
     }
