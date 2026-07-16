@@ -3975,7 +3975,7 @@ function renderBudgetOverview(){
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
-      body = '<div class="more-row" onclick="S.budgetPersonView=null;renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+      body = '<div class="more-row" onclick="S.budgetPersonView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div class="budget-hero"><div style="flex:1"><div class="bh-label">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':personDisplayName(S.budgetPersonView))+'</div><div class="bh-amount">'+fmtEUR(pTotal)+'</div></div></div>'
         +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
         +fabHTML;
@@ -3995,12 +3995,12 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'toi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel,'Toi'))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'toi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
       // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
-      body = '<div class="more-row" onclick="S.budgetCountryView=null;renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+      body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div class="budget-hero"><div style="display:flex;align-items:center;gap:20px">'
         +'<div style="flex:1"><div class="bh-label">'+c2.flag+' '+c2.name+'</div><div class="bh-amount">'+fmtEUR(cSpent)+'</div><div class="bh-sub">sur '+fmtEUR(cBudget)+' prévu</div></div>'
         +renderProgressRing(cBudget>0?Math.min(100,Math.round((cSpent/cBudget)*100)):0, 72, 7, '#95D5B2')
@@ -4012,7 +4012,7 @@ function renderBudgetOverview(){
       var spent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
       var budget = c.budget_daily*c.days;
       var p = budget>0 ? Math.min(100, Math.round((spent/budget)*100)) : 0;
-      return '<div class="budget-country-row" onclick="S.budgetCountryView=\''+c.id+'\';renderContent();">'
+      return '<div class="budget-country-row" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'
         +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0"><span class="bcr-amt">'+fmtEUR(spent)+' / '+fmtEUR(budget)+'</span><div class="bh-bar" style="margin-top:7px;width:100%;height:7px;border-radius:3.5px"><div class="bh-fill" style="width:'+p+'%;border-radius:3.5px"></div></div></div>'
         +'<span class="bcr-pct">'+p+'%</span></div>'
@@ -4021,7 +4021,7 @@ function renderBudgetOverview(){
     var paidBalances = computeBalances();
     var myLabel3 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
-      return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
+      return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';save();renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
         +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Toi':personDisplayName(b.person))+'</span></div>'
         +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
         +'</div>';
@@ -4030,7 +4030,7 @@ function renderBudgetOverview(){
     var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var mySpent = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
     var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
-    var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
+    var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
       +'<div style="display:flex;align-items:flex-end;gap:16px">'
       +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Mes depenses</div>'
       +'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:2px">'+fmtEUR(mySpent)+'</div></div>'
@@ -5038,6 +5038,7 @@ function confirmImportSharedData(){
   history.replaceState(null, '', location.pathname);
   document.getElementById('importModal').classList.remove('open');
   S.tab='home';
+  save();
   renderContent();
 }
 function cancelImportSharedData(){
@@ -5805,10 +5806,10 @@ function restoreCountry(countryName) {
     var activeCountries = effectiveTripCountries().concat([countryName]);
     sb.from('trips').update({ countries: activeCountries, archived_countries: archivedCountries }).eq('id', CURRENT_TRIP.id).then(function(res){
       if (!res.error) { CURRENT_TRIP.countries = activeCountries; CURRENT_TRIP.archived_countries = archivedCountries; }
-      S.tab='archived-countries'; renderContent();
+      S.tab='archived-countries'; save(); renderContent();
     });
   } else {
-    S.tab='archived-countries'; renderContent();
+    S.tab='archived-countries'; save(); renderContent();
   }
 }
 
@@ -5882,7 +5883,7 @@ function renderArchivedCountriesScreen(){
     : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Aucun pays archivé.</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="more-row" onclick="S.tab=\'more\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
     +'<div class="section-title" style="margin-bottom:12px">Gérer les pays</div>'
     +'<div class="info-card">'
     +'<button onclick="openAddCountryToTripModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
@@ -5918,7 +5919,7 @@ function renderMyAccountScreen(){
   // Le pseudo actuel vient désormais de PROFILES_MAP (table profiles), pas de user_metadata.
   var pseudo = (PROFILES_MAP[email] && PROFILES_MAP[email]!==email) ? PROFILES_MAP[email] : '';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="more-row" onclick="S.tab=\'more\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
     +'<div class="section-title" style="margin-bottom:12px">Mon compte</div>'
     +'<div style="display:flex;justify-content:center;margin-bottom:16px">'+avatarCircle(pseudo||email, 72)+'</div>'
     +'<div class="info-card">'
@@ -6155,18 +6156,16 @@ function renderAccessManagementScreen(){
   var isOwner = CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id;
   var tripCountries = effectiveTripCountries();
 
-  var ownerDisplayName, ownerAvatarName, ownerSubtitle;
+  var ownerDisplayName, ownerSubtitle;
   if(isOwner){
     ownerDisplayName = 'Vous';
-    ownerAvatarName = personDisplayName(CURRENT_USER.email); // initiales du vrai nom, pas de "Vous"
     ownerSubtitle = personDisplayName(CURRENT_USER.email)+' (propriétaire)';
   } else {
     var ownerEmail = CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label || 'Propriétaire';
     ownerDisplayName = personDisplayName(ownerEmail);
-    ownerAvatarName = ownerDisplayName;
     ownerSubtitle = 'Propriétaire du voyage';
   }
-  var ownerRow = '<div class="more-row" style="padding:8px 4px">'+avatarCircle(ownerAvatarName,36)
+  var ownerRow = '<div class="more-row" style="padding:8px 4px">'+avatarCircle(ownerDisplayName,36)
     +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(ownerDisplayName)+'</div>'
     +'<div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(ownerSubtitle)+'</div></div></div>';
 
@@ -6176,9 +6175,8 @@ function renderAccessManagementScreen(){
     var label = c.invited_email || c.user_id;
     var isMe = (CURRENT_USER && (c.user_id === CURRENT_USER.id || c.invited_email === CURRENT_USER.email));
     var displayLabel = isMe ? 'Vous' : personDisplayName(label);
-    var avatarName = isMe ? personDisplayName(label) : displayLabel; // initiales du vrai nom, pas de "Vous"
     var removeBtn = isOwner && !isMe ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
-    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(avatarName,36)
+    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(displayLabel,36)
       +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(displayLabel)+(isMe ? '' : '')+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
       +removeBtn+'</div>';
   }).join('');
@@ -6208,7 +6206,7 @@ function renderAccessManagementScreen(){
   }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div class="more-row" onclick="S.tab=\'more\';renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="more-row" onclick="S.tab=\'more\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
     +'<div class="section-title" style="margin-bottom:12px">Voyageurs</div>'
     +'<div class="info-card" style="padding:6px">'+ownerRow+collabRows+'</div>'
     +inviteForm
