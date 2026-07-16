@@ -5376,6 +5376,12 @@ function deleteCity(countryId, cityName){
   });
 
   c.cities.splice(idx,1);
+  // Retirer aussi de S.addedCities : sinon rebuildCountriesFromState() (appelée par de
+  // nombreuses autres actions) réinjecte la ville supprimée dans c.cities.
+  if(S.addedCities && S.addedCities[countryId]){
+    var aIdx = S.addedCities[countryId].findIndex(function(ci){return ci.city===cityName;});
+    if(aIdx>-1) S.addedCities[countryId].splice(aIdx,1);
+  }
   delete S.customActs[ck];
   Object.keys(doneKeys).forEach(function(k){ delete S.done[k]; });
   Object.keys(deletedActsKeys).forEach(function(k){ delete S.deletedActs[k]; });
@@ -5421,6 +5427,11 @@ function restoreCity(trashId){
   var insertAt = Math.min(t.index, c.cities.length);
   c.cities.splice(insertAt, 0, t.cityObj);
   var ck = t.countryId+'_'+t.cityName;
+  // Réinscrire dans S.addedCities pour que rebuildCountriesFromState() ne perde pas la ville restaurée
+  if(!S.addedCities[t.countryId]) S.addedCities[t.countryId]=[];
+  if(!S.addedCities[t.countryId].find(function(ci){return ci.city===t.cityName;})){
+    S.addedCities[t.countryId].push(t.cityObj);
+  }
 
   if(t.customActs) S.customActs[ck]=t.customActs;
   Object.keys(t.done).forEach(function(k){ S.done[k]=t.done[k]; });
@@ -5444,14 +5455,18 @@ function restoreCity(trashId){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    // Réinsérer la ville (et ses activités personnalisées) côté serveur, symétriquement à deleteCity()
+    var whoRestore=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+    sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,added_by_label:whoRestore}).then(function(){});
+    (t.customActs||[]).forEach(function(act){
+      if(act.custom){
+        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,name:act.n,tip:act.m||null,added_by_label:whoRestore}).then(function(){});
+      }
+    });
   }
 }
 function getCityOrder(countryId) {
   if(!S.cityOrder) S.cityOrder={};
-  const c=COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return [];
-  if(S.cityOrder[countryId]&&S.cityOrder[countryId].length===c.cities.length) return S.cityOrder[countryId];
-  return c.cities.map(function(_,i){return i;});
 }
 function moveCity(countryId,currentPos,direction){
   if(!S.cityOrder) S.cityOrder={};
