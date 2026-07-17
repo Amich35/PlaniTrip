@@ -4753,46 +4753,27 @@ function renderDocuments(){
     var isVaccines = d.id==='vaccines';
     var filled = isVaccines ? S.vaccines.length>0 : (d.fields.some(function(f){return data[f.k];}) || (d.id==='tickets' && data.flightsList && data.flightsList.length>0));
     var isOpen=openDoc===d.id;
-    var isLockable = d.id==='passport';
-    var isLocked = isLockable && !!(S.docLocked && S.docLocked[d.id]);
     var body='';
     if(isOpen){
       if(isVaccines){
         body='<div style="margin-top:12px">'+renderVaccinesBlock()+'</div>';
       } else {
         var flightsBlock = d.id==='tickets' ? renderFlightsList(data.flightsList||[]) : '';
-        var changePinBtn = (d.id==='passport') ? '<button onclick="event.stopPropagation();changePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('lock',13)+' '+(S.pin?'Changer le code PIN':'Créer un PIN')+'</button>'+(S.pin?'<button onclick="event.stopPropagation();removePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--red-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('unlock',13)+' Supprimer mon PIN</button>':'') : '';
         body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+flightsBlock+d.fields.map(function(f){
           var val=escHtml(data[f.k]||'');
           if(f.area) return '<textarea class="ef-input" style="min-height:70px;width:100%" placeholder="'+f.lbl+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)">'+val+'</textarea>';
           return '<input class="ef-input" style="width:100%" type="text" placeholder="'+f.lbl+'" value="'+val+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)"/>';
-        }).join('')+changePinBtn+'</div>';
+        }).join('')+'</div>';
       }
     }
-    var statusText = isLocked && !isOpen ? 'Verrouillé' : (filled?'✓ Renseigné':'Non renseigné');
+    var statusText = filled?'✓ Renseigné':'Non renseigné';
     if(isVaccines && filled) statusText = S.vaccines.length+' vaccin'+(S.vaccines.length>1?'s':'');
-    var lockBtn = isLockable ? '<span onclick="event.stopPropagation();toggleDocLock(\''+d.id+'\')" style="padding:4px;color:'+(isLocked?'var(--accent)':'var(--ink-subtle)')+'">'+svgIcon(isLocked?'lock':'unlock',16)+'</span>' : '';
-    return '<div class="info-card doc-card"><div class="doc-card-head" onclick="toggleDocOpen(\''+d.id+'\')"><span class="doc-card-icon">'+svgIcon(d.icon,20)+'</span><div style="flex:1"><div class="doc-card-title">'+d.label+'</div><div class="status-sub">'+statusText+'</div></div>'+lockBtn+'<span style="color:var(--ink-subtle)">'+(isOpen?'▾':'▸')+'</span></div>'+body+'</div>';
+    return '<div class="info-card doc-card"><div class="doc-card-head" onclick="toggleDocOpen(\''+d.id+'\')"><span class="doc-card-icon">'+svgIcon(d.icon,20)+'</span><div style="flex:1"><div class="doc-card-title">'+d.label+'</div><div class="status-sub">'+statusText+'</div></div><span style="color:var(--ink-subtle)">'+(isOpen?'▾':'▸')+'</span></div>'+body+'</div>';
   }).join('');
   return '<div class="subpage-header"><button class="cdh-back-flat" onclick="setTab(\'more\')"><span data-icon="arrow-left" data-icon-size="18"></span></button><div class="section-title">Documents</div></div>'
     +'<div class="section" style="padding-bottom:20px;padding-top:8px">'+cards+'</div>';
 }
-function toggleDocLock(id){
-  if(!S.docLocked) S.docLocked={};
-  if(S.docLocked[id]){
-    requirePin(function(){ S.docLocked[id]=false; save(); renderContent(); });
-  } else {
-    S.docLocked[id]=true;
-    if(S.openDocType===id) S.openDocType=null;
-    save(); renderContent();
-  }
-}
 function toggleDocOpen(id){
-  var isLocked = id==='passport' && S.docLocked && S.docLocked[id];
-  if(isLocked && S.openDocType!==id){
-    requirePin(function(){ S.openDocType = id; renderContent(); });
-    return;
-  }
   S.openDocType = S.openDocType===id ? null : id; renderContent();
 }
 function saveDocField(docId, key, val){ if(!S.documents[docId]) S.documents[docId]={}; S.documents[docId][key]=val; save(); }
@@ -5025,7 +5006,7 @@ function parseLinks(text){
 // ── Catégories Conseils et Checklist ─────────────────────────────────────────
 var TIP_CATEGORIES = ['Incontournable','Transport','Santé','Argent','Restauration','Hébergement','Culture','Sécurité','Bon plan','Autre'];
 var TIP_CAT_COLORS  = {'Incontournable':'#2D6A4F','Transport':'#4D96FF','Santé':'#E76F51','Argent':'#F4A261','Restauration':'#95D5B2','Hébergement':'#6E6E73','Culture':'#9B5DE5','Sécurité':'#c0392b','Bon plan':'#27ae60','Autre':'#6E6E73'};
-var _CL_CAT_COLORS  = {'Santé':'#E76F51','Équipement':'#4D96FF','Documents':'#2D6A4F','Argent':'#F4A261','Vêtements':'#95D5B2','Transport':'#4D96FF','Autre':'#6E6E73'};
+var _CL_CAT_COLORS  = {'Santé':'#E76F51','Équipement':'#4D96FF','Documents':'#2D6A4F','Argent':'#F4A261','Vêtements':'#95D5B2','Transport':'#9B5DE5','Autre':'#6E6E73'};
 function normalizeTipItem(item){
   if(typeof item==='object'&&item!==null&&item.t!==undefined) return item;
   return {t:String(item||''),cat:'Autre'};
@@ -5049,7 +5030,8 @@ function renderGuide(c){
   });
   const tipRows = Object.keys(tipsByCategory).sort(function(a,b){return a.localeCompare(b,'fr');}).map(function(cat){
     var cc=TIP_CAT_COLORS[cat]||'#6E6E73';
-    var itemsHTML = tipsByCategory[cat].map(function(entry){
+    var sortedEntries = tipsByCategory[cat].slice().sort(function(a,b){return a.obj.t.localeCompare(b.obj.t,'fr');});
+    var itemsHTML = sortedEntries.map(function(entry){
       var obj=entry.obj, i=entry.i;
       return '<div class="info-row guide-editable-row" style="cursor:pointer;align-items:flex-start;gap:8px" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')">'
         +'<div style="flex:1"><div class="ir-key" style="margin-bottom:2px">'+escHtml(obj.t)+'</div></div>'
@@ -5078,7 +5060,8 @@ function renderGuide(c){
   });
   const clItems = Object.keys(clByCategory).sort(function(a,b){return a.localeCompare(b,'fr');}).map(function(cat){
     var color=_CL_CAT_COLORS[cat]||_CL_CAT_COLORS['Autre'];
-    var itemsHTML = clByCategory[cat].map(function(entry){
+    var sortedClEntries = clByCategory[cat].slice().sort(function(a,b){return clItemText(a.item).localeCompare(clItemText(b.item),'fr');});
+    var itemsHTML = sortedClEntries.map(function(entry){
       var item=entry.item, i=entry.i;
       const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
       return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0">'
@@ -6060,8 +6043,9 @@ function effectiveTripCountries() {
   return BUILT_IN_COUNTRIES.map(function(c){ return c.name; });
 }
 
-function archiveCurrentCountry() {
-  var c = getC();
+function archiveCurrentCountry(countryId) {
+  var c = countryId ? COUNTRIES.find(function(co){return co.id===countryId;}) : getC();
+  if(!c) return;
   if(COUNTRIES.length <= 1){ alert("Impossible d'archiver le dernier pays."); return; }
   showConfirm('Archiver ' + c.name + ' ? Vous pourrez le restaurer à tout moment depuis "Pays archivés".', function(){
     if(!S.archivedCountryData) S.archivedCountryData = {};
@@ -6189,7 +6173,11 @@ function renderArchivedCountriesScreen(){
     +'<div class="section-title" style="margin-bottom:12px">Gérer les pays</div>'
     +'<div class="info-card">'
     +'<button onclick="openAddCountryToTripModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
-    +'<button onclick="archiveCurrentCountry()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Archiver '+getC().name+'</button>'
+    +'<select id="archiveCountrySelect" style="width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);color:var(--ink);font-size:13px;margin-bottom:8px;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
+    +'<option value="">Choisir un pays à archiver…</option>'
+    +COUNTRIES.slice().sort(function(a,b){return a.name.localeCompare(b.name,'fr');}).map(function(co){return '<option value="'+co.id+'">'+co.flag+' '+escHtml(co.name)+'</option>';}).join('')
+    +'</select>'
+    +'<button onclick="var sel=document.getElementById(\'archiveCountrySelect\');if(sel.value)archiveCurrentCountry(sel.value);" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Archiver</button>'
     +'</div>'
     +'<div class="section-title" style="margin:18px 0 10px;font-size:15px">Pays archivés</div>'
     +'<div class="info-card" style="padding:6px">'+rows+'</div>'
@@ -6238,9 +6226,9 @@ function renderMyAccountScreen(){
     +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
-    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN personnalisé défini' : 'Aucun PIN défini — créer un PIN')+'</div>'
-    +'<button onclick="changePinFlow()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> '+(S.pin?'Changer mon PIN':'Créer un PIN')+'</button>'
-    +(S.pin?'<button onclick="removePinFlow()" style="margin-top:8px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--red-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="unlock" data-icon-size="14"></span> Supprimer mon PIN</button>':'')
+    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN de sécurité défini' : 'Aucun PIN défini — protège l\'accès à ta clé API')+'</div>'
+    +'<button onclick="changePinFlowApi()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> '+(S.pin?'Changer mon PIN':'Créer un PIN')+'</button>'
+    +(S.pin?'<button onclick="removePinFlowApi()" style="margin-top:8px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--red-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="unlock" data-icon-size="14"></span> Supprimer mon PIN</button>':'')
     +'</div>'
     +'<div class="info-card" style="border:1px solid rgba(231,111,81,0.25)">'
     +'<div class="ic-header" style="color:var(--red-muted)">Zone dangereuse</div>'
@@ -6809,7 +6797,7 @@ function requirePin(callback) {
   document.getElementById('pinOverlay').classList.add('open');
   _pinCallback = callback;
 }
-function changePinFlow(){
+function changePinFlowApi(){
   requirePin(function(){
     _pinEntry = '';
     _pinNewValue = '';
@@ -6820,12 +6808,10 @@ function changePinFlow(){
     document.getElementById('pinOverlay').classList.add('open');
   });
 }
-function removePinFlow(){
+function removePinFlowApi(){
   requirePin(function(){
-    showConfirm('Supprimer ton code PIN ? Le passeport ne sera plus protégé.', function(){
+    showConfirm('Supprimer ton code PIN ? L\'accès à la clé API ne sera plus protégé.', function(){
       S.pin = '';
-      if(!S.docLocked) S.docLocked={};
-      S.docLocked['passport'] = false;
       save();
       renderContent();
     }, 'Supprimer');
