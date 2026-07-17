@@ -3066,7 +3066,7 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
       var idx = S.customActs[ck].length;
-      S.customActs[ck].push({n:a.n, m:a.m||'', tags:a.tags||['must']});
+      S.customActs[ck].push({n:a.n, m:a.m||'', tags:a.tags||['must'], ai:true});
       if(a.lat && a.lng) COORDS[ck+'_c'+idx] = [a.lat, a.lng, a.n];
     });
     save();
@@ -3301,7 +3301,8 @@ function renderItinerary(c, embedded){
         return '<div class="act-card'+(cdone?' done':'')+'" style="border-style:dashed">'
           +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
           +'<div class="act-check" onclick="toggleAct(\''+ck2+'\')">'+( cdone?'✓':'')+'</div>'
-          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+'</div>'
+          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span style="font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:10px;vertical-align:middle">✨ IA</span>':'')+'</div>'
+          +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+ck2+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
@@ -3645,11 +3646,20 @@ function renderToday(){
   if(c){
     var allPhotoSpots = [];
     c.cities.forEach(function(city){
+      var ck = c.id+'_'+city.city;
       (city.acts||[]).forEach(function(a, ai){
         if(a.tags && a.tags.indexOf('photo')>-1){
-          var actKey = c.id+'_'+city.city+'_'+ai;
+          var actKey = ck+'_'+ai;
           if(!S.done[actKey]){
             allPhotoSpots.push({name:a.n, meta:a.m, cityName:city.city, actKey:actKey});
+          }
+        }
+      });
+      (S.customActs[ck]||[]).forEach(function(a, ai){
+        if(a.tags && a.tags.indexOf('photo')>-1){
+          var custKey = ck+'_c'+ai;
+          if(!S.done[custKey]){
+            allPhotoSpots.push({name:a.n, meta:a.m, cityName:city.city, actKey:custKey});
           }
         }
       });
