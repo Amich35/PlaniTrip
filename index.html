@@ -4693,7 +4693,7 @@ function renderDocuments(){
         body='<div style="margin-top:12px">'+renderVaccinesBlock()+'</div>';
       } else {
         var flightsBlock = d.id==='tickets' ? renderFlightsList(data.flightsList||[]) : '';
-        var changePinBtn = (d.id==='passport') ? '<button onclick="event.stopPropagation();changePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('lock',13)+' Changer le code PIN</button>' : '';
+        var changePinBtn = (d.id==='passport') ? '<button onclick="event.stopPropagation();changePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('lock',13)+' '+(S.pin?'Changer le code PIN':'Créer un PIN')+'</button>' : '';
         body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+flightsBlock+d.fields.map(function(f){
           var val=escHtml(data[f.k]||'');
           if(f.area) return '<textarea class="ef-input" style="min-height:70px;width:100%" placeholder="'+f.lbl+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)">'+val+'</textarea>';
@@ -6156,8 +6156,8 @@ function renderMyAccountScreen(){
     +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
     +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
-    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN personnalisé défini' : 'PIN par défaut (2026) — définis le tien')+'</div>'
-    +'<button onclick="changePinFlow()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> Changer mon PIN</button>'
+    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN personnalisé défini' : 'Aucun PIN défini — créer un PIN')+'</div>'
+    +'<button onclick="changePinFlow()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> '+(S.pin?'Changer mon PIN':'Créer un PIN')+'</button>'
     +'</div>'
     +'<div class="info-card" style="border:1px solid rgba(231,111,81,0.25)">'
     +'<div class="ic-header" style="color:var(--red-muted)">Zone dangereuse</div>'
@@ -6656,7 +6656,6 @@ var _pinEntry = '';
 var _pinCallback = null;
 var _pinMode = 'verify'; // 'verify' | 'setNew' | 'confirmNew'
 var _pinNewValue = '';
-var DEFAULT_PIN = '2026';
 
 function _pinUpdateDots() {
   for(var i=0;i<4;i++){
@@ -6677,7 +6676,7 @@ function pinPress(key) {
   document.getElementById('pinError').textContent = '';
   if(_pinEntry.length === 4) {
     if(_pinMode === 'verify'){
-      var correct = S.pin || DEFAULT_PIN;
+      var correct = S.pin;
       if(_pinEntry === correct) {
         document.getElementById('pinOverlay').classList.remove('open');
         _pinEntry = '';
@@ -6714,6 +6713,7 @@ function pinPress(key) {
 }
 
 function requirePin(callback) {
+  if(!S.pin){ callback(); return; }
   _pinEntry = '';
   _pinMode = 'verify';
   document.getElementById('pinSub').textContent = 'Entre ton code pour accéder aux réglages';
