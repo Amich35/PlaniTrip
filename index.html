@@ -4694,7 +4694,7 @@ function renderDocuments(){
         body='<div style="margin-top:12px">'+renderVaccinesBlock()+'</div>';
       } else {
         var flightsBlock = d.id==='tickets' ? renderFlightsList(data.flightsList||[]) : '';
-        var changePinBtn = (d.id==='passport') ? '<button onclick="event.stopPropagation();changePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('lock',13)+' '+(S.pin?'Changer le code PIN':'Créer un PIN')+'</button>' : '';
+        var changePinBtn = (d.id==='passport') ? '<button onclick="event.stopPropagation();changePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('lock',13)+' '+(S.pin?'Changer le code PIN':'Créer un PIN')+'</button>'+(S.pin?'<button onclick="event.stopPropagation();removePinFlow()" style="margin-top:6px;width:100%;padding:8px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:12px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--red-muted);display:flex;align-items:center;justify-content:center;gap:6px;">'+svgIcon('unlock',13)+' Supprimer mon PIN</button>':'') : '';
         body='<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">'+flightsBlock+d.fields.map(function(f){
           var val=escHtml(data[f.k]||'');
           if(f.area) return '<textarea class="ef-input" style="min-height:70px;width:100%" placeholder="'+f.lbl+'" oninput="saveDocField(\''+d.id+'\',\''+f.k+'\',this.value)">'+val+'</textarea>';
@@ -6159,6 +6159,7 @@ function renderMyAccountScreen(){
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
     +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN personnalisé défini' : 'Aucun PIN défini — créer un PIN')+'</div>'
     +'<button onclick="changePinFlow()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> '+(S.pin?'Changer mon PIN':'Créer un PIN')+'</button>'
+    +(S.pin?'<button onclick="removePinFlow()" style="margin-top:8px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--red-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="unlock" data-icon-size="14"></span> Supprimer mon PIN</button>':'')
     +'</div>'
     +'<div class="info-card" style="border:1px solid rgba(231,111,81,0.25)">'
     +'<div class="ic-header" style="color:var(--red-muted)">Zone dangereuse</div>'
@@ -6740,6 +6741,17 @@ function changePinFlow(){
     document.getElementById('pinError').textContent = '';
     _pinUpdateDots();
     document.getElementById('pinOverlay').classList.add('open');
+  });
+}
+function removePinFlow(){
+  requirePin(function(){
+    showConfirm('Supprimer ton code PIN ? Le passeport ne sera plus protégé.', function(){
+      S.pin = '';
+      if(!S.docLocked) S.docLocked={};
+      S.docLocked['passport'] = false;
+      save();
+      renderContent();
+    }, 'Supprimer');
   });
 }
 
