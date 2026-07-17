@@ -4155,7 +4155,7 @@ function renderBudgetOverview(){
       var pSubLabel = isSelfView ? ('sur '+fmtEUR(myTotalBudget)+' prévu au total') : ('sur '+fmtEUR(totalSpent)+' dépensés au total par le groupe');
       body = '<div class="more-row" onclick="S.budgetPersonView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
-        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Payé par '+escHtml(S.budgetPersonView===myLabelP?'toi':personDisplayName(S.budgetPersonView))+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(pTotal)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">'+pSubLabel+'</div></div>'
+        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Payé par '+escHtml(S.budgetPersonView===myLabelP?'moi':personDisplayName(S.budgetPersonView))+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(pTotal)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">'+pSubLabel+'</div></div>'
         +renderProgressRing(pPctReal, 72, 7, pOver?'#E76F51':'#95D5B2')
         +'</div></div>'
         +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
@@ -4176,7 +4176,7 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'toi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
@@ -4209,7 +4209,7 @@ function renderBudgetOverview(){
     var myLabel3 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
       return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';save();renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
-        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Toi':personDisplayName(b.person))+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Moi':personDisplayName(b.person))+'</span></div>'
         +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
         +'</div>';
     }).join('');
@@ -4242,13 +4242,13 @@ function renderBudgetOverview(){
       var bg = isPos?'var(--accent-pale)':(isNeg?'var(--red-pale)':'var(--sand-deep)');
       var lbl = isPos?'doit recevoir':(isNeg?'doit':'est à jour');
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:'+bg+';margin-bottom:8px">'
-        +'<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+escHtml(b.person===myLabel2?'Toi':personDisplayName(b.person))+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+escHtml(b.person===myLabel2?'Moi':personDisplayName(b.person))+'</span></div>'
         +'<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:'+color+'">'+fmtEUR(Math.abs(b.balance))+'</div><div style="font-size:11px;color:var(--ink-subtle)">'+lbl+'</div></div>'
         +'</div>';
     }).join('');
     var txnRows = txns.length ? txns.map(function(t){
-      var fromLabel = t.from===myLabel2 ? 'Toi' : personDisplayName(t.from);
-      var toLabel = t.to===myLabel2 ? 'toi' : personDisplayName(t.to);
+      var fromLabel = t.from===myLabel2 ? 'Moi' : personDisplayName(t.from);
+      var toLabel = t.to===myLabel2 ? 'moi' : personDisplayName(t.to);
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--parchment);margin-bottom:8px;box-shadow:var(--shadow-sm)">'
         +'<div style="min-width:0;flex:1">'
         +'<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</div>'
@@ -4260,8 +4260,8 @@ function renderBudgetOverview(){
     var reimbHistory = S.expenses.filter(function(e){return e.category==='reimbursement';}).sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
     var reimbHistHTML = reimbHistory.length ? reimbHistory.map(function(e){
       var toP = (e.participants&&e.participants[0]) || '?';
-      var fromName = e.personLabel===myLabel2 ? 'Toi' : personDisplayName(e.personLabel);
-      var toName = toP===myLabel2 ? 'Toi' : personDisplayName(toP);
+      var fromName = e.personLabel===myLabel2 ? 'Moi' : personDisplayName(e.personLabel);
+      var toName = toP===myLabel2 ? 'Moi' : personDisplayName(toP);
       var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
       return '<div style="padding:9px 2px">'
         // Ligne 1 : avatars + flèche (gauche) / montant en vert (droite)
