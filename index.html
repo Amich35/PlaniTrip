@@ -4248,23 +4248,29 @@ function renderBudgetOverview(){
     var reimbHistHTML = reimbHistory.length ? reimbHistory.map(function(e){
       var toP = (e.participants&&e.participants[0]) || '?';
       var fromName = e.personLabel===myLabel2 ? 'Toi' : personDisplayName(e.personLabel);
-      var toName = toP===myLabel2 ? 'toi' : personDisplayName(toP);
+      var toName = toP===myLabel2 ? 'Toi' : personDisplayName(toP);
       var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px">'
-        +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
-        +avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,30)
-        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',14)+'</span>'
-        +avatarCircle(toP===myLabel2?'Moi':toP,30)
+      return '<div style="padding:9px 2px">'
+        // Ligne 1 : avatars + flèche (gauche) / montant en vert (droite)
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,28)+'<span style="font-size:9.5px;color:var(--ink-subtle);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
+        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toP===myLabel2?'Moi':toP,28)+'<span style="font-size:9.5px;color:var(--ink-subtle);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
         +'</div>'
-        +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:20px;font-weight:600;color:var(--ink)">'+fmtEUR(e.amount)+'</div>'
-        +'<div style="display:flex;align-items:center;gap:6px;margin-top:1px">'
-        +'<span style="font-size:11.5px;color:var(--ink-subtle)">'+dLabel+'</span>'
-        +'<span style="font-size:10px;font-weight:600;color:var(--ink-muted);background:var(--sand);padding:2px 7px;border-radius:20px">Remboursé</span>'
-        +'</div></div>'
-        +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
-        +'<span style="display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--ink-muted);cursor:pointer" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',12)+' Modifier</span>'
-        +'<span style="display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--red-muted);cursor:pointer" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',12)+' Restaurer</span>'
+        +'<span style="font-size:30px;font-weight:600;color:var(--accent);letter-spacing:-0.5px;flex-shrink:0">'+fmtEUR(e.amount)+'</span>'
+        +'</div>'
+        // Ligne 2 : date (gauche) / badge Remboursé (droite)
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">'
+        +'<span style="font-size:12px;color:var(--ink-subtle)">'+dLabel+'</span>'
+        +'<span style="font-size:10px;font-weight:600;color:var(--ink-muted);background:var(--sand);padding:2px 7px;border-radius:20px;display:flex;align-items:center;gap:3px">'+svgIcon('check',10)+' Remboursé</span>'
+        +'</div>'
+        // Séparateur
+        +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:8px 0"></div>'
+        // Ligne 3 : actions horizontales
+        +'<div style="display:flex;align-items:center;gap:16px">'
+        +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted);cursor:pointer" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',13)+' Modifier</span>'
+        +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--red-muted);cursor:pointer" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',13)+' Restaurer</span>'
         +'</div>'
         +'</div>';
     }).join('<div style="height:1px;background:rgba(29,29,31,0.07);margin:0 2px"></div>') : '';
@@ -6595,6 +6601,7 @@ const ICON_PATHS = {
   leaf: '<path d="M11 20A7 7 0 0 1 4 13c0-8 7-11 16-11 0 9-3 16-11 16z"/><path d="M4 13c3-1 6-3 8-6"/>',
   archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
