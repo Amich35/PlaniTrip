@@ -4255,7 +4255,7 @@ function renderBudgetOverview(){
         +'<span style="color:var(--ink-subtle);flex-shrink:0;margin-top:-16px">'+svgIcon('arrow-right',16)+'</span>'
         +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0">'+avatarCircle(t.to===myLabel2?'Moi':t.to,32)+'<span style="font-size:10.5px;color:var(--ink-subtle);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
         +'</div>'
-        +'<div style="text-align:center;margin-top:10px"><span style="font-size:30px;font-weight:700;color:var(--accent);letter-spacing:-0.5px">'+fmtEUR(t.amount)+'</span></div>'
+        +'<div style="text-align:center;margin-top:10px"><span style="font-size:15px;font-weight:700;color:var(--accent)">'+fmtEUR(t.amount)+'</span></div>'
         +'<div style="text-align:center;margin-top:8px"><button onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')" style="border:1px solid rgba(45,106,79,0.25);background:var(--accent-pale);color:var(--accent);font-size:12px;font-weight:600;padding:7px 16px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+svgIcon('check',13)+' Marquer remboursé</button></div>'
         +'</div>';
     }).join('<div style="height:1px;background:rgba(29,29,31,0.07);margin:0 2px"></div>') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
