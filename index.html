@@ -229,7 +229,7 @@ a{color:var(--ink);}
 .info-card{background:var(--parchment);border:var(--border);border-radius:var(--r22);padding:var(--sp16);margin-bottom:var(--sp8);box-shadow:var(--shadow-sm);}
 .rh-card{background:#fff;border:1px solid #ECECEC;border-radius:18px;padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
 .rh-chip-done{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.08);padding:4px 10px;border-radius:20px;}
-.rh-btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:12px;cursor:pointer;transition:all 200ms ease;border:1px solid transparent;}
+.rh-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:7px 14px;border-radius:12px;cursor:pointer;transition:all 200ms ease;border:1px solid transparent;}
 .rh-btn-edit{background:#F5F5F5;color:var(--ink-muted);}
 .rh-btn-edit:hover{background:#ECECEC;}
 .rh-btn-restore{background:rgba(244,162,97,0.08);color:#C9762E;border-color:rgba(244,162,97,0.3);}
@@ -4280,7 +4280,7 @@ function renderBudgetOverview(){
         +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',14)+'</span>'
         +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+avatarCircle(toP===myLabel2?'Moi':toP,30)+'<span style="font-size:10px;color:var(--ink-subtle);max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
         +'</div>'
-        +'<span style="font-size:22px;font-weight:700;color:var(--accent);letter-spacing:-0.5px;flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
+        +'<span style="font-size:15px;font-weight:700;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
         +'</div>'
         // Ligne 2 : date (sous participants) / chip Remboursé
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">'
