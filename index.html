@@ -5041,13 +5041,21 @@ function normalizeClItem(item){
 
 function renderGuide(c){
   const p=c.practical;
-  const tipRows=p.tips.map(function(rawItem,i){
+  const tipsByCategory = {};
+  p.tips.forEach(function(rawItem,i){
     var obj=normalizeTipItem(rawItem);
-    var cc=TIP_CAT_COLORS[obj.cat]||'#6E6E73';
-    return '<div class="info-row guide-editable-row" style="cursor:pointer;align-items:flex-start;gap:8px" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')">'  
-      +'<div style="flex:1"><div class="ir-key" style="margin-bottom:2px">'+escHtml(obj.t)+'</div>'
-      +'<div style="font-size:11px;font-weight:600;color:'+cc+'">'+escHtml(obj.cat)+'</div></div>'
-      +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';
+    if(!tipsByCategory[obj.cat]) tipsByCategory[obj.cat]=[];
+    tipsByCategory[obj.cat].push({obj:obj, i:i});
+  });
+  const tipRows = Object.keys(tipsByCategory).sort(function(a,b){return a.localeCompare(b,'fr');}).map(function(cat){
+    var cc=TIP_CAT_COLORS[cat]||'#6E6E73';
+    var itemsHTML = tipsByCategory[cat].map(function(entry){
+      var obj=entry.obj, i=entry.i;
+      return '<div class="info-row guide-editable-row" style="cursor:pointer;align-items:flex-start;gap:8px" onclick="editGuideListItem(\''+c.id+'\',\'tips\','+i+')">'
+        +'<div style="flex:1"><div class="ir-key" style="margin-bottom:2px">'+escHtml(obj.t)+'</div></div>'
+        +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'tips\','+i+')">×</span></div>';
+    }).join('');
+    return '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;color:'+cc+';text-transform:uppercase;padding:10px 2px 4px">'+escHtml(cat)+'</div>'+itemsHTML;
   }).join('');
   const isEmpty = !c.currency && !c.visa && !c.tagline;
   const aiBadge = c._aiGenerated ? '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les infos avant de partir</div>' : '';
@@ -5055,26 +5063,32 @@ function renderGuide(c){
   const emergOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_emerg']);
   const clOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_checklist']);
   const emergRows=p.emergency.map(function(e,i){return '<div class="info-row" style="cursor:pointer" onclick="editGuideListItem(\''+c.id+'\',\'emergency\','+i+')"><span class="ir-key">'+e.k+'</span><span style="display:flex;align-items:center;gap:8px"><span class="ir-val" style="color:var(--red-muted)">'+e.v+'</span><span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'emergency\','+i+')">×</span></span></div>';}).join('');
-  const CL_CATEGORY_COLORS = {'Santé':'#E76F51','Équipement':'#4D96FF','Documents':'#2D6A4F','Argent':'#F4A261','Vêtements':'#95D5B2','Autre':'#6E6E73'};
-  function clCategoryBadge(item){
+  function getClCategory(item){
     var cat;
     if(typeof item==='object'&&item!==null&&item.cat){cat=item.cat;}
-    else{var m2=String(item||'').match(/^\[([^\]]+)\]/);if(!m2)return '';cat=m2[1];}
-    if(_CL_KNOWN_CATS.indexOf(cat)===-1)return '';
-    var color=_CL_CAT_COLORS[cat]||_CL_CAT_COLORS['Autre'];
-    return '<span style="font-size:10px;font-weight:700;color:'+color+';background:'+color+'22;border-radius:4px;padding:1px 5px">'+escHtml(cat)+'</span>';
+    else{var m2=String(item||'').match(/^\[([^\]]+)\]/);if(!m2)return 'Autre';cat=m2[1];}
+    return _CL_KNOWN_CATS.indexOf(cat)>-1 ? cat : 'Autre';
   }
   function clItemText(item){ return clItemDisplayText(item); }
-  const clItems=p.checklist.map(function(item,i){
-    const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
-    var badge=clCategoryBadge(item);
-    return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0">'
-      +'<div class="ci-box" style="margin-top:2px" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div>'
-      +'<div style="flex:1;cursor:pointer;min-width:0" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'  
-      +'<div class="ci-text">'+parseLinks(clItemText(item))+'</div>'
-      +(badge?'<div style="margin-top:3px">'+badge+'</div>':'')
-      +'</div>'
-      +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
+  const clByCategory = {};
+  p.checklist.forEach(function(item,i){
+    var cat = getClCategory(item);
+    if(!clByCategory[cat]) clByCategory[cat]=[];
+    clByCategory[cat].push({item:item, i:i});
+  });
+  const clItems = Object.keys(clByCategory).sort(function(a,b){return a.localeCompare(b,'fr');}).map(function(cat){
+    var color=_CL_CAT_COLORS[cat]||_CL_CAT_COLORS['Autre'];
+    var itemsHTML = clByCategory[cat].map(function(entry){
+      var item=entry.item, i=entry.i;
+      const k=c.id+'_cl_'+i;const checked=!!S.checklist[k];
+      return '<div class="check-item'+(checked?' checked':'')+'" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0">'
+        +'<div class="ci-box" style="margin-top:2px" onclick="toggleCL(\''+k+'\')">'+(checked?'✓':'')+'</div>'
+        +'<div style="flex:1;cursor:pointer;min-width:0" onclick="editGuideListItem(\''+c.id+'\',\'checklist\','+i+')">'
+        +'<div class="ci-text">'+parseLinks(clItemText(item))+'</div>'
+        +'</div>'
+        +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'checklist\','+i+')">×</span></div>';
+    }).join('');
+    return '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;color:'+color+';text-transform:uppercase;padding:10px 2px 4px">'+escHtml(cat)+'</div>'+itemsHTML;
   }).join('');
   const clDone=p.checklist.filter(function(_,i){return !!S.checklist[c.id+'_cl_'+i];}).length;
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
