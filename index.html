@@ -2035,8 +2035,8 @@ function toggleAct(k){
   // Peak moment: animate the check if just completed
   if(wasUndone && S.done[k]){
     setTimeout(function(){
-      var card = document.querySelector('[data-detail="'+k+'"]')
-        || document.querySelector('.act-check-btn[data-actkey="'+k+'"]');
+      var card = document.querySelector('[data-detail="'+CSS.escape(k)+'"]')
+        || document.querySelector('.act-check-btn[data-actkey="'+CSS.escape(k)+'"]');
       if(card){
         var actCard = card.closest ? card.closest('.act-card') : null;
         if(actCard){ actCard.classList.add('just-done'); setTimeout(function(){ actCard.classList.remove('just-done'); }, 700); }
@@ -2059,7 +2059,7 @@ function toggleFavorite(k){
   }
   renderContent();
 }
-function toggleCity(k){S.openCities[k]=!S.openCities[k];save();const el=document.querySelector('[data-city="'+k+'"]');if(el)el.classList.toggle('open',!!S.openCities[k]);}
+function toggleCity(k){S.openCities[k]=!S.openCities[k];save();renderContent();}
 function toggleCL(k){
   S.checklist[k]=!S.checklist[k];
   save();
@@ -2367,7 +2367,7 @@ function saveAccom(ck) {
 function renderAccomCard(ck) {
   const a = S.accom[ck]||{};
   const esc = escHtml;
-  const ev = 'saveAccom(\''+ck+'\')';
+  const ev = 'saveAccom(\''+jsStrEsc(ck)+'\')';
   return '<div class="accom-card">'
     +'<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div><div class="accom-sub">Coller un lien Booking / Airbnb / autre</div></div></div>'
     +'<div class="accom-fields">'
@@ -3288,21 +3288,21 @@ function renderItinerary(c, embedded){
         var hasDetail=true;
         var dayAssigned=S.actDay[k]||'';
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
-        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+k+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         var daySelector=dateSelector;
         return '<div class="act-card'+(done?' done':'')+'">'
-          +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
-          +'<div class="act-check" onclick="toggleAct(\''+k+'\')">'+( done?'✓':'')+'</div>'
-          +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+k+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+ck+'\')" style="cursor:pointer"':'')+' >'
+          +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>'
+          +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
+          +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
           +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +daySelector
           +'<div class="act-footer" style="margin-top:6px">'
           +'<div></div>'
           +'<div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+k+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
-          +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+k+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
-          +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+ck+'\','+origIdx+',false)">✕</button>'
+          +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
+          +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
+          +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">✕</button>'
           +'</div></div></div></div>';
       } else {
         var ca=custs[origIdx];
@@ -3310,16 +3310,16 @@ function renderItinerary(c, embedded){
         var ck2=ck+'_c'+origIdx;
         var cdone=!!S.done[ck2];
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
-        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+ck2+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="act-card'+(cdone?' done':'')+'" style="border-style:dashed">'
-          +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+ck+'"><span></span><span></span><span></span></div>'
-          +'<div class="act-check" onclick="toggleAct(\''+ck2+'\')">'+( cdone?'✓':'')+'</div>'
+          +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>'
+          +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
           +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span style="font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:10px;vertical-align:middle">✨ IA</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+ck2+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
-          +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+ck+'\','+origIdx+',true)">✕</button></div>'
+          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
+          +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">✕</button></div>'
           +'</div></div></div>';
       }
     }).join('');
@@ -3332,7 +3332,7 @@ function renderItinerary(c, embedded){
       trashHTML='<div class="trash-section"><div class="trash-label">Corbeille ('+cityTrash.length+')</div>';
       cityTrash.forEach(function(item,ti){
         const name=item._builtinIndex!==undefined?(city.acts[item._builtinIndex]||{}).n||'Activité supprimée':item.n||'Activité supprimée';
-        trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><button class="trash-restore" onclick="restoreActivity(\''+ck+'\','+ti+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
+        trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><button class="trash-restore" onclick="restoreActivity(\''+jsStrEsc(ck)+'\','+ti+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
       });
       trashHTML+='</div>';
     }
@@ -3345,11 +3345,11 @@ function renderItinerary(c, embedded){
     const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
     const complete=cityDone===cityTotal&&cityTotal>0;
 
-    const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+ck+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+ck+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
+    const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+jsStrEsc(ck)+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+jsStrEsc(ck)+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
 
-    return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+ck+'" style="position:relative">'
+    return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+escHtml(ck)+'" style="position:relative">'
       +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
-      +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+ck+'\') " style="flex:1;cursor:pointer">'
+      +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+jsStrEsc(ck)+'\') " style="flex:1;cursor:pointer">'
       +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
       +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span></div></div>'
       +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
@@ -5419,7 +5419,7 @@ function goToSearchResult(countryId, cityName, actKey){
   var tabEl=document.getElementById('tab-countries'); if(tabEl) tabEl.classList.add('active');
   renderContent();
   setTimeout(function(){
-    var el=document.querySelector('[data-city="'+ck+'"]');
+    var el=document.querySelector('[data-city="'+CSS.escape(ck)+'"]');
     if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
   },150);
 }
@@ -6005,12 +6005,12 @@ function renderMap(c) {
 
 // ── INLINE EDIT ──────────────────────────────────────────────
 function startEditCity(ck, currentName) {
-  var header = document.querySelector('[data-city="'+ck+'"] .cah-city');
+  var header = document.querySelector('[data-city="'+CSS.escape(ck)+'"] .cah-city');
   if(!header) return;
   var orig = currentName;
   header.innerHTML = '<div class="editable-wrap">'
     +'<input class="edit-inline" id="edit-city-'+ck+'" value="'+escHtml(orig)+'" />'
-    +'<button class="edit-confirm" onclick="confirmEditCity(\''+ck+'\')">✓</button>'
+    +'<button class="edit-confirm" onclick="confirmEditCity(\''+jsStrEsc(ck)+'\')">✓</button>'
     +'<button class="edit-cancel" onclick="renderContent()">✕</button>'
     +'</div>';
   var inp = document.getElementById('edit-city-'+ck);
@@ -6028,7 +6028,7 @@ function confirmEditCity(ck) {
 }
 
 function startEditAct(actKey, currentName) {
-  var el = document.querySelector('[data-detail="'+actKey+'"] .act-name');
+  var el = document.querySelector('[data-detail="'+CSS.escape(actKey)+'"] .act-name');
   if(!el) return;
   el.innerHTML = '<div class="editable-wrap">'
     +'<input class="edit-inline" id="edit-act-'+actKey+'" value="'+escHtml(currentName)+'" />'
