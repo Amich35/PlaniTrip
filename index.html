@@ -227,6 +227,13 @@ a{color:var(--ink);}
 .pl-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,0.4);color:#fff;font-size:14px;cursor:pointer;z-index:2;}
 
 .info-card{background:var(--parchment);border:var(--border);border-radius:var(--r22);padding:var(--sp16);margin-bottom:var(--sp8);box-shadow:var(--shadow-sm);}
+.rh-card{background:#fff;border:1px solid #ECECEC;border-radius:18px;padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.rh-chip-done{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.08);padding:4px 10px;border-radius:20px;}
+.rh-btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:12px;cursor:pointer;transition:all 200ms ease;border:1px solid transparent;}
+.rh-btn-edit{background:#F5F5F5;color:var(--ink-muted);}
+.rh-btn-edit:hover{background:#ECECEC;}
+.rh-btn-restore{background:rgba(244,162,97,0.08);color:#C9762E;border-color:rgba(244,162,97,0.3);}
+.rh-btn-restore:hover{background:rgba(244,162,97,0.16);}
 [data-icon]{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;}
 .ic-header{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-muted);margin-bottom:12px;display:flex;align-items:center;gap:6px;}
 .ic-chevron{margin-left:auto;font-size:15px;color:var(--ink-subtle);letter-spacing:0;text-transform:none;}
@@ -4265,31 +4272,31 @@ function renderBudgetOverview(){
       var fromName = e.personLabel===myLabel2 ? 'Moi' : personDisplayName(e.personLabel);
       var toName = toP===myLabel2 ? 'Moi' : personDisplayName(toP);
       var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
-      return '<div style="padding:9px 2px">'
-        // Ligne 1 : avatars + flèche (gauche) / montant en vert (droite)
-        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
-        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,28)+'<span style="font-size:9.5px;color:var(--ink-subtle);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
-        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toP===myLabel2?'Moi':toP,28)+'<span style="font-size:9.5px;color:var(--ink-subtle);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
+      return '<div class="rh-card">'
+        // Ligne 1 : participants (gauche) / montant (droite, mis en valeur)
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
+        +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,30)+'<span style="font-size:10px;color:var(--ink-subtle);max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
+        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',14)+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+avatarCircle(toP===myLabel2?'Moi':toP,30)+'<span style="font-size:10px;color:var(--ink-subtle);max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
         +'</div>'
-        +'<span style="font-size:15px;font-weight:700;color:var(--accent);flex-shrink:0">'+fmtEUR(e.amount)+'</span>'
+        +'<span style="font-size:22px;font-weight:700;color:var(--accent);letter-spacing:-0.5px;flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
         +'</div>'
-        // Ligne 2 : date (gauche) / badge Remboursé (droite)
-        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">'
-        +'<span style="font-size:12px;color:var(--ink-subtle)">'+dLabel+'</span>'
-        +'<span style="font-size:10px;font-weight:600;color:var(--ink-muted);background:var(--sand);padding:2px 7px;border-radius:20px;display:flex;align-items:center;gap:3px">'+svgIcon('check',10)+' Remboursé</span>'
+        // Ligne 2 : date (sous participants) / chip Remboursé
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">'
+        +'<span style="font-size:12.5px;color:var(--ink-subtle)">'+dLabel+'</span>'
+        +'<span class="rh-chip-done">'+svgIcon('check',11)+' Remboursé</span>'
         +'</div>'
-        // Séparateur
-        +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:8px 0"></div>'
-        // Ligne 3 : actions horizontales
-        +'<div style="display:flex;align-items:center;gap:16px">'
-        +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted);cursor:pointer" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',13)+' Modifier</span>'
-        +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--red-muted);cursor:pointer" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',13)+' Restaurer</span>'
+        // Séparateur discret intégré à la carte
+        +'<div style="height:1px;background:#F0F0F0;margin:14px 0"></div>'
+        // Ligne 3 : actions
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span class="rh-btn rh-btn-edit" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',13)+' Modifier</span>'
+        +'<span class="rh-btn rh-btn-restore" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',13)+' Restaurer</span>'
         +'</div>'
         +'</div>';
     }).join('') : '';
-    var reimbHistCard = reimbHistHTML ? '<div class="info-card" style="margin-top:14px"><div class="ic-header">Historique des remboursements</div>'+reimbHistHTML+'</div>' : '';
+    var reimbHistCard = reimbHistHTML ? '<div style="margin-top:18px"><div class="ic-header" style="display:flex;align-items:center;gap:6px"><span data-icon="history" data-icon-size="15"></span> Historique des remboursements</div>'+reimbHistHTML+'</div>' : '';
     var reimbSuggOpen = S.uiAccordion && S.uiAccordion['reimb_suggested'];
     var settledCount = reimbHistory.length, pendingCount = txns.length;
     var progressBadge = '<div style="display:flex;align-items:center;gap:14px;margin-top:6px">'
@@ -6624,6 +6631,7 @@ const ICON_PATHS = {
   archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
