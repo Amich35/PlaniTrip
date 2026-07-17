@@ -4561,6 +4561,12 @@ function openAddExpenseModal(){
   S.editingExpenseId = null;
   S.expParticipants = null;  // reset pour repartir sur tous les voyageurs
   S.expSplitOverrides = {};
+  S.expDesc = '';
+  S.expAmt = '';
+  S.expCity = '';
+  S.expActivity = '';
+  S.expCategory = 'other';
+  S.expDate = '';
   if(!S.expCountry) S.expCountry = getC().id;
   document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
   document.getElementById('addExpenseModal').classList.add('open');
