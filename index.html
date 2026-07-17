@@ -2349,6 +2349,15 @@ function saveAccom(ck) {
   }
 }
 
+function renderCityPhotoSpots(city){
+  var spots = (city.acts||[]).filter(function(a){return a.tags && a.tags.indexOf('photo')>-1;});
+  if(!spots.length) return '';
+  var rows = spots.map(function(a){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0"><span style="color:var(--accent);flex-shrink:0">'+svgIcon('camera',15)+'</span><div style="min-width:0"><div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(a.n)+'</div>'+(a.m?'<div style="font-size:11.5px;color:var(--ink-subtle)">'+escHtml(a.m)+'</div>':'')+'</div></div>';
+  }).join('');
+  return '<div class="info-card" style="margin-bottom:10px"><div class="ic-header"><span data-icon="camera" data-icon-size="16"></span> Spots photo</div>'+rows+'</div>';
+}
+
 function renderAccomCard(ck) {
   const a = S.accom[ck]||{};
   const esc = escHtml;
@@ -3337,7 +3346,7 @@ function renderItinerary(c, embedded){
       +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
       +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span></div></div>'
       +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
-      +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
+      +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+renderCityPhotoSpots(city)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
   }).join('');
 
   const alertsHTML=c.alerts.map(function(a){
