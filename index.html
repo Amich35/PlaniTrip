@@ -640,6 +640,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .pin-dot.filled{background:var(--accent);border-color:var(--accent);}
 .pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 .pin-key{height:56px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:20px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.1s;color:var(--ink);}
+.pin-key:disabled{opacity:0.35;cursor:default;}
 .pin-key:active{background:var(--accent-soft);}
 .pin-error{font-size:12px;color:var(--red-muted);margin-top:12px;min-height:18px;}
 .auth-screen{position:fixed;inset:0;z-index:9999;background:#F8F6F2;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;box-sizing:border-box;}
@@ -6543,6 +6544,7 @@ const ICON_PATHS = {
   syringe: '<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/>',
   'external-link': '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   unlock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-2"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
 };
 function renderAlertsManageCard(c){
   var alertsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_alerts']);
@@ -6662,6 +6664,8 @@ function _pinUpdateDots() {
     var dot = document.getElementById('pd'+i);
     if(dot) dot.className = 'pin-dot' + (i < _pinEntry.length ? ' filled' : '');
   }
+  var okBtn = document.getElementById('pinOkBtn');
+  if(okBtn) okBtn.disabled = _pinEntry.length !== 4;
 }
 
 function pinPress(key) {
@@ -6674,8 +6678,14 @@ function pinPress(key) {
   _pinEntry += key;
   _pinUpdateDots();
   document.getElementById('pinError').textContent = '';
-  if(_pinEntry.length === 4) {
-    if(_pinMode === 'verify'){
+  if(_pinEntry.length === 4) _pinValidate();
+}
+function pinConfirm() {
+  if(_pinEntry.length !== 4) return;
+  _pinValidate();
+}
+function _pinValidate() {
+  if(_pinMode === 'verify'){
       var correct = S.pin;
       if(_pinEntry === correct) {
         document.getElementById('pinOverlay').classList.remove('open');
@@ -6709,7 +6719,6 @@ function pinPress(key) {
         }, 900);
       }
     }
-  }
 }
 
 function requirePin(callback) {
@@ -7926,8 +7935,9 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
       <button class="pin-key" onclick="pinPress('9')">9</button>
       <button class="pin-key" onclick="pinPress('del')" style="font-size:16px">⌫</button>
       <button class="pin-key" onclick="pinPress('0')">0</button>
-      <button class="pin-key" onclick="document.getElementById('pinOverlay').classList.remove('open');_pinEntry='';_pinUpdateDots();" style="font-size:12px;color:var(--ink-muted)">Annuler</button>
+      <button class="pin-key" id="pinOkBtn" onclick="pinConfirm()" style="font-size:13px;font-weight:700;color:var(--accent)" disabled>OK</button>
     </div>
+    <button onclick="document.getElementById('pinOverlay').classList.remove('open');_pinEntry='';_pinUpdateDots();" style="margin-top:12px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);">Annuler</button>
     <div class="pin-error" id="pinError"></div>
   </div>
 </div>
