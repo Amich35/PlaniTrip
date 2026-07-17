@@ -1992,6 +1992,19 @@ function openCountryDetail(id, subTab){
   renderContent();
   document.getElementById('mainContent').scrollTop=0;
 }
+function openCountryChecklist(id){
+  S.country=id;
+  S.tab='country';
+  S.countryDetailTab='guide';
+  if(!S.uiAccordion) S.uiAccordion={};
+  S.uiAccordion[id+'_checklist']=true;
+  save();
+  renderContent();
+  setTimeout(function(){
+    var el=document.getElementById('guide-checklist-card');
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  },150);
+}
 function setCountryDetailTab(subTab){
   S.countryDetailTab=subTab;
   save();
@@ -3695,7 +3708,7 @@ function renderToday(){
     var forgetHTML = shown.map(function(u){
       return '<div class="check-item'+(u.checked?' checked':'')+'" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box">'+(u.checked?'✓':'')+'</div><span class="ci-text">'+parseLinks(clItemDisplayText(u.item))+'</span></div>';
     }).join('');
-    var seeAllLink = c.practical.checklist.length>3 ? '<div style="text-align:right;margin-top:4px"><span style="font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">Voir toute la checklist →</span></div>' : '';
+    var seeAllLink = c.practical.checklist.length>3 ? '<div style="text-align:right;margin-top:4px"><span style="font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="openCountryChecklist(\''+c.id+'\')">Voir toute la checklist →</span></div>' : '';
     var doneMsg = uncheckedCount===0 ? '<div class="status-sub" style="padding:4px 0 8px">Tout est prêt 🎉</div>' : '';
     forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+doneMsg+forgetHTML+seeAllLink+'</div>';
   }
@@ -5100,7 +5113,7 @@ function renderGuide(c){
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_tips\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span><span style="transform:rotate('+(tipsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(tipsOpen?tipRows:'')+'</div>'
     +renderConverterCard(c)
-    +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_checklist\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="check-square" data-icon-size="16"></span> Checklist avant départ</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;color:var(--accent)">'+clDone+'/'+p.checklist.length+'</span><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'checklist\',\'Nouvel item à préparer :\')">+</span><span style="transform:rotate('+(clOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
+    +'<div class="info-card" id="guide-checklist-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_checklist\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="check-square" data-icon-size="16"></span> Checklist avant départ</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;color:var(--accent)">'+clDone+'/'+p.checklist.length+'</span><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'checklist\',\'Nouvel item à préparer :\')">+</span><span style="transform:rotate('+(clOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +'<div class="bh-bar" style="margin:4px 0 '+(clOpen?'10px':'0')+'"><div class="bh-fill" style="width:'+clPct+'%"></div></div>'
     +(clOpen?clItems:'')+'</div>'
     +'</div>';
