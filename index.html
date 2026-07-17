@@ -4288,7 +4288,7 @@ function renderBudgetOverview(){
         +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--red-muted);cursor:pointer" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',13)+' Restaurer</span>'
         +'</div>'
         +'</div>';
-    }).join('<div style="height:1px;background:rgba(29,29,31,0.07);margin:0 2px"></div>') : '';
+    }).join('') : '';
     var reimbHistCard = reimbHistHTML ? '<div class="info-card" style="margin-top:14px"><div class="ic-header">Historique des remboursements</div>'+reimbHistHTML+'</div>' : '';
     var reimbSuggOpen = S.uiAccordion && S.uiAccordion['reimb_suggested'];
     var settledCount = reimbHistory.length, pendingCount = txns.length;
