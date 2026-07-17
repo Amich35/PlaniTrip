@@ -4267,7 +4267,19 @@ function renderBudgetOverview(){
         +'</div>';
     }).join('<div style="height:1px;background:rgba(29,29,31,0.07);margin:0 2px"></div>') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
     var reimbHistory = S.expenses.filter(function(e){return e.category==='reimbursement';}).sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
-    var reimbHistHTML = reimbHistory.length ? reimbHistory.map(function(e){
+    var reimbHistoryByMonth = {};
+    var reimbHistoryMonthOrder = [];
+    reimbHistory.forEach(function(e){
+      var monthKey = e.date.slice(0,7); // 'YYYY-MM'
+      if(!reimbHistoryByMonth[monthKey]){ reimbHistoryByMonth[monthKey]=[]; reimbHistoryMonthOrder.push(monthKey); }
+      reimbHistoryByMonth[monthKey].push(e);
+    });
+    var reimbHistHTML = reimbHistoryMonthOrder.map(function(monthKey, monthIdx){
+      var monthLabel = new Date(monthKey+'-01T00:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+      monthLabel = monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+      var accKey = 'reimb_month_'+monthKey;
+      var isOpen = S.uiAccordion && S.uiAccordion[accKey]!==undefined ? !!S.uiAccordion[accKey] : monthIdx===0;
+      var itemsHTML = reimbHistoryByMonth[monthKey].map(function(e){
       var toP = (e.participants&&e.participants[0]) || '?';
       var fromName = e.personLabel===myLabel2 ? 'Moi' : personDisplayName(e.personLabel);
       var toName = toP===myLabel2 ? 'Moi' : personDisplayName(toP);
@@ -4295,7 +4307,9 @@ function renderBudgetOverview(){
         +'<span class="rh-btn rh-btn-restore" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',13)+' Restaurer</span>'
         +'</div>'
         +'</div>';
-    }).join('') : '';
+      }).join('');
+      return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;cursor:pointer" onclick="toggleAccordion(\''+accKey+'\')"><span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(monthLabel)+'</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--ink-subtle)">'+reimbHistoryByMonth[monthKey].length+'</span><span style="transform:rotate('+(isOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></span></div>'+(isOpen?itemsHTML:'')+'</div>';
+    }).join('');
     var reimbHistCard = reimbHistHTML ? '<div style="margin-top:18px"><div class="ic-header" style="display:flex;align-items:center;gap:6px"><span data-icon="history" data-icon-size="15"></span> Historique des remboursements</div>'+reimbHistHTML+'</div>' : '';
     var reimbSuggOpen = S.uiAccordion && S.uiAccordion['reimb_suggested'];
     var settledCount = reimbHistory.length, pendingCount = txns.length;
