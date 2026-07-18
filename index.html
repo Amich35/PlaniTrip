@@ -3984,8 +3984,45 @@ const COUNTRY_HERO_QUERY_BY_NAME={
   'Hongrie':'Parliament Building Budapest',
   'Israël':'Jerusalem Old City',
 };
+// ── Hero Engine Phase 1 : variation saisonnière sans IA ──
+// Hémisphère sud : les saisons sont inversées par rapport à la France
+const SOUTHERN_HEMISPHERE_COUNTRIES = ['Australie','Nouvelle-Zélande','Argentine','Chili','Afrique du Sud','Madagascar'];
+function getSeasonFromDate(date, countryName){
+  if(!date) return null;
+  var month = date.getMonth()+1; // 1-12
+  var isSouthern = countryName && SOUTHERN_HEMISPHERE_COUNTRIES.indexOf(countryName)>-1;
+  var season;
+  if(month===12 || month<=2) season = 'hiver';
+  else if(month<=5) season = 'printemps';
+  else if(month<=8) season = 'ete';
+  else season = 'automne';
+  if(isSouthern){
+    var opposite = {hiver:'ete', ete:'hiver', printemps:'automne', automne:'printemps'};
+    season = opposite[season];
+  }
+  return season;
+}
+// Requêtes saisonnières uniquement pour les destinations où la saison change vraiment l'image emblématique
+const SEASONAL_HERO_QUERY = {
+  jp:{ printemps:'Mount Fuji cherry blossom Japan', ete:'Mount Fuji Chureito Pagoda summer Japan', automne:'Mount Fuji autumn leaves Japan', hiver:'Mount Fuji snow winter Japan' },
+  'Norvège':{ hiver:'Lofoten Islands Northern Lights Norway', ete:'Lofoten Islands midnight sun Norway', printemps:'Lofoten Islands fjord Norway', automne:'Lofoten Islands fjord Norway' },
+  'Islande':{ hiver:'Jokulsarlon glacier lagoon aurora Iceland', ete:'Jokulsarlon glacier lagoon summer Iceland', printemps:'Jokulsarlon glacier lagoon Iceland', automne:'Jokulsarlon glacier lagoon Iceland' },
+  'Finlande':{ hiver:'Northern Lights snow Lapland Finland', ete:'Lapland midnight sun Finland', printemps:'Lapland Finland', automne:'Lapland Finland' },
+  'Pays-Bas':{ printemps:'Tulip fields Keukenhof Netherlands', ete:'Windmills Kinderdijk summer Netherlands', automne:'Windmills Kinderdijk autumn Netherlands', hiver:'Amsterdam canals winter Netherlands' },
+  'Corée du Sud':{ printemps:'Gyeongbokgung Palace cherry blossom Seoul', automne:'Gyeongbokgung Palace autumn leaves Seoul', ete:'Gyeongbokgung Palace summer Seoul', hiver:'Gyeongbokgung Palace snow Seoul' },
+  'Canada':{ automne:'Banff National Park fall colors Canada', hiver:'Banff National Park snow winter Canada', printemps:'Banff National Park Canada', ete:'Banff National Park summer Canada' },
+  'Chine':{ printemps:'Great Wall of China spring blossom', automne:'Great Wall of China autumn leaves', ete:'Great Wall of China summer', hiver:'Great Wall of China snow winter' },
+};
+function getSeasonalHeroQuery(c){
+  var seasonal = SEASONAL_HERO_QUERY[c.id] || SEASONAL_HERO_QUERY[c.name];
+  if(!seasonal) return null;
+  var refDate = c.dateStart ? new Date(c.dateStart+'T00:00:00') : (typeof getTripDepartDate==='function' ? getTripDepartDate() : null);
+  var season = getSeasonFromDate(refDate, c.name);
+  if(!season) return null;
+  return seasonal[season] || null;
+}
 function getCountryHeroQuery(c){
-  return COUNTRY_HERO_QUERY[c.id] || COUNTRY_HERO_QUERY_BY_NAME[c.name] || null;
+  return getSeasonalHeroQuery(c) || COUNTRY_HERO_QUERY[c.id] || COUNTRY_HERO_QUERY_BY_NAME[c.name] || null;
 }
 function getCountryImageQuery(c){
   return getCountryHeroQuery(c) || (c.name+' famous landmark');
