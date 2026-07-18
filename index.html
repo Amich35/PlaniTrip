@@ -6712,6 +6712,8 @@ function renderArchivedCountriesScreen(){
 var _acmScopeAll = true;
 var _acmScopeCountries = [];
 var _acmSuccessMsg = '';
+var _acmShowCopyLink = false;
+var _acmLastInvitedEmail = '';
 
 function showMyAccountScreen(){
   S.tab='my-account'; save(); renderContent();
@@ -6949,18 +6951,37 @@ async function addCollaboratorSubmit(){
 
   var tripName = (CURRENT_TRIP && CURRENT_TRIP.name) || 'ce voyage';
   var inviterName = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email]) || (CURRENT_USER && CURRENT_USER.email) || '';
+  var emailFailed = false;
   try {
     var { error: fnError } = await sb.functions.invoke('send-invite', {
       body: { to_email: email, trip_name: tripName, inviter_name: inviterName }
     });
-    if(fnError){ console.warn('[PlaniTrip] send-invite:', fnError); }
-  } catch(e){ console.warn('[PlaniTrip] send-invite failed:', e); }
+    if(fnError){ console.warn('[PlaniTrip] send-invite:', fnError); emailFailed = true; }
+  } catch(e){ console.warn('[PlaniTrip] send-invite failed:', e); emailFailed = true; }
 
   btn.disabled = false; btn.textContent = 'Inviter';
-  _acmSuccessMsg = 'Invitation envoyée à ' + email;
+  _acmLastInvitedEmail = email;
+  _acmShowCopyLink = true;
+  if(emailFailed){
+    _acmSuccessMsg = "Voyageur ajouté, mais l'email d'invitation n'a pas pu être envoyé à " + email + ". Copie le lien ci-dessous pour le lui transmettre.";
+  } else {
+    _acmSuccessMsg = 'Invitation envoyée à ' + email;
+  }
   input.value=''; _acmScopeAll=true; _acmScopeCountries=[];
   await loadCollaborators();
   renderContent();
+}
+function copyInviteLink(){
+  var link = window.location.origin + window.location.pathname;
+  var msg = 'Rejoins-moi sur PlaniTrip pour "'+((CURRENT_TRIP && CURRENT_TRIP.name)||'notre voyage')+'" : '+link+' (connecte-toi avec '+(_acmLastInvitedEmail||'ton email invité')+')';
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(function(){
+      _acmSuccessMsg = 'Lien copié ! Colle-le dans un message à ton voyageur.';
+      renderContent();
+    }).catch(function(){ prompt('Copie ce lien :', msg); });
+  } else {
+    prompt('Copie ce lien :', msg);
+  }
 }
 
 async function removeCollaboratorAction(id){
@@ -7021,9 +7042,10 @@ function renderAccessManagementScreen(){
       +(_acmScopeAll ? '' : '<div style="max-height:220px;overflow-y:auto;margin-bottom:6px">'+countryChecks+'</div>')
       +'<div id="acm-error" class="auth-error" style="display:none;margin:6px 0"></div>'
       +(_acmSuccessMsg?('<div id="acm-success" style="margin:6px 0;padding:9px 12px;border-radius:10px;background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600">'+escHtml(_acmSuccessMsg)+'</div>'):'')
+      +(_acmShowCopyLink?('<button onclick="copyInviteLink()" style="width:100%;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid rgba(29,29,31,0.14);background:transparent;color:var(--ink-muted);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('link',13)+' Copier le lien d\'invitation</button>'):'')
       +'<button id="acm-add-btn" class="btn-primary" onclick="addCollaboratorSubmit()">Inviter</button>'
       +'</div>';
-    if(_acmSuccessMsg) setTimeout(function(){ _acmSuccessMsg=''; },4000);
+    if(_acmSuccessMsg && !_acmShowCopyLink) setTimeout(function(){ _acmSuccessMsg=''; },4000);
   }
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
@@ -8378,12 +8400,17 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   // affinable ensuite depuis l'écran Voyageurs)
   if(CT_TRAVELERS.length > 0){
     var inviterName = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email]) || (CURRENT_USER && CURRENT_USER.email) || '';
+    var failedInvites = [];
     for(var ti=0; ti<CT_TRAVELERS.length; ti++){
       var tEmail = CT_TRAVELERS[ti];
       try{
         await sb.from('collaborators').insert({ trip_id: data.id, invited_email: tEmail, scope: ['all'], role: 'editor' });
-        await sb.functions.invoke('send-invite', { body: { to_email: tEmail, trip_name: name, inviter_name: inviterName } });
-      }catch(e){ console.warn('[PlaniTrip] invite voyageur à la création:', e); }
+        var { error: viErr } = await sb.functions.invoke('send-invite', { body: { to_email: tEmail, trip_name: name, inviter_name: inviterName } });
+        if(viErr) failedInvites.push(tEmail);
+      }catch(e){ console.warn('[PlaniTrip] invite voyageur à la création:', e); failedInvites.push(tEmail); }
+    }
+    if(failedInvites.length){
+      alert("Voyageur(s) ajouté(s), mais l'email d'invitation n'a pas pu être envoyé à : "+failedInvites.join(', ')+". Tu peux leur transmettre le lien de l'app manuellement, ou renvoyer une invitation depuis l'écran Voyageurs.");
     }
   }
 
