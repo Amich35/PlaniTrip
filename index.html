@@ -3608,30 +3608,6 @@ function renderToday(){
       +'</div>';
   }
 
-  // ── Carte Alertes (compacte) ──
-  var activeAlerts = c ? (c.alerts||[]).slice(0,2) : [];
-  var alertsCard;
-  if(activeAlerts.length){
-    var alertRows = activeAlerts.map(function(a){
-      var text = typeof a==='object' ? a.t : a;
-      var url = typeof a==='object' ? a.url : null;
-      var meta = parseAlert(text);
-      var color = meta.type==='danger'?'var(--red-muted)':(meta.type==='warning'?'#EA580C':meta.type==='success'?'var(--accent)':'#2563EB');
-      var bg = meta.type==='danger'?'var(--red-pale)':(meta.type==='warning'?'#FFF7ED':meta.type==='success'?'var(--accent-pale)':'#EFF8FF');
-      var tag = url ? 'a' : 'div';
-      var hrefAttr = url ? ' href="'+escHtml(url)+'" target="_blank" rel="noopener"' : '';
-      return '<'+tag+hrefAttr+' style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:'+bg+';margin-bottom:6px;text-decoration:none">'
-        +'<span style="color:'+color+'">'+svgIcon(meta.icon,16)+'</span>'
-        +'<div><div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(meta.title)+'</div>'+(meta.subtitle?'<div style="font-size:11px;color:var(--ink-subtle)">'+escHtml(meta.subtitle)+'</div>':'')+'</div>'
-        +'</'+tag+'>';
-    }).join('');
-    alertsCard = '<div class="info-card"><div class="ic-header"><span data-icon="triangle-alert" data-icon-size="16"></span> À surveiller</div>'+alertRows+'</div>';
-  } else if(c) {
-    alertsCard = '<div class="info-card"><div class="ic-header"><span data-icon="triangle-alert" data-icon-size="16"></span> À surveiller</div><div class="status-sub" style="padding:4px 0">À renseigner — aucune alerte ajoutée pour ce pays.</div></div>';
-  } else {
-    alertsCard = '';
-  }
-
   // ── Carte Demain / Ensuite ──
   var tomorrowCard = '';
   if(c){
@@ -3725,7 +3701,6 @@ function renderToday(){
     +heroHTML
     +summaryHTML
     +actsCard
-    +alertsCard
     +photoSpotCard
     +tomorrowCard
     +forgetCard
