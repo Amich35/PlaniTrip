@@ -227,9 +227,9 @@ a{color:var(--ink);}
 .pl-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,0.4);color:#fff;font-size:14px;cursor:pointer;z-index:2;}
 
 .info-card{background:var(--parchment);border:var(--border);border-radius:var(--r22);padding:var(--sp16);margin-bottom:var(--sp8);box-shadow:var(--shadow-sm);}
-.rh-card{background:#fff;border:1px solid #ECECEC;border-radius:18px;padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.rh-card{background:#fff;border:1px solid #ECECEC;border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
 .rh-chip-done{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.08);padding:4px 10px;border-radius:20px;}
-.rh-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:7px 14px;border-radius:12px;cursor:pointer;transition:all 200ms ease;border:1px solid transparent;}
+.rh-btn{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:5px 11px;border-radius:10px;cursor:pointer;transition:all 200ms ease;border:1px solid transparent;}
 .rh-btn-edit{background:#F5F5F5;color:var(--ink-muted);}
 .rh-btn-edit:hover{background:#ECECEC;}
 .rh-btn-restore{background:rgba(244,162,97,0.08);color:#C9762E;border-color:rgba(244,162,97,0.3);}
@@ -4391,25 +4391,25 @@ function renderBudgetOverview(){
       var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
       return '<div class="rh-card">'
         // Ligne 1 : participants (gauche) / montant (droite, mis en valeur)
-        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
-        +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,30)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
-        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',14)+'</span>'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+avatarCircle(toP===myLabel2?'Moi':toP,30)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,24)+'<span style="font-size:10.5px;font-weight:600;color:var(--ink);max-width:42px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
+        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',12)+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toP===myLabel2?'Moi':toP,24)+'<span style="font-size:10.5px;font-weight:600;color:var(--ink);max-width:42px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
         +'</div>'
-        +'<span style="font-size:22px;font-weight:700;letter-spacing:-0.4px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
+        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
         +'</div>'
         // Ligne 2 : date + pastille de statut discrète
-        +'<div style="display:flex;align-items:center;gap:6px;margin-top:12px">'
-        +'<span style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>'
-        +'<span style="font-size:11px;color:var(--ink-subtle)">'+dLabel+' · réglé</span>'
+        +'<div style="display:flex;align-items:center;gap:5px;margin-top:8px">'
+        +'<span style="width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>'
+        +'<span style="font-size:10.5px;color:var(--ink-subtle)">'+dLabel+' · réglé</span>'
         +'</div>'
         // Séparateur discret intégré à la carte
-        +'<div style="height:1px;background:#F0F0F0;margin:14px 0"></div>'
+        +'<div style="height:1px;background:#F0F0F0;margin:10px 0"></div>'
         // Ligne 3 : actions
-        +'<div style="display:flex;align-items:center;gap:8px">'
-        +'<span class="rh-btn rh-btn-edit" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',13)+' Modifier</span>'
-        +'<span class="rh-btn rh-btn-restore" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',13)+' Restaurer</span>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<span class="rh-btn rh-btn-edit" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',11)+' Modifier</span>'
+        +'<span class="rh-btn rh-btn-restore" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',11)+' Restaurer</span>'
         +'</div>'
         +'</div>';
       }).join('');
