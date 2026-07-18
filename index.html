@@ -3850,12 +3850,13 @@ function renderToday(){
     return p.important && p.createdAt && (nowMs - new Date(p.createdAt).getTime()) < 86400000;
   }).sort(function(a,b){ return (b.createdAt||'')<(a.createdAt||'') ? -1 : 1; });
   var importantCard = importantPosts.map(function(p){
+    var pText = p.text || p.photoCaption || '';
     return '<div class="info-card" style="border:1.5px solid var(--red-muted);background:var(--red-pale);cursor:pointer;padding:0;overflow:hidden" onclick="setTab(\'feed\')">'
       +'<div style="padding:14px 16px 12px">'
       +'<div class="ic-header" style="color:var(--red-muted)">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div>'
-      +(p.text?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+escHtml(p.text)+'</div>':'')
+      +(pText?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+escHtml(pText)+'</div>':'')
       +'</div>'
-      +(p.photo?('<img src="'+p.photo+'" style="width:100%;display:block;max-height:220px;object-fit:cover"/>'+(p.photoCaption?('<div style="padding:6px 16px 12px;font-size:12px;color:var(--ink-muted);font-style:italic">'+escHtml(p.photoCaption)+'</div>'):'<div style="height:14px"></div>')):'')
+      +(p.photo?('<img src="'+p.photo+'" style="width:100%;display:block;max-height:220px;object-fit:cover"/><div style="height:14px"></div>'):'')
       +'<div style="padding:0 16px 14px;font-size:11px;color:var(--ink-subtle)">'+timeAgoLabel(p.createdAt)+'</div>'
       +'</div>';
   }).join('');
@@ -5196,13 +5197,8 @@ function renderFeed(){
   var postsHTML = posts.map(function(p){
     var isOwner = ownerE && canonicalPerson(p.author)===ownerE;
     var isMine = canonicalPerson(p.author)===myEmail;
-    var photoHTML = p.photo ? ('<div style="margin-top:8px">'
-      +'<div style="border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:5px">'
-      +(p.photoCaption?('<div style="font-size:12.5px;color:var(--ink-muted);font-style:italic;flex:1">'+escHtml(p.photoCaption)+'</div>'):'<div style="flex:1"></div>')
-      +(isMine?('<span onclick="openEditCaptionModal(\''+p.id+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-subtle);cursor:pointer">'+svgIcon('pencil',11)+(p.photoCaption?' Modifier':' Décrire')+'</span>'):'')
-      +'</div>'
-      +'</div>') : '';
+    var photoHTML = p.photo ? ('<div style="border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>') : '';
+    var displayText = p.text || p.photoCaption || '';
     var reactions = p.reactions || [];
     var myReacted = reactions.map(canonicalPerson).indexOf(myEmail)>-1;
     var taggedHTML = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--accent);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
@@ -5220,16 +5216,15 @@ function renderFeed(){
       +'</div>'
       +(p.photo?photoHTML:'')
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:'+(p.photo?'8px':'0')+'">'
-      +(p.text?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap;flex:1">'+escHtml(p.text)+'</div>':'<div style="flex:1"></div>')
-      +(isMine?('<span onclick="openEditPostTextModal(\''+p.id+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-subtle);cursor:pointer">'+svgIcon('pencil',11)+(p.text?' Modifier':' Ajouter texte')+'</span>'):'')
+      +(displayText?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap;flex:1">'+escHtml(displayText)+'</div>':'<div style="flex:1"></div>')
+      +(isMine?('<span onclick="openEditPostTextModal(\''+p.id+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-subtle);cursor:pointer">'+svgIcon('pencil',11)+(displayText?' Modifier':' Ajouter texte')+'</span>'):'')
       +'</div>'
       +taggedHTML
       +reactionPill
       +'</div>';
   }).join('');
 
-  var feedPhotoPreview = window._feedDraftPhoto ? ('<div style="margin-top:8px;border-radius:14px;overflow:hidden;position:relative"><img src="'+window._feedDraftPhoto+'" style="width:100%;display:block;max-height:200px;object-fit:cover"/><span onclick="clearFeedDraftPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">×</span></div>'
-    +'<input id="feedPhotoCaptionInput" type="text" maxlength="120" value="'+escHtml(window._feedDraftPhotoCaption||'')+'" oninput="window._feedDraftPhotoCaption=this.value" placeholder="Décrire cette photo (optionnel)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:9px 12px;border:1px solid rgba(29,29,31,0.10);border-radius:12px;background:var(--sand);font-size:12.5px;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif">') : '';
+  var feedPhotoPreview = window._feedDraftPhoto ? ('<div style="margin-top:8px;border-radius:14px;overflow:hidden;position:relative"><img src="'+window._feedDraftPhoto+'" style="width:100%;display:block;max-height:200px;object-fit:cover"/><span onclick="clearFeedDraftPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">×</span></div>') : '';
 
   var otherPeople = getPeopleList().filter(function(p){return canonicalPerson(p)!==myEmail;});
   var tagChips = '';
@@ -5248,7 +5243,7 @@ function renderFeed(){
   var canPublish = !!(draftTextVal.trim() || window._feedDraftPhoto);
   var extraOpen = draftTextVal.trim().length>0 || !!window._feedDraftPhoto;
   var composer = '<div class="info-card" style="padding:14px 16px 16px">'
-    +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="Partager une nouvelle avec le groupe…" rows="2">'+escHtml(draftTextVal)+'</textarea>'
+    +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="'+(window._feedDraftPhoto?'Décrire cette photo…':'Partager une nouvelle avec le groupe…')+'" rows="2">'+escHtml(draftTextVal)+'</textarea>'
     +'<div id="feedComposerExtra" class="feed-composer-extra'+(extraOpen?' open':'')+'">'
     +feedPhotoPreview
     +tagChips
@@ -5317,7 +5312,7 @@ function openEditPostTextModal(postId){
   if(canonicalPerson(post.author)!==myEmail) return; // sécurité : seul l'auteur peut modifier
   _editPostTextPostId = postId;
   var input = document.getElementById('edit-post-text-input');
-  if(input) input.value = post.text || '';
+  if(input) input.value = post.text || post.photoCaption || '';
   document.getElementById('editPostTextModal').classList.add('open');
 }
 function saveEditPostText(){
@@ -5326,11 +5321,12 @@ function saveEditPostText(){
   var input = document.getElementById('edit-post-text-input');
   var val = (input.value||'').trim();
   post.text = val;
+  post.photoCaption = ''; // fusion : le texte est désormais l'unique description
   save();
   document.getElementById('editPostTextModal').classList.remove('open');
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').update({text: val||null}).eq('id', post.id).then(function(r){
+    sb.from('feed_posts').update({text: val||null, photo_caption:null}).eq('id', post.id).then(function(r){
       if(r && r.error) console.warn('[PlaniTrip] update feed post text:', r.error);
     });
   }
@@ -5393,7 +5389,7 @@ function addFeedPost(){
   var textEl = document.getElementById('feedTextInput');
   var text = textEl ? textEl.value.trim() : '';
   var photo = window._feedDraftPhoto || null;
-  var photoCaption = photo ? (window._feedDraftPhotoCaption||'').trim() : '';
+  var photoCaption = '';
   if(!text && !photo){ return; }
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   var newId = 'f'+Date.now();
