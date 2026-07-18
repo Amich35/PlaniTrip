@@ -5218,8 +5218,11 @@ function renderFeed(){
       +'</div>'
       +(isMine?'<span onclick="removeFeedPost(\''+p.id+'\')" style="color:var(--red-muted);cursor:pointer;font-size:16px;padding:2px 6px">×</span>':'')
       +'</div>'
-      +(p.text?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap">'+escHtml(p.text)+'</div>':'')
-      +photoHTML
+      +(p.photo?photoHTML:'')
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:'+(p.photo?'8px':'0')+'">'
+      +(p.text?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap;flex:1">'+escHtml(p.text)+'</div>':'<div style="flex:1"></div>')
+      +(isMine?('<span onclick="openEditPostTextModal(\''+p.id+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-subtle);cursor:pointer">'+svgIcon('pencil',11)+(p.text?' Modifier':' Ajouter texte')+'</span>'):'')
+      +'</div>'
       +taggedHTML
       +reactionPill
       +'</div>';
@@ -5306,6 +5309,32 @@ function toggleFeedComposerTag(email){
   restoreFeedComposerFocus();
 }
 function triggerFeedFileInput(){ document.getElementById('feedFileInput').click(); }
+var _editPostTextPostId = '';
+function openEditPostTextModal(postId){
+  var post = (S.feedPosts||[]).find(function(p){return p.id===postId;});
+  if(!post) return;
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  if(canonicalPerson(post.author)!==myEmail) return; // sécurité : seul l'auteur peut modifier
+  _editPostTextPostId = postId;
+  var input = document.getElementById('edit-post-text-input');
+  if(input) input.value = post.text || '';
+  document.getElementById('editPostTextModal').classList.add('open');
+}
+function saveEditPostText(){
+  var post = (S.feedPosts||[]).find(function(p){return p.id===_editPostTextPostId;});
+  if(!post) return;
+  var input = document.getElementById('edit-post-text-input');
+  var val = (input.value||'').trim();
+  post.text = val;
+  save();
+  document.getElementById('editPostTextModal').classList.remove('open');
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('feed_posts').update({text: val||null}).eq('id', post.id).then(function(r){
+      if(r && r.error) console.warn('[PlaniTrip] update feed post text:', r.error);
+    });
+  }
+}
 var _editCaptionPostId = '';
 function openEditCaptionModal(postId){
   var post = (S.feedPosts||[]).find(function(p){return p.id===postId;});
@@ -8949,6 +8978,17 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 <!-- Pseudo onboarding modal (first login) -->
 <!-- Edit collaborator pseudo modal (owner only) -->
 <!-- Edit feed photo caption modal -->
+<!-- Edit feed post text modal -->
+<div class="share-modal" id="editPostTextModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Modifier le texte</div>
+    <textarea id="edit-post-text-input" class="modal-field" placeholder="Ton message..." rows="3" style="resize:none"></textarea>
+    <button class="modal-cta" onclick="saveEditPostText()">Enregistrer</button>
+    <div style="text-align:center;margin-top:4px"><span onclick="document.getElementById('editPostTextModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
 <div class="share-modal" id="editCaptionModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
