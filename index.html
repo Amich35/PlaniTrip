@@ -4843,10 +4843,8 @@ function renderFlightsList(flights){
       +(checked?svgIcon('check',11):'')+' '+escHtml(personDisplayName(p,'Toi'))+'</span>';
   }).join('');
 
-  return '<div class="info-card" style="padding:10px 12px">'
-    +'<div class="ic-header" style="margin-bottom:4px">Vols</div>'
-    +(cards || '<div style="font-size:12.5px;color:var(--ink-muted);padding:4px 0 8px">Aucun vol ajouté.</div>')
-    +'<div style="display:flex;gap:6px;margin-top:6px">'
+  var formOpen = !!S.flightFormOpen;
+  var formHTML = '<div style="display:flex;gap:6px;margin-top:6px">'
     +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" style="flex:1;min-width:0">'
     +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" style="flex:1;min-width:0">'
     +'</div>'
@@ -4857,8 +4855,18 @@ function renderFlightsList(flights){
     +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" style="width:100%;margin-top:6px">'
     +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
     +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
-    +'<button onclick="addFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">+ Ajouter un vol</button>'
+    +'<button onclick="addFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">+ Ajouter un vol</button>';
+
+  return '<div class="info-card" style="padding:10px 12px">'
+    +'<div class="ic-header" style="justify-content:space-between;cursor:pointer;margin-bottom:4px" onclick="toggleFlightForm()"><span>Vols</span><span style="transform:rotate('+(formOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
+    +(cards || '<div style="font-size:12.5px;color:var(--ink-muted);padding:4px 0 8px">Aucun vol ajouté.</div>')
+    +(formOpen ? formHTML : '')
     +'</div>';
+}
+function toggleFlightForm(){
+  S.flightFormOpen = !S.flightFormOpen;
+  save();
+  renderContent();
 }
 function toggleFlightParticipant(p){
   if(!S.newFlightParticipants) S.newFlightParticipants = getPeopleList();
