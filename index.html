@@ -4360,9 +4360,9 @@ function renderBudgetOverview(){
       return '<div class="settle-card">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
         +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.from===myLabel2?'Moi':t.from,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(fromLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.to===myLabel2?'Moi':t.to,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(toLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
         +'</div>'
         +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#C9762E;flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
         +'</div>'
@@ -4393,9 +4393,9 @@ function renderBudgetOverview(){
         // Ligne 1 : participants (gauche) / montant (droite, mis en valeur)
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
         +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(e.personLabel===myLabel2?'Moi':e.personLabel,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(fromName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toP===myLabel2?'Moi':toP,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
         +'</div>'
         +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
         +'</div>'
@@ -4491,7 +4491,7 @@ function personDisplayName(emailOrLabel, selfLabel){
   if(!emailOrLabel) return '';
   var canon = canonicalPerson(emailOrLabel);
   if(selfLabel && CURRENT_USER && canon===CURRENT_USER.email) return selfLabel;
-  if(PROFILES_MAP[canon]) return PROFILES_MAP[canon];
+  if(PROFILES_MAP[canon] && PROFILES_MAP[canon]!==canon) return PROFILES_MAP[canon];
   if(canon.indexOf('@')>-1){
     var local = canon.split('@')[0].split(/[._-]+/)[0];
     if(local) return local.charAt(0).toUpperCase()+local.slice(1);
