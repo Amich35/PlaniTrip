@@ -5130,7 +5130,7 @@ function renderFeed(){
     return '<div class="info-card" style="padding:14px 16px'+(p.important?';border:1.5px solid var(--red-muted)':'')+'">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
       +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<span style="width:30px;height:30px;border-radius:50%;background:'+(isOwner?'var(--accent)':'var(--sand-deep)')+';color:'+(isOwner?'#fff':'var(--ink-muted)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">'+escHtml(personDisplayName(p.author,'Toi').slice(0,2).toUpperCase())+'</span>'
+      +'<span style="width:30px;height:30px;border-radius:50%;background:'+(isOwner?'var(--accent)':'var(--sand-deep)')+';color:'+(isOwner?'#fff':'var(--ink-muted)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">'+escHtml(getInitials(personDisplayName(p.author)))+'</span>'
       +'<div><div style="font-size:13.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:5px">'+escHtml(personDisplayName(p.author,'Toi'))+(isOwner?' <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:8px">Organisateur</span>':'')+(p.important?' <span style="font-size:10px;font-weight:700;color:var(--red-muted);background:var(--red-pale);padding:2px 6px;border-radius:8px;display:inline-flex;align-items:center;gap:3px">'+svgIcon('triangle-alert',10)+' Important</span>':'')+'</div>'
       +'<div style="font-size:11px;color:var(--ink-subtle)">'+timeAgoLabel(p.createdAt)+'</div></div>'
       +'</div>'
