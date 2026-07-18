@@ -3611,13 +3611,21 @@ function renderToday(){
   // ── Carte Prochain vol ──
   var flightCard = '';
   var flightsList = (S.documents && S.documents.tickets && S.documents.tickets.flightsList) || [];
-  var upcomingFlights = flightsList.filter(function(f){ return f.date && f.date>=todayStr; }).sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+  var myEmailFlight = canonicalPerson((CURRENT_USER && CURRENT_USER.email) || '');
+  var upcomingFlights = flightsList.filter(function(f){
+    if(!f.date || f.date<todayStr) return false;
+    if(!f.participants || !f.participants.length) return true; // vol ancien sans participants renseignés = tout le monde
+    return f.participants.map(canonicalPerson).indexOf(myEmailFlight)>-1;
+  }).sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
   if(upcomingFlights.length){
     var nf = upcomingFlights[0];
     var nfDate = new Date(nf.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+    var nfPeople = getPeopleList();
+    var nfParticipants = (nf.participants && nf.participants.length) ? nf.participants : nfPeople;
+    var nfWithLabel = nfParticipants.length>=nfPeople.length ? '' : (' · avec '+nfParticipants.filter(function(p){return canonicalPerson(p)!==myEmailFlight;}).map(function(p){return personDisplayName(p,'Toi');}).join(', '));
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Prochain vol')+'</div>'
       +'<div class="status-main">'+escHtml(nf.from||'?')+' → '+escHtml(nf.to||'?')+'</div>'
-      +'<div class="status-sub">'+nfDate+(nf.link?' · billet enregistré':'')+'</div></div>';
+      +'<div class="status-sub">'+nfDate+(nf.link?' · billet enregistré':'')+escHtml(nfWithLabel)+'</div></div>';
   } else {
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochain vol</div><div class="status-sub">À renseigner — aucun vol à venir enregistré.</div></div>';
   }
@@ -4810,18 +4818,29 @@ function toggleDocOpen(id){
 function saveDocField(docId, key, val){ if(!S.documents[docId]) S.documents[docId]={}; S.documents[docId][key]=val; save(); }
 
 function renderFlightsList(flights){
+  var people = getPeopleList();
+  if(!S.newFlightParticipants || !S.newFlightParticipants.length) S.newFlightParticipants = people.slice();
   var cards = flights.map(function(f, i){
     var dateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'Date non renseignée';
     var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
+    var fParticipants = (f.participants && f.participants.length) ? f.participants : people;
+    var namesLabel = fParticipants.length>=people.length ? 'Tous les voyageurs' : fParticipants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
     return '<div class="more-row" style="align-items:flex-start;padding:9px 0">'
       +'<span style="margin-top:2px">'+svgIcon('plane',16)+'</span>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(f.from||'?')+' → '+escHtml(f.to||'?')+'</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+dateLabel+'</div>'
+      +'<div style="font-size:11.5px;color:var(--accent);margin-bottom:2px">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</div>'
       +linkHtml
       +'</div>'
       +'<button onclick="removeFlight('+i+')" style="border:none;background:none;color:var(--red-muted);font-size:16px;cursor:pointer;flex-shrink:0">×</button>'
       +'</div>';
+  }).join('');
+
+  var participantChips = people.map(function(p){
+    var checked = S.newFlightParticipants.indexOf(p)>-1;
+    return '<span onclick="toggleFlightParticipant(\''+jsStrEsc(p)+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:16px;font-size:12.5px;font-weight:600;cursor:pointer;margin:0 6px 6px 0;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:'+(checked?'#fff':'var(--ink-muted)')+'">'
+      +(checked?svgIcon('check',11):'')+' '+escHtml(personDisplayName(p,'Toi'))+'</span>';
   }).join('');
 
   return '<div class="info-card" style="padding:10px 12px">'
@@ -4836,8 +4855,17 @@ function renderFlightsList(flights){
     +'<input id="newFlightDate" type="date" class="ef-input" style="width:100%;text-align:center">'
     +'</div>'
     +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" style="width:100%;margin-top:6px">'
+    +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
+    +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
     +'<button onclick="addFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">+ Ajouter un vol</button>'
     +'</div>';
+}
+function toggleFlightParticipant(p){
+  if(!S.newFlightParticipants) S.newFlightParticipants = getPeopleList();
+  var idx = S.newFlightParticipants.indexOf(p);
+  if(idx>-1) S.newFlightParticipants.splice(idx,1); else S.newFlightParticipants.push(p);
+  save();
+  renderContent();
 }
 
 function addFlight(){
@@ -4848,9 +4876,39 @@ function addFlight(){
   if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
   if(!S.documents.tickets) S.documents.tickets = {};
   if(!S.documents.tickets.flightsList) S.documents.tickets.flightsList = [];
-  S.documents.tickets.flightsList.push({from:from, to:to, date:date, link:link});
+  var people = getPeopleList();
+  var participants = (S.newFlightParticipants && S.newFlightParticipants.length) ? S.newFlightParticipants.slice() : people.slice();
+  var newId = Date.now();
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  S.documents.tickets.flightsList.push({id:newId, from:from, to:to, date:date, link:link, participants:participants});
+  S.newFlightParticipants = people.slice();
   save();
   renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('flights').insert({id:newId, trip_id:CURRENT_TRIP.id, from_place:from, to_place:to, flight_date:date||null, link:link||null, participants:participants, created_by:myEmail}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert flights:', r.error); } });
+  }
+}
+function removeFlight(index){
+  if(!S.documents.tickets || !S.documents.tickets.flightsList) return;
+  var removed = S.documents.tickets.flightsList[index];
+  S.documents.tickets.flightsList.splice(index,1);
+  save();
+  renderContent();
+  if(sb && CURRENT_TRIP && removed && removed.id){
+    sb.from('flights').delete().eq('id', removed.id).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] delete flights:', r.error); } });
+  }
+}
+async function loadFlights(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data, error} = await sb.from('flights').select('*').eq('trip_id',CURRENT_TRIP.id);
+  if(error){ return; } // table pas encore créée ou erreur réseau : on garde les vols locaux tels quels
+  if(!S.documents) S.documents = {};
+  if(!S.documents.tickets) S.documents.tickets = {};
+  // Serveur autoritaire : reconstruction complète de la liste des vols.
+  S.documents.tickets.flightsList = (data||[]).map(function(row){
+    return {id:row.id, from:row.from_place, to:row.to_place, date:row.flight_date, link:row.link, participants:row.participants||[]};
+  }).sort(function(a,b){ return (a.date||'')<(b.date||'') ? -1 : ((a.date||'')>(b.date||'') ? 1 : 0); });
+  save();
 }
 
 function removeFlight(index){
@@ -7375,6 +7433,7 @@ async function enterTrip(trip, resetTab) {
   await loadActivityDetails();
   await loadAccommodations();
   await loadCustomPhotos();
+  await loadFlights();
   await loadProfiles();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
