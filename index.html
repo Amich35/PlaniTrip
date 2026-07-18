@@ -2822,14 +2822,14 @@ async function autofillCountryWithAI(countryId){
       headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:1100,
+        max_tokens:1600,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
 `Tu es le Travel Data Engine de PlaniTrip. Ton objectif n'est pas de rediger un guide touristique mais de produire des donnees structurees, fiables, a jour et immediatement exploitables. Chaque information doit etre concise et factuelle. Privilegie les sources officielles (gouvernements, offices de tourisme) lorsqu'elles existent. Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
 
 Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"]}
-budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement).`
+{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
+budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement). phrases = 10 mots ou expressions de base les plus utiles pour un touriste (bonjour, merci, oui, non, combien ca coute, l'addition svp, aide, ou sont les toilettes, delicieux, au revoir) traduits dans la/les langue(s) locale(s) principale(s).`
         }]
       })
     });
@@ -2847,6 +2847,7 @@ budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 chose
     c.practical.tips = info.tips || c.practical.tips;
     c.practical.emergency = info.emergency || c.practical.emergency;
     c.practical.checklist = (info.checklist && info.checklist.length) ? info.checklist : c.practical.checklist;
+    c.practical.phrases = (info.phrases && info.phrases.length) ? info.phrases : c.practical.phrases;
     c._aiGenerated = true;
     c._aiGeneratedAt = new Date().toISOString();
     saveCountryEdit(c.id);
@@ -2863,7 +2864,7 @@ function saveCountryEdit(countryId){
     tagline:c.tagline, currency:c.currency, rate:c.rate, visa:c.visa, lang:c.lang,
     budget_daily:c.budget_daily, dates:c.dates, days:c.days, dateStart:c.dateStart||'', dateEnd:c.dateEnd||'', _aiGenerated:c._aiGenerated||false, _aiGeneratedAt:c._aiGeneratedAt||null,
     timezone:c.timezone||'', alerts:c.alerts||[],
-    practical:{tips:c.practical.tips, emergency:c.practical.emergency, checklist:c.practical.checklist}
+    practical:{tips:c.practical.tips, emergency:c.practical.emergency, checklist:c.practical.checklist, phrases:c.practical.phrases||[]}
   };
   save();
   if(sb && CURRENT_TRIP){
@@ -2919,12 +2920,12 @@ function editCountryField(countryId, field, value){
   saveCountryEdit(countryId);
 }
 function addGuideListItem(countryId, listField, promptLabel){
-  if(listField==='tips'||listField==='checklist'||listField==='emergency'){
+  if(listField==='tips'||listField==='checklist'||listField==='emergency'||listField==='phrases'){
     openGuideItemModal(countryId, listField, null); return;
   }
 }
 function editGuideListItem(countryId, listField, idx){
-  if(listField==='tips'||listField==='checklist'||listField==='emergency'){
+  if(listField==='tips'||listField==='checklist'||listField==='emergency'||listField==='phrases'){
     openGuideItemModal(countryId, listField, idx); return;
   }
 }
@@ -2967,6 +2968,17 @@ function openGuideItemModal(countryId, listField, idx){
     document.getElementById('guideItemModalBody').innerHTML=
       '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%"/></div>'
       +'<div class="ef-row"><input class="ef-input" id="guideModalCitySub" type="text" placeholder="Durée (ex: 3 jours)" style="width:100%" value="2 jours"/></div>';
+    _guideModalSaveFn = saveGuideItem;
+    document.getElementById('guideItemModal').classList.add('open');
+    return;
+  }
+
+  if(listField==='phrases'){
+    var currentP = isEdit ? (c.practical.phrases||[])[_guideModalIdx] : {fr:'',local:''};
+    document.getElementById('guideItemModalTitle').textContent=isEdit?'Modifier':'Nouveau mot / expression';
+    document.getElementById('guideItemModalBody').innerHTML=
+      '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalPhraseFr" type="text" placeholder="En français (ex: Bonjour)" style="width:100%" value="'+escHtml(currentP.fr||'')+'"/></div>'
+      +'<div class="ef-row"><input class="ef-input" id="guideModalPhraseLocal" type="text" placeholder="Traduction locale (ex: Konnichiwa)" style="width:100%" value="'+escHtml(currentP.local||'')+'"/></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
     return;
@@ -3028,6 +3040,20 @@ function saveGuideItem(){
     return;
   }
 
+  if(_guideModalListField==='phrases'){
+    var pfr=((document.getElementById('guideModalPhraseFr')||{}).value||'').trim();
+    var plocal=((document.getElementById('guideModalPhraseLocal')||{}).value||'').trim();
+    if(!pfr||!plocal){closeGuideItemModal();return;}
+    if(!c.practical.phrases) c.practical.phrases=[];
+    var newP={fr:stripHtml(pfr),local:stripHtml(plocal)};
+    if(_guideModalIdx!==null) c.practical.phrases[_guideModalIdx]=newP;
+    else c.practical.phrases.push(newP);
+    saveCountryEdit(_guideModalCountryId);
+    closeGuideItemModal();
+    renderContent();
+    return;
+  }
+
   var text=((document.getElementById('guideModalText')||{}).value||'').trim();
   var cat=(document.getElementById('guideModalCatSel')||{}).value||'Autre';
   if(!text){closeGuideItemModal();return;}
@@ -3074,12 +3100,13 @@ function saveDatesModal(){
   closeGuideItemModal();
 }
 function removeGuideListItem(countryId, listField, idx){
-  var label = listField==='checklist' ? 'cet item' : (listField==='emergency' ? 'ce numéro' : 'ce conseil');
+  var label = listField==='checklist' ? 'cet item' : (listField==='emergency' ? 'ce numéro' : (listField==='phrases' ? 'ce mot/expression' : 'ce conseil'));
   showConfirm('Supprimer '+label+' ?', function(){
     var c = COUNTRIES.find(function(co){return co.id===countryId;});
     if(!c) return;
     if(listField==='tips'){ c.practical.tips.splice(idx,1); }
     else if(listField==='emergency'){ c.practical.emergency.splice(idx,1); }
+    else if(listField==='phrases'){ c.practical.phrases.splice(idx,1); }
     else if(listField==='checklist'){
       c.practical.checklist.splice(idx,1);
       var newChecklistState = {};
@@ -5682,6 +5709,13 @@ function renderGuide(c){
   }).join('');
   const clDone=p.checklist.filter(function(_,i){return !!S.checklist[c.id+'_cl_'+i];}).length;
   const clPct=p.checklist.length>0?Math.round((clDone/p.checklist.length)*100):0;
+  if(!p.phrases) p.phrases=[];
+  const phrasesOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_phrases']);
+  const phraseRows = p.phrases.map(function(ph,i){
+    return '<div class="info-row guide-editable-row" style="cursor:pointer;align-items:flex-start;gap:8px" onclick="editGuideListItem(\''+c.id+'\',\'phrases\','+i+')">'
+      +'<div style="flex:1"><div class="ir-key" style="margin-bottom:2px">'+escHtml(ph.fr||'')+'</div><div class="status-sub" style="margin-top:1px">'+escHtml(ph.local||'')+'</div></div>'
+      +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'phrases\','+i+')">×</span></div>';
+  }).join('');
   return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
     +aiBadge
     +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
@@ -5706,6 +5740,8 @@ function renderGuide(c){
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_emerg\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'emergency\',null)">+</span><span style="transform:rotate('+(emergOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'+(emergOpen?(emergRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un contact d\'urgence.</div>'):'')+'</div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_tips\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="lightbulb" data-icon-size="16"></span> Conseils</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'tips\',\'Nouveau conseil :\')">+</span><span style="transform:rotate('+(tipsOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(tipsOpen?(tipRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un conseil.</div>'):'')+'</div>'
+    +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_phrases\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="message-circle" data-icon-size="16"></span> Mots & expressions</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'phrases\',null)">+</span><span style="transform:rotate('+(phrasesOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
+    +(phrasesOpen?(phraseRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un mot ou une expression.</div>'):'')+'</div>'
     +renderConverterCard(c)
     +'<div class="info-card" id="guide-checklist-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_checklist\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="check-square" data-icon-size="16"></span> Checklist avant départ</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;color:var(--accent)">'+clDone+'/'+p.checklist.length+'</span><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'checklist\',\'Nouvel item à préparer :\')">+</span><span style="transform:rotate('+(clOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +'<div class="bh-bar" style="margin:4px 0 '+(clOpen?'10px':'0')+'"><div class="bh-fill" style="width:'+clPct+'%"></div></div>'
@@ -7168,7 +7204,7 @@ function renderAccessManagementScreen(){
       +(_acmScopeAll ? '' : '<div style="max-height:220px;overflow-y:auto;margin-bottom:6px">'+countryChecks+'</div>')
       +'<div id="acm-error" class="auth-error" style="display:none;margin:6px 0"></div>'
       +(_acmSuccessMsg?('<div id="acm-success" style="margin:6px 0;padding:9px 12px;border-radius:10px;background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600">'+escHtml(_acmSuccessMsg)+'</div>'):'')
-      +(_acmShowCopyLink?('<button onclick="copyInviteLink()" style="width:100%;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid rgba(29,29,31,0.14);background:transparent;color:var(--ink-muted);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('link',13)+' Copier le lien d\'invitation</button>'):'')
+      +(_acmShowCopyLink?('<button onclick="copyInviteLink()" style="width:100%;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid rgba(29,29,31,0.14);background:transparent;color:var(--ink-muted);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('share',13)+' Copier le lien d\'invitation</button>'):'')
       +'<button id="acm-add-btn" class="btn-primary" onclick="addCollaboratorSubmit()">Inviter</button>'
       +'</div>';
     if(_acmSuccessMsg && !_acmShowCopyLink) setTimeout(function(){ _acmSuccessMsg=''; },4000);
@@ -7823,7 +7859,7 @@ function applyTripCountryFilter(trip) {
         id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
         currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier', lang: langGuess, budget_daily: 50,
         timezone: (tzGuess && tzGuess!=='0h') ? (tzGuess+' par rapport à la France') : (tzGuess==='0h' ? 'Identique à la France' : ''),
-        alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[]}
+        alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[], phrases:[]}
       };
       COUNTRIES.push(newCountry);
       if (!S.customCountries) S.customCountries = [];
