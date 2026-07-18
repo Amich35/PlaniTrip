@@ -716,6 +716,19 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ts-trip-item{display:flex;align-items:center;justify-content:space-between;background:#F8F6F2;border-radius:14px;padding:14px;font-size:15px;font-weight:500;color:#1D1D1F;cursor:pointer;margin-bottom:8px;transition:background .15s;}
 .ts-trip-item:hover{background:#F0ECE4;}
 .ts-trip-item .ts-arrow{color:#6E6E73;font-size:14px;}
+.feed-textarea{width:100%;box-sizing:border-box;border:1.5px solid transparent;background:var(--sand);border-radius:16px;padding:13px 14px;font-size:15px;line-height:1.4;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:72px;transition:border-color .2s ease,box-shadow .2s ease;}
+.feed-textarea::placeholder{color:var(--ink-subtle);}
+.feed-textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,106,79,0.10);background:#fff;}
+.feed-toggle{width:44px;height:26px;border-radius:13px;background:var(--sand-deep);position:relative;flex-shrink:0;cursor:pointer;transition:background .2s ease;}
+.feed-toggle.on{background:var(--red-muted);}
+.feed-toggle .feed-toggle-thumb{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.18);transition:transform .2s ease;}
+.feed-toggle.on .feed-toggle-thumb{transform:translateX(18px);}
+.feed-photo-btn{width:36px;height:36px;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .15s ease;}
+.feed-photo-btn:active{background:var(--sand);}
+.feed-publish-btn{padding:9px 22px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:transform .15s ease,background .2s ease;}
+.feed-publish-btn:active{transform:scale(0.96);}
+.feed-publish-btn.disabled{background:var(--sand-deep);color:var(--ink-subtle);cursor:default;pointer-events:none;}
+.feed-tag-pill{display:inline-flex;align-items:center;gap:4px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s ease,color .15s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
 </style>
 </head>
 <body>
@@ -4468,7 +4481,12 @@ function personDisplayName(emailOrLabel, selfLabel){
   if(!emailOrLabel) return '';
   var canon = canonicalPerson(emailOrLabel);
   if(selfLabel && CURRENT_USER && canon===CURRENT_USER.email) return selfLabel;
-  return PROFILES_MAP[canon] || canon;
+  if(PROFILES_MAP[canon]) return PROFILES_MAP[canon];
+  if(canon.indexOf('@')>-1){
+    var local = canon.split('@')[0].split(/[._-]+/)[0];
+    if(local) return local.charAt(0).toUpperCase()+local.slice(1);
+  }
+  return canon;
 }
 // Résout un ancien pseudo (utilisé comme identité brute dans une vieille dépense) vers l'email
 // canonique de la personne, si connu. Sinon retourne la valeur telle quelle.
@@ -5121,27 +5139,28 @@ function renderFeed(){
   var tagChips = '';
   if(otherPeople.length){
     if(!S.feedComposerTagged) S.feedComposerTagged=[];
-    tagChips = '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'
+    tagChips = '<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">'
       +otherPeople.map(function(p){
         var checked = S.feedComposerTagged.indexOf(p)>-1;
-        return '<span onclick="toggleFeedComposerTag(\''+jsStrEsc(p)+'\')" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:'+(checked?'#fff':'var(--ink-muted)')+'">'+(checked?'@':'')+escHtml(personDisplayName(p,'Toi'))+'</span>';
+        return '<span class="feed-tag-pill" onclick="toggleFeedComposerTag(\''+jsStrEsc(p)+'\')" style="background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:'+(checked?'#fff':'var(--ink-muted)')+'">'+(checked?'@':'')+escHtml(personDisplayName(p,'Toi'))+'</span>';
       }).join('')
       +'</div>';
   }
 
   var importantChecked = !!S.feedComposerImportant;
   var draftTextVal = window._feedDraftText || '';
-  var composer = '<div class="info-card" style="padding:12px 14px">'
-    +'<textarea id="feedTextInput" oninput="window._feedDraftText=this.value" placeholder="Partager une nouvelle avec le groupe…" style="width:100%;box-sizing:border-box;border:none;background:transparent;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:44px" rows="2">'+escHtml(draftTextVal)+'</textarea>'
+  var canPublish = !!(draftTextVal.trim() || window._feedDraftPhoto);
+  var composer = '<div class="info-card" style="padding:14px 16px 16px">'
+    +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="Partager une nouvelle avec le groupe…" rows="2">'+escHtml(draftTextVal)+'</textarea>'
     +feedPhotoPreview
     +tagChips
-    +'<div onclick="toggleFeedComposerImportant()" style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">'
-    +'<span style="width:18px;height:18px;border-radius:5px;border:1.5px solid '+(importantChecked?'var(--red-muted)':'var(--sand-deep)')+';background:'+(importantChecked?'var(--red-muted)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(importantChecked?svgIcon('check',12):'')+'</span>'
-    +'<span style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:'+(importantChecked?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('triangle-alert',14)+' Marquer comme important (visible 24h dans Aujourd\'hui)</span>'
+    +'<div onclick="toggleFeedComposerImportant()" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;cursor:pointer">'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:'+(importantChecked?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('triangle-alert',15)+' Important'+(importantChecked?' <span style="font-size:11px;font-weight:500;color:var(--ink-subtle)">· visible 24h</span>':'')+'</span>'
+    +'<span class="feed-toggle'+(importantChecked?' on':'')+'"><span class="feed-toggle-thumb"></span></span>'
     +'</div>'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">'
-    +'<span onclick="triggerFeedFileInput()" style="display:flex;align-items:center;gap:5px;color:var(--ink-muted);cursor:pointer;font-size:12.5px;font-weight:600">'+svgIcon('camera',16)+' Photo</span>'
-    +'<button onclick="addFeedPost()" class="ef-btn" style="padding:8px 20px">Publier</button>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">'
+    +'<span class="feed-photo-btn" onclick="triggerFeedFileInput()">'+svgIcon('camera',17)+'</span>'
+    +'<button id="feedPublishBtn" onclick="addFeedPost()" class="feed-publish-btn'+(canPublish?'':' disabled')+'">Publier</button>'
     +'</div>'
     +'<input type="file" id="feedFileInput" accept="image/*" style="display:none" onchange="handleFeedPhotoSelected(event)">'
     +'</div>';
@@ -5152,6 +5171,14 @@ function renderFeed(){
     +'<div style="height:12px"></div>'
     +(postsHTML || '<div class="info-card" style="text-align:center;padding:24px 16px"><div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('message-circle',28)+'</div><div style="font-size:14px;color:var(--ink-muted)">Aucune actualité pour l\'instant — sois le premier à partager quelque chose !</div></div>')
     +'</div>';
+}
+function onFeedTextInput(el){
+  window._feedDraftText = el.value;
+  var btn = document.getElementById('feedPublishBtn');
+  if(btn){
+    var canPublish = !!(el.value.trim() || window._feedDraftPhoto);
+    btn.classList.toggle('disabled', !canPublish);
+  }
 }
 function captureFeedDraftText(){
   var textEl = document.getElementById('feedTextInput');
