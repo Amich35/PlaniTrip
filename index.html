@@ -729,6 +729,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .feed-publish-btn:active{transform:scale(0.96);}
 .feed-publish-btn.disabled{background:var(--sand-deep);color:var(--ink-subtle);cursor:default;pointer-events:none;}
 .feed-tag-pill{display:inline-flex;align-items:center;gap:4px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s ease,color .15s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
+.feed-composer-extra{max-height:0;opacity:0;overflow:hidden;transition:max-height .2s ease,opacity .2s ease,margin-top .2s ease;}
+.feed-composer-extra.open{max-height:400px;opacity:1;margin-top:4px;}
 </style>
 </head>
 <body>
@@ -5150,8 +5152,10 @@ function renderFeed(){
   var importantChecked = !!S.feedComposerImportant;
   var draftTextVal = window._feedDraftText || '';
   var canPublish = !!(draftTextVal.trim() || window._feedDraftPhoto);
+  var extraOpen = draftTextVal.trim().length>0 || !!window._feedDraftPhoto;
   var composer = '<div class="info-card" style="padding:14px 16px 16px">'
     +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="Partager une nouvelle avec le groupe…" rows="2">'+escHtml(draftTextVal)+'</textarea>'
+    +'<div id="feedComposerExtra" class="feed-composer-extra'+(extraOpen?' open':'')+'">'
     +feedPhotoPreview
     +tagChips
     +'<div onclick="toggleFeedComposerImportant()" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;cursor:pointer">'
@@ -5163,6 +5167,7 @@ function renderFeed(){
     +'<button id="feedPublishBtn" onclick="addFeedPost()" class="feed-publish-btn'+(canPublish?'':' disabled')+'">Publier</button>'
     +'</div>'
     +'<input type="file" id="feedFileInput" accept="image/*" style="display:none" onchange="handleFeedPhotoSelected(event)">'
+    +'</div>'
     +'</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
@@ -5179,6 +5184,8 @@ function onFeedTextInput(el){
     var canPublish = !!(el.value.trim() || window._feedDraftPhoto);
     btn.classList.toggle('disabled', !canPublish);
   }
+  var extra = document.getElementById('feedComposerExtra');
+  if(extra) extra.classList.toggle('open', el.value.trim().length>0 || !!window._feedDraftPhoto);
 }
 function captureFeedDraftText(){
   var textEl = document.getElementById('feedTextInput');
