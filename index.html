@@ -7760,6 +7760,7 @@ function showTripSelectorScreen(trips) {
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         showConfirm('Supprimer définitivement "'+t.name+'" ? Toutes ses données (pays, villes, activités, budget, documents, fil, carnet) seront perdues pour tous les voyageurs. Cette action est irréversible.', function(){
+          item.remove();
           deleteTripPermanently(t);
         }, 'Supprimer');
       });
@@ -7798,26 +7799,27 @@ async function deleteTripPermanently(trip){
   if(!sb) return;
   var tripId = trip.id;
   var tables = ['collaborators','budget_entries','carnet_entries','cities','activities','country_settings','activity_details','accommodations','custom_photos','flights','feed_posts'];
-  for(var i=0;i<tables.length;i++){
-    try{ await sb.from(tables[i]).delete().eq('trip_id', tripId); }catch(e){ console.warn('[PlaniTrip] suppression '+tables[i]+':', e); }
-  }
+  var childDeletes = tables.map(function(tbl){
+    return sb.from(tbl).delete().eq('trip_id', tripId).then(function(){}, function(e){ console.warn('[PlaniTrip] suppression '+tbl+':', e); });
+  });
+  Promise.all(childDeletes).catch(function(){});
   try{
     var { error } = await sb.from('trips').delete().eq('id', tripId);
-    if(error){ alert('Erreur lors de la suppression du voyage : '+error.message); return; }
-  }catch(e){ alert('Erreur lors de la suppression du voyage.'); return; }
+    if(error){ console.error('[PlaniTrip] suppression trips:', error); }
+  }catch(e){ console.error('[PlaniTrip] suppression trips:', e); }
 
   if(CURRENT_TRIP && CURRENT_TRIP.id===tripId){
     CURRENT_TRIP = null;
     localStorage.removeItem('planitrip_last_trip_id');
   }
-  backToTripSelector();
 }
 function startRenameTrip(item, trip, nameSpan) {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = trip.name;
+  input.maxLength = 30;
   input.className = 'auth-input';
-  input.style.cssText = 'margin:0;padding:8px 10px;font-size:14px;flex:1;';
+  input.style.cssText = 'margin:0;padding:8px 10px;font-size:14px;flex:1;min-width:0;width:auto;max-width:100%;box-sizing:border-box;';
 
   item.replaceChild(input, nameSpan);
   input.focus();
