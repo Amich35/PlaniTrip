@@ -3645,7 +3645,8 @@ function renderToday(){
     }
     if(tmCountry && tmCountry.id!==c.id){
       var transp = TRANSPORTS.find(function(t){return t[0]===c.id && t[1]===tmCountry.id;});
-      var tmLandingCity = tmCountry.cities && tmCountry.cities[0] ? tmCountry.cities[0].city : null;
+      var tmCityOrder = getCityOrder(tmCountry.id);
+      var tmLandingCity = (tmCityOrder.length && tmCountry.cities[tmCityOrder[0]]) ? tmCountry.cities[tmCityOrder[0]].city : (tmCountry.cities && tmCountry.cities[0] ? tmCountry.cities[0].city : null);
       var tmOnclick = tmLandingCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmLandingCity)+'\']=true;') : '';
       tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
         +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+tmCountry.flag+' Départ vers '+tmCountry.name+'</div>'
@@ -3653,7 +3654,8 @@ function renderToday(){
         +'</div>';
     } else if(tmCountry){
       var tmActs = [];
-      tmCountry.cities.forEach(function(city){ tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStrRef)); });
+      var tmCityOrder2 = getCityOrder(tmCountry.id);
+      tmCityOrder2.forEach(function(ci){ var city=tmCountry.cities[ci]; if(city) tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStrRef)); });
       var tmActCity = (tmActs[0] && tmActs[0].city) ? tmActs[0].city : null;
       var tmActOnclick = tmActCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmActCity)+'\']=true;') : '';
       tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmActOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('calendar', tomorrowCardTitle)+'</div>'
