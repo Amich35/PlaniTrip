@@ -3452,6 +3452,20 @@ function getTripDepartDate(){
   }
   return new Date('2026-09-10T00:00:00');
 }
+function getCityForCountryDay(country, dayInCountry){
+  if(!country || !country.cities || !country.cities.length) return null;
+  var orderedIdx = getCityOrder(country.id);
+  var orderedCities = orderedIdx.map(function(idx){ return country.cities[idx]; });
+  if(dayInCountry<1) return orderedCities[0];
+  var cCum=0;
+  for(var j=0;j<orderedCities.length;j++){
+    var city=orderedCities[j];
+    var nDays=parseInt((city.sub||'').match(/\d+/))||1;
+    if(dayInCountry>=cCum+1 && dayInCountry<=cCum+nDays){ return city; }
+    cCum+=nDays;
+  }
+  return orderedCities[orderedCities.length-1];
+}
 function getTripStatus(){
   var DEPART=getTripDepartDate();
   var now=new Date();
@@ -3637,31 +3651,30 @@ function renderToday(){
   var tomorrowCard = '';
   if(c){
     var tomorrowElapsed = refOffset+1;
-    var cumulative=0, tmCountry=null;
+    var cumulative=0, tmCountry=null, tmDayInCountry=0;
     for(var ti=0; ti<COUNTRIES.length; ti++){
       var cc=COUNTRIES[ti];
-      if(tomorrowElapsed>=cumulative && tomorrowElapsed<cumulative+cc.days){ tmCountry=cc; break; }
+      if(tomorrowElapsed>=cumulative && tomorrowElapsed<cumulative+cc.days){ tmCountry=cc; tmDayInCountry=tomorrowElapsed-cumulative+1; break; }
       cumulative+=cc.days;
     }
     if(tmCountry && tmCountry.id!==c.id){
       var transp = TRANSPORTS.find(function(t){return t[0]===c.id && t[1]===tmCountry.id;});
-      var tmCityOrder = getCityOrder(tmCountry.id);
-      var tmLandingCity = (tmCityOrder.length && tmCountry.cities[tmCityOrder[0]]) ? tmCountry.cities[tmCityOrder[0]].city : (tmCountry.cities && tmCountry.cities[0] ? tmCountry.cities[0].city : null);
+      var tmLandingCityObj = getCityForCountryDay(tmCountry, 1);
+      var tmLandingCity = tmLandingCityObj ? tmLandingCityObj.city : null;
       var tmOnclick = tmLandingCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmLandingCity)+'\']=true;') : '';
       tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
         +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+tmCountry.flag+' Départ vers '+tmCountry.name+'</div>'
         +(transp?'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(transp[2])+'</div>':'<div class="status-sub" style="margin-top:2px">Moyen de transport à renseigner.</div>')
         +'</div>';
     } else if(tmCountry){
-      var tmActs = [];
-      var tmCityOrder2 = getCityOrder(tmCountry.id);
-      tmCityOrder2.forEach(function(ci){ var city=tmCountry.cities[ci]; if(city) tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStrRef)); });
-      var tmActCity = (tmActs[0] && tmActs[0].city) ? tmActs[0].city : null;
+      var tmCityObj = getCityForCountryDay(tmCountry, tmDayInCountry);
+      var tmActCity = tmCityObj ? tmCityObj.city : null;
+      var tmActs = tmCityObj ? getCityActivitiesForToday(tmCountry, tmCityObj, tomorrowStrRef) : [];
       var tmActOnclick = tmActCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmActCity)+'\']=true;') : '';
       tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmActOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('calendar', tomorrowCardTitle)+'</div>'
         +(tmActs.length
           ? '<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActCity?' à '+escHtml(tmActCity):'')+'</div>'
-          : '<div class="status-sub">À renseigner — rien de prévu pour l\'instant.</div>')
+          : '<div class="status-sub">'+(tmActCity?('À renseigner — rien de prévu à '+escHtml(tmActCity)+' pour l\'instant.'):'À renseigner — rien de prévu pour l\'instant.')+'</div>')
         +'</div>';
     } else {
       tomorrowCard = '<div class="info-card"><div class="ic-header"><span data-icon="calendar" data-icon-size="16"></span> '+tomorrowCardTitle+'</div><div class="status-sub">À renseigner — jours au programme non définis.</div></div>';
