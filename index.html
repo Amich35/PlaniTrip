@@ -731,6 +731,10 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .feed-tag-pill{display:inline-flex;align-items:center;gap:4px;padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s ease,color .15s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
 .feed-composer-extra{max-height:0;opacity:0;overflow:hidden;transition:max-height .2s ease,opacity .2s ease,margin-top .2s ease;}
 .feed-composer-extra.open{max-height:400px;opacity:1;margin-top:4px;}
+.settle-card{background:var(--sand);border-radius:18px;padding:20px;margin-bottom:16px;}
+.settle-card:last-child{margin-bottom:0;}
+.settle-btn{height:40px;padding:0 16px;border-radius:14px;border:1px solid rgba(45,106,79,0.22);background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:transform .15s ease,background .15s ease;}
+.settle-btn:active{transform:scale(0.96);background:rgba(45,106,79,0.16);}
 </style>
 </head>
 <body>
@@ -4353,16 +4357,20 @@ function renderBudgetOverview(){
     var txnRows = txns.length ? txns.map(function(t){
       var fromLabel = t.from===myLabel2 ? 'Moi' : personDisplayName(t.from);
       var toLabel = t.to===myLabel2 ? 'Moi' : personDisplayName(t.to);
-      return '<div style="padding:12px 2px">'
-        +'<div style="display:flex;align-items:center;justify-content:center;gap:10px">'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0">'+avatarCircle(t.from===myLabel2?'Moi':t.from,32)+'<span style="font-size:10.5px;color:var(--ink-subtle);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
-        +'<span style="color:var(--ink-subtle);flex-shrink:0;margin-top:-16px">'+svgIcon('arrow-right',16)+'</span>'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0">'+avatarCircle(t.to===myLabel2?'Moi':t.to,32)+'<span style="font-size:10.5px;color:var(--ink-subtle);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
+      return '<div class="settle-card">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+        +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.from===myLabel2?'Moi':t.from,44)+'<span style="font-size:13px;font-weight:600;color:var(--ink-muted);max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
+        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',15)+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.to===myLabel2?'Moi':t.to,44)+'<span style="font-size:13px;font-weight:600;color:var(--ink-muted);max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
         +'</div>'
-        +'<div style="text-align:center;margin-top:10px"><span style="font-size:15px;font-weight:700;color:var(--accent)">'+fmtEUR(t.amount)+'</span></div>'
-        +'<div style="text-align:center;margin-top:8px"><button onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')" style="border:1px solid rgba(45,106,79,0.25);background:var(--accent-pale);color:var(--accent);font-size:12px;font-weight:600;padding:7px 16px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+svgIcon('check',13)+' Marquer remboursé</button></div>'
+        +'<span style="font-size:30px;font-weight:700;letter-spacing:-0.5px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
+        +'</div>'
+        +'<div style="display:flex;justify-content:flex-end;margin-top:8px">'
+        +'<button class="settle-btn" onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')">'+svgIcon('check',13)+' Marqué remboursé</button>'
+        +'</div>'
         +'</div>';
-    }).join('<div style="height:1px;background:rgba(29,29,31,0.07);margin:0 2px"></div>') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
+    }).join('') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
     var reimbHistory = S.expenses.filter(function(e){return e.category==='reimbursement';}).sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
     var reimbHistoryByMonth = {};
     var reimbHistoryMonthOrder = [];
