@@ -3058,6 +3058,7 @@ function openDatesModal(countryId){
     +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(c.dateEnd||'')+'"/></div></div>';
   _guideModalSaveFn = saveDatesModal;
   document.getElementById('guideItemModal').classList.add('open');
+  wireDateRangeSync('guideModalDateStart', 'guideModalDateEnd');
   var _btnRow = document.querySelector('#guideItemModal .share-sheet > div[style*="display:flex"]');
   if(_btnRow){
     var _cancelBtn = _btnRow.querySelector('.modal-cancel-btn');
@@ -8219,6 +8220,16 @@ function showCreateTripScreen(errorMsg, showBack) {
   else { errEl.style.display = 'none'; }
   loadCountryList();
 }
+function wireDateRangeSync(startId, endId){
+  var startEl = document.getElementById(startId);
+  var endEl = document.getElementById(endId);
+  if(!startEl || !endEl) return;
+  startEl.addEventListener('change', function(){
+    if(!startEl.value) return;
+    endEl.min = startEl.value;
+    if(!endEl.value || endEl.value < startEl.value){ endEl.value = startEl.value; }
+  });
+}
 function updateCtDaysCount(){
   var start = document.getElementById('ct-start-input').value;
   var end = document.getElementById('ct-end-input').value;
@@ -8367,6 +8378,7 @@ document.getElementById('ct-country-modal').addEventListener('click', (e) => {
 
 document.getElementById('ct-start-input').addEventListener('input', updateCtDaysCount);
 document.getElementById('ct-end-input').addEventListener('input', updateCtDaysCount);
+wireDateRangeSync('ct-start-input', 'ct-end-input');
 document.getElementById('ct-add-traveler-btn').addEventListener('click', addCtTraveler);
 document.getElementById('ct-traveler-email-input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addCtTraveler(); } });
 
