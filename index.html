@@ -5237,6 +5237,51 @@ function renderCarnetScreen(){
     +'<div class="section" style="padding-bottom:20px;padding-top:8px">'+form+timelineHTML+'</div>';
 }
 
+function isTripOwner(){
+  return !!(CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id);
+}
+function showManageTripScreen(){
+  S.tab = '_manageTrip';
+  save();
+  renderContent();
+}
+function renderManageTripScreen(){
+  var t = CURRENT_TRIP;
+  if(!t) return '';
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="more-row" onclick="S.tab=\'more\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Gérer le voyage</div>'
+    +'<div class="info-card" style="padding:14px 16px">'
+    +'<label class="auth-label" style="margin-top:0">Nom du voyage</label>'
+    +'<input type="text" id="mgt-name-input" class="auth-input" maxlength="30" value="'+escHtml(t.name)+'" style="margin-bottom:10px">'
+    +'<button onclick="saveManageTripName()" class="ef-btn" style="width:100%;text-align:center">Enregistrer</button>'
+    +'</div>'
+    +'<div class="info-card" style="padding:14px 16px;margin-top:12px">'
+    +'<div style="font-size:13px;color:var(--ink-muted);margin-bottom:10px">Supprimer définitivement ce voyage et toutes ses données (pays, villes, activités, budget, documents, fil, carnet) pour tous les voyageurs. Cette action est irréversible.</div>'
+    +'<button onclick="confirmDeleteCurrentTrip()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Supprimer ce voyage</button>'
+    +'</div>'
+    +'</div>';
+}
+async function saveManageTripName(){
+  var input = document.getElementById('mgt-name-input');
+  var newName = (input.value||'').trim();
+  if(!newName || !CURRENT_TRIP) return;
+  if(newName === CURRENT_TRIP.name){ S.tab='more'; save(); renderContent(); return; }
+  var { error } = await sb.from('trips').update({ name: newName }).eq('id', CURRENT_TRIP.id);
+  if(error){ alert('Erreur lors du renommage : '+error.message); return; }
+  CURRENT_TRIP.name = newName;
+  S.tab='more';
+  save();
+  renderContent();
+}
+function confirmDeleteCurrentTrip(){
+  if(!CURRENT_TRIP) return;
+  var t = CURRENT_TRIP;
+  showConfirm('Supprimer définitivement "'+t.name+'" ? Toutes ses données seront perdues pour tous les voyageurs. Cette action est irréversible.', function(){
+    deleteTripPermanently(t);
+    backToTripSelector();
+  }, 'Supprimer');
+}
 function renderMore(){
   var myPseudo = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email] && PROFILES_MAP[CURRENT_USER.email]!==CURRENT_USER.email) ? PROFILES_MAP[CURRENT_USER.email] : '';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
@@ -5252,6 +5297,7 @@ function renderMore(){
     +'<div class="info-card" style="padding:6px">'
     +'<div class="more-row" onclick="showAccessManagementScreen()"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">Voyageurs</span><span style="font-size:12px;color:var(--ink-muted);margin-right:4px">'+(1+CURRENT_COLLABORATORS.length)+'</span><span class="more-row-chevron">›</span></div>'
     +'<div class="more-row" onclick="showArchivedCountriesScreen()"><span class="more-row-icon" data-icon="globe" data-icon-size="19"></span><span class="more-row-label">Gérer les pays</span><span class="more-row-chevron">›</span></div>'
+    +(isTripOwner()?'<div class="more-row" onclick="showManageTripScreen()"><span class="more-row-icon" data-icon="settings" data-icon-size="19"></span><span class="more-row-label">Gérer le voyage</span><span class="more-row-chevron">›</span></div>':'')
     +'<div class="more-row" onclick="backToTripSelector()"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
@@ -6861,6 +6907,7 @@ function renderContent(){
     else html=renderCountryDetailShell(c, renderGuide(c));
   }
   else if(S.tab==='favorites')html=renderFavoritesScreen();
+  else if(S.tab==='_manageTrip')html=renderManageTripScreen();
   else if(S.tab==='feed')html=renderFeed();
   else if(S.tab==='budget')html=renderBudgetOverview();
   else if(S.tab==='documents')html=renderDocuments();
@@ -6948,6 +6995,7 @@ const ICON_PATHS = {
   'message-circle': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   heart: '<path d="M19 14c1.5-1.5 3-3.5 3-6a5 5 0 0 0-9-3 5 5 0 0 0-9 3c0 5 6 8.5 9 12 1-1 2-2 3-3"/>',
   'trash-2': '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+  settings: '<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>',
 };
 function renderAlertsManageCard(c){
   var alertsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_alerts']);
@@ -7733,8 +7781,7 @@ function showTripSelectorScreen(trips) {
   function buildItem(t, canRename) {
     const item = document.createElement('div');
     item.className = 'ts-trip-item';
-    item.style.position = 'relative';
-    item.style.paddingRight = '38px';
+    item.addEventListener('click', () => enterTrip(t, true));
 
     const nameSpan = document.createElement('span');
     nameSpan.textContent = t.name;
@@ -7742,37 +7789,13 @@ function showTripSelectorScreen(trips) {
     nameSpan.style.overflow = 'hidden';
     nameSpan.style.textOverflow = 'ellipsis';
     nameSpan.style.whiteSpace = 'nowrap';
-    if (canRename) {
-      nameSpan.addEventListener('click', (e) => {
-        e.stopPropagation();
-        startRenameTrip(item, t, nameSpan);
-      });
-    } else {
-      nameSpan.addEventListener('click', () => enterTrip(t, true));
-    }
     item.appendChild(nameSpan);
-
-    if (canRename) {
-      const delBtn = document.createElement('button');
-      delBtn.textContent = '✕';
-      delBtn.setAttribute('aria-label', 'Supprimer');
-      delBtn.style.cssText = 'position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,0.06);color:var(--ink-muted);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;';
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showConfirm('Supprimer définitivement "'+t.name+'" ? Toutes ses données (pays, villes, activités, budget, documents, fil, carnet) seront perdues pour tous les voyageurs. Cette action est irréversible.', function(){
-          item.remove();
-          deleteTripPermanently(t);
-        }, 'Supprimer');
-      });
-      item.appendChild(delBtn);
-    }
 
     const arrow = document.createElement('span');
     arrow.className = 'ts-arrow';
     arrow.textContent = '›';
     arrow.style.flexShrink = '0';
     arrow.style.marginLeft = '8px';
-    arrow.addEventListener('click', (e) => { e.stopPropagation(); enterTrip(t, true); });
     item.appendChild(arrow);
 
     return item;
