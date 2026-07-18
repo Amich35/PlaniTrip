@@ -3594,7 +3594,7 @@ function renderToday(){
 
   // ── Carte Aujourd'hui / Prochainement ──
   var actsCard;
-  var todayOnclick = c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '';
+  var todayOnclick = c && ts.currentCity ? (' onclick="S.openCities[\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\']=true;openCountryDetail(\''+c.id+'\',\'lieux\')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
   var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>') : '';
   if(todayActs.length){
     var actsHTML = todayActs.map(function(a){
@@ -3645,16 +3645,20 @@ function renderToday(){
     }
     if(tmCountry && tmCountry.id!==c.id){
       var transp = TRANSPORTS.find(function(t){return t[0]===c.id && t[1]===tmCountry.id;});
-      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
+      var tmLandingCity = tmCountry.cities && tmCountry.cities[0] ? tmCountry.cities[0].city : null;
+      var tmOnclick = tmLandingCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmLandingCity)+'\']=true;') : '';
+      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
         +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+tmCountry.flag+' Départ vers '+tmCountry.name+'</div>'
         +(transp?'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(transp[2])+'</div>':'<div class="status-sub" style="margin-top:2px">Moyen de transport à renseigner.</div>')
         +'</div>';
     } else if(tmCountry){
       var tmActs = [];
       tmCountry.cities.forEach(function(city){ tmActs = tmActs.concat(getCityActivitiesForToday(tmCountry, city, tomorrowStrRef)); });
-      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('calendar', tomorrowCardTitle)+'</div>'
+      var tmActCity = (tmActs[0] && tmActs[0].city) ? tmActs[0].city : null;
+      var tmActOnclick = tmActCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmActCity)+'\']=true;') : '';
+      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmActOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('calendar', tomorrowCardTitle)+'</div>'
         +(tmActs.length
-          ? '<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActs[0]&&tmActs[0].city?' à '+escHtml(tmActs[0].city):'')+'</div>'
+          ? '<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActCity?' à '+escHtml(tmActCity):'')+'</div>'
           : '<div class="status-sub">À renseigner — rien de prévu pour l\'instant.</div>')
         +'</div>';
     } else {
