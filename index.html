@@ -877,6 +877,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   <nav class="bottom-nav">
     <button class="nav-btn active" onclick="setTab('today')" id="tab-today"><span class="nav-icon icon" id="ni-today"></span><span class="nav-lbl">Aujourd'hui</span></button>
     <button class="nav-btn" onclick="setTab('countries')" id="tab-countries"><span class="nav-icon icon" id="ni-countries"></span><span class="nav-lbl">Pays</span></button>
+    <button class="nav-btn" onclick="setTab('feed')" id="tab-feed"><span class="nav-icon icon" id="ni-feed"></span><span class="nav-lbl">Fil</span></button>
     <button class="nav-btn" onclick="setTab('budget')" id="tab-budget"><span class="nav-icon icon" id="ni-budget"></span><span class="nav-lbl">Budget</span></button>
     <button class="nav-btn" onclick="setTab('more')" id="tab-more"><span class="nav-icon icon" id="ni-more"></span><span class="nav-lbl">Plus</span></button>
   </nav>
@@ -1942,6 +1943,7 @@ function ensureStateDefaults(){
   if(!S.customDetails) S.customDetails={};
   if(!S.cityNames) S.cityNames={};
   if(!S.actNames) S.actNames={};
+  if(!S.feedPosts) S.feedPosts=[];
 }
 ensureStateDefaults();
 
@@ -4920,13 +4922,15 @@ function addFlight(){
 }
 function removeFlight(index){
   if(!S.documents.tickets || !S.documents.tickets.flightsList) return;
-  var removed = S.documents.tickets.flightsList[index];
-  S.documents.tickets.flightsList.splice(index,1);
-  save();
-  renderContent();
-  if(sb && CURRENT_TRIP && removed && removed.id){
-    sb.from('flights').delete().eq('id', removed.id).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] delete flights:', r.error); } });
-  }
+  showConfirm('Retirer ce vol ?', function(){
+    var removed = S.documents.tickets.flightsList[index];
+    S.documents.tickets.flightsList.splice(index,1);
+    save();
+    renderContent();
+    if(sb && CURRENT_TRIP && removed && removed.id){
+      sb.from('flights').delete().eq('id', removed.id).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] delete flights:', r.error); } });
+    }
+  }, 'Retirer');
 }
 async function loadFlights(){
   if(!sb || !CURRENT_TRIP) return;
@@ -4941,15 +4945,127 @@ async function loadFlights(){
   save();
 }
 
-function removeFlight(index){
-  showConfirm('Retirer ce vol ?', function(){
-    S.documents.tickets.flightsList.splice(index,1);
+// ── FIL DU VOYAGE (FEED) ────────────────────────────────────
+function timeAgoLabel(iso){
+  if(!iso) return '';
+  var diff = Date.now() - new Date(iso).getTime();
+  var mins = Math.floor(diff/60000);
+  if(mins<1) return "à l'instant";
+  if(mins<60) return 'il y a '+mins+' min';
+  var hrs = Math.floor(mins/60);
+  if(hrs<24) return 'il y a '+hrs+'h';
+  var days = Math.floor(hrs/24);
+  if(days<7) return 'il y a '+days+'j';
+  return new Date(iso).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+}
+function renderFeed(){
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
+  var posts = (S.feedPosts||[]).slice().sort(function(a,b){ return (b.createdAt||'')<(a.createdAt||'') ? -1 : ((b.createdAt||'')>(a.createdAt||'') ? 1 : 0); });
+  var postsHTML = posts.map(function(p){
+    var isOwner = ownerE && canonicalPerson(p.author)===ownerE;
+    var isMine = canonicalPerson(p.author)===myEmail;
+    var photoHTML = p.photo ? '<div style="margin-top:8px;border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>' : '';
+    return '<div class="info-card" style="padding:14px 16px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="width:30px;height:30px;border-radius:50%;background:'+(isOwner?'var(--accent)':'var(--sand-deep)')+';color:'+(isOwner?'#fff':'var(--ink-muted)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">'+escHtml(personDisplayName(p.author,'Toi').slice(0,2).toUpperCase())+'</span>'
+      +'<div><div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(personDisplayName(p.author,'Toi'))+(isOwner?' <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:8px;margin-left:2px">Organisateur</span>':'')+'</div>'
+      +'<div style="font-size:11px;color:var(--ink-subtle)">'+timeAgoLabel(p.createdAt)+'</div></div>'
+      +'</div>'
+      +(isMine?'<span onclick="removeFeedPost(\''+p.id+'\')" style="color:var(--red-muted);cursor:pointer;font-size:16px;padding:2px 6px">×</span>':'')
+      +'</div>'
+      +(p.text?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap">'+escHtml(p.text)+'</div>':'')
+      +photoHTML
+      +'</div>';
+  }).join('');
+
+  var feedPhotoPreview = window._feedDraftPhoto ? ('<div style="margin-top:8px;border-radius:14px;overflow:hidden;position:relative"><img src="'+window._feedDraftPhoto+'" style="width:100%;display:block;max-height:200px;object-fit:cover"/><span onclick="clearFeedDraftPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">×</span></div>') : '';
+
+  var composer = '<div class="info-card" style="padding:12px 14px">'
+    +'<textarea id="feedTextInput" placeholder="Partager une nouvelle avec le groupe…" style="width:100%;box-sizing:border-box;border:none;background:transparent;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:44px" rows="2"></textarea>'
+    +feedPhotoPreview
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'
+    +'<span onclick="triggerFeedFileInput()" style="display:flex;align-items:center;gap:5px;color:var(--ink-muted);cursor:pointer;font-size:12.5px;font-weight:600">'+svgIcon('camera',16)+' Photo</span>'
+    +'<button onclick="addFeedPost()" class="ef-btn" style="padding:8px 20px">Publier</button>'
+    +'</div>'
+    +'<input type="file" id="feedFileInput" accept="image/*" style="display:none" onchange="handleFeedPhotoSelected(event)">'
+    +'</div>';
+
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="section-title" style="margin-bottom:12px">Fil du voyage</div>'
+    +composer
+    +'<div style="height:12px"></div>'
+    +(postsHTML || '<div class="info-card" style="text-align:center;padding:24px 16px"><div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('message-circle',28)+'</div><div style="font-size:14px;color:var(--ink-muted)">Aucune actualité pour l\'instant — sois le premier à partager quelque chose !</div></div>')
+    +'</div>';
+}
+function triggerFeedFileInput(){ document.getElementById('feedFileInput').click(); }
+function handleFeedPhotoSelected(e){
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt){
+    var img = new Image();
+    img.onload = function(){
+      var maxW = 900;
+      var scale = Math.min(1, maxW/img.width);
+      var canvas = document.createElement('canvas');
+      canvas.width = img.width*scale;
+      canvas.height = img.height*scale;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      window._feedDraftPhoto = canvas.toDataURL('image/jpeg', 0.7);
+      renderContent();
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+function clearFeedDraftPhoto(){ window._feedDraftPhoto=null; renderContent(); }
+function openFeedPhoto(postId){
+  var p = (S.feedPosts||[]).find(function(fp){return fp.id===postId;});
+  if(!p || !p.photo) return;
+  window.open(p.photo, '_blank');
+}
+function addFeedPost(){
+  var textEl = document.getElementById('feedTextInput');
+  var text = textEl ? textEl.value.trim() : '';
+  var photo = window._feedDraftPhoto || null;
+  if(!text && !photo){ return; }
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  var newId = 'f'+Date.now();
+  var createdAt = new Date().toISOString();
+  var post = {id:newId, author:myEmail, text:text, photo:photo, createdAt:createdAt};
+  if(!S.feedPosts) S.feedPosts=[];
+  S.feedPosts.push(post);
+  window._feedDraftPhoto = null;
+  save();
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('feed_posts').insert({id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, created_at:createdAt}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert feed_posts:', r.error); } });
+  }
+}
+function removeFeedPost(postId){
+  showConfirm('Supprimer cette publication ?', function(){
+    S.feedPosts = (S.feedPosts||[]).filter(function(p){return p.id!==postId;});
     save();
     renderContent();
-  }, 'Retirer');
+    if(sb && CURRENT_TRIP){
+      sb.from('feed_posts').delete().eq('id', postId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] delete feed_posts:', r.error); } });
+    }
+  }, 'Supprimer');
+}
+async function loadFeedPosts(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data, error} = await sb.from('feed_posts').select('*').eq('trip_id',CURRENT_TRIP.id);
+  if(error){ return; } // table pas encore créée ou erreur réseau : on garde les posts locaux tels quels
+  S.feedPosts = (data||[]).map(function(row){
+    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, createdAt:row.created_at};
+  });
+  save();
 }
 
-// ── CARNET DE VOYAGE (JOURNAL) ──────────────────────────────
 function handleJournalPhotoPick(input){
   var file=input.files&&input.files[0];
   if(!file) return;
@@ -6654,6 +6770,7 @@ function renderContent(){
     else html=renderCountryDetailShell(c, renderGuide(c));
   }
   else if(S.tab==='favorites')html=renderFavoritesScreen();
+  else if(S.tab==='feed')html=renderFeed();
   else if(S.tab==='budget')html=renderBudgetOverview();
   else if(S.tab==='documents')html=renderDocuments();
   else if(S.tab==='journal')html=renderCarnetScreen();
@@ -6737,6 +6854,7 @@ const ICON_PATHS = {
   'external-link': '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   unlock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-2"/>',
   lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  'message-circle': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
 };
 function renderAlertsManageCard(c){
   var alertsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_alerts']);
@@ -6816,6 +6934,7 @@ function renderIcons() {
     'ni-today': svgIcon('sun'),
     'ni-favorites': svgIcon('star'),
     'ni-budget': svgIcon('wallet'),
+    'ni-feed': svgIcon('message-circle'),
     'ni-more': svgIcon('ellipsis'),
     'ni-share': svgIcon('users', 16),
     'ni-search': svgIcon('search', 18),
@@ -7464,6 +7583,7 @@ async function enterTrip(trip, resetTab) {
   await loadAccommodations();
   await loadCustomPhotos();
   await loadFlights();
+  await loadFeedPosts();
   await loadProfiles();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
