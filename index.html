@@ -3803,10 +3803,10 @@ function renderToday(){
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
-    +importantCard
     +heroHTML
     +summaryHTML
     +actsCard
+    +importantCard
     +flightCard
     +photoSpotCard
     +tomorrowCard
@@ -5130,8 +5130,9 @@ function renderFeed(){
   }
 
   var importantChecked = !!S.feedComposerImportant;
+  var draftTextVal = window._feedDraftText || '';
   var composer = '<div class="info-card" style="padding:12px 14px">'
-    +'<textarea id="feedTextInput" placeholder="Partager une nouvelle avec le groupe…" style="width:100%;box-sizing:border-box;border:none;background:transparent;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:44px" rows="2"></textarea>'
+    +'<textarea id="feedTextInput" oninput="window._feedDraftText=this.value" placeholder="Partager une nouvelle avec le groupe…" style="width:100%;box-sizing:border-box;border:none;background:transparent;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:44px" rows="2">'+escHtml(draftTextVal)+'</textarea>'
     +feedPhotoPreview
     +tagChips
     +'<div onclick="toggleFeedComposerImportant()" style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">'
@@ -5152,17 +5153,32 @@ function renderFeed(){
     +(postsHTML || '<div class="info-card" style="text-align:center;padding:24px 16px"><div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('message-circle',28)+'</div><div style="font-size:14px;color:var(--ink-muted)">Aucune actualité pour l\'instant — sois le premier à partager quelque chose !</div></div>')
     +'</div>';
 }
+function captureFeedDraftText(){
+  var textEl = document.getElementById('feedTextInput');
+  if(textEl) window._feedDraftText = textEl.value;
+}
+function restoreFeedComposerFocus(){
+  var textEl = document.getElementById('feedTextInput');
+  if(!textEl) return;
+  textEl.focus();
+  var pos = textEl.value.length;
+  textEl.setSelectionRange(pos, pos);
+}
 function toggleFeedComposerImportant(){
+  captureFeedDraftText();
   S.feedComposerImportant = !S.feedComposerImportant;
   save();
   renderContent();
+  restoreFeedComposerFocus();
 }
 function toggleFeedComposerTag(email){
+  captureFeedDraftText();
   if(!S.feedComposerTagged) S.feedComposerTagged=[];
   var idx = S.feedComposerTagged.indexOf(email);
   if(idx>-1) S.feedComposerTagged.splice(idx,1); else S.feedComposerTagged.push(email);
   save();
   renderContent();
+  restoreFeedComposerFocus();
 }
 function triggerFeedFileInput(){ document.getElementById('feedFileInput').click(); }
 function handleFeedPhotoSelected(e){
@@ -5207,6 +5223,7 @@ function addFeedPost(){
   if(!S.feedPosts) S.feedPosts=[];
   S.feedPosts.push(post);
   window._feedDraftPhoto = null;
+  window._feedDraftText = null;
   S.feedComposerTagged = [];
   S.feedComposerImportant = false;
   save();
