@@ -7521,6 +7521,50 @@ function showAuthScreen() {
   document.getElementById('main-app').style.display = 'none';
 }
 
+async function maybeShowPseudoOnboarding(user) {
+  if (!sb || !user) return;
+  var skipKey = 'planitrip_pseudo_skip_' + user.id;
+  if (localStorage.getItem(skipKey)) return;
+  try {
+    var { data } = await sb.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
+    var hasPseudo = data && data.display_name && data.display_name.trim() && data.display_name !== user.email;
+    if (!hasPseudo) showPseudoOnboardingModal();
+  } catch (e) { console.warn('[PlaniTrip] pseudo onboarding check failed:', e); }
+}
+function showPseudoOnboardingModal() {
+  var input = document.getElementById('pseudo-onboarding-input');
+  if (input) input.value = '';
+  var err = document.getElementById('pseudo-onboarding-error');
+  if (err) err.style.display = 'none';
+  var modal = document.getElementById('pseudoOnboardingModal');
+  if (modal) modal.classList.add('open');
+}
+function skipPseudoOnboarding() {
+  if (CURRENT_USER) localStorage.setItem('planitrip_pseudo_skip_' + CURRENT_USER.id, '1');
+  document.getElementById('pseudoOnboardingModal').classList.remove('open');
+}
+async function savePseudoOnboarding() {
+  var input = document.getElementById('pseudo-onboarding-input');
+  var err = document.getElementById('pseudo-onboarding-error');
+  var val = (input.value || '').trim();
+  err.style.display = 'none';
+  if (!val) { err.textContent = 'Merci de renseigner un pseudo.'; err.style.display = 'block'; return; }
+  if (!sb || !CURRENT_USER) return;
+  var btn = document.getElementById('pseudo-onboarding-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    await sb.from('profiles').update({ display_name: val }).eq('id', CURRENT_USER.id);
+    PROFILES_MAP[CURRENT_USER.email] = val;
+  } catch (e) {
+    console.warn('[PlaniTrip] save pseudo onboarding failed:', e);
+    btn.disabled = false; btn.textContent = 'Continuer';
+    err.textContent = "Impossible d'enregistrer, réessaie."; err.style.display = 'block';
+    return;
+  }
+  btn.disabled = false; btn.textContent = 'Continuer';
+  document.getElementById('pseudoOnboardingModal').classList.remove('open');
+  renderContent();
+}
 async function onAuthenticated(user, freshLogin) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'none';
@@ -7539,6 +7583,7 @@ async function onAuthenticated(user, freshLogin) {
     } catch(e) { console.warn('[PlaniTrip] profile check failed:', e); }
   }
   checkUserTrips(user, freshLogin);
+  maybeShowPseudoOnboarding(user);
 }
 
 // ---- Trips: routing post-connexion ----
@@ -8683,6 +8728,19 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
       <button class="confirm-cancel" onclick="confirmResolve(false)">Annuler</button>
       <button class="confirm-ok" id="confirmOkBtn" onclick="confirmResolve(true)">Supprimer</button>
     </div>
+  </div>
+</div>
+
+<!-- Pseudo onboarding modal (first login) -->
+<div class="share-modal" id="pseudoOnboardingModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Choisis ton pseudo</div>
+    <div class="modal-sub">Il apparaîtra à la place de ton email pour tes compagnons de voyage — dans le Fil, les dépenses, les remboursements.</div>
+    <input type="text" id="pseudo-onboarding-input" class="modal-field" placeholder="ex : André" maxlength="30">
+    <div id="pseudo-onboarding-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
+    <button class="modal-cta" id="pseudo-onboarding-save-btn" onclick="savePseudoOnboarding()">Continuer</button>
+    <div style="text-align:center;margin-top:4px"><span onclick="skipPseudoOnboarding()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Plus tard</span></div>
   </div>
 </div>
 
