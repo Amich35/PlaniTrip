@@ -3712,7 +3712,10 @@ function renderToday(){
   var todayOnclick = c && ts.currentCity ? (' onclick="S.openCities[\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\']=true;openCountryDetail(\''+c.id+'\',\'lieux\')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
   var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>') : '';
   if(todayActs.length){
-    var actsHTML = todayActs.map(function(a){
+    var todayDoneCount = todayActs.filter(function(a){return a.done;}).length;
+    var visibleActsCount = Math.min(todayActs.length, 3 + todayDoneCount);
+    var visibleActs = todayActs.slice(0, visibleActsCount);
+    var actsHTML = visibleActs.map(function(a){
       return '<div class="check-item'+(a.done?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="event.stopPropagation();toggleAct(\''+a.key+'\')">'+(a.done?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="event.stopPropagation();openDetail(\''+a.key+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.ck+'\')">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
     }).join('');
     actsCard = '<div class="info-card" style="cursor:'+(c?'pointer':'default')+'"'+todayOnclick+'><div class="ic-header">'+(c?icHeaderChevron('calendar', todayCardTitle):('<span data-icon="calendar" data-icon-size="16"></span> '+todayCardTitle))+'</div>'+todayCityLabel+actsHTML+'</div>';
