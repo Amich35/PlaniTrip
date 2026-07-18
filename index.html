@@ -817,8 +817,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 <!-- Create trip screen -->
 <div id="create-trip-screen" class="auth-screen" style="display:none;">
+  <div id="ct-back-btn" onclick="backToTripSelector()" style="display:none;position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;align-items:center;gap:4px;color:var(--ink-muted);font-size:14px;font-weight:600;cursor:pointer;z-index:10;padding:6px 4px">‹ Retour</div>
   <div class="auth-hero">
-    <div id="ct-back-btn" onclick="backToTripSelector()" style="display:flex;align-items:center;gap:4px;color:var(--ink-muted);font-size:14px;cursor:pointer;margin-bottom:8px">‹ Retour</div>
     <h1 style="font-size:22px;">Créer mon voyage</h1>
     <p class="auth-subtitle">Quelques infos pour démarrer</p>
   </div>
