@@ -4892,10 +4892,10 @@ function renderFlightsList(flights){
   if(!S.newFlightParticipants || !S.newFlightParticipants.length) S.newFlightParticipants = people.slice();
   var cards = flights.map(function(f, i){
     var dateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'Date non renseignée';
-    var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
+    var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
     var fParticipants = (f.participants && f.participants.length) ? f.participants : people;
     var namesLabel = fParticipants.length>=people.length ? 'Tous les voyageurs' : fParticipants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
-    return '<div class="more-row" style="align-items:flex-start;padding:9px 0">'
+    return '<div class="more-row" style="align-items:flex-start;padding:9px 0;cursor:pointer" onclick="editFlight('+i+')">'
       +'<span style="margin-top:2px">'+svgIcon('plane',16)+'</span>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(f.from||'?')+' → '+escHtml(f.to||'?')+'</div>'
@@ -4903,7 +4903,8 @@ function renderFlightsList(flights){
       +'<div style="font-size:11.5px;color:var(--accent);margin-bottom:2px">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</div>'
       +linkHtml
       +'</div>'
-      +'<button onclick="removeFlight('+i+')" style="border:none;background:none;color:var(--red-muted);font-size:16px;cursor:pointer;flex-shrink:0">×</button>'
+      +'<span style="color:var(--ink-subtle);margin-top:2px" onclick="event.stopPropagation();editFlight('+i+')">'+svgIcon('pencil',14)+'</span>'
+      +'<button onclick="event.stopPropagation();removeFlight('+i+')" style="border:none;background:none;color:var(--red-muted);font-size:16px;cursor:pointer;flex-shrink:0;margin-left:4px">×</button>'
       +'</div>';
   }).join('');
 
@@ -4913,19 +4914,21 @@ function renderFlightsList(flights){
       +(checked?svgIcon('check',11):'')+' '+escHtml(personDisplayName(p,'Toi'))+'</span>';
   }).join('');
 
+  var editingFlight = S.editingFlightId ? flights.find(function(f){ return f.id===S.editingFlightId; }) : null;
   var formOpen = !!S.flightFormOpen;
   var formHTML = '<div style="display:flex;gap:6px;margin-top:6px">'
-    +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" style="flex:1;min-width:0">'
-    +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" style="flex:1;min-width:0">'
+    +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" value="'+(editingFlight?escHtml(editingFlight.from||''):'')+'" style="flex:1;min-width:0">'
+    +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'" style="flex:1;min-width:0">'
     +'</div>'
     +'<div style="display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:8px">'
     +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date du vol<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
-    +'<input id="newFlightDate" type="date" class="ef-input" style="width:100%;text-align:center">'
+    +'<input id="newFlightDate" type="date" class="ef-input" value="'+(editingFlight?escHtml(editingFlight.date||''):'')+'" style="width:100%;text-align:center">'
     +'</div>'
-    +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" style="width:100%;margin-top:6px">'
+    +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" value="'+(editingFlight?escHtml(editingFlight.link||''):'')+'" style="width:100%;margin-top:6px">'
     +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
     +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
-    +'<button onclick="addFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">+ Ajouter un vol</button>';
+    +'<button onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
+    +(editingFlight?'<div onclick="cancelEditFlight()" style="text-align:center;margin-top:8px;font-size:12.5px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Annuler</div>':'');
 
   return '<div class="info-card" style="padding:10px 12px">'
     +'<div class="ic-header" style="justify-content:space-between;cursor:pointer;margin-bottom:4px" onclick="toggleFlightForm()"><span>Vols</span><span style="transform:rotate('+(formOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
@@ -4946,7 +4949,24 @@ function toggleFlightParticipant(p){
   renderContent();
 }
 
-function addFlight(){
+function editFlight(index){
+  var flights = (S.documents.tickets && S.documents.tickets.flightsList) || [];
+  var f = flights[index];
+  if(!f) return;
+  S.editingFlightId = f.id;
+  S.flightFormOpen = true;
+  var people = getPeopleList();
+  S.newFlightParticipants = (f.participants && f.participants.length) ? f.participants.slice() : people.slice();
+  save();
+  renderContent();
+}
+function cancelEditFlight(){
+  S.editingFlightId = null;
+  S.newFlightParticipants = getPeopleList();
+  save();
+  renderContent();
+}
+function saveFlight(){
   var from = document.getElementById('newFlightFrom').value.trim();
   var to = document.getElementById('newFlightTo').value.trim();
   var date = document.getElementById('newFlightDate').value;
@@ -4956,21 +4976,35 @@ function addFlight(){
   if(!S.documents.tickets.flightsList) S.documents.tickets.flightsList = [];
   var people = getPeopleList();
   var participants = (S.newFlightParticipants && S.newFlightParticipants.length) ? S.newFlightParticipants.slice() : people.slice();
-  var newId = Date.now();
-  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
-  S.documents.tickets.flightsList.push({id:newId, from:from, to:to, date:date, link:link, participants:participants});
+
+  if(S.editingFlightId){
+    var idx = S.documents.tickets.flightsList.findIndex(function(f){ return f.id===S.editingFlightId; });
+    if(idx>-1){
+      var editId = S.editingFlightId;
+      S.documents.tickets.flightsList[idx] = {id:editId, from:from, to:to, date:date, link:link, participants:participants};
+      if(sb && CURRENT_TRIP){
+        sb.from('flights').update({from_place:from, to_place:to, flight_date:date||null, link:link||null, participants:participants}).eq('id', editId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update flights:', r.error); } });
+      }
+    }
+    S.editingFlightId = null;
+  } else {
+    var newId = Date.now();
+    var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+    S.documents.tickets.flightsList.push({id:newId, from:from, to:to, date:date, link:link, participants:participants});
+    if(sb && CURRENT_TRIP){
+      sb.from('flights').insert({id:newId, trip_id:CURRENT_TRIP.id, from_place:from, to_place:to, flight_date:date||null, link:link||null, participants:participants, created_by:myEmail}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert flights:', r.error); } });
+    }
+  }
   S.newFlightParticipants = people.slice();
   save();
   renderContent();
-  if(sb && CURRENT_TRIP){
-    sb.from('flights').insert({id:newId, trip_id:CURRENT_TRIP.id, from_place:from, to_place:to, flight_date:date||null, link:link||null, participants:participants, created_by:myEmail}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert flights:', r.error); } });
-  }
 }
 function removeFlight(index){
   if(!S.documents.tickets || !S.documents.tickets.flightsList) return;
   showConfirm('Retirer ce vol ?', function(){
     var removed = S.documents.tickets.flightsList[index];
     S.documents.tickets.flightsList.splice(index,1);
+    if(removed && S.editingFlightId===removed.id) S.editingFlightId = null;
     save();
     renderContent();
     if(sb && CURRENT_TRIP && removed && removed.id){
