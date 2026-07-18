@@ -3788,8 +3788,22 @@ function renderToday(){
     forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+doneMsg+forgetHTML+seeAllLink+'</div>';
   }
 
+  // ── Messages importants du Fil (visibles 24h) ──
+  var nowMs = Date.now();
+  var importantPosts = (S.feedPosts||[]).filter(function(p){
+    return p.important && p.createdAt && (nowMs - new Date(p.createdAt).getTime()) < 86400000;
+  }).sort(function(a,b){ return (b.createdAt||'')<(a.createdAt||'') ? -1 : 1; });
+  var importantCard = importantPosts.map(function(p){
+    return '<div class="info-card" style="border:1.5px solid var(--red-muted);background:var(--red-pale);cursor:pointer" onclick="setTab(\'feed\')">'
+      +'<div class="ic-header" style="color:var(--red-muted)">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div>'
+      +(p.text?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+escHtml(p.text)+'</div>':'')
+      +'<div style="font-size:11px;color:var(--ink-subtle);margin-top:4px">'+timeAgoLabel(p.createdAt)+'</div>'
+      +'</div>';
+  }).join('');
+
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
+    +importantCard
     +heroHTML
     +summaryHTML
     +actsCard
@@ -5085,11 +5099,11 @@ function renderFeed(){
     var reactionPill = '<div style="margin-top:8px;display:flex;align-items:center;gap:6px">'
       +'<span onclick="toggleFeedReaction(\''+p.id+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:14px;cursor:pointer;font-size:12.5px;font-weight:600;background:'+(myReacted?'var(--red-pale)':'var(--sand-deep)')+';color:'+(myReacted?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('heart',13)+(reactions.length?(' '+reactions.length):'')+'</span>'
       +'</div>';
-    return '<div class="info-card" style="padding:14px 16px">'
+    return '<div class="info-card" style="padding:14px 16px'+(p.important?';border:1.5px solid var(--red-muted)':'')+'">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
       +'<div style="display:flex;align-items:center;gap:8px">'
       +'<span style="width:30px;height:30px;border-radius:50%;background:'+(isOwner?'var(--accent)':'var(--sand-deep)')+';color:'+(isOwner?'#fff':'var(--ink-muted)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">'+escHtml(personDisplayName(p.author,'Toi').slice(0,2).toUpperCase())+'</span>'
-      +'<div><div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(personDisplayName(p.author,'Toi'))+(isOwner?' <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:8px;margin-left:2px">Organisateur</span>':'')+'</div>'
+      +'<div><div style="font-size:13.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:5px">'+escHtml(personDisplayName(p.author,'Toi'))+(isOwner?' <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:8px">Organisateur</span>':'')+(p.important?' <span style="font-size:10px;font-weight:700;color:var(--red-muted);background:var(--red-pale);padding:2px 6px;border-radius:8px;display:inline-flex;align-items:center;gap:3px">'+svgIcon('triangle-alert',10)+' Important</span>':'')+'</div>'
       +'<div style="font-size:11px;color:var(--ink-subtle)">'+timeAgoLabel(p.createdAt)+'</div></div>'
       +'</div>'
       +(isMine?'<span onclick="removeFeedPost(\''+p.id+'\')" style="color:var(--red-muted);cursor:pointer;font-size:16px;padding:2px 6px">×</span>':'')
@@ -5115,11 +5129,16 @@ function renderFeed(){
       +'</div>';
   }
 
+  var importantChecked = !!S.feedComposerImportant;
   var composer = '<div class="info-card" style="padding:12px 14px">'
     +'<textarea id="feedTextInput" placeholder="Partager une nouvelle avec le groupe…" style="width:100%;box-sizing:border-box;border:none;background:transparent;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:44px" rows="2"></textarea>'
     +feedPhotoPreview
     +tagChips
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'
+    +'<div onclick="toggleFeedComposerImportant()" style="display:flex;align-items:center;gap:6px;margin-top:10px;cursor:pointer">'
+    +'<span style="width:18px;height:18px;border-radius:5px;border:1.5px solid '+(importantChecked?'var(--red-muted)':'var(--sand-deep)')+';background:'+(importantChecked?'var(--red-muted)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(importantChecked?svgIcon('check',12):'')+'</span>'
+    +'<span style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:'+(importantChecked?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('triangle-alert',14)+' Marquer comme important (visible 24h dans Aujourd\'hui)</span>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">'
     +'<span onclick="triggerFeedFileInput()" style="display:flex;align-items:center;gap:5px;color:var(--ink-muted);cursor:pointer;font-size:12.5px;font-weight:600">'+svgIcon('camera',16)+' Photo</span>'
     +'<button onclick="addFeedPost()" class="ef-btn" style="padding:8px 20px">Publier</button>'
     +'</div>'
@@ -5132,6 +5151,11 @@ function renderFeed(){
     +'<div style="height:12px"></div>'
     +(postsHTML || '<div class="info-card" style="text-align:center;padding:24px 16px"><div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('message-circle',28)+'</div><div style="font-size:14px;color:var(--ink-muted)">Aucune actualité pour l\'instant — sois le premier à partager quelque chose !</div></div>')
     +'</div>';
+}
+function toggleFeedComposerImportant(){
+  S.feedComposerImportant = !S.feedComposerImportant;
+  save();
+  renderContent();
 }
 function toggleFeedComposerTag(email){
   if(!S.feedComposerTagged) S.feedComposerTagged=[];
@@ -5178,15 +5202,17 @@ function addFeedPost(){
   var newId = 'f'+Date.now();
   var createdAt = new Date().toISOString();
   var tagged = (S.feedComposerTagged||[]).slice();
-  var post = {id:newId, author:myEmail, text:text, photo:photo, createdAt:createdAt, reactions:[], tagged:tagged};
+  var important = !!S.feedComposerImportant;
+  var post = {id:newId, author:myEmail, text:text, photo:photo, createdAt:createdAt, reactions:[], tagged:tagged, important:important};
   if(!S.feedPosts) S.feedPosts=[];
   S.feedPosts.push(post);
   window._feedDraftPhoto = null;
   S.feedComposerTagged = [];
+  S.feedComposerImportant = false;
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').insert({id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, created_at:createdAt, reactions:[], tagged:tagged}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert feed_posts:', r.error); } });
+    sb.from('feed_posts').insert({id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, created_at:createdAt, reactions:[], tagged:tagged, important:important}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert feed_posts:', r.error); } });
   }
 }
 function toggleFeedReaction(postId){
@@ -5219,7 +5245,7 @@ async function loadFeedPosts(){
   var {data, error} = await sb.from('feed_posts').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(error){ return; } // table pas encore créée ou erreur réseau : on garde les posts locaux tels quels
   S.feedPosts = (data||[]).map(function(row){
-    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, createdAt:row.created_at, reactions:row.reactions||[], tagged:row.tagged||[]};
+    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, createdAt:row.created_at, reactions:row.reactions||[], tagged:row.tagged||[], important:!!row.important};
   });
   save();
   updateFeedBadge();
