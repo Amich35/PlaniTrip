@@ -6946,6 +6946,7 @@ const ICON_PATHS = {
   lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   'message-circle': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   heart: '<path d="M19 14c1.5-1.5 3-3.5 3-6a5 5 0 0 0-9-3 5 5 0 0 0-9 3c0 5 6 8.5 9 12 1-1 2-2 3-3"/>',
+  'trash-2': '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
 };
 function renderAlertsManageCard(c){
   var alertsOpen = !!(S.uiAccordion && S.uiAccordion[c.id+'_alerts']);
@@ -7752,6 +7753,18 @@ function showTripSelectorScreen(trips) {
         startRenameTrip(item, t, nameSpan);
       });
       item.appendChild(editBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.innerHTML = svgIcon('trash-2', 15);
+      delBtn.setAttribute('aria-label', 'Supprimer');
+      delBtn.style.cssText = 'border:none;background:none;color:var(--red-muted);cursor:pointer;padding:4px 8px;flex-shrink:0;display:flex;align-items:center;';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showConfirm('Supprimer définitivement "'+t.name+'" ? Toutes ses données (pays, villes, activités, budget, documents, fil, carnet) seront perdues pour tous les voyageurs. Cette action est irréversible.', function(){
+          deleteTripPermanently(t);
+        }, 'Supprimer');
+      });
+      item.appendChild(delBtn);
     }
 
     const arrow = document.createElement('span');
@@ -7780,6 +7793,24 @@ function showTripSelectorScreen(trips) {
   }
 }
 
+async function deleteTripPermanently(trip){
+  if(!sb) return;
+  var tripId = trip.id;
+  var tables = ['collaborators','budget_entries','carnet_entries','cities','activities','country_settings','activity_details','accommodations','custom_photos','flights','feed_posts'];
+  for(var i=0;i<tables.length;i++){
+    try{ await sb.from(tables[i]).delete().eq('trip_id', tripId); }catch(e){ console.warn('[PlaniTrip] suppression '+tables[i]+':', e); }
+  }
+  try{
+    var { error } = await sb.from('trips').delete().eq('id', tripId);
+    if(error){ alert('Erreur lors de la suppression du voyage : '+error.message); return; }
+  }catch(e){ alert('Erreur lors de la suppression du voyage.'); return; }
+
+  if(CURRENT_TRIP && CURRENT_TRIP.id===tripId){
+    CURRENT_TRIP = null;
+    localStorage.removeItem('planitrip_last_trip_id');
+  }
+  backToTripSelector();
+}
 function startRenameTrip(item, trip, nameSpan) {
   const input = document.createElement('input');
   input.type = 'text';
