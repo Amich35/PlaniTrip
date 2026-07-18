@@ -3595,14 +3595,16 @@ function renderToday(){
   // ── Carte Aujourd'hui / Prochainement ──
   var actsCard;
   var todayOnclick = c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '';
+  var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>') : '';
   if(todayActs.length){
     var actsHTML = todayActs.map(function(a){
       return '<div class="check-item'+(a.done?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="event.stopPropagation();toggleAct(\''+a.key+'\')">'+(a.done?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="event.stopPropagation();openDetail(\''+a.key+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.ck+'\')">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
     }).join('');
-    actsCard = '<div class="info-card" style="cursor:'+(c?'pointer':'default')+'"'+todayOnclick+'><div class="ic-header">'+(c?icHeaderChevron('calendar', todayCardTitle):('<span data-icon="calendar" data-icon-size="16"></span> '+todayCardTitle))+'</div>'+actsHTML+'</div>';
+    actsCard = '<div class="info-card" style="cursor:'+(c?'pointer':'default')+'"'+todayOnclick+'><div class="ic-header">'+(c?icHeaderChevron('calendar', todayCardTitle):('<span data-icon="calendar" data-icon-size="16"></span> '+todayCardTitle))+'</div>'+todayCityLabel+actsHTML+'</div>';
   } else {
     var emptyBtnCity = ts.currentCity ? ts.currentCity.city : null;
     actsCard = '<div class="info-card" style="text-align:center;padding:24px 16px;cursor:'+(c?'pointer':'default')+'"'+todayOnclick+'>'
+      +(ts.currentCity?('<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>'):'')
       +'<div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('calendar',28)+'</div>'
       +'<div style="font-size:14px;color:var(--ink-muted);margin-bottom:14px">À renseigner — aucune activité datée pour l\'instant.</div>'
       +(c?'<button onclick="event.stopPropagation();'+(emptyBtnCity?('S.openCities[\''+c.id+'_'+emptyBtnCity.replace(/'/g,"\\'")+'\']=true;'):'')+'openCountryDetail(\''+c.id+'\',\'lieux\')" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir '+(emptyBtnCity?escHtml(emptyBtnCity):'les lieux')+'</button>':'')
