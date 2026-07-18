@@ -3850,10 +3850,13 @@ function renderToday(){
     return p.important && p.createdAt && (nowMs - new Date(p.createdAt).getTime()) < 86400000;
   }).sort(function(a,b){ return (b.createdAt||'')<(a.createdAt||'') ? -1 : 1; });
   var importantCard = importantPosts.map(function(p){
-    return '<div class="info-card" style="border:1.5px solid var(--red-muted);background:var(--red-pale);cursor:pointer" onclick="setTab(\'feed\')">'
+    return '<div class="info-card" style="border:1.5px solid var(--red-muted);background:var(--red-pale);cursor:pointer;padding:0;overflow:hidden" onclick="setTab(\'feed\')">'
+      +'<div style="padding:14px 16px 12px">'
       +'<div class="ic-header" style="color:var(--red-muted)">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div>'
       +(p.text?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+escHtml(p.text)+'</div>':'')
-      +'<div style="font-size:11px;color:var(--ink-subtle);margin-top:4px">'+timeAgoLabel(p.createdAt)+'</div>'
+      +'</div>'
+      +(p.photo?('<img src="'+p.photo+'" style="width:100%;display:block;max-height:220px;object-fit:cover"/>'+(p.photoCaption?('<div style="padding:6px 16px 12px;font-size:12px;color:var(--ink-muted);font-style:italic">'+escHtml(p.photoCaption)+'</div>'):'<div style="height:14px"></div>')):'')
+      +'<div style="padding:0 16px 14px;font-size:11px;color:var(--ink-subtle)">'+timeAgoLabel(p.createdAt)+'</div>'
       +'</div>';
   }).join('');
 
