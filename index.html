@@ -7015,8 +7015,13 @@ async function saveEditPseudo(){
   var btn = document.getElementById('edit-pseudo-save-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
   try {
-    var { error } = await sb.from('profiles').update({ display_name: val }).eq('id', _editPseudoUserId);
+    var { data: updRows, error } = await sb.from('profiles').update({ display_name: val }).eq('id', _editPseudoUserId).select('id');
     if(error){ throw error; }
+    if(!updRows || !updRows.length){
+      btn.disabled = false; btn.textContent = 'Enregistrer';
+      err.textContent = "Le changement n'a pas été appliqué (droits insuffisants côté base). Préviens André."; err.style.display = 'block';
+      return;
+    }
     if(_editPseudoEmail) PROFILES_MAP[_editPseudoEmail] = val;
   } catch(e){
     console.warn('[PlaniTrip] saveEditPseudo failed:', e);
