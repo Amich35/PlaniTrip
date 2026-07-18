@@ -5160,7 +5160,10 @@ function renderFeed(){
     var isMine = canonicalPerson(p.author)===myEmail;
     var photoHTML = p.photo ? ('<div style="margin-top:8px">'
       +'<div style="border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>'
-      +(p.photoCaption?('<div style="font-size:12.5px;color:var(--ink-muted);margin-top:5px;font-style:italic">'+escHtml(p.photoCaption)+'</div>'):'')
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:5px">'
+      +(p.photoCaption?('<div style="font-size:12.5px;color:var(--ink-muted);font-style:italic;flex:1">'+escHtml(p.photoCaption)+'</div>'):'<div style="flex:1"></div>')
+      +(isMine?('<span onclick="openEditCaptionModal(\''+p.id+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-subtle);cursor:pointer">'+svgIcon('pencil',11)+(p.photoCaption?' Modifier':' Décrire')+'</span>'):'')
+      +'</div>'
       +'</div>') : '';
     var reactions = p.reactions || [];
     var myReacted = reactions.map(canonicalPerson).indexOf(myEmail)>-1;
@@ -5265,6 +5268,32 @@ function toggleFeedComposerTag(email){
   restoreFeedComposerFocus();
 }
 function triggerFeedFileInput(){ document.getElementById('feedFileInput').click(); }
+var _editCaptionPostId = '';
+function openEditCaptionModal(postId){
+  var post = (S.feedPosts||[]).find(function(p){return p.id===postId;});
+  if(!post) return;
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  if(canonicalPerson(post.author)!==myEmail) return; // sécurité : seul l'auteur peut modifier
+  _editCaptionPostId = postId;
+  var input = document.getElementById('edit-caption-input');
+  if(input) input.value = post.photoCaption || '';
+  document.getElementById('editCaptionModal').classList.add('open');
+}
+function saveEditCaption(){
+  var post = (S.feedPosts||[]).find(function(p){return p.id===_editCaptionPostId;});
+  if(!post) return;
+  var input = document.getElementById('edit-caption-input');
+  var val = (input.value||'').trim();
+  post.photoCaption = val;
+  save();
+  document.getElementById('editCaptionModal').classList.remove('open');
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('feed_posts').update({photo_caption: val||null}).eq('id', post.id).then(function(r){
+      if(r && r.error) console.warn('[PlaniTrip] update photo_caption:', r.error);
+    });
+  }
+}
 function handleFeedPhotoSelected(e){
   var file = e.target.files && e.target.files[0];
   if(!file) return;
@@ -8869,6 +8898,17 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 
 <!-- Pseudo onboarding modal (first login) -->
 <!-- Edit collaborator pseudo modal (owner only) -->
+<!-- Edit feed photo caption modal -->
+<div class="share-modal" id="editCaptionModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Décrire la photo</div>
+    <input type="text" id="edit-caption-input" class="modal-field" placeholder="ex : Coucher de soleil à Kyoto" maxlength="120">
+    <button class="modal-cta" onclick="saveEditCaption()">Enregistrer</button>
+    <div style="text-align:center;margin-top:4px"><span onclick="document.getElementById('editCaptionModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
 <div class="share-modal" id="editPseudoModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
