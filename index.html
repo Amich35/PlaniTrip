@@ -7894,7 +7894,10 @@ function applyTripCountryFilter(trip) {
     }
   });
 
-  S.country = COUNTRIES.filter(c => S.deletedCountryIds.indexOf(c.id) === -1)[0]?.id || S.country;
+  var validCountryIds = COUNTRIES.filter(c => S.deletedCountryIds.indexOf(c.id) === -1).map(c => c.id);
+  if(!S.country || validCountryIds.indexOf(S.country)===-1){
+    S.country = validCountryIds[0] || S.country;
+  }
   save();
   rebuildCountriesFromState();
 }
