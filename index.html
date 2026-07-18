@@ -822,21 +822,29 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <p class="auth-subtitle">Quelques infos pour démarrer</p>
   </div>
   <div class="auth-card ct-card">
-    <label class="auth-label">Nom du voyage</label>
-    <input type="text" id="ct-name-input" class="auth-input" placeholder="ex : Mexique 2026">
+    <label class="auth-label">Nom du voyage <span style="font-weight:400;color:var(--ink-subtle)">(optionnel)</span></label>
+    <input type="text" id="ct-name-input" class="auth-input" placeholder="Auto-généré à partir des pays">
 
     <label class="auth-label">Dates</label>
     <div class="ct-dates-row">
       <input type="date" id="ct-start-input" class="auth-input ct-date">
       <input type="date" id="ct-end-input" class="auth-input ct-date">
     </div>
+    <div id="ct-days-count" style="font-size:12.5px;color:var(--accent);font-weight:600;margin-top:4px;display:none"></div>
 
     <label class="auth-label">Pays visités</label>
     <div id="ct-countries-list" class="ct-countries-list"></div>
     <button id="ct-add-country-btn" class="btn-secondary ct-add-btn" type="button">+ Ajouter un pays</button>
 
+    <label class="auth-label">Voyageurs <span style="font-weight:400;color:var(--ink-subtle)">(optionnel)</span></label>
+    <div id="ct-travelers-list" class="ct-countries-list"></div>
+    <div style="display:flex;gap:8px">
+      <input type="email" id="ct-traveler-email-input" class="auth-input" placeholder="email@exemple.com" style="flex:1">
+      <button id="ct-add-traveler-btn" class="btn-secondary" type="button" style="white-space:nowrap;padding:0 14px">+ Inviter</button>
+    </div>
+
     <div id="ct-error" class="auth-error" style="display:none;"></div>
-    <button id="ct-submit-btn" class="btn-primary" style="margin-top:18px;">Créer le voyage</button>
+    <button id="ct-submit-btn" class="btn-primary" style="margin-top:18px;">Créer mon voyage</button>
   </div>
 </div>
 
@@ -7814,6 +7822,7 @@ document.getElementById('ts-new-trip-btn').addEventListener('click', () => {
 
 // ---- Écran Créer mon voyage ----
 let CT_COUNTRIES = [];
+let CT_TRAVELERS = [];
 let CT_ALL_COUNTRY_NAMES = [];
 window.COUNTRY_FLAGS = {};
 window.COUNTRY_CURRENCIES = {};
@@ -7873,11 +7882,48 @@ function showCreateTripScreen(errorMsg) {
   document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('create-trip-screen').style.display = 'flex';
   CT_COUNTRIES = [];
+  CT_TRAVELERS = [];
   renderCtCountries();
+  renderCtTravelers();
   const errEl = document.getElementById('ct-error');
   if (errorMsg) { errEl.textContent = errorMsg; errEl.style.display = 'block'; }
   else { errEl.style.display = 'none'; }
   loadCountryList();
+}
+function updateCtDaysCount(){
+  var start = document.getElementById('ct-start-input').value;
+  var end = document.getElementById('ct-end-input').value;
+  var el = document.getElementById('ct-days-count');
+  if(start && end){
+    var d1 = new Date(start+'T00:00:00');
+    var d2 = new Date(end+'T00:00:00');
+    var days = Math.round((d2-d1)/86400000)+1;
+    if(days>0){ el.textContent = days+' jour'+(days>1?'s':''); el.style.display='block'; }
+    else { el.style.display='none'; }
+  } else { el.style.display='none'; }
+}
+function renderCtTravelers() {
+  const list = document.getElementById('ct-travelers-list');
+  list.innerHTML = '';
+  CT_TRAVELERS.forEach((email, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'ct-country-chip';
+    chip.innerHTML = '<span></span><button type="button" aria-label="Retirer">✕</button>';
+    chip.querySelector('span').textContent = email;
+    chip.querySelector('button').addEventListener('click', () => {
+      CT_TRAVELERS.splice(idx, 1);
+      renderCtTravelers();
+    });
+    list.appendChild(chip);
+  });
+}
+function addCtTraveler(){
+  var input = document.getElementById('ct-traveler-email-input');
+  var email = (input.value||'').trim().toLowerCase();
+  if(!email || !email.includes('@')) return;
+  if(CT_TRAVELERS.indexOf(email)===-1) CT_TRAVELERS.push(email);
+  input.value='';
+  renderCtTravelers();
 }
 
 function renderCtCountries() {
@@ -7987,19 +8033,19 @@ document.getElementById('ct-country-modal').addEventListener('click', (e) => {
   if (e.target.id === 'ct-country-modal') e.currentTarget.style.display = 'none';
 });
 
+document.getElementById('ct-start-input').addEventListener('input', updateCtDaysCount);
+document.getElementById('ct-end-input').addEventListener('input', updateCtDaysCount);
+document.getElementById('ct-add-traveler-btn').addEventListener('click', addCtTraveler);
+document.getElementById('ct-traveler-email-input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addCtTraveler(); } });
+
 document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   const errEl = document.getElementById('ct-error');
   errEl.style.display = 'none';
 
-  const name = document.getElementById('ct-name-input').value.trim();
+  var name = document.getElementById('ct-name-input').value.trim();
   const start = document.getElementById('ct-start-input').value;
   const end = document.getElementById('ct-end-input').value;
 
-  if (!name) {
-    errEl.textContent = 'Merci de donner un nom à ton voyage.';
-    errEl.style.display = 'block';
-    return;
-  }
   if (CT_COUNTRIES.length === 0) {
     errEl.textContent = 'Ajoute au moins un pays.';
     errEl.style.display = 'block';
@@ -8009,6 +8055,13 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     errEl.textContent = 'Erreur de connexion. Recharge la page.';
     errEl.style.display = 'block';
     return;
+  }
+
+  if(!name){
+    var yearSuffix = start ? (' '+new Date(start+'T00:00:00').getFullYear()) : '';
+    if(CT_COUNTRIES.length===1) name = CT_COUNTRIES[0] + yearSuffix;
+    else if(CT_COUNTRIES.length===2) name = CT_COUNTRIES.join(' & ') + yearSuffix;
+    else name = CT_COUNTRIES.slice(0,-1).join(', ') + ' & ' + CT_COUNTRIES[CT_COUNTRIES.length-1] + yearSuffix;
   }
 
   const btn = document.getElementById('ct-submit-btn');
@@ -8028,7 +8081,7 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     .single();
 
   btn.disabled = false;
-  btn.textContent = 'Créer le voyage';
+  btn.textContent = 'Créer mon voyage';
 
   if (error) {
     errEl.textContent = 'Erreur : ' + error.message;
@@ -8054,12 +8107,72 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     });
     try { await sb.from('country_settings').insert(settingsRows); } catch(e){}
   }
-  enterTrip(data, true);
+
+  // Invitations optionnelles des voyageurs saisis à la création (scope "tous les pays" par défaut,
+  // affinable ensuite depuis l'écran Voyageurs)
+  if(CT_TRAVELERS.length > 0){
+    var inviterName = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email]) || (CURRENT_USER && CURRENT_USER.email) || '';
+    for(var ti=0; ti<CT_TRAVELERS.length; ti++){
+      var tEmail = CT_TRAVELERS[ti];
+      try{
+        await sb.from('collaborators').insert({ trip_id: data.id, invited_email: tEmail, scope: ['all'], role: 'editor' });
+        await sb.functions.invoke('send-invite', { body: { to_email: tEmail, trip_name: name, inviter_name: inviterName } });
+      }catch(e){ console.warn('[PlaniTrip] invite voyageur à la création:', e); }
+    }
+  }
+
+  await enterTrip(data, true);
+  showPostCreateModal(data);
 });
 
 loadCountryFlags();
 initAuth();
 setTimeout(renderIcons, 10);
+
+// ── PROMPT POST-CRÉATION : préparer le voyage (IA / vide / import) ──
+function showPostCreateModal(trip){
+  var hasKey = !!S.apiKey;
+  var aiCardStyle = hasKey ? 'cursor:pointer' : 'cursor:default;opacity:0.5';
+  var aiOnclick = hasKey ? ' onclick="runAiTripPrep()"' : '';
+  var body = '<div class="modal-title" style="font-size:18px;margin-bottom:4px">Voulez-vous que PlaniTrip prépare votre voyage ?</div>'
+    +'<div style="font-size:13px;color:var(--ink-subtle);margin-bottom:16px">Tu peux tout modifier ensuite.</div>'
+    +'<div id="postCreateOptions">'
+    +'<div class="info-card" style="'+aiCardStyle+';margin-bottom:10px"'+aiOnclick+'>'
+    +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Générer avec l\'IA</div>'
+    +'<div class="status-sub">Infos pratiques, checklist, budget suggéré et conseils par pays'+(hasKey?'':' — nécessite une clé API (Réglages, après création)')+'</div>'
+    +'</div>'
+    +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="closePostCreateModal()">'
+    +'<div class="ic-header">'+svgIcon('file-text',18)+' Partir d\'un voyage vide</div>'
+    +'<div class="status-sub">Tu rempliras tout toi-même, à ton rythme</div>'
+    +'</div>'
+    +'<div class="info-card" style="opacity:0.5">'
+    +'<div class="ic-header">'+svgIcon('download',18)+' Importer un itinéraire</div>'
+    +'<div class="status-sub">Bientôt disponible</div>'
+    +'</div>'
+    +'</div>';
+  document.getElementById('postCreateModalBody').innerHTML = body;
+  document.getElementById('postCreateModal').classList.add('open');
+}
+function closePostCreateModal(){
+  document.getElementById('postCreateModal').classList.remove('open');
+}
+async function runAiTripPrep(){
+  var optsEl = document.getElementById('postCreateOptions');
+  var countries = COUNTRIES.slice();
+  for(var i=0;i<countries.length;i++){
+    optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
+      +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('sparkles',28)+'</div>'
+      +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Préparation du voyage…</div>'
+      +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[i].flag+' '+countries[i].name)+' — recherche des infos pratiques…</div>'
+      +'</div>';
+    try{ await autofillCountryWithAI(countries[i].id); }catch(e){}
+  }
+  optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
+    +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('check',28)+'</div>'
+    +'<div style="font-size:14px;font-weight:600;color:var(--ink)">Voyage prêt !</div>'
+    +'</div>';
+  setTimeout(closePostCreateModal, 900);
+}
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
   console.log('[PlaniTrip auth] clic sur "Recevoir le lien magique"');
@@ -8349,6 +8462,13 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
       <button class="confirm-cancel" onclick="confirmResolve(false)">Annuler</button>
       <button class="confirm-ok" id="confirmOkBtn" onclick="confirmResolve(true)">Supprimer</button>
     </div>
+  </div>
+</div>
+
+<div class="share-modal" id="postCreateModal">
+  <div class="share-sheet" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="postCreateModalBody"></div>
   </div>
 </div>
 
