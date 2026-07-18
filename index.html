@@ -5158,7 +5158,10 @@ function renderFeed(){
   var postsHTML = posts.map(function(p){
     var isOwner = ownerE && canonicalPerson(p.author)===ownerE;
     var isMine = canonicalPerson(p.author)===myEmail;
-    var photoHTML = p.photo ? '<div style="margin-top:8px;border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>' : '';
+    var photoHTML = p.photo ? ('<div style="margin-top:8px">'
+      +'<div style="border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>'
+      +(p.photoCaption?('<div style="font-size:12.5px;color:var(--ink-muted);margin-top:5px;font-style:italic">'+escHtml(p.photoCaption)+'</div>'):'')
+      +'</div>') : '';
     var reactions = p.reactions || [];
     var myReacted = reactions.map(canonicalPerson).indexOf(myEmail)>-1;
     var taggedHTML = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--accent);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
@@ -5181,7 +5184,8 @@ function renderFeed(){
       +'</div>';
   }).join('');
 
-  var feedPhotoPreview = window._feedDraftPhoto ? ('<div style="margin-top:8px;border-radius:14px;overflow:hidden;position:relative"><img src="'+window._feedDraftPhoto+'" style="width:100%;display:block;max-height:200px;object-fit:cover"/><span onclick="clearFeedDraftPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">×</span></div>') : '';
+  var feedPhotoPreview = window._feedDraftPhoto ? ('<div style="margin-top:8px;border-radius:14px;overflow:hidden;position:relative"><img src="'+window._feedDraftPhoto+'" style="width:100%;display:block;max-height:200px;object-fit:cover"/><span onclick="clearFeedDraftPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">×</span></div>'
+    +'<input id="feedPhotoCaptionInput" type="text" maxlength="120" value="'+escHtml(window._feedDraftPhotoCaption||'')+'" oninput="window._feedDraftPhotoCaption=this.value" placeholder="Décrire cette photo (optionnel)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:9px 12px;border:1px solid rgba(29,29,31,0.10);border-radius:12px;background:var(--sand);font-size:12.5px;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif">') : '';
 
   var otherPeople = getPeopleList().filter(function(p){return canonicalPerson(p)!==myEmail;});
   var tagChips = '';
@@ -5283,7 +5287,7 @@ function handleFeedPhotoSelected(e){
   reader.readAsDataURL(file);
   e.target.value='';
 }
-function clearFeedDraftPhoto(){ window._feedDraftPhoto=null; renderContent(); }
+function clearFeedDraftPhoto(){ window._feedDraftPhoto=null; window._feedDraftPhotoCaption=null; renderContent(); }
 function openFeedPhoto(postId){
   var p = (S.feedPosts||[]).find(function(fp){return fp.id===postId;});
   if(!p || !p.photo) return;
@@ -5293,23 +5297,35 @@ function addFeedPost(){
   var textEl = document.getElementById('feedTextInput');
   var text = textEl ? textEl.value.trim() : '';
   var photo = window._feedDraftPhoto || null;
+  var photoCaption = photo ? (window._feedDraftPhotoCaption||'').trim() : '';
   if(!text && !photo){ return; }
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   var newId = 'f'+Date.now();
   var createdAt = new Date().toISOString();
   var tagged = (S.feedComposerTagged||[]).slice();
   var important = !!S.feedComposerImportant;
-  var post = {id:newId, author:myEmail, text:text, photo:photo, createdAt:createdAt, reactions:[], tagged:tagged, important:important};
+  var post = {id:newId, author:myEmail, text:text, photo:photo, photoCaption:photoCaption, createdAt:createdAt, reactions:[], tagged:tagged, important:important};
   if(!S.feedPosts) S.feedPosts=[];
   S.feedPosts.push(post);
   window._feedDraftPhoto = null;
+  window._feedDraftPhotoCaption = null;
   window._feedDraftText = null;
   S.feedComposerTagged = [];
   S.feedComposerImportant = false;
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').insert({id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, created_at:createdAt, reactions:[], tagged:tagged, important:important}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert feed_posts:', r.error); } });
+    var feedRow = {id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, photo_caption:photoCaption||null, created_at:createdAt, reactions:[], tagged:tagged, important:important};
+    sb.from('feed_posts').insert(feedRow).then(function(r){
+      if(r && r.error){
+        console.error('[PlaniTrip] insert feed_posts:', r.error);
+        // Fallback si la colonne photo_caption n'existe pas encore côté base
+        if(/photo_caption/.test(r.error.message||'')){
+          delete feedRow.photo_caption;
+          sb.from('feed_posts').insert(feedRow).then(function(r2){ if(r2&&r2.error){ console.error('[PlaniTrip] insert feed_posts (fallback):', r2.error); } });
+        }
+      }
+    });
   }
 }
 function toggleFeedReaction(postId){
@@ -5342,7 +5358,7 @@ async function loadFeedPosts(){
   var {data, error} = await sb.from('feed_posts').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(error){ return; } // table pas encore créée ou erreur réseau : on garde les posts locaux tels quels
   S.feedPosts = (data||[]).map(function(row){
-    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, createdAt:row.created_at, reactions:row.reactions||[], tagged:row.tagged||[], important:!!row.important};
+    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, photoCaption:row.photo_caption||'', createdAt:row.created_at, reactions:row.reactions||[], tagged:row.tagged||[], important:!!row.important};
   });
   save();
   updateFeedBadge();
