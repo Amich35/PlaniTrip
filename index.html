@@ -877,7 +877,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   <nav class="bottom-nav">
     <button class="nav-btn active" onclick="setTab('today')" id="tab-today"><span class="nav-icon icon" id="ni-today"></span><span class="nav-lbl">Aujourd'hui</span></button>
     <button class="nav-btn" onclick="setTab('countries')" id="tab-countries"><span class="nav-icon icon" id="ni-countries"></span><span class="nav-lbl">Pays</span></button>
-    <button class="nav-btn" onclick="setTab('feed')" id="tab-feed"><span class="nav-icon icon" id="ni-feed"></span><span class="nav-lbl">Fil</span></button>
+    <button class="nav-btn" onclick="setTab('feed')" id="tab-feed"><span style="position:relative;display:inline-flex"><span class="nav-icon icon" id="ni-feed"></span><span id="feed-badge-dot" style="display:none;position:absolute;top:-2px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--red-muted);border:1.5px solid var(--parchment)"></span></span><span class="nav-lbl">Fil</span></button>
     <button class="nav-btn" onclick="setTab('budget')" id="tab-budget"><span class="nav-icon icon" id="ni-budget"></span><span class="nav-lbl">Budget</span></button>
     <button class="nav-btn" onclick="setTab('more')" id="tab-more"><span class="nav-icon icon" id="ni-more"></span><span class="nav-lbl">Plus</span></button>
   </nav>
@@ -1944,6 +1944,8 @@ function ensureStateDefaults(){
   if(!S.cityNames) S.cityNames={};
   if(!S.actNames) S.actNames={};
   if(!S.feedPosts) S.feedPosts=[];
+  if(!S.feedLastSeenAt) S.feedLastSeenAt=null;
+  if(!S.feedSeenReactionCounts) S.feedSeenReactionCounts={};
 }
 ensureStateDefaults();
 
@@ -2028,6 +2030,7 @@ function backToCountries(){
 var NAV_TABS=['home','countries','favorites','budget','more'];
 function setTab(tab){
   S.tab=tab;
+  if(tab==='feed') markFeedSeen();
   save();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   var activeNavTab = (tab==='country') ? 'countries' : (tab==='documents'||tab==='journal'||tab==='favorites') ? 'more' : tab;
@@ -4946,6 +4949,39 @@ async function loadFlights(){
 }
 
 // ── FIL DU VOYAGE (FEED) ────────────────────────────────────
+function markFeedSeen(){
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  S.feedLastSeenAt = new Date().toISOString();
+  if(!S.feedSeenReactionCounts) S.feedSeenReactionCounts={};
+  (S.feedPosts||[]).forEach(function(p){
+    if(canonicalPerson(p.author)===myEmail){
+      S.feedSeenReactionCounts[p.id] = (p.reactions||[]).length;
+    }
+  });
+  save();
+  updateFeedBadge();
+}
+function hasFeedNotification(){
+  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+  if(!myEmail) return false;
+  var lastSeen = S.feedLastSeenAt;
+  var seenReactions = S.feedSeenReactionCounts || {};
+  return (S.feedPosts||[]).some(function(p){
+    var isMine = canonicalPerson(p.author)===myEmail;
+    // Nouveau post d'un autre voyageur
+    if(!isMine && (!lastSeen || (p.createdAt && p.createdAt>lastSeen))) return true;
+    // Nouvelle réaction sur un de mes posts
+    if(isMine && (p.reactions||[]).length > (seenReactions[p.id]||0)) return true;
+    // Je suis tagué dans un post pas encore vu
+    if(!isMine && (p.tagged||[]).map(canonicalPerson).indexOf(myEmail)>-1 && (!lastSeen || (p.createdAt && p.createdAt>lastSeen))) return true;
+    return false;
+  });
+}
+function updateFeedBadge(){
+  var dot = document.getElementById('feed-badge-dot');
+  if(!dot) return;
+  dot.style.display = hasFeedNotification() ? 'block' : 'none';
+}
 function timeAgoLabel(iso){
   if(!iso) return '';
   var diff = Date.now() - new Date(iso).getTime();
@@ -4968,6 +5004,7 @@ function renderFeed(){
     var photoHTML = p.photo ? '<div style="margin-top:8px;border-radius:14px;overflow:hidden;cursor:pointer" onclick="openFeedPhoto(\''+p.id+'\')"><img src="'+p.photo+'" style="width:100%;display:block;max-height:320px;object-fit:cover" /></div>' : '';
     var reactions = p.reactions || [];
     var myReacted = reactions.map(canonicalPerson).indexOf(myEmail)>-1;
+    var taggedHTML = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--accent);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
     var reactionPill = '<div style="margin-top:8px;display:flex;align-items:center;gap:6px">'
       +'<span onclick="toggleFeedReaction(\''+p.id+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:14px;cursor:pointer;font-size:12.5px;font-weight:600;background:'+(myReacted?'var(--red-pale)':'var(--sand-deep)')+';color:'+(myReacted?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('heart',13)+(reactions.length?(' '+reactions.length):'')+'</span>'
       +'</div>';
@@ -4982,15 +5019,29 @@ function renderFeed(){
       +'</div>'
       +(p.text?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap">'+escHtml(p.text)+'</div>':'')
       +photoHTML
+      +taggedHTML
       +reactionPill
       +'</div>';
   }).join('');
 
   var feedPhotoPreview = window._feedDraftPhoto ? ('<div style="margin-top:8px;border-radius:14px;overflow:hidden;position:relative"><img src="'+window._feedDraftPhoto+'" style="width:100%;display:block;max-height:200px;object-fit:cover"/><span onclick="clearFeedDraftPhoto()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">×</span></div>') : '';
 
+  var otherPeople = getPeopleList().filter(function(p){return canonicalPerson(p)!==myEmail;});
+  var tagChips = '';
+  if(otherPeople.length){
+    if(!S.feedComposerTagged) S.feedComposerTagged=[];
+    tagChips = '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'
+      +otherPeople.map(function(p){
+        var checked = S.feedComposerTagged.indexOf(p)>-1;
+        return '<span onclick="toggleFeedComposerTag(\''+jsStrEsc(p)+'\')" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:'+(checked?'#fff':'var(--ink-muted)')+'">'+(checked?'@':'')+escHtml(personDisplayName(p,'Toi'))+'</span>';
+      }).join('')
+      +'</div>';
+  }
+
   var composer = '<div class="info-card" style="padding:12px 14px">'
     +'<textarea id="feedTextInput" placeholder="Partager une nouvelle avec le groupe…" style="width:100%;box-sizing:border-box;border:none;background:transparent;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:44px" rows="2"></textarea>'
     +feedPhotoPreview
+    +tagChips
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'
     +'<span onclick="triggerFeedFileInput()" style="display:flex;align-items:center;gap:5px;color:var(--ink-muted);cursor:pointer;font-size:12.5px;font-weight:600">'+svgIcon('camera',16)+' Photo</span>'
     +'<button onclick="addFeedPost()" class="ef-btn" style="padding:8px 20px">Publier</button>'
@@ -5004,6 +5055,13 @@ function renderFeed(){
     +'<div style="height:12px"></div>'
     +(postsHTML || '<div class="info-card" style="text-align:center;padding:24px 16px"><div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('message-circle',28)+'</div><div style="font-size:14px;color:var(--ink-muted)">Aucune actualité pour l\'instant — sois le premier à partager quelque chose !</div></div>')
     +'</div>';
+}
+function toggleFeedComposerTag(email){
+  if(!S.feedComposerTagged) S.feedComposerTagged=[];
+  var idx = S.feedComposerTagged.indexOf(email);
+  if(idx>-1) S.feedComposerTagged.splice(idx,1); else S.feedComposerTagged.push(email);
+  save();
+  renderContent();
 }
 function triggerFeedFileInput(){ document.getElementById('feedFileInput').click(); }
 function handleFeedPhotoSelected(e){
@@ -5042,14 +5100,16 @@ function addFeedPost(){
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   var newId = 'f'+Date.now();
   var createdAt = new Date().toISOString();
-  var post = {id:newId, author:myEmail, text:text, photo:photo, createdAt:createdAt, reactions:[]};
+  var tagged = (S.feedComposerTagged||[]).slice();
+  var post = {id:newId, author:myEmail, text:text, photo:photo, createdAt:createdAt, reactions:[], tagged:tagged};
   if(!S.feedPosts) S.feedPosts=[];
   S.feedPosts.push(post);
   window._feedDraftPhoto = null;
+  S.feedComposerTagged = [];
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').insert({id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, created_at:createdAt, reactions:[]}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert feed_posts:', r.error); } });
+    sb.from('feed_posts').insert({id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, created_at:createdAt, reactions:[], tagged:tagged}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert feed_posts:', r.error); } });
   }
 }
 function toggleFeedReaction(postId){
@@ -5062,6 +5122,7 @@ function toggleFeedReaction(postId){
   if(idx>-1) post.reactions.splice(idx,1); else post.reactions.push(myEmail);
   save();
   renderContent();
+  updateFeedBadge();
   if(sb && CURRENT_TRIP){
     sb.from('feed_posts').update({reactions:post.reactions}).eq('id', postId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update feed_posts reactions:', r.error); } });
   }
@@ -5081,9 +5142,10 @@ async function loadFeedPosts(){
   var {data, error} = await sb.from('feed_posts').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(error){ return; } // table pas encore créée ou erreur réseau : on garde les posts locaux tels quels
   S.feedPosts = (data||[]).map(function(row){
-    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, createdAt:row.created_at, reactions:row.reactions||[]};
+    return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, createdAt:row.created_at, reactions:row.reactions||[], tagged:row.tagged||[]};
   });
   save();
+  updateFeedBadge();
 }
 
 function handleJournalPhotoPick(input){
@@ -7085,6 +7147,7 @@ var _initTabEl = document.getElementById('tab-'+_initActiveTab);
 if(_initTabEl) _initTabEl.classList.add('active');
 renderContent();
 renderIcons();
+updateFeedBadge();
 checkForSharedDataOnLoad();
 
 // ── PULL TO REFRESH (fonctionne aussi en PWA standalone) ──
