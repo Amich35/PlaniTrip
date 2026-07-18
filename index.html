@@ -4360,11 +4360,11 @@ function renderBudgetOverview(){
       return '<div class="settle-card">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
         +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.from===myLabel2?'Moi':t.from,32)+'<span style="font-size:11px;font-weight:600;color:var(--ink-muted);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.from===myLabel2?'Moi':t.from,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:11px;font-weight:600;color:var(--ink-muted);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
         +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.to===myLabel2?'Moi':t.to,32)+'<span style="font-size:11px;font-weight:600;color:var(--ink-muted);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(t.to===myLabel2?'Moi':t.to,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:11px;font-weight:600;color:var(--ink-muted);max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
         +'</div>'
-        +'<span style="font-size:19px;font-weight:700;letter-spacing:-0.3px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
+        +'<span style="font-size:19px;font-weight:700;letter-spacing:-0.3px;color:#C9762E;flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
         +'</div>'
         +'<div style="display:flex;justify-content:flex-end;margin-top:6px">'
         +'<button class="settle-btn" onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')">'+svgIcon('check',12)+' Marqué remboursé</button>'
@@ -6724,9 +6724,11 @@ function getInitials(str){
   if(parts.length>=2) return (parts[0][0]+parts[1][0]).toUpperCase();
   return base.slice(0,2).toUpperCase();
 }
-function avatarCircle(label, size){
+function avatarCircle(label, size, bg, fg){
   size = size || 44;
-  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:var(--accent-pale);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:'+(size*0.38)+'px;flex-shrink:0">'+getInitials(label)+'</div>';
+  bg = bg || 'var(--accent-pale)';
+  fg = fg || 'var(--accent)';
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:'+(size*0.38)+'px;flex-shrink:0">'+getInitials(label)+'</div>';
 }
 
 function renderMyAccountScreen(){
