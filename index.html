@@ -3608,6 +3608,20 @@ function renderToday(){
       +'</div>';
   }
 
+  // ── Carte Prochain vol ──
+  var flightCard = '';
+  var flightsList = (S.documents && S.documents.tickets && S.documents.tickets.flightsList) || [];
+  var upcomingFlights = flightsList.filter(function(f){ return f.date && f.date>=todayStr; }).sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+  if(upcomingFlights.length){
+    var nf = upcomingFlights[0];
+    var nfDate = new Date(nf.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+    flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Prochain vol')+'</div>'
+      +'<div class="status-main">'+escHtml(nf.from||'?')+' → '+escHtml(nf.to||'?')+'</div>'
+      +'<div class="status-sub">'+nfDate+(nf.link?' · billet enregistré':'')+'</div></div>';
+  } else {
+    flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochain vol</div><div class="status-sub">À renseigner — aucun vol à venir enregistré.</div></div>';
+  }
+
   // ── Carte Demain / Ensuite ──
   var tomorrowCard = '';
   if(c){
@@ -3701,6 +3715,7 @@ function renderToday(){
     +heroHTML
     +summaryHTML
     +actsCard
+    +flightCard
     +photoSpotCard
     +tomorrowCard
     +forgetCard
