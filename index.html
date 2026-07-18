@@ -6991,6 +6991,44 @@ async function removeCollaboratorAction(id){
   }, 'Retirer');
 }
 
+var _editPseudoUserId = '';
+var _editPseudoEmail = '';
+function openEditPseudoModal(userId, email, currentLabel){
+  if(!(CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id)) return; // sécurité: propriétaire uniquement
+  _editPseudoUserId = userId;
+  _editPseudoEmail = email;
+  var sub = document.getElementById('edit-pseudo-sub');
+  if(sub) sub.textContent = email ? ('Ce pseudo remplace l\'email de '+email+' pour tout le voyage.') : 'Ce pseudo sera visible par tous les voyageurs.';
+  var input = document.getElementById('edit-pseudo-input');
+  if(input) input.value = (currentLabel && currentLabel!=='Vous') ? currentLabel : '';
+  var err = document.getElementById('edit-pseudo-error');
+  if(err) err.style.display = 'none';
+  document.getElementById('editPseudoModal').classList.add('open');
+}
+async function saveEditPseudo(){
+  var input = document.getElementById('edit-pseudo-input');
+  var err = document.getElementById('edit-pseudo-error');
+  var val = (input.value || '').trim();
+  err.style.display = 'none';
+  if(!val){ err.textContent = 'Merci de renseigner un pseudo.'; err.style.display = 'block'; return; }
+  if(!sb || !_editPseudoUserId){ err.textContent = 'Erreur de connexion.'; err.style.display = 'block'; return; }
+  var btn = document.getElementById('edit-pseudo-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    var { error } = await sb.from('profiles').update({ display_name: val }).eq('id', _editPseudoUserId);
+    if(error){ throw error; }
+    if(_editPseudoEmail) PROFILES_MAP[_editPseudoEmail] = val;
+  } catch(e){
+    console.warn('[PlaniTrip] saveEditPseudo failed:', e);
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+    err.textContent = "Impossible d'enregistrer, réessaie."; err.style.display = 'block';
+    return;
+  }
+  btn.disabled = false; btn.textContent = 'Enregistrer';
+  document.getElementById('editPseudoModal').classList.remove('open');
+  await loadProfiles();
+  renderContent();
+}
 function renderAccessManagementScreen(){
   var isOwner = CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id;
   var tripCountries = effectiveTripCountries();
@@ -7017,10 +7055,11 @@ function renderAccessManagementScreen(){
     var isMe = (CURRENT_USER && (c.user_id === CURRENT_USER.id || c.invited_email === CURRENT_USER.email));
     var displayLabel = isMe ? 'Vous' : personDisplayName(label);
     var avatarName = isMe ? personDisplayName(label) : displayLabel; // initiales du vrai nom, pas de "Vous"
+    var editBtn = (isOwner && !isMe && c.user_id) ? '<button onclick="openEditPseudoModal(\''+c.user_id+'\',\''+jsStrEsc(c.invited_email||'')+'\',\''+jsStrEsc(displayLabel)+'\')" style="border:none;background:none;color:var(--ink-muted);font-size:12px;cursor:pointer;margin-left:8px;display:inline-flex;align-items:center;gap:3px">'+svgIcon('pencil',12)+' Pseudo</button>' : '';
     var removeBtn = isOwner && !isMe ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
     return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(avatarName,36)
       +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(displayLabel)+(isMe ? '' : '')+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
-      +removeBtn+'</div>';
+      +editBtn+removeBtn+'</div>';
   }).join('');
 
   var inviteForm = '';
@@ -8759,6 +8798,19 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 </div>
 
 <!-- Pseudo onboarding modal (first login) -->
+<!-- Edit collaborator pseudo modal (owner only) -->
+<div class="share-modal" id="editPseudoModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Modifier le pseudo</div>
+    <div class="modal-sub" id="edit-pseudo-sub"></div>
+    <input type="text" id="edit-pseudo-input" class="modal-field" placeholder="ex : Marion" maxlength="30">
+    <div id="edit-pseudo-error" class="auth-error" style="display:none;margin-bottom:10px"></div>
+    <button class="modal-cta" id="edit-pseudo-save-btn" onclick="saveEditPseudo()">Enregistrer</button>
+    <div style="text-align:center;margin-top:4px"><span onclick="document.getElementById('editPseudoModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
 <div class="share-modal" id="pseudoOnboardingModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
