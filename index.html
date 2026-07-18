@@ -2025,7 +2025,13 @@ function rebuildCountriesFromState(){
   // Re-apply any manual edits made to built-in countries' Guide fields
   Object.keys(S.countryEdits||{}).forEach(function(cid){
     var c=COUNTRIES.find(function(co){return co.id===cid;});
-    if(c) Object.assign(c, S.countryEdits[cid]);
+    if(!c) return;
+    var defaultPhrases = (c.practical && c.practical.phrases) ? c.practical.phrases : [];
+    Object.assign(c, S.countryEdits[cid]);
+    // Une sauvegarde antérieure à la fonctionnalité "Mots & expressions" n'a pas ce champ : on retombe sur les mots par défaut du pays plutôt que de laisser vide
+    if((!c.practical.phrases || !c.practical.phrases.length) && defaultPhrases.length){
+      c.practical.phrases = defaultPhrases;
+    }
   });
   // Remplissage automatique du décalage horaire (pays du catalogue Asie comme pays custom), si pas déjà rempli/édité
   if(window.COUNTRY_TIMEZONES){
