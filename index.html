@@ -3454,35 +3454,13 @@ function swipeEnd(e, el){
   }
   _swipeState = null;
 }
-function renderItinerary(c, embedded){
-  var _depart = getTripDepartDate();
-  var tripStarted = _depart ? (new Date() >= _depart) : false;
-  const allBaseActs = c.cities.reduce((s,city)=>{
-    const base = city.acts.filter((_,i)=>!S.deletedActs[c.id+'_'+city.city+'_'+i]);
-    return s + base.length + (S.customActs[c.id+'_'+city.city]||[]).length;
-  },0);
-  const doneActs=c.cities.reduce((s,city)=>{
-    const baseDone=city.acts.filter((_,i)=>!S.deletedActs[c.id+'_'+city.city+'_'+i]&&S.done[c.id+'_'+city.city+'_'+i]).length;
-    const customDone=(S.customActs[c.id+'_'+city.city]||[]).filter((_,i)=>S.done[c.id+'_'+city.city+'_c'+i]).length;
-    return s+baseDone+customDone;
-  },0);
-
-  const cityOrder=getCityOrder(c.id);
-  const citiesHTML=cityOrder.map(function(cityIdx, cityPos){
-    const city=c.cities[cityIdx];
+function renderCityPanelContent(c, city){
     const ck=c.id+'_'+city.city;
-    const isOpen=!!S.openCities[ck];
-
-    // Base activities (not deleted) — respecting drag order
     const customs=S.customActs[ck]||[];
-    // Render in order — base items
     const activeDay = S.activeDay[ck]||'Tous';
-    const days = getDays(ck);
     const totalBase=city.acts.length;
     const totalCustomAll=(S.customActs[ck]||[]).length;
     const order=getOrder(ck,totalBase,totalCustomAll);
-
-    // Render ALL activities following order array (base + custom interleaved)
     const custs=S.customActs[ck]||[];
     const baseActsHTML=order.map(function(slot,slotIdx){
       var isBase=slot[0]==='b';
@@ -3496,17 +3474,15 @@ function renderItinerary(c, embedded){
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
-        var dayAssigned=S.actDay[k]||'';
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
-        var daySelector=dateSelector;
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
           +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
-          +daySelector
+          +dateSelector
           +'<div class="act-footer" style="margin-top:6px">'
           +'<div></div>'
           +'<div style="display:flex;gap:2px">'
@@ -3531,9 +3507,7 @@ function renderItinerary(c, embedded){
           +'</div></div></div></div>';
       }
     }).join('');
-    const customActsHTML='';
 
-    // Trash section
     const cityTrash=(S.trash&&S.trash[ck])||[];
     let trashHTML='';
     if(cityTrash.length){
@@ -3545,26 +3519,89 @@ function renderItinerary(c, embedded){
       trashHTML+='</div>';
     }
 
-    // Counts
+    const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+jsStrEsc(ck)+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+jsStrEsc(ck)+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
+
+    return renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+trashHTML+addForm;
+}
+
+function openCityDetail(ck){
+  S.currentCityKey = ck;
+  S.tab = 'cityDetail';
+  save();
+  renderContent();
+  window.scrollTo(0,0);
+}
+function closeCityDetail(){
+  S.tab = 'country';
+  S.countryDetailTab = 'lieux';
+  save();
+  renderContent();
+}
+function renderCityDetailScreen(){
+  var ck = S.currentCityKey;
+  if(!ck) { closeCityDetail(); return ''; }
+  var countryId = ck.split('_')[0];
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) { closeCityDetail(); return ''; }
+  var city = c.cities.find(function(ci){return c.id+'_'+ci.city===ck;});
+  if(!city) { closeCityDetail(); return ''; }
+
+  const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
+  const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
+  const cityDone=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i]&&S.done[ck+'_'+i];}).length
+    +(S.customActs[ck]||[]).filter(function(_,i){return S.done[ck+'_c'+i];}).length;
+  const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
+
+  const accomInfo = S.accom[ck]||{};
+  const nightsPart = accomInfo.nights ? (accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
+  var query = (city.city+' '+c.name);
+
+  var header = '<div class="country-detail-header" style="background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+')" data-img-query="'+escHtml(query)+'">'
+    +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
+    +photoEditBtn(query)
+    +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
+    +'<div class="cdh-tagline">'+escHtml(city.sub)+(nightsPart?' · '+escHtml(nightsPart):'')+'</div>'
+    +'<div class="cover-pills" style="margin-top:8px"><span class="cover-pill">'+cityDone+'/'+cityTotal+' activités</span><span class="cover-pill">'+pct+'%</span></div></div>'
+    +'</div>';
+
+  return header+'<div class="section" style="padding-top:16px">'+renderCityPanelContent(c, city)+'</div>';
+}
+
+function renderItinerary(c, embedded){
+  var _depart = getTripDepartDate();
+  var tripStarted = _depart ? (new Date() >= _depart) : false;
+  const allBaseActs = c.cities.reduce((s,city)=>{
+    const base = city.acts.filter((_,i)=>!S.deletedActs[c.id+'_'+city.city+'_'+i]);
+    return s + base.length + (S.customActs[c.id+'_'+city.city]||[]).length;
+  },0);
+  const doneActs=c.cities.reduce((s,city)=>{
+    const baseDone=city.acts.filter((_,i)=>!S.deletedActs[c.id+'_'+city.city+'_'+i]&&S.done[c.id+'_'+city.city+'_'+i]).length;
+    const customDone=(S.customActs[c.id+'_'+city.city]||[]).filter((_,i)=>S.done[c.id+'_'+city.city+'_c'+i]).length;
+    return s+baseDone+customDone;
+  },0);
+
+  const cityOrder=getCityOrder(c.id);
+  const citiesHTML=cityOrder.map(function(cityIdx){
+    const city=c.cities[cityIdx];
+    const ck=c.id+'_'+city.city;
+
     const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
     const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
     const cityDone=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i]&&S.done[ck+'_'+i];}).length
       +(S.customActs[ck]||[]).filter(function(_,i){return S.done[ck+'_c'+i];}).length;
     const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
-    const complete=cityDone===cityTotal&&cityTotal>0;
-
-    const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+jsStrEsc(ck)+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+jsStrEsc(ck)+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
 
     const accomInfo = S.accom[ck]||{};
     const nightsPart = accomInfo.nights ? (' · '+accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-    const accomNameLine = accomInfo.name ? ('<div class="cah-accom">🏨 '+escHtml(accomInfo.name)+'</div>') : '';
+    const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px">🏨 '+escHtml(accomInfo.name)+'</div>') : '';
+    var imgQuery = city.city+' '+c.name;
 
-    return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+escHtml(ck)+'" style="position:relative">'
-      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
-      +'<div class="city-accordion-header"><div class="cah-left" onclick="toggleCity(\''+jsStrEsc(ck)+'\') " style="flex:1;cursor:pointer">'
-      +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+nightsPart+' · '+cityDone+'/'+cityTotal+' activités</div>'+accomNameLine+'</div>'
-      +'<div class="cah-right">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)')+'</div></div>'
-      +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
+    return '<div class="country-card" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" style="position:relative">'
+      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:8px;right:8px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
+      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'">'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
+      +'<div class="cc-body"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+escHtml(city.sub)+nightsPart+' · '+cityTotal+' activités</div>'+accomNameLine+'</div>'
+      +'<span style="flex-shrink:0;margin-right:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)')+'</span>'
+      +'</div>';
   }).join('');
 
   const alertsHTML=c.alerts.map(function(a){
@@ -7385,7 +7422,7 @@ function updateTopBarSub(){
   el.textContent = name + ' · ' + countryCount + ' pays';
 }
 function syncActiveNavTab(){
-  var activeId = (S.tab==='country') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='archived-countries'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var activeId = (S.tab==='country'||S.tab==='cityDetail') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='archived-countries'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   var el = document.getElementById('tab-'+activeId);
   if(el) el.classList.add('active');
@@ -7401,6 +7438,7 @@ function renderContent(){
     else if(sub==='carte')html=renderCountryDetailShell(c, renderMap(c));
     else html=renderCountryDetailShell(c, renderGuide(c));
   }
+  else if(S.tab==='cityDetail')html=renderCityDetailScreen();
   else if(S.tab==='favorites')html=renderFavoritesScreen();
   else if(S.tab==='_manageTrip')html=renderManageTripScreen();
   else if(S.tab==='feed')html=renderFeed();
@@ -7695,7 +7733,7 @@ function removePinFlowApi(){
 
 S.tab = S.tab && NAV_TABS.concat(['country','documents','journal']).indexOf(S.tab)>-1 ? S.tab : 'home';
 document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
-var _initActiveTab = (S.tab==='country') ? 'countries' : (S.tab==='documents'||S.tab==='journal') ? 'more' : S.tab;
+var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail') ? 'countries' : (S.tab==='documents'||S.tab==='journal') ? 'more' : S.tab;
 var _initTabEl = document.getElementById('tab-'+_initActiveTab);
 if(_initTabEl) _initTabEl.classList.add('active');
 renderContent();
