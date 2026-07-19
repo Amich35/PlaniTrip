@@ -2560,7 +2560,8 @@ function renderAccomCard(ck) {
   const statusPill = a.status==='pending'
     ? '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">À réserver</span>'
     : '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
-  const datesLine = a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '';
+  const cityStayLine = (typeof fmtCityStayLine==='function') ? fmtCityStayLine(ck) : null;
+  const datesLine = cityStayLine || (a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '');
   const timesLine = (a.checkin||a.checkout) ? ('Check-in '+(a.checkin||'—')+' · Check-out '+(a.checkout||'—')) : '';
   return '<div class="accom-card" onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer">'
     +'<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div></div></div>'
@@ -3642,7 +3643,7 @@ function selectCategoryForAct(catKey){
   renderContent();
 }
 
-function renderCityPanelContent(c, city){
+function renderCityPanelContentBody(c, city){
     const ck=c.id+'_'+city.city;
     const customs=S.customActs[ck]||[];
     const activeDay = S.activeDay[ck]||'Tous';
@@ -3734,7 +3735,7 @@ function renderCityPanelContent(c, city){
         +'</div>';
     }
 
-    return renderDayTabs(ck)+categoryFilterHTML+renderAccomCard(ck)+baseActsHTML+trashHTML+addForm;
+    return renderDayTabs(ck)+categoryFilterHTML+baseActsHTML+trashHTML+addForm;
 }
 
 function setCityCategory(ck, cat){
@@ -3781,16 +3782,43 @@ function renderCityDetailScreen(){
   const nightsPart = accomInfo.nights ? (accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
   const taglineTxt = stayLine || 'Ajouter les dates du séjour';
   var query = (city.city+' '+c.name);
+  var cityFavKey = ck+'_city';
+  var isFavCity = !!S.favorites[cityFavKey];
 
   var header = '<div class="country-detail-header" style="background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+');border-radius:0 0 28px 28px;overflow:hidden" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
+    +'<div style="position:absolute;top:14px;right:14px;z-index:2;display:flex;gap:8px">'
+    +'<button onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(cityFavKey)+'\')" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:'+(isFavCity?'#95D5B2':'#fff')+';cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="heart" data-icon-size="17"></span></button>'
+    +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
+    +'</div>'
     +photoEditBtn(query)
     +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
     +'<div class="cdh-tagline" onclick="openCityDatesModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(city.city)+'\')" style="cursor:pointer;display:flex;align-items:center;gap:5px">'+taglineTxt+svgIcon('chevron-right',13)+'</div>'
+    +renderTravelerAvatarStack()
     +'<div class="cover-pills" style="margin-top:8px"><span class="cover-pill">'+cityDone+'/'+cityTotal+' activités</span><span class="cover-pill">'+pct+'%</span></div></div>'
     +'</div>';
 
-  return header+'<div class="section" style="padding-top:16px">'+renderCityPanelContent(c, city)+'</div>';
+  return header+'<div class="section" style="padding-top:16px;margin-top:-16px;position:relative;z-index:2;background:var(--sand);border-radius:22px 22px 0 0">'+renderAccomCard(ck)+'<div style="height:14px"></div>'+renderCityPanelContentBody(c, city)+'</div>';
+}
+function renderTravelerAvatarStack(){
+  var people=[];
+  if(CURRENT_TRIP && CURRENT_TRIP.owner_email) people.push(CURRENT_TRIP.owner_email);
+  (CURRENT_COLLABORATORS||[]).forEach(function(cl){ if(cl.invited_email && people.indexOf(cl.invited_email)===-1) people.push(cl.invited_email); });
+  if(people.length<2) return '';
+  var colors=['#2D6A4F','#4D96FF','#F4A261','#E76F51','#95D5B2'];
+  var shown=people.slice(0,4);
+  var extra=people.length-shown.length;
+  var html='<div style="display:flex;align-items:center;margin-top:8px">';
+  shown.forEach(function(email,i){
+    var label = PROFILES_MAP[email]||email;
+    var initials = stripHtml(label).slice(0,2).toUpperCase();
+    html+='<span style="width:26px;height:26px;border-radius:50%;background:'+colors[i%colors.length]+';border:2px solid rgba(255,255,255,0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-left:'+(i===0?'0':'-8px')+';flex-shrink:0">'+escHtml(initials)+'</span>';
+  });
+  if(extra>0){
+    html+='<span style="width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.45);border:2px solid rgba(255,255,255,0.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-left:-8px;flex-shrink:0">+'+extra+'</span>';
+  }
+  html+='</div>';
+  return html;
 }
 
 function renderItinerary(c, embedded){
