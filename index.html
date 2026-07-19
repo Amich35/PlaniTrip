@@ -3853,13 +3853,12 @@ function renderToday(){
     var pText = p.text || p.photoCaption || '';
     var pTagged = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--red-muted);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
     return '<div class="info-card" style="border:1.5px solid var(--red-muted);background:var(--red-pale);cursor:pointer;padding:0;overflow:hidden" onclick="setTab(\'feed\')">'
-      +'<div style="padding:14px 16px 12px"><div class="ic-header" style="color:var(--red-muted)">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div></div>'
+      +'<div style="padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="ic-header" style="color:var(--red-muted);margin:0">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div><span style="font-size:11px;color:var(--ink-subtle);flex-shrink:0">'+timeAgoLabel(p.createdAt)+'</span></div>'
       +(p.photo?('<img src="'+p.photo+'" style="width:100%;display:block;max-height:220px;object-fit:cover"/>'):'')
-      +'<div style="padding:'+(p.photo?'10px':'0')+' 16px 14px">'
+      +(pText||pTagged?('<div style="padding:'+(p.photo?'10px':'0')+' 16px 14px">'
       +(pText?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+escHtml(pText)+'</div>':'')
       +pTagged
-      +'<div style="font-size:11px;color:var(--ink-subtle);margin-top:'+(pText||pTagged?'6px':'0')+'">'+timeAgoLabel(p.createdAt)+'</div>'
-      +'</div>'
+      +'</div>'):(p.photo?'<div style="height:8px"></div>':''))
       +'</div>';
   }).join('');
 
