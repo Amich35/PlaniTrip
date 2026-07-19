@@ -130,6 +130,9 @@ a{color:var(--ink);}
 .fav-btn:active{transform:scale(0.92);}
 
 .act-del{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:rgba(29,29,31,0.070);color:var(--ink-subtle);border-radius:50%;line-height:1;opacity:0.5;transition:opacity 0.15s,background 0.15s;padding:0;} .act-card:hover .act-del,.act-card:active .act-del{opacity:1;}
+.swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r16);margin-top:6px;}
+.swipe-delete-bg{position:absolute;inset:0;background:var(--red-muted);color:#fff;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;font-size:13px;font-weight:600;gap:6px;border-radius:var(--r16);}
+.swipe-fg{margin-top:0 !important;touch-action:pan-y;will-change:transform;}
 .act-del:active{opacity:1;background:rgba(155,58,46,0.15);color:var(--red-muted);}
 
 /* Add activity form inside city panel */
@@ -3354,6 +3357,49 @@ async function loadWeatherSection(countryId) {
   }).join('');
 }
 
+var _swipeState = null;
+function swipeStart(e, el){
+  if(e.touches.length!==1) return;
+  var t = e.touches[0];
+  _swipeState = {el:el, startX:t.clientX, startY:t.clientY, dx:0, dragging:false, wasOpen: el.dataset.swipeOpen==='1'};
+}
+function swipeMove(e, el){
+  if(!_swipeState || _swipeState.el!==el) return;
+  var t = e.touches[0];
+  var dx = t.clientX - _swipeState.startX;
+  var dy = t.clientY - _swipeState.startY;
+  if(!_swipeState.dragging){
+    if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8){ _swipeState.dragging = true; }
+    else if(Math.abs(dy) > 8){ _swipeState = null; return; }
+  }
+  if(_swipeState && _swipeState.dragging){
+    var base = _swipeState.wasOpen ? -84 : 0;
+    dx = Math.min(0, Math.max(-84, base + dx));
+    _swipeState.dx = dx;
+    el.style.transition = 'none';
+    el.style.transform = 'translateX('+dx+'px)';
+    e.preventDefault();
+  }
+}
+function swipeEnd(e, el){
+  if(!_swipeState || _swipeState.el!==el){ return; }
+  el.style.transition = 'transform 0.2s ease';
+  if(_swipeState.dragging){
+    if(_swipeState.dx < -40){
+      el.style.transform = 'translateX(-84px)';
+      el.dataset.swipeOpen = '1';
+    } else {
+      el.style.transform = '';
+      el.dataset.swipeOpen = '';
+    }
+    e.preventDefault();
+  } else if(_swipeState.wasOpen){
+    el.style.transform = '';
+    el.dataset.swipeOpen = '';
+    e.preventDefault();
+  }
+  _swipeState = null;
+}
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
   var tripStarted = _depart ? (new Date() >= _depart) : false;
@@ -3400,7 +3446,8 @@ function renderItinerary(c, embedded){
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         var daySelector=dateSelector;
-        return '<div class="act-card'+(done?' done':'')+'">'
+        return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
+          +'<div class="act-card swipe-fg'+(done?' done':'')+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +(tripStarted?'':'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>')
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
@@ -3412,8 +3459,7 @@ function renderItinerary(c, embedded){
           +'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
-          +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">✕</button>'
-          +'</div></div></div></div>';
+          +'</div></div></div></div></div>';
       } else {
         var ca=custs[origIdx];
         if(!ca) return '';
@@ -3421,16 +3467,16 @@ function renderItinerary(c, embedded){
         var cdone=!!S.done[ck2];
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
-        return '<div class="act-card'+(cdone?' done':'')+'" style="border-style:dashed">'
+        return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
+          +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +(tripStarted?'':'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>')
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
           +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
-          +'<button class="act-del" onclick="event.stopPropagation();deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">✕</button></div>'
-          +'</div></div></div>';
+          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button></div>'
+          +'</div></div></div></div>';
       }
     }).join('');
     const customActsHTML='';
