@@ -132,7 +132,7 @@ a{color:var(--ink);}
 
 .act-del{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:rgba(29,29,31,0.070);color:var(--ink-subtle);border-radius:50%;line-height:1;opacity:0.5;transition:opacity 0.15s,background 0.15s;padding:0;} .act-card:hover .act-del,.act-card:active .act-del{opacity:1;}
 .swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r16);margin-top:6px;-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
-.swipe-delete-bg{position:absolute;top:8px;bottom:8px;right:8px;width:100px;background:var(--red-muted);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:12px;}
+.swipe-delete-bg{position:absolute;top:0;bottom:0;right:0;width:100px;background:var(--red-muted);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:0 var(--r16) var(--r16) 0;}
 .swipe-fg{margin-top:0 !important;touch-action:pan-y;will-change:transform;-webkit-backface-visibility:hidden;backface-visibility:hidden;-webkit-transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent;outline:none;}
 .swipe-fg *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
 .act-del:active{opacity:1;background:rgba(155,58,46,0.15);color:var(--red-muted);}
@@ -3597,7 +3597,7 @@ function renderItinerary(c, embedded){
     const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px">🏨 '+escHtml(accomInfo.name)+'</div>') : '';
     var imgQuery = city.city+' '+c.name;
 
-    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'">'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+escHtml(city.sub)+nightsPart+' · '+cityTotal+' activités</div>'+accomNameLine+'</div>'
