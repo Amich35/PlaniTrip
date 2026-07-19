@@ -3000,6 +3000,15 @@ function toLocalISODate(d){
   var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
   return y+'-'+m+'-'+day;
 }
+function _dateModalAnchor(countryId){
+  var c = countryId ? COUNTRIES.find(function(co){return co.id===countryId;}) : null;
+  if(c && c.dateStart) return c.dateStart;
+  if(typeof getTripDepartDate==='function'){
+    var d = getTripDepartDate();
+    if(d) return toLocalISODate(d);
+  }
+  return '';
+}
 function fmtDateRangeFr(startISO, endISO){
   if(!startISO && !endISO) return '';
   if(startISO && !endISO) return new Date(startISO+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
@@ -3116,9 +3125,10 @@ function openGuideItemModal(countryId, listField, idx){
 
   if(listField==='city'){
     document.getElementById('guideItemModalTitle').textContent='Nouvelle ville';
+    var cityAnchor = _dateModalAnchor(countryId);
     document.getElementById('guideItemModalBody').innerHTML=
       '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%"/></div>'
-      +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div>'
+      +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cityAnchor||'')+'"/></div>'
       +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalCityDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
@@ -3232,9 +3242,10 @@ function openDatesModal(countryId){
   _datesModalCountryId=countryId;
   var c=COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
+  var anchor = _dateModalAnchor(countryId);
   document.getElementById('guideItemModalTitle').textContent='Dates du séjour';
   document.getElementById('guideItemModalBody').innerHTML=
-    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(c.dateStart||'')+'"/></div>'
+    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(c.dateStart||anchor||'')+'"/></div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(c.dateEnd||'')+'"/></div></div>';
   _guideModalSaveFn = saveDatesModal;
   document.getElementById('guideItemModal').classList.add('open');
@@ -3258,10 +3269,13 @@ var _cityDatesModalCk=null;
 function openCityDatesModal(ck, cityLabel){
   _cityDatesModalCk=ck;
   var cur = (S.cityDates && S.cityDates[ck])||{};
+  var anchor = _dateModalAnchor(ck.split('_')[0]);
+  var startVal = cur.start || anchor;
+  var endVal = cur.end || anchor;
   document.getElementById('guideItemModalTitle').textContent='Dates du séjour'+(cityLabel?' — '+cityLabel:'');
   document.getElementById('guideItemModalBody').innerHTML=
-    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cur.start||'')+'"/></div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cur.end||'')+'"/></div></div>';
+    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(startVal||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cur.end?endVal:'')+'"/></div></div>';
   _guideModalSaveFn = saveCityDatesModal;
   document.getElementById('guideItemModal').classList.add('open');
   wireDateRangeSync('guideModalDateStart', 'guideModalDateEnd');
@@ -8767,6 +8781,10 @@ function wireDateRangeSync(startId, endId){
     if(!startEl.value) return;
     endEl.min = startEl.value;
     if(!endEl.value || endEl.value < startEl.value){ endEl.value = startEl.value; }
+    setTimeout(function(){
+      endEl.focus();
+      if(typeof endEl.showPicker === 'function'){ try{ endEl.showPicker(); }catch(e){} }
+    }, 50);
   });
 }
 function updateCtDaysCount(){
