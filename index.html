@@ -2500,12 +2500,17 @@ if(!S.cityDates) S.cityDates={};
 function saveAccom(ck) {
   const name    = document.getElementById('am_name')?.value||'';
   const link    = document.getElementById('am_link')?.value||'';
+  const start   = document.getElementById('am_start')?.value||'';
+  const end     = document.getElementById('am_end')?.value||'';
   const nights  = document.getElementById('am_nights')?.value||'';
   const checkin = document.getElementById('am_checkin')?.value||'';
   const checkout= document.getElementById('am_checkout')?.value||'';
   const note    = document.getElementById('am_note')?.value||'';
   const status  = S._accomModalStatus||'confirmed';
-  S.accom[ck] = {name, link, nights, checkin, checkout, note, status};
+  if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
+  var entry = {id:_accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000)), name, link, start, end, nights, checkin, checkout, note, status};
+  var idx = S.accom[ck].findIndex(function(e){return e.id===entry.id;});
+  if(idx>-1) S.accom[ck][idx]=entry; else S.accom[ck].push(entry);
   save();
   if(sb && CURRENT_TRIP){
     var countryId = ck.split('_')[0];
@@ -2513,6 +2518,18 @@ function saveAccom(ck) {
   }
   document.getElementById('accomModal').classList.remove('open');
   renderContent();
+}
+function deleteAccomEntry(ck, id){
+  showConfirm('Supprimer ce logement ?', function(){
+    if(!Array.isArray(S.accom[ck])) return;
+    S.accom[ck] = S.accom[ck].filter(function(e){return e.id!==id;});
+    save();
+    renderContent();
+    if(sb && CURRENT_TRIP){
+      var countryId = ck.split('_')[0];
+      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(){});
+    }
+  }, 'Supprimer');
 }
 
 function accomSourceLabel(link){
@@ -2524,21 +2541,29 @@ function accomSourceLabel(link){
 }
 
 var _accomModalCk = '';
-function openAccomModal(ck){
+var _accomModalId = null;
+function openAccomModal(ck, id){
   _accomModalCk = ck;
-  var a = S.accom[ck]||{};
-  S._accomModalStatus = a.status||'confirmed';
+  _accomModalId = id||null;
+  var list = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
+  var a = id ? (list.find(function(e){return e.id===id;})||{}) : {};
+  var cityStay = S.cityDates && S.cityDates[ck];
   document.getElementById('accomModalTitle').textContent = a.name ? 'Modifier le logement' : 'Ajouter un logement';
   document.getElementById('accomModalBody').innerHTML =
     '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_name" type="text" placeholder="Nom (ex : Hotel Gracery Osaka)" style="width:100%" value="'+escHtml(a.name||'')+'"/></div>'
     +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_link" type="url" placeholder="Lien Booking / Airbnb / autre" style="width:100%" value="'+escHtml(a.link||'')+'"/></div>'
+    +'<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="am_start" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(a.start||(cityStay&&cityStay.start)||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="am_end" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(a.end||(cityStay&&cityStay.end)||'')+'"/></div></div>'
     +'<div class="ef-row" style="margin-bottom:8px;display:flex;gap:8px"><input class="ef-input" id="am_nights" type="number" placeholder="Nuits" style="flex:1" value="'+escHtml(a.nights||'')+'"/><input class="ef-input" id="am_checkin" type="time" placeholder="Check-in" style="flex:1" value="'+escHtml(a.checkin||'')+'"/><input class="ef-input" id="am_checkout" type="time" placeholder="Check-out" style="flex:1" value="'+escHtml(a.checkout||'')+'"/></div>'
     +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_note" type="text" placeholder="Note (ex : 800 m de la gare d\'Osaka)" style="width:100%" value="'+escHtml(a.note||'')+'"/></div>'
     +'<div style="display:flex;gap:8px;margin-bottom:4px">'
     +'<span onclick="setAccomStatus(\'confirmed\')" id="am_status_confirmed" class="feed-tag-pill" style="background:'+((a.status||'confirmed')==='confirmed'?'var(--accent)':'var(--sand-deep)')+';color:'+((a.status||'confirmed')==='confirmed'?'#fff':'var(--ink-muted)')+'">Confirmé</span>'
     +'<span onclick="setAccomStatus(\'pending\')" id="am_status_pending" class="feed-tag-pill" style="background:'+(a.status==='pending'?'var(--accent)':'var(--sand-deep)')+';color:'+(a.status==='pending'?'#fff':'var(--ink-muted)')+'">À réserver</span>'
-    +'</div>';
+    +'</div>'
+    +(id?'<button onclick="event.stopPropagation();deleteAccomEntry(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(id)+'\');document.getElementById(\'accomModal\').classList.remove(\'open\')" style="margin-top:6px;width:100%;padding:10px;border-radius:var(--r12);border:none;background:transparent;color:var(--red-muted,#E76F51);font-size:13px;font-weight:600;cursor:pointer">Supprimer ce logement</button>':'');
+  S._accomModalStatus = a.status||'confirmed';
   document.getElementById('accomModal').classList.add('open');
+  wireDateRangeSync('am_start','am_end');
 }
 function setAccomStatus(s){
   S._accomModalStatus = s;
@@ -2549,32 +2574,35 @@ function setAccomStatus(s){
 function saveAccomModal(){ saveAccom(_accomModalCk); }
 
 function renderAccomCard(ck) {
-  const a = S.accom[ck]||{};
   const esc = escHtml;
-  if(!a.name && !a.link){
-    return '<div onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer;text-align:center;padding:18px 16px">'
-      +'<div style="font-size:13px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('plus',15)+' Ajouter un logement</div>'
-      +'</div>';
+  const list = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
+  const addRow = '<div onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer;text-align:center;padding:'+(list.length?'12px 16px':'18px 16px')+'">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('plus',15)+' '+(list.length?'Ajouter un autre logement':'Ajouter un logement')+'</div>'
+    +'</div>';
+  if(!list.length){
+    return '<div style="padding:0 16px"><div class="accom-header" style="padding-top:14px"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div></div></div></div>'+addRow;
   }
-  const source = accomSourceLabel(a.link);
-  const statusPill = a.status==='pending'
-    ? '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">À réserver</span>'
-    : '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
-  const cityStayLine = (typeof fmtCityStayLine==='function') ? fmtCityStayLine(ck) : null;
-  const datesLine = cityStayLine || (a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '');
-  const timesLine = (a.checkin||a.checkout) ? ('Check-in '+(a.checkin||'—')+' · Check-out '+(a.checkout||'—')) : '';
-  return '<div onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer;padding:14px 16px">'
-    +'<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div></div></div>'
-    +'<div style="padding:2px 2px 0">'
-    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--ink)">'+esc(a.name||'Sans nom')+'</span>'+statusPill+(source?'<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">'+source+'</span>':'')+'</div>'
-    +(datesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(datesLine)+'</div>':'')
-    +(timesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(timesLine)+'</div>':'')
-    +(a.note?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(a.note)+'</div>':'')
-    +'<div style="display:flex;gap:8px;margin-top:10px">'
-    +(a.link?'<a href="'+esc(a.link)+'" target="_blank" onclick="event.stopPropagation()" style="flex:1;text-align:center;padding:10px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent);color:#fff;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir réservation</a>':'')
-    +'<button onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom\',\''+esc((a.name||'').replace(/\x27/g,"\\\x27"))+'\')" style="flex:1;padding:10px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:'+(a.link?'var(--sand-deep)':'var(--accent)')+';color:'+(a.link?'var(--ink)':'#fff')+';cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
-    +'</div>'
-    +'</div></div>';
+  const entriesHTML = list.map(function(a, i){
+    const source = accomSourceLabel(a.link);
+    const statusPill = a.status==='pending'
+      ? '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">À réserver</span>'
+      : '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
+    const datesLine = (a.start && a.end) ? fmtDateRangeFr(a.start, a.end)+(a.nights?(' • '+a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')):'') : (a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '');
+    const timesLine = (a.checkin||a.checkout) ? ('Check-in '+(a.checkin||'—')+' · Check-out '+(a.checkout||'—')) : '';
+    const headerBlock = i===0 ? '<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement'+(list.length>1?' ('+list.length+')':'')+'</div></div></div>' : '<div style="height:1px;background:rgba(29,29,31,0.08);margin:12px 0"></div>';
+    return headerBlock
+      +'<div style="padding:2px 2px 0">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--ink)">'+esc(a.name||'Sans nom')+'</span>'+statusPill+(source?'<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">'+source+'</span>':'')+'</div>'
+      +(datesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(datesLine)+'</div>':'')
+      +(timesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(timesLine)+'</div>':'')
+      +(a.note?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(a.note)+'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-top:10px">'
+      +'<button onclick="event.stopPropagation();openAccomModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(a.id)+'\')" style="flex:1;padding:10px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir réservation</button>'
+      +'<button onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom'+i+'\',\''+esc((a.name||'').replace(/\x27/g,"\\\x27"))+'\')" style="flex:1;padding:10px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--sand-deep);color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+  return '<div style="padding:14px 16px 6px">'+entriesHTML+'</div>'+addRow;
 }
 
 function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -3061,13 +3089,26 @@ function editCityDateRange(ck, startVal, endVal){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
+function cityStayRange(ck){
+  var start=null, end=null;
+  var accomList = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
+  accomList.forEach(function(a){
+    if(a.start && (!start || a.start<start)) start=a.start;
+    if(a.end && (!end || a.end>end)) end=a.end;
+  });
+  if(!start || !end){
+    var cd = S.cityDates && S.cityDates[ck];
+    if(cd && cd.start && cd.end){ start=cd.start; end=cd.end; }
+  }
+  return (start && end) ? {start:start, end:end} : null;
+}
 function fmtCityStayLine(ck){
-  var cd = S.cityDates && S.cityDates[ck];
-  if(!cd || !cd.start || !cd.end) return null;
-  var d1 = new Date(cd.start+'T00:00:00'), d2 = new Date(cd.end+'T00:00:00');
+  var range = cityStayRange(ck);
+  if(!range) return null;
+  var d1 = new Date(range.start+'T00:00:00'), d2 = new Date(range.end+'T00:00:00');
   var nights = Math.round((d2-d1)/86400000);
   var nightsTxt = nights>0 ? (' • '+nights+(nights===1?' nuit':' nuits')) : '';
-  return fmtDateRangeFr(cd.start, cd.end)+nightsTxt;
+  return fmtDateRangeFr(range.start, range.end)+nightsTxt;
 }
 function editCountryField(countryId, field, value){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
@@ -3668,7 +3709,7 @@ function renderCityPanelContentBody(c, city){
         var hasDetail=true;
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         var actCat = getActCategory(k, a.n, a.m);
-        var actCityStay = S.cityDates && S.cityDates[ck];
+        var actCityStay = cityStayRange(ck);
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
@@ -3750,11 +3791,6 @@ function openCityDetail(ck){
   save();
   renderContent();
   window.scrollTo(0,0);
-  var hasDates = S.cityDates && S.cityDates[ck] && S.cityDates[ck].start && S.cityDates[ck].end;
-  if(!hasDates){
-    var cityLabel = ck.indexOf('_')>-1 ? ck.slice(ck.indexOf('_')+1) : ck;
-    setTimeout(function(){ openCityDatesModal(ck, cityLabel); }, 300);
-  }
 }
 function closeCityDetail(){
   S.tab = 'country';
@@ -3777,10 +3813,8 @@ function renderCityDetailScreen(){
     +(S.customActs[ck]||[]).filter(function(_,i){return S.done[ck+'_c'+i];}).length;
   const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
 
-  const accomInfo = S.accom[ck]||{};
   const stayLine = fmtCityStayLine(ck);
-  const nightsPart = accomInfo.nights ? (accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-  const taglineTxt = stayLine || 'Ajouter les dates du séjour';
+  const taglineTxt = stayLine || 'Dates à définir';
   var query = (city.city+' '+c.name);
   var cityFavKey = ck+'_city';
   var isFavCity = !!S.favorites[cityFavKey];
@@ -3794,7 +3828,7 @@ function renderCityDetailScreen(){
     +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
     +'</div>'
     +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
-    +'<div class="cdh-tagline" onclick="openCityDatesModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(city.city)+'\')" style="cursor:pointer;display:flex;align-items:center;gap:5px">'+taglineTxt+svgIcon('chevron-right',13)+'</div>'
+    +'<div class="cdh-tagline">'+taglineTxt+'</div>'
     +renderTravelerAvatarStack()
     +'</div>'
     +'</div>'
@@ -3848,13 +3882,11 @@ function renderItinerary(c, embedded){
       +(S.customActs[ck]||[]).filter(function(_,i){return S.done[ck+'_c'+i];}).length;
     const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
 
-    const accomInfo = S.accom[ck]||{};
+    const accomList = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
     const stayLine = fmtCityStayLine(ck);
-    const nightsPart = accomInfo.nights ? (' · '+accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-    const periodLine = stayLine
-      ? ('<span onclick="event.stopPropagation();openCityDatesModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(city.city)+'\')" style="cursor:pointer;display:inline-flex;align-items:center;gap:3px">'+stayLine+'<span style="opacity:0.45;display:inline-flex">'+svgIcon('chevron-right',11)+'</span></span>')
-      : ('<span style="color:var(--accent)" onclick="event.stopPropagation();openCityDatesModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(city.city)+'\')">Ajouter les dates ›</span>');
-    const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+escHtml(accomInfo.name)+'</div>') : '';
+    const periodLine = stayLine || '<span style="color:var(--ink-subtle)">Dates à définir</span>';
+    const accomNameLine = accomList.length===1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+escHtml(accomList[0].name||'')+'</div>')
+      : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+' '+c.name;
 
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
@@ -4309,7 +4341,7 @@ function getCityStartDayInCountry(countryId, cityName){
 }
 function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
-  var ckStay = S.cityDates && S.cityDates[countryId+'_'+cityName];
+  var ckStay = cityStayRange(countryId+'_'+cityName);
   if(ckStay && ckStay.start) return ckStay.start;
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return null;
@@ -8509,7 +8541,12 @@ async function loadAccommodations(){
   var {data} = await sb.from('accommodations').select('*').eq('trip_id',CURRENT_TRIP.id);
   // Serveur autoritaire : reconstruction complète.
   S.accom = {};
-  (data||[]).forEach(function(row){ S.accom[row.city_key] = row.data; });
+  (data||[]).forEach(function(row){
+    var d = row.data;
+    if(Array.isArray(d)){ S.accom[row.city_key] = d; }
+    else if(d && (d.name||d.link)){ S.accom[row.city_key] = [Object.assign({id:'a'+Date.now()+Math.floor(Math.random()*1000)}, d)]; }
+    else { S.accom[row.city_key] = []; }
+  });
   save();
 }
 async function loadCustomPhotos(){
