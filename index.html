@@ -994,8 +994,13 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <div class="detail-tag" id="detailTag"></div>
       <div class="detail-title" id="detailTitle"></div>
       <div class="detail-sub" id="detailSub"></div>
+      <div id="detailQuickInfo" style="margin:10px 0"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="detail-map-btn" id="detailMapBtn" style="flex:1;margin:0">Voir sur la carte</button>
+        <button id="detailFavBtn" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(29,29,31,0.12);background:transparent;color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"></button>
+        <button id="detailDoneBtn" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(29,29,31,0.12);background:transparent;color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"></button>
+      </div>
       <div id="detailSections"></div>
-      <button class="detail-map-btn" id="detailMapBtn">Voir sur la carte</button>
     </div>
   </div>
 </div>
@@ -2303,6 +2308,35 @@ function openDetail(actKey, actName, cityKey) {
   document.getElementById('detailTitle').textContent = actName;
   document.getElementById('detailSub').textContent = d.address || '';
 
+  // Infos rapides — chips de scan ultra-rapide (horaires, durée, coûts, réservation)
+  var chips = [];
+  if(d.hours) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('sun',12)+' '+escHtml(d.hours)+'</span>');
+  if(d.duration) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('history',12)+' '+escHtml(d.duration)+'</span>');
+  if(d.costs && d.costs.length) chips.push('<span class="detail-chip cost" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('coins',12)+' '+escHtml(d.costs.join(' · '))+'</span>');
+  if(d.bookingRequired) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('check-square',12)+' '+escHtml(d.bookingRequired)+'</span>');
+  if(d.bestTime) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('sparkles',12)+' '+escHtml(d.bestTime)+'</span>');
+  document.getElementById('detailQuickInfo').innerHTML = chips.length ? ('<div class="detail-chips">'+chips.join('')+'</div>') : '';
+
+  // Actions — toujours visibles, en haut
+  document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(actKey, actName); };
+  function refreshActionButtons(){
+    var favBtn = document.getElementById('detailFavBtn');
+    var doneBtn = document.getElementById('detailDoneBtn');
+    var isFav = !!S.favorites[actKey];
+    var isDone = !!S.done[actKey];
+    favBtn.innerHTML = svgIcon('star',15)+' '+(isFav?'Favori':'Favori');
+    favBtn.style.background = isFav ? 'var(--accent-pale)' : 'transparent';
+    favBtn.style.color = isFav ? 'var(--accent)' : 'var(--ink)';
+    favBtn.style.borderColor = isFav ? 'transparent' : 'rgba(29,29,31,0.12)';
+    doneBtn.innerHTML = svgIcon('check',15)+' '+(isDone?'Fait':'Marquer fait');
+    doneBtn.style.background = isDone ? 'var(--accent)' : 'transparent';
+    doneBtn.style.color = isDone ? '#fff' : 'var(--ink)';
+    doneBtn.style.borderColor = isDone ? 'transparent' : 'rgba(29,29,31,0.12)';
+  }
+  document.getElementById('detailFavBtn').onclick = function(){ toggleFavorite(actKey); refreshActionButtons(); };
+  document.getElementById('detailDoneBtn').onclick = function(){ toggleAct(actKey); refreshActionButtons(); };
+  refreshActionButtons();
+
   // Sections
   let html = '';
   if(!hasAnyDetail){
@@ -2314,20 +2348,6 @@ function openDetail(actKey, actName, cityKey) {
     }
   }
   if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
-  if(d.duration || d.bestTime) {
-    html += '<div class="detail-section"><div class="detail-section-title">⏱️ Visite</div>'
-      + (d.duration?'<div class="detail-text">Durée conseillée : '+d.duration+'</div>':'')
-      + (d.bestTime?'<div class="detail-text">'+d.bestTime+'</div>':'')
-      +'</div>';
-  }
-  if(d.history) html += '<div class="detail-section"><div class="detail-section-title">📖 Histoire & contexte</div><div class="detail-text">'+d.history+'</div></div>';
-  if(d.hours) html += '<div class="detail-section"><div class="detail-section-title">🕐 Horaires</div><div class="detail-text">'+d.hours+'</div></div>';
-  if(d.costs && d.costs.length) {
-    html += '<div class="detail-section"><div class="detail-section-title">💶 Coûts</div><div class="detail-chips">'
-      + d.costs.map(c=>'<span class="detail-chip cost">'+c+'</span>').join('')
-      +'</div></div>';
-  }
-  if(d.bookingRequired) html += '<div class="detail-section"><div class="detail-section-title">🎟️ Réservation</div><div class="detail-text">'+d.bookingRequired+'</div></div>';
   if(d.tips && d.tips.length) {
     html += '<div class="detail-section"><div class="detail-section-title">💡 Conseils & astuces</div>'
       + d.tips.map(t=>'<div class="detail-text" style="padding:4px 0;border-bottom:1px solid rgba(29,29,31,0.056)">'+t+'</div>').join('')
@@ -2339,11 +2359,10 @@ function openDetail(actKey, actName, cityKey) {
       + (d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps ↗</a>':'')
       +'</div>';
   }
+  if(d.history) {
+    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.hist-chevron\').style.transform=b.style.display===\'none\'?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">📖 Histoire & contexte<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div><div class="detail-text" style="display:none">'+d.history+'</div></div>';
+  }
   document.getElementById('detailSections').innerHTML = html;
-
-  // Map button
-  const coordKey = actKey;
-  document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(coordKey, actName); };
 
   modal.classList.add('open');
 }
