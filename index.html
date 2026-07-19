@@ -2502,13 +2502,25 @@ function saveAccom(ck) {
   const link    = document.getElementById('am_link')?.value||'';
   const start   = document.getElementById('am_start')?.value||'';
   const end     = document.getElementById('am_end')?.value||'';
-  const nights  = document.getElementById('am_nights')?.value||'';
   const checkin = document.getElementById('am_checkin')?.value||'';
   const checkout= document.getElementById('am_checkout')?.value||'';
   const note    = document.getElementById('am_note')?.value||'';
   const status  = S._accomModalStatus||'confirmed';
+  const nights  = (start && end) ? String(Math.max(0, Math.round((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000))) : '';
   if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
-  var entry = {id:_accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000)), name, link, start, end, nights, checkin, checkout, note, status};
+  var thisId = _accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000));
+  if(start && end){
+    var conflict = S.accom[ck].find(function(e){
+      if(e.id===thisId) return false;
+      if(!e.start || !e.end) return false;
+      return start < e.end && e.start < end;
+    });
+    if(conflict){
+      alert('Ces dates chevauchent celles de "'+(conflict.name||'un autre logement')+'" ('+fmtDateRangeFr(conflict.start,conflict.end)+'). Ajuste les dates pour éviter le chevauchement.');
+      return;
+    }
+  }
+  var entry = {id:thisId, name, link, start, end, nights, checkin, checkout, note, status};
   var idx = S.accom[ck].findIndex(function(e){return e.id===entry.id;});
   if(idx>-1) S.accom[ck][idx]=entry; else S.accom[ck].push(entry);
   save();
@@ -2539,6 +2551,28 @@ function accomSourceLabel(link){
   if(/hotels\.com/i.test(link)) return 'Hotels.com';
   return 'Lien';
 }
+function _timeSelectOptions(selected){
+  var html = '<option value=""'+(selected?'':' selected')+'>—</option>';
+  for(var h=0; h<24; h++){
+    for(var m=0; m<60; m+=30){
+      var v = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      html += '<option value="'+v+'"'+(selected===v?' selected':'')+'>'+v+'</option>';
+    }
+  }
+  return html;
+}
+function updateAccomNightsDisplay(){
+  var s = document.getElementById('am_start')?.value||'';
+  var e = document.getElementById('am_end')?.value||'';
+  var el = document.getElementById('am_nights_display');
+  if(!el) return;
+  if(s && e){
+    var n = Math.round((new Date(e+'T00:00:00')-new Date(s+'T00:00:00'))/86400000);
+    el.textContent = n>0 ? (n+(n===1?' nuit':' nuits')) : '—';
+  } else {
+    el.textContent = '—';
+  }
+}
 
 var _accomModalCk = '';
 var _accomModalId = null;
@@ -2552,9 +2586,13 @@ function openAccomModal(ck, id){
   document.getElementById('accomModalBody').innerHTML =
     '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_name" type="text" placeholder="Nom (ex : Hotel Gracery Osaka)" style="width:100%" value="'+escHtml(a.name||'')+'"/></div>'
     +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_link" type="url" placeholder="Lien Booking / Airbnb / autre" style="width:100%" value="'+escHtml(a.link||'')+'"/></div>'
-    +'<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="am_start" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(a.start||(cityStay&&cityStay.start)||'')+'"/></div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="am_end" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(a.end||(cityStay&&cityStay.end)||'')+'"/></div></div>'
-    +'<div class="ef-row" style="margin-bottom:8px;display:flex;gap:8px"><input class="ef-input" id="am_nights" type="number" placeholder="Nuits" style="flex:1" value="'+escHtml(a.nights||'')+'"/><input class="ef-input" id="am_checkin" type="time" placeholder="Check-in" style="flex:1" value="'+escHtml(a.checkin||'')+'"/><input class="ef-input" id="am_checkout" type="time" placeholder="Check-out" style="flex:1" value="'+escHtml(a.checkout||'')+'"/></div>'
+    +'<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="am_start" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.start||(cityStay&&cityStay.start)||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="am_end" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.end||(cityStay&&cityStay.end)||'')+'"/></div></div>'
+    +'<div class="ef-row" style="margin-bottom:8px;display:flex;gap:8px;align-items:flex-end">'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Nuits</div><div id="am_nights_display" style="height:44px;display:flex;align-items:center;padding:0 12px;border-radius:var(--r8);background:var(--sand-deep);color:var(--ink-muted);font-size:13px;font-weight:600">—</div></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Check-in</div><select class="ef-input" id="am_checkin" style="width:100%;height:44px">'+_timeSelectOptions(a.checkin||'')+'</select></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Check-out</div><select class="ef-input" id="am_checkout" style="width:100%;height:44px">'+_timeSelectOptions(a.checkout||'')+'</select></div>'
+    +'</div>'
     +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_note" type="text" placeholder="Note (ex : 800 m de la gare d\'Osaka)" style="width:100%" value="'+escHtml(a.note||'')+'"/></div>'
     +'<div style="display:flex;gap:8px;margin-bottom:4px">'
     +'<span onclick="setAccomStatus(\'confirmed\')" id="am_status_confirmed" class="feed-tag-pill" style="background:'+((a.status||'confirmed')==='confirmed'?'var(--accent)':'var(--sand-deep)')+';color:'+((a.status||'confirmed')==='confirmed'?'#fff':'var(--ink-muted)')+'">Confirmé</span>'
@@ -2564,6 +2602,7 @@ function openAccomModal(ck, id){
   S._accomModalStatus = a.status||'confirmed';
   document.getElementById('accomModal').classList.add('open');
   wireDateRangeSync('am_start','am_end');
+  updateAccomNightsDisplay();
 }
 function setAccomStatus(s){
   S._accomModalStatus = s;
