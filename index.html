@@ -484,8 +484,8 @@ a{color:var(--ink);}
 /* ── DAY PLANNING ── */
 .day-tabs{display:flex;gap:4px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none;margin-bottom:6px;}
 .day-tabs::-webkit-scrollbar{display:none;}
-.day-tab{flex-shrink:0;padding:6px 14px;min-height:32px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid rgba(29,29,31,0.126);background:var(--sand);color:var(--ink-muted);cursor:pointer;transition:all 0.15s;}
-.day-tab.active{background:var(--ink);color:var(--sand);border-color:transparent;box-shadow:0 2px 6px rgba(28,24,20,0.2);}
+.day-tab{flex-shrink:0;padding:5px 12px;min-height:26px;border-radius:16px;font-size:11px;font-weight:500;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;transition:all 0.15s;}
+.day-tab.active{background:var(--sand-deep);color:var(--ink);font-weight:600;}
 .day-tab-add{flex-shrink:0;padding:5px 10px;border-radius:20px;font-size:13px;border:1px dashed rgba(29,29,31,0.210);background:transparent;color:var(--ink-muted);cursor:pointer;}
 
 /* ── COUNTDOWN ── */
@@ -2898,15 +2898,40 @@ function getCityDateList(ck){
   }
   return dates;
 }
+function countActivitiesByDate(ck){
+  var counts = {};
+  var parts = ck.split('_');
+  var countryId = parts[0];
+  var cityName = parts.slice(1).join('_');
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  var city = c && c.cities.find(function(ci){return ci.city===cityName;});
+  if(!city) return counts;
+  var totalBase = city.acts.length;
+  var customs = S.customActs[ck]||[];
+  var totalCustom = customs.length;
+  var order = getOrder(ck, totalBase, totalCustom);
+  order.forEach(function(slot, slotIdx){
+    var isBase = slot[0]==='b';
+    var origIdx = parseInt(slot.slice(1));
+    var k = isBase ? (ck+'_'+origIdx) : (ck+'_c'+origIdx);
+    if(isBase && S.deletedActs[ck+'_'+origIdx]) return;
+    if(!isBase && !customs[origIdx]) return;
+    var d = getActivityDate(k, countryId, cityName, slotIdx, order.length);
+    if(d) counts[d] = (counts[d]||0)+1;
+  });
+  return counts;
+}
 function renderDayTabs(ck) {
   const dates = getCityDateList(ck);
   if(!dates.length) return '';
   const active = S.activeDay[ck]||'Tous';
+  const counts = countActivitiesByDate(ck);
   let html = '<div class="day-tabs">';
   html += '<button class="'+(active==='Tous'?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')">Tous</button>';
   dates.forEach(function(iso){
     var label = new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-    html += '<button class="'+(iso===active?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')">'+label+'</button>';
+    var n = counts[iso]||0;
+    html += '<button class="'+(iso===active?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')">'+label+(n?' · '+n:'')+'</button>';
   });
   html += '</div>';
   return html;
