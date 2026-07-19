@@ -87,6 +87,7 @@ a{color:var(--ink);}
 .cah-left{flex:1;min-width:0;}
 .cah-city{font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-0.2px;}
 .cah-sub{font-size:11px;color:var(--ink-subtle);margin-top:3px;}
+.cah-accom{font-size:11px;color:var(--ink-muted);margin-top:4px;display:flex;align-items:center;gap:4px;}
 .cah-right{display:flex;align-items:center;gap:8px;flex-shrink:0;align-self:flex-start;margin-top:28px;margin-right:-6px;}
 .cah-progress{font-size:11px;color:var(--ink-muted);background:var(--sand);padding:4px 10px;border-radius:20px;border:1px solid rgba(29,29,31,0.084);font-weight:500;}
 .cah-progress.complete{background:var(--green-muted);color:#fff;border-color:transparent;box-shadow:0 2px 6px rgba(92,107,74,0.3);}
@@ -2435,11 +2436,12 @@ if(!S.accom) S.accom={};
 if(!S.actDate) S.actDate={};
 
 function saveAccom(ck) {
+  const name  = document.getElementById('ac_name_'+ck)?.value||'';
   const link  = document.getElementById('ac_link_'+ck)?.value||'';
   const price = document.getElementById('ac_price_'+ck)?.value||'';
   const nights= document.getElementById('ac_nights_'+ck)?.value||'';
   const type  = document.getElementById('ac_type_'+ck)?.value||'';
-  S.accom[ck] = {link, price, nights, type};
+  S.accom[ck] = {name, link, price, nights, type};
   save();
   if(sb && CURRENT_TRIP){
     var countryId = ck.split('_')[0];
@@ -2454,6 +2456,7 @@ function renderAccomCard(ck) {
   return '<div class="accom-card">'
     +'<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div><div class="accom-sub">Coller un lien Booking / Airbnb / autre</div></div></div>'
     +'<div class="accom-fields">'
+    +'<div class="accom-field"><span class="accom-label">Nom</span><input class="accom-input" id="ac_name_'+ck+'" type="text" placeholder="ex : Hotel Gracery Osaka" value="'+esc(a.name||'')+'" oninput="'+ev+'"/></div>'
     +'<div class="accom-field"><span class="accom-label">Lien</span><input class="accom-input" id="ac_link_'+ck+'" type="url" placeholder="https://www.airbnb.fr/rooms/…" value="'+esc(a.link||'')+'" oninput="'+ev+'"/></div>'
     +'<div class="accom-field"><span class="accom-label">Nuits</span><input class="accom-input" id="ac_nights_'+ck+'" type="number" placeholder="nb de nuits" value="'+esc(a.nights||'')+'" oninput="'+ev+'"/></div>'
     +(a.link?'<a class="accom-link" href="'+esc(a.link)+'" target="_blank">🔗 Voir le logement</a>':'')
@@ -3503,10 +3506,14 @@ function renderItinerary(c, embedded){
 
     const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+jsStrEsc(ck)+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+jsStrEsc(ck)+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
 
+    const accomInfo = S.accom[ck]||{};
+    const nightsPart = accomInfo.nights ? (' · '+accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
+    const accomNameLine = accomInfo.name ? ('<div class="cah-accom">🏨 '+escHtml(accomInfo.name)+'</div>') : '';
+
     return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+escHtml(ck)+'" style="position:relative">'
       +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
       +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'" style="'+(tripStarted?'display:none':'')+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+jsStrEsc(ck)+'\') " style="flex:1;cursor:pointer">'
-      +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityDone+'/'+cityTotal+' activités</div></div>'
+      +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+nightsPart+' · '+cityDone+'/'+cityTotal+' activités</div>'+accomNameLine+'</div>'
       +'<div class="cah-right">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)')+'</div></div>'
       +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
   }).join('');
@@ -3579,7 +3586,7 @@ function renderItinerary(c, embedded){
   return cdHTML+coverHTML
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'+citiesHTML
-    +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(29,29,31,0.2);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif"><span data-icon="plus" data-icon-size="14"></span> Ajouter une ville</button>'
+    +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:16px;border-radius:var(--r16);font-size:14px;font-weight:600;border:1.5px dashed rgba(45,106,79,0.35);background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span data-icon="plus" data-icon-size="16"></span> Ajouter une étape</button>'
     +cityTrashSectionHTML(c.id)
     +'</div>'
     +'<div class="section" style="padding-bottom:20px"><div class="section-header"><div class="section-title">Spots photo</div></div><div class="photo-grid">'+photoHTML+'</div>'
