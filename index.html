@@ -3355,6 +3355,8 @@ async function loadWeatherSection(countryId) {
 }
 
 function renderItinerary(c, embedded){
+  var _depart = getTripDepartDate();
+  var tripStarted = _depart ? (new Date() >= _depart) : false;
   const allBaseActs = c.cities.reduce((s,city)=>{
     const base = city.acts.filter((_,i)=>!S.deletedActs[c.id+'_'+city.city+'_'+i]);
     return s + base.length + (S.customActs[c.id+'_'+city.city]||[]).length;
@@ -3399,7 +3401,7 @@ function renderItinerary(c, embedded){
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         var daySelector=dateSelector;
         return '<div class="act-card'+(done?' done':'')+'">'
-          +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>'
+          +(tripStarted?'':'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>')
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
           +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+'</div>'
@@ -3420,9 +3422,9 @@ function renderItinerary(c, embedded){
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="act-card'+(cdone?' done':'')+'" style="border-style:dashed">'
-          +'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>'
+          +(tripStarted?'':'<div class="drag-handle" data-drag-act="'+slotIdx+'" data-drag-ck="'+escHtml(ck)+'"><span></span><span></span><span></span></div>')
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
-          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span style="font-size:9px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:10px;vertical-align:middle">✨ IA</span>':'')+'</div>'
+          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
@@ -3457,10 +3459,9 @@ function renderItinerary(c, embedded){
 
     return '<div class="city-accordion'+(isOpen?' open':'')+'" data-city="'+escHtml(ck)+'" style="position:relative">'
       +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:10px;right:10px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
-      +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+jsStrEsc(ck)+'\') " style="flex:1;cursor:pointer">'
-      +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityTotal+' activités</div></div>'
-      +'<div class="cah-right"><span class="cah-progress'+(complete?' complete':'')+'" >'+cityDone+'/'+cityTotal+'</span></div></div>'
-      +'<div class="cah-bar"><div class="cah-bar-fill" style="width:'+pct+'%"></div></div>'
+      +'<div class="city-accordion-header"><div class="city-drag-handle" data-drag-city="'+cityPos+'" data-drag-country="'+c.id+'" style="'+(tripStarted?'display:none':'')+'"><span></span><span></span><span></span></div><div class="cah-left" onclick="toggleCity(\''+jsStrEsc(ck)+'\') " style="flex:1;cursor:pointer">'
+      +'<div class="cah-city" style="padding-right:24px">'+city.city+' <span style="font-size:10px;color:var(--accent)">›</span></div><div class="cah-sub">'+city.sub+' · '+cityDone+'/'+cityTotal+' activités</div></div>'
+      +'<div class="cah-right">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)')+'</div></div>'
       +'<div class="city-panel">'+renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+customActsHTML+trashHTML+addForm+'</div></div>';
   }).join('');
 
@@ -4284,15 +4285,16 @@ function renderCountriesScreen(){
 function filterCountries(q){ S.countryFilterQuery=q; renderContent(); var i=document.getElementById('countrySearchInput'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function setCountryFilterStatus(s){ S.countryFilterStatus=s; save(); renderContent(); }
 
-function renderProgressRing(pct, size, stroke, color){
+function renderProgressRing(pct, size, stroke, color, trackColor, textColor){
   size=size||72; stroke=stroke||7; color=color||'#95D5B2';
+  trackColor=trackColor||'rgba(255,255,255,0.15)'; textColor=textColor||'#fff';
   var r=(size-stroke)/2;
   var circ=2*Math.PI*r;
   var offset=circ*(1-Math.min(100,Math.max(0,pct))/100);
   return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" style="flex-shrink:0">'
-    +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="'+stroke+'"/>'
+    +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+trackColor+'" stroke-width="'+stroke+'"/>'
     +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+stroke+'" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>'
-    +'<text x="'+(size/2)+'" y="'+(size/2)+'" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="'+(size*0.22)+'" font-weight="700" font-family="-apple-system,sans-serif">'+pct+'%</text>'
+    +'<text x="'+(size/2)+'" y="'+(size/2)+'" text-anchor="middle" dominant-baseline="central" fill="'+textColor+'" font-size="'+(size*0.28)+'" font-weight="700" font-family="-apple-system,sans-serif">'+pct+'%</text>'
     +'</svg>';
 }
 function renderBudgetOverview(){
