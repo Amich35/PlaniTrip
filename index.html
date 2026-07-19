@@ -3782,7 +3782,9 @@ function renderCityPanelContentBody(c, city){
         var caCat = getActCategory(ck2, ca.n, ca.m);
         if(activeCat!=='Tous' && caCat!==activeCat) return '';
         var cdone=!!S.done[ck2];
-        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var cCityStay = cityStayRange(ck);
+        var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
+        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
@@ -4415,6 +4417,16 @@ function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   return toLocalISODate(d);
 }
 function setActivityDate(actKey, dateVal){
+  if(dateVal){
+    var ck = actKey.replace(/_c?\d+$/,'');
+    var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
+    if(range && (dateVal<range.start || dateVal>range.end)){
+      var fmt1 = function(iso){ return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
+      alert('Cette date doit être comprise entre le '+fmt1(range.start)+' et le '+fmt1(range.end)+' (dates de séjour dans la ville).');
+      renderContent();
+      return;
+    }
+  }
   if(!S.actDate) S.actDate={};
   if(dateVal) S.actDate[actKey]=dateVal; else delete S.actDate[actKey];
   save();
