@@ -3118,8 +3118,8 @@ function openGuideItemModal(countryId, listField, idx){
     document.getElementById('guideItemModalTitle').textContent='Nouvelle ville';
     document.getElementById('guideItemModalBody').innerHTML=
       '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%"/></div>'
-      +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box"/></div>'
-      +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalCityDateEnd" type="date" style="width:100%;box-sizing:border-box"/></div></div>';
+      +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalCityDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
     wireDateRangeSync('guideModalCityDateStart', 'guideModalCityDateEnd');
@@ -3234,8 +3234,8 @@ function openDatesModal(countryId){
   if(!c) return;
   document.getElementById('guideItemModalTitle').textContent='Dates du séjour';
   document.getElementById('guideItemModalBody').innerHTML=
-    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(c.dateStart||'')+'"/></div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(c.dateEnd||'')+'"/></div></div>';
+    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(c.dateStart||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(c.dateEnd||'')+'"/></div></div>';
   _guideModalSaveFn = saveDatesModal;
   document.getElementById('guideItemModal').classList.add('open');
   wireDateRangeSync('guideModalDateStart', 'guideModalDateEnd');
@@ -3260,8 +3260,8 @@ function openCityDatesModal(ck, cityLabel){
   var cur = (S.cityDates && S.cityDates[ck])||{};
   document.getElementById('guideItemModalTitle').textContent='Dates du séjour'+(cityLabel?' — '+cityLabel:'');
   document.getElementById('guideItemModalBody').innerHTML=
-    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(cur.start||'')+'"/></div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(cur.end||'')+'"/></div></div>';
+    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cur.start||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cur.end||'')+'"/></div></div>';
   _guideModalSaveFn = saveCityDatesModal;
   document.getElementById('guideItemModal').classList.add('open');
   wireDateRangeSync('guideModalDateStart', 'guideModalDateEnd');
@@ -3278,6 +3278,7 @@ function saveCityDatesModal(){
   var end=((document.getElementById('guideModalDateEnd')||{}).value||'');
   editCityDateRange(_cityDatesModalCk, start, end);
   closeGuideItemModal();
+  window.scrollTo(0,0);
 }
 function removeGuideListItem(countryId, listField, idx){
   var label = listField==='checklist' ? 'cet item' : (listField==='emergency' ? 'ce numéro' : (listField==='phrases' ? 'ce mot/expression' : 'ce conseil'));
