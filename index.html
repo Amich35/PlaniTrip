@@ -3556,7 +3556,7 @@ function renderCityDetailScreen(){
   const nightsPart = accomInfo.nights ? (accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
   var query = (city.city+' '+c.name);
 
-  var header = '<div class="country-detail-header" style="background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+')" data-img-query="'+escHtml(query)+'">'
+  var header = '<div class="country-detail-header" style="background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+');border-radius:0 0 28px 28px;overflow:hidden" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
     +photoEditBtn(query)
     +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
@@ -3596,12 +3596,12 @@ function renderItinerary(c, embedded){
     const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px">🏨 '+escHtml(accomInfo.name)+'</div>') : '';
     var imgQuery = city.city+' '+c.name;
 
-    return '<div class="country-card" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" style="position:relative;align-items:flex-start;padding:14px 40px 14px 14px">'
-      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" style="position:absolute;top:14px;right:12px;z-index:3;width:22px;height:22px;border-radius:50%;background:rgba(29,29,31,0.06);border:none;color:var(--ink-subtle);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;" title="Supprimer la ville">✕</button>'
+    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:var(--r22)" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+      +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'">'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+escHtml(city.sub)+nightsPart+' · '+cityTotal+' activités</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)')+'</span>'
-      +'</div>';
+      +'</div></div>';
   }).join('');
 
   const alertsHTML=c.alerts.map(function(a){
@@ -3671,7 +3671,7 @@ function renderItinerary(c, embedded){
     +'<div class="cover-pills"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
     +weatherSection
-    +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'+citiesHTML
+    +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div><div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:16px;border-radius:var(--r16);font-size:14px;font-weight:600;border:1.5px dashed rgba(45,106,79,0.35);background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span data-icon="plus" data-icon-size="16"></span> Ajouter une étape</button>'
     +cityTrashSectionHTML(c.id)
     +'</div>'
