@@ -2924,14 +2924,15 @@ function countActivitiesByDate(ck){
 function renderDayTabs(ck) {
   const dates = getCityDateList(ck);
   if(!dates.length) return '';
-  const active = S.activeDay[ck]||'Tous';
   const counts = countActivitiesByDate(ck);
+  const nonEmptyDates = dates.filter(function(iso){ return (counts[iso]||0)>0; });
+  if(!nonEmptyDates.length) return '';
+  const active = S.activeDay[ck]||'Tous';
   let html = '<div class="day-tabs">';
   html += '<button class="'+(active==='Tous'?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')">Tous</button>';
-  dates.forEach(function(iso){
+  nonEmptyDates.forEach(function(iso){
     var label = new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-    var n = counts[iso]||0;
-    html += '<button class="'+(iso===active?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')">'+label+(n?' · '+n:'')+'</button>';
+    html += '<button class="'+(iso===active?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')">'+label+'</button>';
   });
   html += '</div>';
   return html;
@@ -4417,8 +4418,18 @@ function getCityStartDayInCountry(countryId, cityName){
 }
 function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
-  var ckStay = cityStayRange(countryId+'_'+cityName);
-  if(ckStay && ckStay.start) return ckStay.start;
+  var ck = countryId+'_'+cityName;
+  var ckStay = cityStayRange(ck);
+  if(ckStay && ckStay.start){
+    var dateList = getCityDateList(ck);
+    if(dateList.length){
+      var idx = totalActs>0 ? Math.floor(actIdx * dateList.length / totalActs) : 0;
+      if(idx>=dateList.length) idx=dateList.length-1;
+      if(idx<0) idx=0;
+      return dateList[idx];
+    }
+    return ckStay.start;
+  }
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return null;
   var cityObj = c.cities.find(function(ci){return ci.city===cityName;});
