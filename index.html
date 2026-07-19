@@ -1687,7 +1687,7 @@ function loadState(){
       return parsed;
     }
   }catch(e){}
-  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{}};
+  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
 }
 function save(){
   try{
@@ -2006,6 +2006,7 @@ function ensureStateDefaults(){
   if(!S.addedCities) S.addedCities={};
   if(!S.accom) S.accom={};
   if(!S.actDate) S.actDate={};
+  if(!S.cityDates) S.cityDates={};
   if(!S.customPhotos) S.customPhotos={};
   if(!S.days) S.days={};
   if(!S.actDay) S.actDay={};
@@ -2494,6 +2495,7 @@ function closeDetail(){ document.getElementById('detailModal').classList.remove(
 // S.accom = { 'jp_Kyoto': {link:'...', price:'', nights:'', type:''} }
 if(!S.accom) S.accom={};
 if(!S.actDate) S.actDate={};
+if(!S.cityDates) S.cityDates={};
 
 function saveAccom(ck) {
   const name    = document.getElementById('am_name')?.value||'';
@@ -3031,6 +3033,32 @@ function editCountryDateRange(countryId, startVal, endVal){
   saveCountryEdit(countryId);
   renderContent();
 }
+// ── Dates de séjour par ville (arrivée/départ réelles, remplace le texte "X jours") ──
+function editCityDateRange(ck, startVal, endVal){
+  if(!S.cityDates) S.cityDates={};
+  var cur = S.cityDates[ck]||{};
+  var newStart = startVal!==null ? startVal : cur.start;
+  var newEnd = endVal!==null ? endVal : cur.end;
+  if(newStart && newEnd && newEnd < newStart){
+    alert("La date de départ doit être postérieure à la date d'arrivée.");
+    renderContent();
+    return;
+  }
+  S.cityDates[ck] = {start:newStart||'', end:newEnd||''};
+  save();
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+  }
+}
+function fmtCityStayLine(ck){
+  var cd = S.cityDates && S.cityDates[ck];
+  if(!cd || !cd.start || !cd.end) return null;
+  var d1 = new Date(cd.start+'T00:00:00'), d2 = new Date(cd.end+'T00:00:00');
+  var nights = Math.round((d2-d1)/86400000);
+  var nightsTxt = nights>0 ? (' • '+nights+(nights===1?' nuit':' nuits')) : '';
+  return fmtDateRangeFr(cd.start, cd.end)+nightsTxt;
+}
 function editCountryField(countryId, field, value){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
@@ -3090,9 +3118,11 @@ function openGuideItemModal(countryId, listField, idx){
     document.getElementById('guideItemModalTitle').textContent='Nouvelle ville';
     document.getElementById('guideItemModalBody').innerHTML=
       '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%"/></div>'
-      +'<div class="ef-row"><input class="ef-input" id="guideModalCitySub" type="text" placeholder="Durée (ex: 3 jours)" style="width:100%" value="2 jours"/></div>';
+      +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box"/></div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalCityDateEnd" type="date" style="width:100%;box-sizing:border-box"/></div></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
+    wireDateRangeSync('guideModalCityDateStart', 'guideModalCityDateEnd');
     return;
   }
 
@@ -3143,9 +3173,10 @@ function saveGuideItem(){
 
   if(_guideModalListField==='city'){
     var cname=((document.getElementById('guideModalCityName')||{}).value||'').trim();
-    var csub=((document.getElementById('guideModalCitySub')||{}).value||'').trim();
+    var cdStart=((document.getElementById('guideModalCityDateStart')||{}).value||'').trim();
+    var cdEnd=((document.getElementById('guideModalCityDateEnd')||{}).value||'').trim();
     closeGuideItemModal();
-    _createCityFromModal(_guideModalCountryId, cname, csub);
+    _createCityFromModal(_guideModalCountryId, cname, '', cdStart, cdEnd);
     return;
   }
 
@@ -3222,6 +3253,32 @@ function saveDatesModal(){
   editCountryDateRange(_datesModalCountryId, start, end);
   closeGuideItemModal();
 }
+// ── Modale Dates du séjour (par ville) ──
+var _cityDatesModalCk=null;
+function openCityDatesModal(ck, cityLabel){
+  _cityDatesModalCk=ck;
+  var cur = (S.cityDates && S.cityDates[ck])||{};
+  document.getElementById('guideItemModalTitle').textContent='Dates du séjour'+(cityLabel?' — '+cityLabel:'');
+  document.getElementById('guideItemModalBody').innerHTML=
+    '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(cur.start||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box" value="'+escHtml(cur.end||'')+'"/></div></div>';
+  _guideModalSaveFn = saveCityDatesModal;
+  document.getElementById('guideItemModal').classList.add('open');
+  wireDateRangeSync('guideModalDateStart', 'guideModalDateEnd');
+  var _btnRow = document.querySelector('#guideItemModal .share-sheet > div[style*="display:flex"]');
+  if(_btnRow){
+    var _cancelBtn = _btnRow.querySelector('.modal-cancel-btn');
+    var _ctaBtn = _btnRow.querySelector('.modal-cta');
+    if(_cancelBtn) _cancelBtn.style.cssText='flex:1;padding:13px;min-height:44px;border-radius:var(--r16);font-size:14px;font-weight:600;border:var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+    if(_ctaBtn) _ctaBtn.style.cssText='flex:1;padding:13px;min-height:44px;border-radius:var(--r16);font-size:14px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 8px rgba(28,24,20,0.2);margin-bottom:0;';
+  }
+}
+function saveCityDatesModal(){
+  var start=((document.getElementById('guideModalDateStart')||{}).value||'');
+  var end=((document.getElementById('guideModalDateEnd')||{}).value||'');
+  editCityDateRange(_cityDatesModalCk, start, end);
+  closeGuideItemModal();
+}
 function removeGuideListItem(countryId, listField, idx){
   var label = listField==='checklist' ? 'cet item' : (listField==='emergency' ? 'ce numéro' : (listField==='phrases' ? 'ce mot/expression' : 'ce conseil'));
   showConfirm('Supprimer '+label+' ?', function(){
@@ -3251,7 +3308,7 @@ function removeGuideListItem(countryId, listField, idx){
 function addCityToCountry(countryId){
   openGuideItemModal(countryId, 'city', null);
 }
-function _createCityFromModal(countryId, name, sub){
+function _createCityFromModal(countryId, name, sub, dateStart, dateEnd){
   name = stripHtml(name||'');
   sub = stripHtml(sub||'');
   if(!name || !name.trim()) return;
@@ -3260,15 +3317,15 @@ function _createCityFromModal(countryId, name, sub){
   if(c.cities.find(function(ci){return ci.city===name.trim();})){ alert('Cette ville existe déjà.'); return; }
   var newCity = {city:name.trim(), sub:sub, acts:[]};
   c.cities.push(newCity);
-  if(c.days===0){
-    var subDays = parseInt((sub||'').match(/\d+/));
-    if(subDays) { c.days = subDays; saveCountryEdit(countryId); }
-  }
   if(!S.addedCities[countryId]) S.addedCities[countryId]=[];
   S.addedCities[countryId].push(newCity);
   save();
   S.openCities[countryId+'_'+newCity.city]=true;
-  renderContent();
+  if(dateStart && dateEnd){
+    editCityDateRange(countryId+'_'+newCity.city, dateStart, dateEnd);
+  } else {
+    renderContent();
+  }
   if(S.apiKey) suggestActivitiesWithAI(countryId, newCity.city);
   if(sb && CURRENT_TRIP){
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
@@ -3595,7 +3652,9 @@ function renderCityPanelContent(c, city){
         var hasDetail=true;
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         var actCat = getActCategory(k, a.n, a.m);
-        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var actCityStay = S.cityDates && S.cityDates[ck];
+        var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
+        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
@@ -3698,14 +3757,16 @@ function renderCityDetailScreen(){
   const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
 
   const accomInfo = S.accom[ck]||{};
+  const stayLine = fmtCityStayLine(ck);
   const nightsPart = accomInfo.nights ? (accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
+  const taglineTxt = stayLine || (escHtml(city.sub)+(nightsPart?' · '+escHtml(nightsPart):''));
   var query = (city.city+' '+c.name);
 
   var header = '<div class="country-detail-header" style="background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+');border-radius:0 0 28px 28px;overflow:hidden" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
     +photoEditBtn(query)
     +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
-    +'<div class="cdh-tagline">'+escHtml(city.sub)+(nightsPart?' · '+escHtml(nightsPart):'')+'</div>'
+    +'<div class="cdh-tagline" onclick="openCityDatesModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(city.city)+'\')" style="cursor:pointer;display:flex;align-items:center;gap:5px">'+taglineTxt+svgIcon('chevron-right',13)+'</div>'
     +'<div class="cover-pills" style="margin-top:8px"><span class="cover-pill">'+cityDone+'/'+cityTotal+' activités</span><span class="cover-pill">'+pct+'%</span></div></div>'
     +'</div>';
 
@@ -3737,15 +3798,17 @@ function renderItinerary(c, embedded){
     const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
 
     const accomInfo = S.accom[ck]||{};
+    const stayLine = fmtCityStayLine(ck);
     const nightsPart = accomInfo.nights ? (' · '+accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-    const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px">🏨 '+escHtml(accomInfo.name)+'</div>') : '';
+    const periodLine = stayLine || (escHtml(city.sub)+nightsPart);
+    const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+escHtml(accomInfo.name)+'</div>') : '';
     var imgQuery = city.city+' '+c.name;
 
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'">'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
-      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+escHtml(city.sub)+nightsPart+' · '+cityTotal+' activités</div>'+accomNameLine+'</div>'
-      +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)')+'</span>'
+      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
+      +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div>';
   }).join('');
 
@@ -4193,6 +4256,8 @@ function getCityStartDayInCountry(countryId, cityName){
 }
 function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
+  var ckStay = S.cityDates && S.cityDates[countryId+'_'+cityName];
+  if(ckStay && ckStay.start) return ckStay.start;
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return null;
   var cityObj = c.cities.find(function(ci){return ci.city===cityName;});
@@ -4569,16 +4634,18 @@ function renderCountriesScreen(){
 function filterCountries(q){ S.countryFilterQuery=q; renderContent(); var i=document.getElementById('countrySearchInput'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function setCountryFilterStatus(s){ S.countryFilterStatus=s; save(); renderContent(); }
 
-function renderProgressRing(pct, size, stroke, color, trackColor, textColor){
+function renderProgressRing(pct, size, stroke, color, trackColor, textColor, label){
   size=size||72; stroke=stroke||7; color=color||'#95D5B2';
   trackColor=trackColor||'rgba(255,255,255,0.15)'; textColor=textColor||'#fff';
   var r=(size-stroke)/2;
   var circ=2*Math.PI*r;
   var offset=circ*(1-Math.min(100,Math.max(0,pct))/100);
+  var txt = (label!==undefined && label!==null && label!=='') ? label : pct+'%';
+  var fontSize = (label!==undefined && label!==null && label!=='') ? size*0.26 : size*0.28;
   return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" style="flex-shrink:0">'
     +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+trackColor+'" stroke-width="'+stroke+'"/>'
     +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+stroke+'" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>'
-    +'<text x="'+(size/2)+'" y="'+(size/2)+'" text-anchor="middle" dominant-baseline="central" fill="'+textColor+'" font-size="'+(size*0.28)+'" font-weight="700" font-family="-apple-system,sans-serif">'+pct+'%</text>'
+    +'<text x="'+(size/2)+'" y="'+(size/2)+'" text-anchor="middle" dominant-baseline="central" fill="'+textColor+'" font-size="'+fontSize+'" font-weight="700" font-family="-apple-system,sans-serif">'+txt+'</text>'
     +'</svg>';
 }
 function renderBudgetOverview(){
@@ -6452,6 +6519,7 @@ function deleteCity(countryId, cityName){
     actDay: actDayKeys,
     favorites: favoriteKeys,
     actDate: actDateKeys,
+    cityDates: (S.cityDates && S.cityDates[ck]) || null,
     details: detailKeys,
     activeDay: S.activeDay[ck]||null,
     wasOpen: !!S.openCities[ck],
@@ -6472,6 +6540,7 @@ function deleteCity(countryId, cityName){
   Object.keys(actDayKeys).forEach(function(k){ delete S.actDay[k]; });
   Object.keys(favoriteKeys).forEach(function(k){ delete S.favorites[k]; });
   Object.keys(actDateKeys).forEach(function(k){ delete S.actDate[k]; });
+  if(S.cityDates) delete S.cityDates[ck];
   Object.keys(detailKeys).forEach(function(k){ delete window._customDetails[k]; });
   S.customDetails = window._customDetails;
   delete S.days[ck];
@@ -6496,6 +6565,7 @@ function deleteCity(countryId, cityName){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     // La ville et ses activités personnalisées doivent aussi être supprimées côté serveur,
     // sinon loadCitiesActivities() (serveur autoritaire) les fait réapparaître au chargement suivant.
     sb.from('cities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',countryId).eq('city',cityName).then(function(r){
@@ -6527,6 +6597,7 @@ function restoreCity(trashId){
   Object.keys(t.actDay).forEach(function(k){ S.actDay[k]=t.actDay[k]; });
   if(t.favorites) Object.keys(t.favorites).forEach(function(k){ S.favorites[k]=t.favorites[k]; });
   if(t.actDate) { if(!S.actDate) S.actDate={}; Object.keys(t.actDate).forEach(function(k){ S.actDate[k]=t.actDate[k]; }); }
+  if(t.cityDates) { if(!S.cityDates) S.cityDates={}; S.cityDates[ck]=t.cityDates; }
   if(t.details) { if(!window._customDetails) window._customDetails={}; Object.keys(t.details).forEach(function(k){ window._customDetails[k]=t.details[k]; }); S.customDetails=window._customDetails; }
   if(t.days) S.days[ck]=t.days;
   if(t.activeDay) S.activeDay[ck]=t.activeDay;
@@ -6543,6 +6614,7 @@ function restoreCity(trashId){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
     // Réinsérer la ville (et ses activités personnalisées) côté serveur, symétriquement à deleteCity()
     var whoRestore=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,added_by_label:whoRestore}).then(function(){});
@@ -8356,6 +8428,8 @@ async function loadActivityDetails(){
     // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
     if(row.detail_key === '__planitrip__actDate'){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
+    } else if(row.detail_key === '__planitrip__cityDates'){
+      if(row.data && typeof row.data === 'object'){ S.cityDates = row.data; }
     } else if(row.detail_key === '__planitrip__actDay'){
       if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
     } else if(row.detail_key === '__planitrip__actOrder'){
