@@ -3806,7 +3806,7 @@ function renderItinerary(c, embedded){
     const accomInfo = S.accom[ck]||{};
     const stayLine = fmtCityStayLine(ck);
     const nightsPart = accomInfo.nights ? (' · '+accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-    const periodLine = stayLine || '<span style="color:var(--accent)">Ajouter les dates ›</span>';
+    const periodLine = stayLine || '<span style="color:var(--accent)" onclick="event.stopPropagation();openCityDatesModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(city.city)+'\')">Ajouter les dates ›</span>';
     const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+escHtml(accomInfo.name)+'</div>') : '';
     var imgQuery = city.city+' '+c.name;
 
