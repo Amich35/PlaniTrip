@@ -1990,6 +1990,8 @@ function ensureStateDefaults(){
   if(!S.favorites) S.favorites={};
   if(!S.documents) S.documents={};
   if(!S.journal) S.journal=[];
+  if(!S.activeCategory) S.activeCategory={};
+  if(!S.actCategory) S.actCategory={};
   if(!S.customCountries) S.customCountries=[];
   if(!S.deletedCountryIds) S.deletedCountryIds=[];
   if(!S.countryEdits) S.countryEdits={};
@@ -3455,10 +3457,46 @@ function swipeEnd(e, el){
   }
   _swipeState = null;
 }
+const ACTIVITY_CATEGORIES = {
+  monument:{label:'Monument',icon:'landmark',emoji:'🏯'},
+  food:{label:'Repas',icon:'utensils',emoji:'🍜'},
+  shopping:{label:'Shopping',icon:'shopping-bag',emoji:'🛍'},
+  nature:{label:'Nature',icon:'leaf',emoji:'🌸'},
+  photo:{label:'Photo',icon:'camera',emoji:'📷'},
+  walk:{label:'Balade',icon:'map-pin',emoji:'🚶'}
+};
+const CATEGORY_KEYWORDS = {
+  monument:['temple','château','chateau','castle','palais','palace','pagode','pagoda','sanctuaire','shrine','monument','tour','fort','cathédrale','cathedrale','église','eglise','ruines','angkor','wat ','musée','musee','museum'],
+  food:['restaurant','street food','food court','marché alimentaire','ramen','sushi','déjeuner','dejeuner','dîner','diner','cuisine','café','cafe','brunch','food','cooking class','dégustation','degustation'],
+  shopping:['shopping','marché','marche','boutique','souk','bazar','mall','night market','marché nocturne'],
+  nature:['parc','jardin','forêt','foret','montagne','lac','plage','cascade','jungle','bambou','île','ile','volcan','rizière','riziere','nature','réserve','reserve','national park'],
+  photo:['spot photo','panorama','vue','coucher de soleil','lever de soleil','sunset','sunrise','point de vue','belvédère','belvedere','rooftop'],
+  walk:['balade','quartier','promenade','rue','marche à pied','ruelle','district','old town','vieille ville']
+};
+function guessActivityCategory(name, meta){
+  var text = ((name||'')+' '+(meta||'')).toLowerCase();
+  for(var cat in CATEGORY_KEYWORDS){
+    var kws = CATEGORY_KEYWORDS[cat];
+    for(var i=0;i<kws.length;i++){ if(text.indexOf(kws[i])>-1) return cat; }
+  }
+  return null;
+}
+function getActCategory(actKey, name, meta){
+  if(S.actCategory && S.actCategory[actKey]) return S.actCategory[actKey];
+  return guessActivityCategory(name, meta);
+}
+function categoryPill(catKey){
+  var cat = ACTIVITY_CATEGORIES[catKey];
+  if(!cat) return '';
+  return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+}
+
 function renderCityPanelContent(c, city){
     const ck=c.id+'_'+city.city;
     const customs=S.customActs[ck]||[];
     const activeDay = S.activeDay[ck]||'Tous';
+    if(!S.activeCategory) S.activeCategory={};
+    const activeCat = S.activeCategory[ck]||'Tous';
     const totalBase=city.acts.length;
     const totalCustomAll=(S.customActs[ck]||[]).length;
     const order=getOrder(ck,totalBase,totalCustomAll);
@@ -3472,16 +3510,18 @@ function renderCityPanelContent(c, city){
         if(!a) return '';
         var k=ck+'_'+origIdx;
         if(activeDay!=='Tous'&&S.actDay[k]&&S.actDay[k]!==activeDay) return '';
+        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m)!==activeCat) return '';
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
+        var actCat = getActCategory(k, a.n, a.m);
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
-          +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+'</div>'
+          +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+(actCat?categoryPill(actCat):'')+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +dateSelector
           +'<div class="act-footer" style="margin-top:6px">'
@@ -3494,13 +3534,15 @@ function renderCityPanelContent(c, city){
         var ca=custs[origIdx];
         if(!ca) return '';
         var ck2=ck+'_c'+origIdx;
+        var caCat = getActCategory(ck2, ca.n, ca.m);
+        if(activeCat!=='Tous' && caCat!==activeCat) return '';
         var cdone=!!S.done[ck2];
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
-          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
+          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+(caCat?categoryPill(caCat):'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
@@ -3522,9 +3564,32 @@ function renderCityPanelContent(c, city){
 
     const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+jsStrEsc(ck)+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+jsStrEsc(ck)+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
 
-    return renderDayTabs(ck)+renderAccomCard(ck)+baseActsHTML+trashHTML+addForm;
+    // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
+    var presentCats = {};
+    city.acts.forEach(function(a,i){ if(!S.deletedActs[ck+'_'+i]){ var cat=getActCategory(ck+'_'+i,a.n,a.m); if(cat) presentCats[cat]=true; } });
+    (S.customActs[ck]||[]).forEach(function(ca,i){ var cat=getActCategory(ck+'_c'+i,ca.n,ca.m); if(cat) presentCats[cat]=true; });
+    var catKeys = Object.keys(presentCats);
+    var categoryFilterHTML = '';
+    if(catKeys.length){
+      categoryFilterHTML = '<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch">'
+        +'<span onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\'Tous\')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;background:'+(activeCat==='Tous'?'var(--ink)':'var(--sand-deep)')+';color:'+(activeCat==='Tous'?'#fff':'var(--ink-muted)')+'">Tous</span>'
+        +catKeys.map(function(catKey){
+          var cat = ACTIVITY_CATEGORIES[catKey];
+          var isActive = activeCat===catKey;
+          return '<span onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\''+catKey+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;background:'+(isActive?'var(--ink)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(cat.icon,13)+' '+cat.label+'</span>';
+        }).join('')
+        +'</div>';
+    }
+
+    return renderDayTabs(ck)+categoryFilterHTML+renderAccomCard(ck)+baseActsHTML+trashHTML+addForm;
 }
 
+function setCityCategory(ck, cat){
+  if(!S.activeCategory) S.activeCategory={};
+  S.activeCategory[ck] = cat;
+  save();
+  renderContent();
+}
 function openCityDetail(ck){
   S.currentCityKey = ck;
   S.tab = 'cityDetail';
