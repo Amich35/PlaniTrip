@@ -2436,30 +2436,81 @@ if(!S.accom) S.accom={};
 if(!S.actDate) S.actDate={};
 
 function saveAccom(ck) {
-  const name  = document.getElementById('ac_name_'+ck)?.value||'';
-  const link  = document.getElementById('ac_link_'+ck)?.value||'';
-  const price = document.getElementById('ac_price_'+ck)?.value||'';
-  const nights= document.getElementById('ac_nights_'+ck)?.value||'';
-  const type  = document.getElementById('ac_type_'+ck)?.value||'';
-  S.accom[ck] = {name, link, price, nights, type};
+  const name    = document.getElementById('am_name')?.value||'';
+  const link    = document.getElementById('am_link')?.value||'';
+  const nights  = document.getElementById('am_nights')?.value||'';
+  const checkin = document.getElementById('am_checkin')?.value||'';
+  const checkout= document.getElementById('am_checkout')?.value||'';
+  const note    = document.getElementById('am_note')?.value||'';
+  const status  = S._accomModalStatus||'confirmed';
+  S.accom[ck] = {name, link, nights, checkin, checkout, note, status};
   save();
   if(sb && CURRENT_TRIP){
     var countryId = ck.split('_')[0];
     sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(){});
   }
+  document.getElementById('accomModal').classList.remove('open');
+  renderContent();
 }
+
+function accomSourceLabel(link){
+  if(!link) return '';
+  if(/booking\.com/i.test(link)) return 'Booking';
+  if(/airbnb/i.test(link)) return 'Airbnb';
+  if(/hotels\.com/i.test(link)) return 'Hotels.com';
+  return 'Lien';
+}
+
+var _accomModalCk = '';
+function openAccomModal(ck){
+  _accomModalCk = ck;
+  var a = S.accom[ck]||{};
+  S._accomModalStatus = a.status||'confirmed';
+  document.getElementById('accomModalTitle').textContent = a.name ? 'Modifier le logement' : 'Ajouter un logement';
+  document.getElementById('accomModalBody').innerHTML =
+    '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_name" type="text" placeholder="Nom (ex : Hotel Gracery Osaka)" style="width:100%" value="'+escHtml(a.name||'')+'"/></div>'
+    +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_link" type="url" placeholder="Lien Booking / Airbnb / autre" style="width:100%" value="'+escHtml(a.link||'')+'"/></div>'
+    +'<div class="ef-row" style="margin-bottom:8px;display:flex;gap:8px"><input class="ef-input" id="am_nights" type="number" placeholder="Nuits" style="flex:1" value="'+escHtml(a.nights||'')+'"/><input class="ef-input" id="am_checkin" type="time" placeholder="Check-in" style="flex:1" value="'+escHtml(a.checkin||'')+'"/><input class="ef-input" id="am_checkout" type="time" placeholder="Check-out" style="flex:1" value="'+escHtml(a.checkout||'')+'"/></div>'
+    +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_note" type="text" placeholder="Note (ex : 800 m de la gare d\'Osaka)" style="width:100%" value="'+escHtml(a.note||'')+'"/></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:4px">'
+    +'<span onclick="setAccomStatus(\'confirmed\')" id="am_status_confirmed" class="feed-tag-pill" style="background:'+((a.status||'confirmed')==='confirmed'?'var(--accent)':'var(--sand-deep)')+';color:'+((a.status||'confirmed')==='confirmed'?'#fff':'var(--ink-muted)')+'">Confirmé</span>'
+    +'<span onclick="setAccomStatus(\'pending\')" id="am_status_pending" class="feed-tag-pill" style="background:'+(a.status==='pending'?'var(--accent)':'var(--sand-deep)')+';color:'+(a.status==='pending'?'#fff':'var(--ink-muted)')+'">À réserver</span>'
+    +'</div>';
+  document.getElementById('accomModal').classList.add('open');
+}
+function setAccomStatus(s){
+  S._accomModalStatus = s;
+  var c = document.getElementById('am_status_confirmed'), p = document.getElementById('am_status_pending');
+  if(c){ c.style.background = s==='confirmed'?'var(--accent)':'var(--sand-deep)'; c.style.color = s==='confirmed'?'#fff':'var(--ink-muted)'; }
+  if(p){ p.style.background = s==='pending'?'var(--accent)':'var(--sand-deep)'; p.style.color = s==='pending'?'#fff':'var(--ink-muted)'; }
+}
+function saveAccomModal(){ saveAccom(_accomModalCk); }
 
 function renderAccomCard(ck) {
   const a = S.accom[ck]||{};
   const esc = escHtml;
-  const ev = 'saveAccom(\''+jsStrEsc(ck)+'\')';
-  return '<div class="accom-card">'
-    +'<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div><div class="accom-sub">Coller un lien Booking / Airbnb / autre</div></div></div>'
-    +'<div class="accom-fields">'
-    +'<div class="accom-field"><span class="accom-label">Nom</span><input class="accom-input" id="ac_name_'+ck+'" type="text" placeholder="ex : Hotel Gracery Osaka" value="'+esc(a.name||'')+'" oninput="'+ev+'"/></div>'
-    +'<div class="accom-field"><span class="accom-label">Lien</span><input class="accom-input" id="ac_link_'+ck+'" type="url" placeholder="https://www.airbnb.fr/rooms/…" value="'+esc(a.link||'')+'" oninput="'+ev+'"/></div>'
-    +'<div class="accom-field"><span class="accom-label">Nuits</span><input class="accom-input" id="ac_nights_'+ck+'" type="number" placeholder="nb de nuits" value="'+esc(a.nights||'')+'" oninput="'+ev+'"/></div>'
-    +(a.link?'<a class="accom-link" href="'+esc(a.link)+'" target="_blank">🔗 Voir le logement</a>':'')
+  if(!a.name && !a.link){
+    return '<div class="accom-card" onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer;text-align:center;padding:18px 14px">'
+      +'<div style="font-size:13px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('plus',15)+' Ajouter un logement</div>'
+      +'</div>';
+  }
+  const source = accomSourceLabel(a.link);
+  const statusPill = a.status==='pending'
+    ? '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">À réserver</span>'
+    : '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
+  const datesLine = a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '';
+  const timesLine = (a.checkin||a.checkout) ? ('Check-in '+(a.checkin||'—')+' · Check-out '+(a.checkout||'—')) : '';
+  return '<div class="accom-card" onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer">'
+    +'<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div></div></div>'
+    +'<div style="padding:2px 2px 0">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--ink)">'+esc(a.name||'Sans nom')+'</span>'+statusPill+(source?'<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">'+source+'</span>':'')+'</div>'
+    +(datesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(datesLine)+'</div>':'')
+    +(timesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(timesLine)+'</div>':'')
+    +(a.note?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(a.note)+'</div>':'')
+    +'<div style="display:flex;gap:8px;margin-top:10px">'
+    +(a.link?'<a class="ef-btn-outline" href="'+esc(a.link)+'" target="_blank" onclick="event.stopPropagation()" style="flex:1;text-align:center;padding:9px;border-radius:12px;font-size:12.5px;font-weight:600;border:1px solid rgba(29,29,31,0.12);color:var(--ink);text-decoration:none">Voir réservation</a>':'')
+    +'<button onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom\',\''+esc((a.name||'').replace(/\x27/g,"\\\x27"))+'\')" style="flex:1;padding:9px;border-radius:12px;font-size:12.5px;font-weight:600;border:1px solid rgba(29,29,31,0.12);background:transparent;color:var(--ink);cursor:pointer">Voir sur la carte</button>'
+    +'</div>'
     +'</div></div>';
 }
 
@@ -9031,6 +9082,17 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 <!-- Edit collaborator pseudo modal (owner only) -->
 <!-- Edit feed photo caption modal -->
 <!-- Edit feed post text modal -->
+<!-- Accommodation edit modal -->
+<div class="share-modal" id="accomModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="accomModalTitle">Logement</div>
+    <div id="accomModalBody"></div>
+    <button class="modal-cta" onclick="saveAccomModal()">Enregistrer</button>
+    <div style="text-align:center;margin-top:4px"><span onclick="document.getElementById('accomModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
 <div class="share-modal" id="editPostTextModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
