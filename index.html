@@ -3734,6 +3734,11 @@ function openCityDetail(ck){
   save();
   renderContent();
   window.scrollTo(0,0);
+  var hasDates = S.cityDates && S.cityDates[ck] && S.cityDates[ck].start && S.cityDates[ck].end;
+  if(!hasDates){
+    var cityLabel = ck.indexOf('_')>-1 ? ck.slice(ck.indexOf('_')+1) : ck;
+    setTimeout(function(){ openCityDatesModal(ck, cityLabel); }, 300);
+  }
 }
 function closeCityDetail(){
   S.tab = 'country';
@@ -3759,7 +3764,7 @@ function renderCityDetailScreen(){
   const accomInfo = S.accom[ck]||{};
   const stayLine = fmtCityStayLine(ck);
   const nightsPart = accomInfo.nights ? (accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-  const taglineTxt = stayLine || (escHtml(city.sub)+(nightsPart?' · '+escHtml(nightsPart):''));
+  const taglineTxt = stayLine || 'Ajouter les dates du séjour';
   var query = (city.city+' '+c.name);
 
   var header = '<div class="country-detail-header" style="background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+');border-radius:0 0 28px 28px;overflow:hidden" data-img-query="'+escHtml(query)+'">'
@@ -3800,7 +3805,7 @@ function renderItinerary(c, embedded){
     const accomInfo = S.accom[ck]||{};
     const stayLine = fmtCityStayLine(ck);
     const nightsPart = accomInfo.nights ? (' · '+accomInfo.nights+(accomInfo.nights==='1'||accomInfo.nights===1?' nuit':' nuits')) : '';
-    const periodLine = stayLine || (escHtml(city.sub)+nightsPart);
+    const periodLine = stayLine || '<span style="color:var(--accent)">Ajouter les dates ›</span>';
     const accomNameLine = accomInfo.name ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+escHtml(accomInfo.name)+'</div>') : '';
     var imgQuery = city.city+' '+c.name;
 
