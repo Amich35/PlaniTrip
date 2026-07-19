@@ -2886,19 +2886,28 @@ function assignDay(actKey, ck, day) {
   }
 }
 
-function renderDayTabs(ck) {
-  const days = getDays(ck);
-  const active = S.activeDay[ck]||'Tous';
-  const nonAll = days.filter(d=>d!=='Tous');
-  let html = '<div class="day-tabs">';
-  days.forEach(function(d){
-    const cls = d===active ? 'day-tab active' : 'day-tab';
-    html += '<button class="'+cls+'" onclick="setActiveDay(\'' +ck+ '\',\'' +d+ '\')">'+d+'</button>';
-  });
-  html += '<button class="day-tab-add" onclick="addDay(\'' +ck+ '\')">＋</button>';
-  if(nonAll.length > 0){
-    html += '<button class="day-tab-add" onclick="removeDay(\'' +ck+ '\')" style="background:rgba(192,57,43,0.08);color:var(--red-muted)" title="Supprimer le dernier jour">－</button>';
+function getCityDateList(ck){
+  var range = cityStayRange(ck);
+  if(!range) return [];
+  var dates = [];
+  var d = new Date(range.start+'T00:00:00');
+  var last = new Date(range.end+'T00:00:00');
+  while(d<=last){
+    dates.push(toLocalISODate(d));
+    d.setDate(d.getDate()+1);
   }
+  return dates;
+}
+function renderDayTabs(ck) {
+  const dates = getCityDateList(ck);
+  if(!dates.length) return '';
+  const active = S.activeDay[ck]||'Tous';
+  let html = '<div class="day-tabs">';
+  html += '<button class="'+(active==='Tous'?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')">Tous</button>';
+  dates.forEach(function(iso){
+    var label = new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    html += '<button class="'+(iso===active?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')">'+label+'</button>';
+  });
   html += '</div>';
   return html;
 }
@@ -3741,12 +3750,12 @@ function renderCityPanelContentBody(c, city){
         var a=city.acts[origIdx];
         if(!a) return '';
         var k=ck+'_'+origIdx;
-        if(activeDay!=='Tous'&&S.actDay[k]&&S.actDay[k]!==activeDay) return '';
+        var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
+        if(activeDay!=='Tous' && actDateVal!==activeDay) return '';
         if(activeCat!=='Tous' && getActCategory(k,a.n,a.m)!==activeCat) return '';
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
-        var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         var actCat = getActCategory(k, a.n, a.m);
         var actCityStay = cityStayRange(ck);
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
@@ -3768,10 +3777,11 @@ function renderCityPanelContentBody(c, city){
         var ca=custs[origIdx];
         if(!ca) return '';
         var ck2=ck+'_c'+origIdx;
+        var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
+        if(activeDay!=='Tous' && cDateVal!==activeDay) return '';
         var caCat = getActCategory(ck2, ca.n, ca.m);
         if(activeCat!=='Tous' && caCat!==activeCat) return '';
         var cdone=!!S.done[ck2];
-        var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'" onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
