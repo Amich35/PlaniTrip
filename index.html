@@ -471,7 +471,7 @@ a{color:var(--ink);}
 /* ── ACCOMMODATION ── */
 .accom-card{background:var(--parchment);border:var(--border);border-radius:var(--r16);padding:var(--sp16);margin-bottom:var(--sp8);box-shadow:var(--shadow-sm);}
 .accom-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.accom-icon{font-size:22px;}
+.accom-icon{font-size:22px;color:var(--accent);}
 .accom-title{font-size:14px;font-weight:500;color:var(--ink);}
 .accom-sub{font-size:11px;color:var(--ink-muted);margin-top:1px;}
 .accom-fields{display:flex;flex-direction:column;gap:6px;}
@@ -2580,7 +2580,7 @@ function renderAccomCard(ck) {
     +'<div style="font-size:13px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('plus',15)+' '+(list.length?'Ajouter un autre logement':'Ajouter un logement')+'</div>'
     +'</div>';
   if(!list.length){
-    return '<div style="padding:0 16px"><div class="accom-header" style="padding-top:14px"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement</div></div></div></div>'+addRow;
+    return '<div style="padding:0 16px"><div class="accom-header" style="padding-top:14px"><span class="accom-icon" style="display:inline-flex">'+svgIcon('bed',20)+'</span><div><div class="accom-title">Logement</div></div></div></div>'+addRow;
   }
   const entriesHTML = list.map(function(a, i){
     const source = accomSourceLabel(a.link);
@@ -2589,7 +2589,7 @@ function renderAccomCard(ck) {
       : '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
     const datesLine = (a.start && a.end) ? fmtDateRangeFr(a.start, a.end)+(a.nights?(' • '+a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')):'') : (a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '');
     const timesLine = (a.checkin||a.checkout) ? ('Check-in '+(a.checkin||'—')+' · Check-out '+(a.checkout||'—')) : '';
-    const headerBlock = i===0 ? '<div class="accom-header"><span class="accom-icon">🏨</span><div><div class="accom-title">Logement'+(list.length>1?' ('+list.length+')':'')+'</div></div></div>' : '<div style="height:1px;background:rgba(29,29,31,0.08);margin:12px 0"></div>';
+    const headerBlock = i===0 ? '<div class="accom-header"><span class="accom-icon" style="display:inline-flex">'+svgIcon('bed',20)+'</span><div><div class="accom-title">Logement'+(list.length>1?' ('+list.length+')':'')+'</div></div></div>' : '<div style="height:1px;background:rgba(29,29,31,0.08);margin:12px 0"></div>';
     return headerBlock
       +'<div style="padding:2px 2px 0">'
       +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--ink)">'+esc(a.name||'Sans nom')+'</span>'+statusPill+(source?'<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">'+source+'</span>':'')+'</div>'
