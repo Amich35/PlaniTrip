@@ -3485,10 +3485,32 @@ function getActCategory(actKey, name, meta){
   if(S.actCategory && S.actCategory[actKey]) return S.actCategory[actKey];
   return guessActivityCategory(name, meta);
 }
-function categoryPill(catKey){
-  var cat = ACTIVITY_CATEGORIES[catKey];
-  if(!cat) return '';
-  return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+function categoryPill(catKey, actKey){
+  if(catKey){
+    var cat = ACTIVITY_CATEGORIES[catKey];
+    return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;cursor:pointer">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+  }
+  return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;cursor:pointer">'+svgIcon('plus',10)+' Catégorie</span>';
+}
+var _categoryModalActKey = '';
+function openCategoryPickerModal(actKey){
+  _categoryModalActKey = actKey;
+  var current = getActCategory(actKey, '', '');
+  var body = Object.keys(ACTIVITY_CATEGORIES).map(function(catKey){
+    var cat = ACTIVITY_CATEGORIES[catKey];
+    var isActive = current===catKey;
+    return '<span onclick="selectCategoryForAct(\''+catKey+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;margin:3px;background:'+(isActive?'var(--accent)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(cat.icon,14)+' '+cat.label+'</span>';
+  }).join('');
+  document.getElementById('categoryModalBody').innerHTML = '<div style="display:flex;flex-wrap:wrap">'+body+'</div>'
+    +'<div style="text-align:center;margin-top:10px"><span onclick="selectCategoryForAct(\'\')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Aucune catégorie</span></div>';
+  document.getElementById('categoryModal').classList.add('open');
+}
+function selectCategoryForAct(catKey){
+  if(!S.actCategory) S.actCategory={};
+  if(catKey) S.actCategory[_categoryModalActKey] = catKey; else delete S.actCategory[_categoryModalActKey];
+  save();
+  document.getElementById('categoryModal').classList.remove('open');
+  renderContent();
 }
 
 function renderCityPanelContent(c, city){
@@ -3521,7 +3543,7 @@ function renderCityPanelContent(c, city){
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
-          +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+(actCat?categoryPill(actCat):'')+'</div>'
+          +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+categoryPill(actCat,k)+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +dateSelector
           +'<div class="act-footer" style="margin-top:6px">'
@@ -3542,7 +3564,7 @@ function renderCityPanelContent(c, city){
         return '<div class="swipe-wrap"><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
-          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+(caCat?categoryPill(caCat):'')+'</div>'
+          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+categoryPill(caCat,ck2)+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
@@ -9199,6 +9221,16 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 <!-- Edit feed photo caption modal -->
 <!-- Edit feed post text modal -->
 <!-- Accommodation edit modal -->
+<!-- Category picker modal -->
+<div class="share-modal" id="categoryModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Choisir une catégorie</div>
+    <div id="categoryModalBody"></div>
+    <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('categoryModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Fermer</span></div>
+  </div>
+</div>
+
 <div class="share-modal" id="accomModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
