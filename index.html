@@ -462,6 +462,9 @@ a{color:var(--ink);}
 .detail-chip.cost{background:#FEF9ED;color:#7A5010;border-color:rgba(196,160,58,0.25);}
 .detail-chip.time{background:#EBF4F0;color:#1E5C3A;border-color:rgba(30,100,60,0.15);}
 .detail-map-btn{width:100%;margin-top:var(--sp16);padding:var(--sp16);min-height:52px;border-radius:var(--r16);font-size:14px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(28,24,20,0.18);transition:transform 0.15s;}
+.detail-action-btn{flex:1;padding:12px 6px;border-radius:14px;border:1px solid rgba(29,29,31,0.10);background:#fff;color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:transform 0.15s,background 0.15s;}
+.detail-action-btn span{font-size:11px;font-weight:600;text-align:center;line-height:1.2;}
+.detail-action-btn:active{transform:scale(0.96);}
 .detail-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.3);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;}
 .detail-img-wrap{position:relative;}
 
@@ -995,10 +998,10 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <div class="detail-title" id="detailTitle"></div>
       <div class="detail-sub" id="detailSub"></div>
       <div id="detailQuickInfo" style="margin:10px 0"></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button class="detail-map-btn" id="detailMapBtn" style="flex:1;margin:0">Voir sur la carte</button>
-        <button id="detailFavBtn" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(29,29,31,0.12);background:transparent;color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"></button>
-        <button id="detailDoneBtn" style="flex:1;padding:12px;border-radius:12px;border:1px solid rgba(29,29,31,0.12);background:transparent;color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"></button>
+      <div style="display:flex;gap:8px;margin-bottom:14px" id="detailActionsRow">
+        <button class="detail-action-btn" id="detailMapBtn"></button>
+        <button class="detail-action-btn" id="detailFavBtn"></button>
+        <button class="detail-action-btn" id="detailDoneBtn"></button>
       </div>
       <div id="detailSections"></div>
     </div>
@@ -2308,30 +2311,62 @@ function openDetail(actKey, actName, cityKey) {
   document.getElementById('detailTitle').textContent = actName;
   document.getElementById('detailSub').textContent = d.address || '';
 
-  // Infos rapides — chips de scan ultra-rapide (horaires, durée, coûts, réservation)
-  var chips = [];
-  if(d.hours) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('sun',12)+' '+escHtml(d.hours)+'</span>');
-  if(d.duration) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('history',12)+' '+escHtml(d.duration)+'</span>');
-  if(d.costs && d.costs.length) chips.push('<span class="detail-chip cost" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('coins',12)+' '+escHtml(d.costs.join(' · '))+'</span>');
-  if(d.bookingRequired) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('check-square',12)+' '+escHtml(d.bookingRequired)+'</span>');
-  if(d.bestTime) chips.push('<span class="detail-chip" style="display:inline-flex;align-items:center;gap:4px">'+svgIcon('sparkles',12)+' '+escHtml(d.bestTime)+'</span>');
-  document.getElementById('detailQuickInfo').innerHTML = chips.length ? ('<div class="detail-chips">'+chips.join('')+'</div>') : '';
+  // Récupère la courte description déjà affichée dans la liste (fallback pour "À savoir")
+  var actMeta = '';
+  if(cityKey){
+    var ctryId = cityKey.split('_')[0];
+    var ctry = COUNTRIES.find(function(co){return co.id===ctryId;});
+    if(ctry){
+      var cty = ctry.cities.find(function(ci){return ctryId+'_'+ci.city===cityKey;});
+      if(cty){
+        var idxPart = actKey.slice(cityKey.length+1);
+        if(/^\d+$/.test(idxPart)){
+          var baseAct = cty.acts[parseInt(idxPart)];
+          if(baseAct) actMeta = baseAct.m||'';
+        } else if(idxPart.indexOf('c')===0){
+          var custAct = (S.customActs[cityKey]||[])[parseInt(idxPart.slice(1))];
+          if(custAct) actMeta = custAct.m||'';
+        }
+      }
+    }
+  }
 
-  // Actions — toujours visibles, en haut
+  // Infos rapides — grille de scan ultra-rapide (icône / label / valeur), à la Flighty
+  var quickItems = [];
+  if(d.hours) quickItems.push({icon:'sun', label:'Ouvert', value:d.hours});
+  if(d.duration) quickItems.push({icon:'history', label:'Durée', value:d.duration});
+  if(d.bookingRequired) quickItems.push({icon:'check-square', label:'Réservation', value:d.bookingRequired});
+  if(d.bestTime) quickItems.push({icon:'sparkles', label:'Idéal', value:d.bestTime});
+  var quickHTML = '';
+  if(quickItems.length){
+    quickHTML = '<div style="display:flex;border:1px solid rgba(29,29,31,0.08);border-radius:16px;padding:14px 8px;background:#fff">'
+      + quickItems.map(function(item){
+          return '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px">'
+            +'<span style="width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(29,29,31,0.12);display:flex;align-items:center;justify-content:center;color:var(--ink)">'+svgIcon(item.icon,16)+'</span>'
+            +'<span style="font-size:9.5px;letter-spacing:0.6px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(item.label)+'</span>'
+            +'<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(item.value)+'</span>'
+            +'</div>';
+        }).join('')
+      +'</div>';
+  }
+  document.getElementById('detailQuickInfo').innerHTML = quickHTML;
+
+  // Actions — toujours visibles, en haut, style grille icône/label
+  document.getElementById('detailMapBtn').innerHTML = svgIcon('map-pin',18)+'<span>Carte</span>';
   document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(actKey, actName); };
   function refreshActionButtons(){
     var favBtn = document.getElementById('detailFavBtn');
     var doneBtn = document.getElementById('detailDoneBtn');
     var isFav = !!S.favorites[actKey];
     var isDone = !!S.done[actKey];
-    favBtn.innerHTML = svgIcon('star',15)+' '+(isFav?'Favori':'Favori');
-    favBtn.style.background = isFav ? 'var(--accent-pale)' : 'transparent';
+    favBtn.innerHTML = svgIcon('star',18)+'<span>'+(isFav?'Favori':'Favori')+'</span>';
+    favBtn.style.background = isFav ? 'var(--accent-pale)' : '#fff';
     favBtn.style.color = isFav ? 'var(--accent)' : 'var(--ink)';
-    favBtn.style.borderColor = isFav ? 'transparent' : 'rgba(29,29,31,0.12)';
-    doneBtn.innerHTML = svgIcon('check',15)+' '+(isDone?'Fait':'Marquer fait');
-    doneBtn.style.background = isDone ? 'var(--accent)' : 'transparent';
+    favBtn.style.borderColor = isFav ? 'transparent' : 'rgba(29,29,31,0.10)';
+    doneBtn.innerHTML = svgIcon('check',18)+'<span>'+(isDone?'Fait':'Marquer fait')+'</span>';
+    doneBtn.style.background = isDone ? 'var(--accent)' : '#fff';
     doneBtn.style.color = isDone ? '#fff' : 'var(--ink)';
-    doneBtn.style.borderColor = isDone ? 'transparent' : 'rgba(29,29,31,0.12)';
+    doneBtn.style.borderColor = isDone ? 'transparent' : 'rgba(29,29,31,0.10)';
   }
   document.getElementById('detailFavBtn').onclick = function(){ toggleFavorite(actKey); refreshActionButtons(); };
   document.getElementById('detailDoneBtn').onclick = function(){ toggleAct(actKey); refreshActionButtons(); };
@@ -2348,6 +2383,9 @@ function openDetail(actKey, actName, cityKey) {
     }
   }
   if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
+  if(d.m || actMeta) {
+    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">À savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',15)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
+  }
   if(d.tips && d.tips.length) {
     html += '<div class="detail-section"><div class="detail-section-title">💡 Conseils & astuces</div>'
       + d.tips.map(t=>'<div class="detail-text" style="padding:4px 0;border-bottom:1px solid rgba(29,29,31,0.056)">'+t+'</div>').join('')
@@ -2414,7 +2452,7 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     const info = deepSanitize(parseAiJson(text));
     if(!window._customDetails) window._customDetails={};
     window._customDetails[detailKey] = {
-      emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'',
+      emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'', m: info.m||'',
       hours: info.hours||'', costs: info.costs||[], tips: info.tips||[],
       address: info.address||'', lat: info.lat||null, lng: info.lng||null,
       duration: (info.duration && info.duration!=='Inconnu') ? info.duration : '',
