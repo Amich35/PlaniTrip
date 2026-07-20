@@ -106,7 +106,7 @@ a{color:var(--ink);}
 .act-card.done .act-check{background:var(--green-muted);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(92,107,74,0.35);transform:scale(1.05);}
 .act-body{flex:1;min-width:0;}
 .act-name{font-size:14px;color:var(--ink);font-weight:500;line-height:1.3;letter-spacing:-0.1px;}
-.act-meta{font-size:11px;color:var(--ink-subtle);margin-top:3px;line-height:1.4;}
+.act-meta{font-size:11px;color:var(--ink-subtle);margin-top:3px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .act-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px;}
 .act-tags{display:flex;gap:4px;flex-wrap:wrap;flex:1;}
 .tag{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:500;letter-spacing:0.2px;}
@@ -133,7 +133,7 @@ a{color:var(--ink);}
 .act-del{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:rgba(29,29,31,0.070);color:var(--ink-subtle);border-radius:50%;line-height:1;opacity:0.5;transition:opacity 0.15s,background 0.15s;padding:0;} .act-card:hover .act-del,.act-card:active .act-del{opacity:1;}
 .swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r16);margin-top:6px;-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-mask-image:-webkit-radial-gradient(white,black);}
 .swipe-delete-bg{position:absolute;top:1px;bottom:1px;right:1px;width:100px;background:var(--red-muted);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:0 var(--r16) var(--r16) 0;}
-.swipe-done-bg{position:absolute;top:1px;bottom:1px;left:1px;width:90px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:var(--r16) 0 0 var(--r16);}
+.swipe-done-bg{position:absolute;top:1px;bottom:1px;left:1px;width:90px;background:#8A8A8E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:var(--r16) 0 0 var(--r16);}
 .swipe-fg{margin-top:0 !important;touch-action:pan-y;will-change:transform;-webkit-backface-visibility:hidden;backface-visibility:hidden;-webkit-transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent;outline:none;}
 .swipe-fg *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
 .act-del:active{opacity:1;background:rgba(155,58,46,0.15);color:var(--red-muted);}
@@ -3775,9 +3775,9 @@ function getActCategory(actKey, name, meta){
 function categoryPill(catKey, actKey){
   if(catKey){
     var cat = ACTIVITY_CATEGORIES[catKey];
-    return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;cursor:pointer">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+    return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
   }
-  return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;cursor:pointer">'+svgIcon('plus',10)+' Catégorie</span>';
+  return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('plus',10)+' Catégorie</span>';
 }
 var _categoryModalActKey = '';
 function openCategoryPickerModal(actKey){
@@ -3831,9 +3831,9 @@ function renderCityPanelContentBody(c, city){
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city);
         return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
-          +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(done?'<div style="position:absolute;inset:0;background:rgba(45,106,79,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
+          +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
-          +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+categoryPill(actCat,k)+'</div>'
+          +'<div class="act-name" style="display:flex;align-items:center;gap:0;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</span>'+categoryPill(actCat,k)+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +'<div class="act-footer" style="margin-top:6px;justify-content:flex-end">'
           +'<div style="display:flex;gap:2px">'
@@ -3855,8 +3855,8 @@ function renderCityPanelContentBody(c, city){
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city);
         return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
-          +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(45,106,79,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
-          +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+categoryPill(caCat,ck2)+'</div>'
+          +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
+          +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name" style="display:flex;align-items:center;gap:0;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</span>'+categoryPill(caCat,ck2)+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +'<div class="act-footer" style="margin-top:6px;justify-content:flex-end"><div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button></div>'
