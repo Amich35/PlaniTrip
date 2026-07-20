@@ -100,7 +100,7 @@ a{color:var(--ink);}
 
 /* Activity card with map button */
 .act-card{display:flex;align-items:flex-start;gap:var(--sp8);padding:10px var(--sp12);border-radius:var(--r16);margin-top:6px;background:var(--parchment);border:var(--border);position:relative;overflow:hidden;transition:box-shadow 0.15s,transform 0.15s;}
-.act-card.done{background:var(--parchment);} .act-card.done>*{opacity:0.4;} .act-card.done .act-check{opacity:1;} .act-card:not(.done):active{transform:scale(0.99);box-shadow:var(--shadow-sm);}
+.act-card.done{background:var(--parchment);} .act-card.done>*{opacity:0.4;} .act-card.done .act-thumb{opacity:1;} .act-card:not(.done):active{transform:scale(0.99);box-shadow:var(--shadow-sm);}
 .act-card.done .act-name{text-decoration:line-through;}
 .act-check{width:24px;height:24px;border-radius:50%;flex-shrink:0;margin-top:0;border:1.5px solid rgba(29,29,31,0.175);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);background:transparent;}
 .act-card.done .act-check{background:var(--green-muted);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(92,107,74,0.35);transform:scale(1.05);}
@@ -371,6 +371,7 @@ a{color:var(--ink);}
 .country-card{display:flex;align-items:center;gap:12px;background:var(--parchment);border-radius:var(--r22);padding:12px;box-shadow:var(--shadow-sm);cursor:pointer;transition:transform 0.1s;}
 .country-card:active{transform:scale(0.98);}
 .cc-thumb{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
+.act-thumb{width:48px;height:48px;border-radius:12px;background:var(--sand-deep) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;color:rgba(29,29,31,0.25);}
 .cc-thumb-flag{font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));}
 .cc-thumb.has-photo .cc-thumb-flag{display:none;}
 .home-hero-fallback-icon{display:flex;}
@@ -557,7 +558,7 @@ a{color:var(--ink);}
   30%{background:rgba(92,107,74,0.08)}
   100%{background:var(--sand)}
 }
-.act-card.just-done .act-check{animation:checkPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;}
+.act-card.just-done .act-thumb{animation:checkPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;}
 .act-card.just-done{animation:actDone 0.6s ease forwards;}
 
 /* ── GLOBAL INPUT FOCUS ── */
@@ -3805,9 +3806,10 @@ function renderCityPanelContentBody(c, city){
         var actCityStay = cityStayRange(ck);
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city);
         return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
-          +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(k)+'\')">'+( done?'✓':'')+'</div>'
+          +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(done?'<div style="position:absolute;inset:0;background:rgba(45,106,79,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
           +'<div class="act-name">'+a.n+(hasDetail?' <span style="font-size:10px;color:var(--accent)">›</span>':'')+categoryPill(actCat,k)+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
@@ -3830,10 +3832,11 @@ function renderCityPanelContentBody(c, city){
         var cCityStay = cityStayRange(ck);
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);margin-top:4px;"/>';
+        var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city);
         return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
-          +'<div class="act-check" onclick="toggleAct(\''+jsStrEsc(ck2)+'\')">'+( cdone?'✓':'')+'</div>'
-          +'<div class="act-body"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+categoryPill(caCat,ck2)+'</div>'
+          +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(45,106,79,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
+          +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+categoryPill(caCat,ck2)+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +cDateSelector
           +'<div class="act-footer"><div></div><div style="display:flex;gap:2px">'
@@ -9682,5 +9685,4 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 </div>
 </body>
 </html>
-
 
