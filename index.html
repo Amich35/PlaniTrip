@@ -4460,7 +4460,7 @@ function renderCityDetailScreen(){
   const stayLine = fmtCityStayLine(ck);
   const actCountTxt = cityTotal+(cityTotal===1?' activité':' activités');
   const taglineTxt = (stayLine ? (stayLine+' • '+actCountTxt) : ('Dates à définir · '+actCountTxt));
-  var query = (city.city+' '+c.name);
+  var query = city.city+', '+getEnglishCountryName(c.name);
   var cityFavKey = ck+'_city';
   var isFavCity = !!S.favorites[cityFavKey];
 
