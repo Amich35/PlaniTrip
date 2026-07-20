@@ -4961,7 +4961,7 @@ function renderCountriesScreen(){
       : c.cities.slice(0,2).map(function(ci){return ci.city;}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
     return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">'
-      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span>'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
+      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
       +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
       +'</div>';
