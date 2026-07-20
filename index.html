@@ -4876,7 +4876,7 @@ function renderCountriesScreen(){
   if(ts.elapsedDays<0){
     dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
       +photoEditBtn(heroQuery)
-      +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+ts.currentCountry.flag+' Départ dans '+Math.abs(ts.elapsedDays)+' jours</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé · '+tripRecap+'</div></div></div>';
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Départ dans '+Math.abs(ts.elapsedDays)+' jours '+ts.currentCountry.flag+'</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé · '+tripRecap+'</div></div></div>';
   } else {
     dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
       +photoEditBtn(heroQuery)
