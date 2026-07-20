@@ -3087,27 +3087,46 @@ function addPhotoSpot(countryId){
   renderContent();
 }
 
-function addActivity(cityKey) {
-  const inp = document.getElementById('newact_'+cityKey);
-  if(!inp) return;
-  const val = stripHtml(inp.value.trim());
+function _createActivityCore(cityKey, val){
+  val = stripHtml(val.trim());
   if(!val) return;
   if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
   const newIdx = S.customActs[cityKey].length;
   const actObj = {n:val, m:'Chargement des infos…', tags:[], custom:true, _loading:true};
   S.customActs[cityKey].push(actObj);
-  inp.value='';
-  const sugg = document.getElementById('sugg_'+cityKey);
-  if(sugg){ sugg.classList.remove('open'); sugg.innerHTML=''; }
   save();
   renderContent();
-  // Enrich with Claude API
   fetchActivityDetailAI(cityKey, val, cityKey+'_c'+newIdx, newIdx);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(){});
   }
+}
+function addActivity(cityKey) {
+  const inp = document.getElementById('newact_'+cityKey);
+  if(!inp) return;
+  const val = inp.value.trim();
+  if(!val) return;
+  inp.value='';
+  const sugg = document.getElementById('sugg_'+cityKey);
+  if(sugg){ sugg.classList.remove('open'); sugg.innerHTML=''; }
+  _createActivityCore(cityKey, val);
+}
+var _addActivityModalCk = '';
+function openAddActivityModal(ck){
+  _addActivityModalCk = ck;
+  document.getElementById('guideItemModalTitle').textContent = 'Ajouter une activité';
+  document.getElementById('guideItemModalBody').innerHTML =
+    '<div class="ef-row"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off"/></div>';
+  _guideModalSaveFn = saveAddActivityModal;
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function saveAddActivityModal(){
+  var val = ((document.getElementById('guideModalActName')||{}).value||'').trim();
+  if(!val) return;
+  closeGuideItemModal();
+  _createActivityCore(_addActivityModalCk, val);
 }
 
 async function autofillCountryWithAI(countryId){
@@ -3915,7 +3934,7 @@ function renderCityPanelContentBody(c, city){
       trashHTML+='</div>';
     }
 
-    const addForm='<div class="add-act-form">'      +'<div class="add-act-row"><input class="add-act-input" id="newact_'+ck+'" type="text" placeholder="Ajouter une activité…" autocomplete="off" oninput="showSuggestions(\''+jsStrEsc(ck)+'\')"/>'      +'<button class="add-act-btn" onclick="addActivity(\''+jsStrEsc(ck)+'\')">&#65291;</button></div>'      +'<div class="suggestions-list" id="sugg_'+ck+'"></div>'      +'</div>';
+    const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:16px;border-radius:var(--r16);font-size:14px;font-weight:600;border:1.5px dashed rgba(45,106,79,0.35);background:transparent;color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span data-icon="plus" data-icon-size="16"></span> Ajouter une activité</button>';
 
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
