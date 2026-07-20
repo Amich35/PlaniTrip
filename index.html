@@ -3118,9 +3118,36 @@ function openAddActivityModal(ck){
   _addActivityModalCk = ck;
   document.getElementById('guideItemModalTitle').textContent = 'Ajouter une activité';
   document.getElementById('guideItemModalBody').innerHTML =
-    '<div class="ef-row"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off"/></div>';
+    '<div class="ef-row"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
+    +'<div class="suggestions-list" id="guideModalActSuggestions" style="position:static;margin-top:6px"></div>';
   _guideModalSaveFn = saveAddActivityModal;
   document.getElementById('guideItemModal').classList.add('open');
+}
+function showModalActSuggestions(ck){
+  var inp = document.getElementById('guideModalActName');
+  var list = document.getElementById('guideModalActSuggestions');
+  if(!inp || !list) return;
+  var q = inp.value.trim().toLowerCase();
+  if(q.length < 2) { list.classList.remove('open'); list.innerHTML=''; return; }
+  var pool = _buildActPool();
+  var matches = pool.filter(function(a){
+    return a.n.toLowerCase().indexOf(q) !== -1 || (a.m && a.m.toLowerCase().indexOf(q) !== -1);
+  }).slice(0, 5);
+  if(!matches.length) { list.classList.remove('open'); list.innerHTML=''; return; }
+  list.innerHTML = matches.map(function(a, i){
+    return '<div class="suggestion-item" data-sug-idx="'+i+'">'      +'<span class="sug-emoji">'+a.emoji+'</span>'      +'<div class="sug-info"><div class="sug-name">'+a.n+'</div>'+(a.m?'<div class="sug-meta">'+a.m+'</div>':'')+'</div>'      +'</div>';
+  }).join('');
+  list.classList.add('open');
+  list.querySelectorAll('.suggestion-item').forEach(function(el, i){
+    el.addEventListener('click', function(e){
+      e.stopPropagation();
+      var a = matches[i];
+      if(!S.customActs[ck]) S.customActs[ck]=[];
+      S.customActs[ck].push({n:a.n, m:a.m, tags:a.tags, custom:true, _detailKey:a.key});
+      closeGuideItemModal();
+      save(); renderContent();
+    });
+  });
 }
 function saveAddActivityModal(){
   var val = ((document.getElementById('guideModalActName')||{}).value||'').trim();
