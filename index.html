@@ -8030,11 +8030,11 @@ function renderArchivedCountriesScreen(){
           +'<button onclick="restoreCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button>'
           +'<button onclick="deleteCountryPermanently(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer</button></div>';
       }).join('')
-    : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Aucun pays archivé.</div>';
+    : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Corbeille vide.</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="more-row" onclick="S.tab=\'countries\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
-    +'<div class="section-title" style="margin-bottom:12px">Corbeille — Pays</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Corbeille</div>'
     +'<div class="info-card" style="padding:6px">'+rows+'</div>'
     +'</div>';
 }
