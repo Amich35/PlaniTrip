@@ -4470,8 +4470,8 @@ function renderCityDetailScreen(){
     +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
     +'<div style="position:absolute;top:14px;right:14px;z-index:2;display:flex;gap:8px">'
     +'<button onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(cityFavKey)+'\')" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:'+(isFavCity?'#95D5B2':'#fff')+';cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="heart" data-icon-size="17"></span></button>'
-    +'<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
     +'</div>'
+    +'<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="position:absolute;bottom:14px;right:14px;z-index:2;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
     +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
     +'<div class="cdh-tagline">'+taglineTxt+'</div>'
     +renderTravelerAvatarStack(ck)
