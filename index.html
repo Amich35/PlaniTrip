@@ -2541,6 +2541,23 @@ function saveAccom(ck) {
       alert('Ces dates doivent rester comprises dans le séjour du pays ('+fmtDateRangeFr(countryRangeCheck.start,countryRangeCheck.end)+').');
       return;
     }
+    if(countryCheck){
+      var thisCityName = ck.split('_').slice(1).join('_');
+      var otherCityConflict = null;
+      for(var oi=0; oi<countryCheck.cities.length; oi++){
+        var otherCity = countryCheck.cities[oi];
+        if(otherCity.city===thisCityName) continue;
+        var otherRange = cityStayRange(countryIdCheck+'_'+otherCity.city);
+        if(otherRange && start<otherRange.end && otherRange.start<end){
+          otherCityConflict = {city:otherCity.city, range:otherRange};
+          break;
+        }
+      }
+      if(otherCityConflict){
+        alert('Ces dates chevauchent le séjour à '+otherCityConflict.city+' ('+fmtDateRangeFr(otherCityConflict.range.start,otherCityConflict.range.end)+'). Tu ne peux pas être dans deux villes en même temps.');
+        return;
+      }
+    }
   }
   if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
   var thisId = _accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000));
