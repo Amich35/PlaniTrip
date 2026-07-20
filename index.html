@@ -8033,17 +8033,8 @@ function renderArchivedCountriesScreen(){
     : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Aucun pays archivé.</div>';
 
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div class="more-row" onclick="S.tab=\'more\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
-    +'<div class="section-title" style="margin-bottom:12px">Gérer les pays</div>'
-    +'<div class="info-card">'
-    +'<button onclick="openAddCountryToTripModal()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-bottom:8px">＋ Ajouter un pays</button>'
-    +'<select id="archiveCountrySelect" style="width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);color:var(--ink);font-size:13px;margin-bottom:8px;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
-    +'<option value="">Choisir un pays à archiver…</option>'
-    +COUNTRIES.slice().sort(function(a,b){return a.name.localeCompare(b.name,'fr');}).map(function(co){return '<option value="'+co.id+'">'+co.flag+' '+escHtml(co.name)+'</option>';}).join('')
-    +'</select>'
-    +'<button onclick="var sel=document.getElementById(\'archiveCountrySelect\');if(sel.value)archiveCurrentCountry(sel.value);" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Archiver</button>'
-    +'</div>'
-    +'<div class="section-title" style="margin:18px 0 10px;font-size:15px">Pays archivés</div>'
+    +'<div class="more-row" onclick="S.tab=\'countries\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Corbeille — Pays</div>'
     +'<div class="info-card" style="padding:6px">'+rows+'</div>'
     +'</div>';
 }
@@ -8450,7 +8441,7 @@ function updateTopBarSub(){
   el.textContent = name + ' · ' + countryCount + ' pays';
 }
 function syncActiveNavTab(){
-  var activeId = (S.tab==='country'||S.tab==='cityDetail') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='archived-countries'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   var el = document.getElementById('tab-'+activeId);
   if(el) el.classList.add('active');
