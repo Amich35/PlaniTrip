@@ -3416,6 +3416,171 @@ function editGuideListItem(countryId, listField, idx){
 }
 var _guideModalCountryId=null, _guideModalListField=null, _guideModalIdx=null;
 var _guideModalSaveFn=null;
+const WORLD_CITIES = {
+"France":["Paris","Lyon","Marseille","Nice","Bordeaux","Toulouse","Strasbourg","Lille","Nantes","Annecy"],
+"Espagne":["Madrid","Barcelone","Séville","Valence","Grenade","Malaga","Bilbao","Saint-Sébastien","Cordoue","Palma de Majorque"],
+"Italie":["Rome","Milan","Venise","Florence","Naples","Turin","Bologne","Vérone","Palerme","Cinque Terre"],
+"Portugal":["Lisbonne","Porto","Faro","Coimbra","Sintra","Braga","Funchal","Albufeira","Évora","Cascais"],
+"Allemagne":["Berlin","Munich","Hambourg","Cologne","Francfort","Dresde","Düsseldorf","Stuttgart","Nuremberg","Heidelberg"],
+"Royaume-Uni":["Londres","Manchester","Édimbourg","Liverpool","Glasgow","Oxford","Cambridge","Bristol","York","Bath"],
+"Irlande":["Dublin","Cork","Galway","Killarney","Limerick","Belfast"],
+"Pays-Bas":["Amsterdam","Rotterdam","La Haye","Utrecht","Eindhoven","Maastricht","Delft"],
+"Belgique":["Bruxelles","Bruges","Anvers","Gand","Liège","Namur"],
+"Suisse":["Zurich","Genève","Lausanne","Berne","Lucerne","Interlaken","Zermatt","Bâle","Montreux"],
+"Autriche":["Vienne","Salzbourg","Innsbruck","Graz","Hallstatt"],
+"Grèce":["Athènes","Santorin","Mykonos","Héraklion","Rhodes","Thessalonique","Corfou","Naxos"],
+"Croatie":["Zagreb","Dubrovnik","Split","Zadar","Rovinj","Hvar"],
+"Suède":["Stockholm","Göteborg","Malmö","Uppsala"],
+"Norvège":["Oslo","Bergen","Tromsø","Ålesund","Stavanger"],
+"Danemark":["Copenhague","Aarhus","Odense"],
+"Finlande":["Helsinki","Rovaniemi","Tampere","Turku"],
+"Islande":["Reykjavik","Akureyri","Vik"],
+"Pologne":["Varsovie","Cracovie","Gdansk","Wroclaw","Poznan"],
+"République tchèque":["Prague","Brno","Karlovy Vary","Cesky Krumlov"],
+"Hongrie":["Budapest","Debrecen","Szeged"],
+"Slovénie":["Ljubljana","Bled","Piran"],
+"Slovaquie":["Bratislava","Kosice"],
+"Roumanie":["Bucarest","Cluj-Napoca","Brasov","Sibiu","Timisoara"],
+"Bulgarie":["Sofia","Plovdiv","Varna","Bourgas"],
+"Serbie":["Belgrade","Novi Sad","Nis"],
+"Bosnie-Herzégovine":["Sarajevo","Mostar"],
+"Monténégro":["Podgorica","Kotor","Budva"],
+"Albanie":["Tirana","Saranda","Vlore"],
+"Macédoine du Nord":["Skopje","Ohrid"],
+"Estonie":["Tallinn","Tartu"],
+"Lettonie":["Riga","Jurmala"],
+"Lituanie":["Vilnius","Kaunas","Klaipeda"],
+"Ukraine":["Kiev","Lviv","Odessa","Kharkiv"],
+"Russie":["Moscou","Saint-Pétersbourg","Kazan","Sotchi","Novossibirsk"],
+"Malte":["La Valette","Sliema","Mdina"],
+"Chypre":["Nicosie","Limassol","Paphos","Larnaca"],
+"Luxembourg":["Luxembourg-ville"],
+"Monaco":["Monaco"],
+"Japon":["Tokyo","Kyoto","Osaka","Hiroshima","Nara","Sapporo","Fukuoka","Nagoya","Kobe","Yokohama"],
+"Chine":["Pékin","Shanghai","Xi'an","Guilin","Chengdu","Hong Kong","Guangzhou","Suzhou","Hangzhou","Lijiang"],
+"Corée du Sud":["Séoul","Busan","Jeju","Gyeongju","Incheon","Jeonju"],
+"Taïwan":["Taipei","Kaohsiung","Tainan","Hualien","Taichung"],
+"Thaïlande":["Bangkok","Chiang Mai","Phuket","Krabi","Koh Samui","Ayutthaya","Pai","Koh Phi Phi","Chiang Rai"],
+"Vietnam":["Hanoï","Hô Chi Minh-Ville","Hoi An","Da Nang","Halong","Hue","Sapa","Dalat","Nha Trang","Can Tho"],
+"Cambodge":["Phnom Penh","Siem Reap","Battambang","Sihanoukville","Kampot"],
+"Laos":["Vientiane","Luang Prabang","Vang Vieng","Pakse"],
+"Myanmar":["Yangon","Mandalay","Bagan","Inle Lake","Naypyidaw"],
+"Malaisie":["Kuala Lumpur","Penang","Langkawi","Malacca","Kota Kinabalu","Ipoh"],
+"Singapour":["Singapour"],
+"Indonésie":["Jakarta","Bali (Denpasar)","Ubud","Yogyakarta","Lombok","Bandung","Surabaya","Gili Islands"],
+"Philippines":["Manille","Cebu","Palawan","Boracay","Bohol","Davao","Siargao"],
+"Inde":["New Delhi","Mumbai","Jaipur","Agra","Goa","Varanasi","Udaipur","Kerala (Kochi)","Rishikesh","Bangalore"],
+"Népal":["Katmandou","Pokhara","Chitwan","Lumbini"],
+"Sri Lanka":["Colombo","Kandy","Galle","Ella","Sigiriya","Nuwara Eliya"],
+"Bhoutan":["Thimphou","Paro","Punakha"],
+"Bangladesh":["Dacca","Chittagong","Sylhet","Cox's Bazar"],
+"Pakistan":["Islamabad","Lahore","Karachi","Hunza Valley"],
+"Mongolie":["Oulan-Bator","Kharkhorin"],
+"Kazakhstan":["Almaty","Astana"],
+"Ouzbékistan":["Tachkent","Samarcande","Boukhara","Khiva"],
+"Kirghizistan":["Bichkek","Osh"],
+"Émirats arabes unis":["Dubaï","Abou Dabi","Sharjah"],
+"Qatar":["Doha"],
+"Arabie saoudite":["Riyad","Djeddah","La Mecque","Médine","AlUla"],
+"Oman":["Mascate","Salalah","Nizwa"],
+"Jordanie":["Amman","Petra","Aqaba","Wadi Rum","Jerash"],
+"Israël":["Jérusalem","Tel Aviv","Haïfa","Eilat","Nazareth"],
+"Liban":["Beyrouth","Byblos","Baalbek"],
+"Turquie":["Istanbul","Cappadoce (Göreme)","Antalya","Izmir","Ankara","Bodrum","Pamukkale","Fethiye"],
+"Géorgie":["Tbilissi","Batoumi","Koutaïssi"],
+"Arménie":["Erevan"],
+"Azerbaïdjan":["Bakou"],
+"Iran":["Téhéran","Ispahan","Chiraz","Yazd"],
+"Égypte":["Le Caire","Louxor","Assouan","Hurghada","Charm el-Cheikh","Alexandrie"],
+"Maroc":["Marrakech","Casablanca","Fès","Chefchaouen","Rabat","Essaouira","Agadir","Tanger"],
+"Tunisie":["Tunis","Sousse","Djerba","Hammamet","Sidi Bou Saïd"],
+"Algérie":["Alger","Oran","Constantine"],
+"Afrique du Sud":["Le Cap","Johannesburg","Durban","Pretoria","Stellenbosch","Kruger (Nelspruit)"],
+"Kenya":["Nairobi","Mombasa","Masai Mara"],
+"Tanzanie":["Dar es Salaam","Zanzibar","Arusha","Serengeti"],
+"Ouganda":["Kampala","Entebbe"],
+"Rwanda":["Kigali"],
+"Éthiopie":["Addis-Abeba","Lalibela","Gondar"],
+"Namibie":["Windhoek","Swakopmund"],
+"Botswana":["Gaborone","Maun"],
+"Zimbabwe":["Harare","Victoria Falls","Bulawayo"],
+"Zambie":["Lusaka","Livingstone"],
+"Mozambique":["Maputo","Vilanculos"],
+"Madagascar":["Antananarivo","Nosy Be","Toamasina"],
+"Île Maurice":["Port-Louis","Grand Baie","Flic en Flac"],
+"Seychelles":["Mahé (Victoria)","Praslin","La Digue"],
+"Sénégal":["Dakar","Saint-Louis","Saly"],
+"Ghana":["Accra","Kumasi","Cape Coast"],
+"Nigeria":["Lagos","Abuja"],
+"Côte d'Ivoire":["Abidjan","Yamoussoukro"],
+"Cameroun":["Yaoundé","Douala"],
+"États-Unis":["New York","Los Angeles","San Francisco","Las Vegas","Miami","Chicago","Washington","Boston","Seattle","La Nouvelle-Orléans"],
+"Canada":["Toronto","Montréal","Vancouver","Québec","Ottawa","Calgary","Banff","Whistler"],
+"Mexique":["Mexico","Cancún","Tulum","Playa del Carmen","Oaxaca","Guadalajara","Puerto Vallarta","Mérida"],
+"Cuba":["La Havane","Varadero","Trinidad","Santiago de Cuba"],
+"République dominicaine":["Saint-Domingue","Punta Cana","Puerto Plata"],
+"Jamaïque":["Kingston","Montego Bay","Negril"],
+"Costa Rica":["San José","Monteverde","La Fortuna","Manuel Antonio","Tamarindo"],
+"Panama":["Panama City","Bocas del Toro","San Blas"],
+"Guatemala":["Antigua","Guatemala City","Lac Atitlán","Tikal"],
+"Belize":["Belize City","Caye Caulker","San Ignacio"],
+"Nicaragua":["Managua","Granada","Léon","Ometepe"],
+"Honduras":["Tegucigalpa","Roatán"],
+"Colombie":["Bogota","Medellín","Carthagène","Cali","Santa Marta","San Andrés"],
+"Venezuela":["Caracas","Mérida","Isla Margarita"],
+"Équateur":["Quito","Guayaquil","Îles Galápagos","Cuenca","Baños"],
+"Pérou":["Lima","Cusco","Machu Picchu","Arequipa","Puno (Titicaca)","Iquitos"],
+"Bolivie":["La Paz","Sucre","Salar d'Uyuni","Santa Cruz"],
+"Chili":["Santiago","Valparaíso","San Pedro de Atacama","Patagonie (Puerto Natales)","Île de Pâques"],
+"Argentine":["Buenos Aires","Bariloche","Mendoza","El Calafate","Ushuaia","Cordoba"],
+"Uruguay":["Montevideo","Punta del Este","Colonia del Sacramento"],
+"Paraguay":["Asunción"],
+"Brésil":["Rio de Janeiro","Sao Paulo","Salvador de Bahia","Florianópolis","Manaus","Foz do Iguaçu","Recife"],
+"Guyane":["Cayenne"],
+"Australie":["Sydney","Melbourne","Brisbane","Perth","Cairns","Adélaïde","Gold Coast","Uluru"],
+"Nouvelle-Zélande":["Auckland","Wellington","Queenstown","Christchurch","Rotorua","Dunedin"],
+"Fidji":["Nadi","Suva","Denarau"],
+"Polynésie française":["Papeete","Bora Bora","Moorea"],
+"Nouvelle-Calédonie":["Nouméa"],
+"Groenland":["Nuuk","Ilulissat"]
+};
+
+function _normalizeCountryKey(name){
+  return (name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
+}
+var _WORLD_CITIES_NORMALIZED = null;
+function _getWorldCitiesForCountry(countryName){
+  if(!_WORLD_CITIES_NORMALIZED){
+    _WORLD_CITIES_NORMALIZED = {};
+    Object.keys(WORLD_CITIES).forEach(function(k){ _WORLD_CITIES_NORMALIZED[_normalizeCountryKey(k)] = WORLD_CITIES[k]; });
+  }
+  return _WORLD_CITIES_NORMALIZED[_normalizeCountryKey(countryName)] || null;
+}
+function showCityNameSuggestions(countryId){
+  var inp = document.getElementById('guideModalCityName');
+  var list = document.getElementById('guideModalCitySuggestions');
+  if(!inp || !list) return;
+  var country = COUNTRIES.find(function(co){return co.id===countryId;});
+  var pool = country ? _getWorldCitiesForCountry(country.name) : null;
+  if(!pool){ list.classList.remove('open'); list.innerHTML=''; return; }
+  var q = inp.value.trim().toLowerCase();
+  var already = (country.cities||[]).map(function(ci){return ci.city.toLowerCase();});
+  var matches = pool.filter(function(city){
+    return already.indexOf(city.toLowerCase())===-1 && (q.length<1 || city.toLowerCase().indexOf(q)!==-1);
+  }).slice(0, 6);
+  if(!matches.length){ list.classList.remove('open'); list.innerHTML=''; return; }
+  list.innerHTML = matches.map(function(city, i){
+    return '<div class="suggestion-item" data-sug-idx="'+i+'"><span class="sug-emoji">'+svgIcon('map-pin',14)+'</span><div class="sug-info"><div class="sug-name">'+escHtml(city)+'</div></div></div>';
+  }).join('');
+  list.classList.add('open');
+  list.querySelectorAll('.suggestion-item').forEach(function(el, i){
+    el.addEventListener('click', function(){
+      inp.value = matches[i];
+      list.classList.remove('open');
+      list.innerHTML='';
+    });
+  });
+}
 function openGuideItemModal(countryId, listField, idx){
   _guideModalCountryId=countryId;
   _guideModalListField=listField;
@@ -3452,12 +3617,14 @@ function openGuideItemModal(countryId, listField, idx){
     document.getElementById('guideItemModalTitle').textContent='Nouvelle ville';
     var cityAnchor = _dateModalAnchor(countryId);
     document.getElementById('guideItemModalBody').innerHTML=
-      '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%"/></div>'
+      '<div class="ef-row" style="margin-bottom:4px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%" autocomplete="off" oninput="showCityNameSuggestions(\''+jsStrEsc(countryId)+'\')"/></div>'
+      +'<div class="suggestions-list" id="guideModalCitySuggestions" style="position:static;margin-bottom:8px"></div>'
       +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cityAnchor||'')+'"/></div>'
       +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalCityDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
     wireDateRangeSync('guideModalCityDateStart', 'guideModalCityDateEnd');
+    showCityNameSuggestions(countryId);
     return;
   }
 
