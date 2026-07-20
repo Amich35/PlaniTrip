@@ -1007,12 +1007,15 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <div class="detail-handle"></div>
     <div class="detail-body">
       <div id="detailQuickInfo" style="margin:10px 0"></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px" id="detailActionsRow">
+      <div style="display:flex;gap:8px" id="detailActionsRow">
         <button class="detail-action-btn" id="detailMapBtn"></button>
-        <button class="detail-action-btn" id="detailDateBtn"></button>
+        <div class="detail-action-btn" id="detailDateBtn" style="position:relative;padding:0">
+          <input type="date" id="detailDateInput" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;cursor:pointer"/>
+          <div id="detailDateBtnInner" style="pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:12px 6px"></div>
+        </div>
         <button class="detail-action-btn" id="detailDoneBtn"></button>
-        <input type="date" id="detailDateInput" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;left:-9999px"/>
       </div>
+      <div id="detailDateReminder" style="text-align:center;font-size:11.5px;color:var(--ink-subtle);margin-top:6px;margin-bottom:8px"></div>
       <div id="detailSections"></div>
     </div>
   </div>
@@ -2371,15 +2374,22 @@ function openDetail(actKey, actName, cityKey) {
     if(!iso) return 'Date';
     return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
   }
+  function fmtDetailDateFull(iso){
+    if(!iso) return '';
+    return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  }
   function refreshActionButtons(){
     var dateBtn = document.getElementById('detailDateBtn');
+    var dateBtnInner = document.getElementById('detailDateBtnInner');
     var doneBtn = document.getElementById('detailDoneBtn');
+    var reminder = document.getElementById('detailDateReminder');
     var isDone = !!S.done[actKey];
     var curDate = S.actDate && S.actDate[actKey];
-    dateBtn.innerHTML = svgIcon('calendar',18)+'<span>'+fmtDetailDateLabel(curDate)+'</span>';
+    dateBtnInner.innerHTML = svgIcon('calendar',18)+'<span>'+fmtDetailDateLabel(curDate)+'</span>';
     dateBtn.style.background = curDate ? 'var(--accent-pale)' : '#fff';
     dateBtn.style.color = curDate ? 'var(--accent)' : 'var(--ink)';
     dateBtn.style.borderColor = curDate ? 'transparent' : 'rgba(29,29,31,0.10)';
+    reminder.textContent = curDate ? ('Prévu le '+fmtDetailDateFull(curDate)) : '';
     doneBtn.innerHTML = svgIcon('check',18)+'<span>'+(isDone?'Fait':'Marquer fait')+'</span>';
     doneBtn.style.background = isDone ? 'var(--accent)' : '#fff';
     doneBtn.style.color = isDone ? '#fff' : 'var(--ink)';
@@ -2392,10 +2402,6 @@ function openDetail(actKey, actName, cityKey) {
   dateInputEl.max = stayRangeForDate ? stayRangeForDate.end : '';
   dateInputEl.value = (S.actDate && S.actDate[actKey]) || (stayRangeForDate ? stayRangeForDate.start : '');
   dateInputEl.onchange = function(){ setActivityDate(actKey, dateInputEl.value); refreshActionButtons(); };
-  document.getElementById('detailDateBtn').onclick = function(){
-    if(typeof dateInputEl.showPicker === 'function'){ try{ dateInputEl.showPicker(); return; }catch(e){} }
-    dateInputEl.click();
-  };
   document.getElementById('detailDoneBtn').onclick = function(){ toggleAct(actKey); refreshActionButtons(); };
   refreshActionButtons();
 
