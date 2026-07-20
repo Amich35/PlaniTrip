@@ -3342,6 +3342,23 @@ function editCityDateRange(ck, startVal, endVal){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
   }
 }
+// Dates réelles d'un pays = étendue min/max des séjours réels de ses villes (logements),
+// pas une valeur saisie à part qui peut se désynchroniser. Fallback sur une date saisie
+// manuellement (c.dateStart/dateEnd) uniquement si aucune ville n'a encore de dates.
+function getCountryDateRange(c){
+  if(!c) return null;
+  var start=null, end=null;
+  (c.cities||[]).forEach(function(city){
+    var range = cityStayRange(c.id+'_'+city.city);
+    if(range){
+      if(!start || range.start<start) start=range.start;
+      if(!end || range.end>end) end=range.end;
+    }
+  });
+  if(start && end) return {start:start, end:end};
+  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
+  return null;
+}
 function cityStayRange(ck){
   var start=null, end=null;
   var accomList = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
@@ -4239,7 +4256,8 @@ function getTripDepartDate(){
   var earliestStart = null;
   if(typeof COUNTRIES !== 'undefined'){
     COUNTRIES.forEach(function(cc){
-      if(cc.dateStart && (!earliestStart || cc.dateStart<earliestStart)) earliestStart = cc.dateStart;
+      var range = getCountryDateRange(cc);
+      if(range && range.start && (!earliestStart || range.start<earliestStart)) earliestStart = range.start;
     });
   }
   if (earliestStart) {
@@ -4332,7 +4350,7 @@ function getCityActivitiesForToday(c, city, todayStr){
 }
 function renderToday(){
   var ts = getTripStatus();
-  var hasDepartDate = !!(COUNTRIES.find(function(cc){return cc.dateStart;}) || (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date));
+  var hasDepartDate = !!(COUNTRIES.find(function(cc){return getCountryDateRange(cc);}) || (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date));
   var refOffset = Math.max(0, ts.elapsedDays); // avant le départ : on prévisualise le Jour 1
   var DEPART = getTripDepartDate();
   var refDate = new Date(DEPART); refDate.setDate(refDate.getDate()+refOffset);
@@ -4340,16 +4358,19 @@ function renderToday(){
   var tomorrowDate = new Date(refDate); tomorrowDate.setDate(tomorrowDate.getDate()+1);
   var tomorrowStrRef = toLocalISODate(tomorrowDate);
   var c = ts.currentCountry;
-  var firstCountryWithDate = null, lastCountryWithDate = null;
+  var earliestSpanStart = null, latestSpanEnd = null;
   COUNTRIES.forEach(function(cc){
-    if(cc.dateStart && (!firstCountryWithDate || cc.dateStart<firstCountryWithDate.dateStart)) firstCountryWithDate = cc;
-    if(cc.dateEnd && (!lastCountryWithDate || cc.dateEnd>lastCountryWithDate.dateEnd)) lastCountryWithDate = cc;
+    var range = getCountryDateRange(cc);
+    if(range){
+      if(!earliestSpanStart || range.start<earliestSpanStart) earliestSpanStart = range.start;
+      if(!latestSpanEnd || range.end>latestSpanEnd) latestSpanEnd = range.end;
+    }
   });
-  var totalDaysKnown = !!(firstCountryWithDate && lastCountryWithDate);
+  var totalDaysKnown = !!(earliestSpanStart && latestSpanEnd);
   var totalDays = 0;
   if(totalDaysKnown){
-    var spanStart = new Date(firstCountryWithDate.dateStart+'T00:00:00');
-    var spanEnd = new Date(lastCountryWithDate.dateEnd+'T00:00:00');
+    var spanStart = new Date(earliestSpanStart+'T00:00:00');
+    var spanEnd = new Date(latestSpanEnd+'T00:00:00');
     totalDays = Math.round((spanEnd-spanStart)/86400000)+1;
   }
   var tripDay=totalDaysKnown ? Math.max(1, Math.min(totalDays, ts.elapsedDays+1)) : 0;
@@ -6483,9 +6504,13 @@ function renderGuide(c){
     +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub" style="line-height:1.5">Deux façons de remplir cette fiche : <strong>à la main</strong> (remplis simplement les champs ci-dessous) ou <strong>avec l\'IA</strong> (recherche web automatique) en configurant une clé API personnelle dans Plus → Réglages avancés.</div></div>')
     +'<div class="info-card" onclick="openDatesModal(\''+c.id+'\')" style="cursor:pointer"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
-    +(c.dateStart&&c.dateEnd
-      ? '<div class="status-main">'+fmtDateRangeFr(c.dateStart,c.dateEnd)+'</div>'
-      : '<div class="status-sub">À renseigner — touche pour choisir les dates.</div>')
+    +(function(){
+        var dr = getCountryDateRange(c);
+        var derivedFromCities = !!((c.cities||[]).some(function(city){ return cityStayRange(c.id+'_'+city.city); }));
+        if(!dr) return '<div class="status-sub">À renseigner — touche pour choisir les dates.</div>';
+        return '<div class="status-main">'+fmtDateRangeFr(dr.start,dr.end)+'</div>'
+          +(derivedFromCities?'<div class="status-sub" style="margin-top:2px">Calculé automatiquement à partir des dates de logement des villes.</div>':'');
+      })()
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
