@@ -99,7 +99,7 @@ a{color:var(--ink);}
 .city-accordion.open .city-panel{display:block;}
 
 /* Activity card with map button */
-.act-card{display:flex;align-items:stretch;gap:var(--sp8);padding:10px var(--sp12);border-radius:var(--r16);margin-top:6px;background:var(--parchment);border:var(--border);position:relative;overflow:hidden;transition:box-shadow 0.15s,transform 0.15s;}
+.act-card{display:flex;align-items:flex-start;gap:var(--sp8);padding:10px var(--sp12);border-radius:var(--r16);margin-top:6px;background:var(--parchment);border:var(--border);position:relative;overflow:hidden;transition:box-shadow 0.15s,transform 0.15s;}
 .act-card.done{background:var(--parchment);} .act-card.done>*{opacity:0.4;} .act-card.done .act-thumb{opacity:1;} .act-card:not(.done):active{transform:scale(0.99);box-shadow:var(--shadow-sm);}
 .act-card.done .act-name{text-decoration:line-through;}
 .act-check{width:24px;height:24px;border-radius:50%;flex-shrink:0;margin-top:0;border:1.5px solid rgba(29,29,31,0.175);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);background:transparent;}
@@ -368,10 +368,11 @@ a{color:var(--ink);}
 .cf-tab{flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:500;border:1px solid rgba(30,80,55,0.15);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:all 0.15s;}
 .cf-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .country-card-list{display:flex;flex-direction:column;gap:10px;}
-.country-card{display:flex;align-items:stretch;gap:12px;background:var(--parchment);border-radius:var(--r22);padding:12px;box-shadow:var(--shadow-sm);cursor:pointer;transition:transform 0.1s;}
+.country-card{display:flex;align-items:center;gap:12px;background:var(--parchment);border-radius:var(--r22);padding:12px;box-shadow:var(--shadow-sm);cursor:pointer;transition:transform 0.1s;}
 .country-card:active{transform:scale(0.98);}
-.cc-thumb{width:104px;align-self:stretch;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
-.act-thumb{width:96px;align-self:stretch;border-radius:12px;background:var(--sand-deep) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;color:rgba(29,29,31,0.25);}
+.cc-thumb{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
+.city-thumb{width:104px;height:104px;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
+.act-thumb{width:60px;height:60px;border-radius:12px;background:var(--sand-deep) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;color:rgba(29,29,31,0.25);}
 .cc-thumb-flag{font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));}
 .cc-thumb.has-photo .cc-thumb-flag{display:none;}
 .home-hero-fallback-icon{display:flex;}
@@ -3990,7 +3991,7 @@ function renderItinerary(c, embedded){
 
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px">'
-      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'">'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
+      +'<div class="city-thumb" data-img-query="'+escHtml(imgQuery)+'">'+photoEditBtn(imgQuery,'position:absolute;bottom:2px;right:2px;transform:scale(0.72);transform-origin:bottom right;')+'</div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div>';
