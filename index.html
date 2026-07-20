@@ -2545,9 +2545,14 @@ function saveAccom(ck) {
       return;
     }
   }
+  var oldRange = cityStayRange(ck);
   var entry = {id:thisId, name, link, start, end, nights, checkin, checkout, note, status};
   var idx = S.accom[ck].findIndex(function(e){return e.id===entry.id;});
   if(idx>-1) S.accom[ck][idx]=entry; else S.accom[ck].push(entry);
+  var newRange = cityStayRange(ck);
+  if(oldRange && newRange && (oldRange.start!==newRange.start || oldRange.end!==newRange.end)){
+    shiftActivityDatesForCity(ck, oldRange, newRange);
+  }
   save();
   if(sb && CURRENT_TRIP){
     var countryId = ck.split('_')[0];
@@ -2556,10 +2561,48 @@ function saveAccom(ck) {
   document.getElementById('accomModal').classList.remove('open');
   renderContent();
 }
+// Quand les dates d'un logement changent, les activités qui avaient une date explicite
+// dans l'ancienne plage de séjour sont replacées proportionnellement dans la nouvelle
+// plage, pour ne jamais se retrouver hors dates / sans date.
+function shiftActivityDatesForCity(ck, oldRange, newRange){
+  if(!S.actDate) return;
+  var parts = ck.split('_');
+  var countryId = parts[0];
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  var cityName = parts.slice(1).join('_');
+  var city = c && c.cities.find(function(ci){return ci.city===cityName;});
+  if(!city) return;
+  var oldStartMs = new Date(oldRange.start+'T00:00:00').getTime();
+  var oldEndMs = new Date(oldRange.end+'T00:00:00').getTime();
+  var newStartMs = new Date(newRange.start+'T00:00:00').getTime();
+  var newEndMs = new Date(newRange.end+'T00:00:00').getTime();
+  var oldSpan = oldEndMs - oldStartMs;
+  var keys = [];
+  for(var i=0;i<city.acts.length;i++) keys.push(ck+'_'+i);
+  (S.customActs[ck]||[]).forEach(function(_,i){ keys.push(ck+'_c'+i); });
+  var changed = false;
+  keys.forEach(function(k){
+    var d = S.actDate[k];
+    if(!d) return;
+    var dMs = new Date(d+'T00:00:00').getTime();
+    var ratio = oldSpan>0 ? Math.min(1, Math.max(0, (dMs-oldStartMs)/oldSpan)) : 0;
+    var newMs = newStartMs + ratio*(newEndMs-newStartMs);
+    var newDate = toLocalISODate(new Date(newMs));
+    if(newDate!==d){ S.actDate[k] = newDate; changed = true; }
+  });
+  if(changed && sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+  }
+}
 function deleteAccomEntry(ck, id){
   showConfirm('Supprimer ce logement ?', function(){
     if(!Array.isArray(S.accom[ck])) return;
+    var oldRange = cityStayRange(ck);
     S.accom[ck] = S.accom[ck].filter(function(e){return e.id!==id;});
+    var newRange = cityStayRange(ck);
+    if(oldRange && newRange && (oldRange.start!==newRange.start || oldRange.end!==newRange.end)){
+      shiftActivityDatesForCity(ck, oldRange, newRange);
+    }
     save();
     renderContent();
     if(sb && CURRENT_TRIP){
