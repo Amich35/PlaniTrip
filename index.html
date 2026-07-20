@@ -3581,6 +3581,165 @@ function showCityNameSuggestions(countryId){
     });
   });
 }
+const PLACES_DB = {
+jp: [
+{n:"Fushimi Inari Taisha",city:"Kyoto",cat:"monument",dur:"2h",budget:"Gratuit",desc:"Sanctuaire shinto célèbre pour ses milliers de torii orange, idéal tôt le matin."},
+{n:"Kinkaku-ji (Pavillon d'Or)",city:"Kyoto",cat:"monument",dur:"1h",budget:"~5€",desc:"Temple bouddhiste recouvert de feuilles d'or, reflété dans son étang."},
+{n:"Arashiyama et la forêt de bambous",city:"Kyoto",cat:"nature",dur:"2h",budget:"Gratuit",desc:"Allée emblématique de bambous géants, à visiter avant 8h pour éviter la foule."},
+{n:"Quartier de Gion",city:"Kyoto",cat:"walk",dur:"2h",budget:"Gratuit",desc:"Vieux quartier des geishas, ruelles traditionnelles en bois."},
+{n:"Kiyomizu-dera",city:"Kyoto",cat:"monument",dur:"1h30",budget:"~4€",desc:"Temple perché offrant une vue panoramique sur Kyoto."},
+{n:"Château d'Osaka",city:"Osaka",cat:"monument",dur:"2h",budget:"~6€",desc:"Château historique entouré de douves et de jardins."},
+{n:"Dotonbori",city:"Osaka",cat:"food",dur:"2h",budget:"Variable",desc:"Quartier animé aux néons, street food (takoyaki, okonomiyaki)."},
+{n:"Kuromon Ichiba Market",city:"Osaka",cat:"shopping",dur:"1h30",budget:"Variable",desc:"Marché couvert réputé pour les produits frais et la street food."},
+{n:"Mont Fuji (Chureito Pagoda)",city:"Kawaguchiko",cat:"photo",dur:"3h",budget:"Gratuit",desc:"Vue iconique du Mont Fuji encadré par une pagode et des cerisiers."},
+{n:"Shibuya Crossing",city:"Tokyo",cat:"photo",dur:"30min",budget:"Gratuit",desc:"Le carrefour piéton le plus fréquenté au monde."},
+{n:"Senso-ji",city:"Tokyo",cat:"monument",dur:"1h30",budget:"Gratuit",desc:"Plus ancien temple de Tokyo, dans le quartier d'Asakusa."},
+{n:"TeamLab Planets",city:"Tokyo",cat:"photo",dur:"2h",budget:"~25€",desc:"Musée d'art numérique immersif, réservation conseillée."},
+{n:"Marché de Tsukiji Outer",city:"Tokyo",cat:"food",dur:"1h30",budget:"Variable",desc:"Marché aux poissons historique, sushi frais dès le matin."},
+{n:"Harajuku et Takeshita Street",city:"Tokyo",cat:"shopping",dur:"2h",budget:"Variable",desc:"Épicentre de la mode alternative japonaise et des boutiques kawaii."},
+{n:"Nara Park et Todai-ji",city:"Nara",cat:"nature",dur:"3h",budget:"~5€",desc:"Parc où errent des daims sacrés, à côté du grand Bouddha en bronze."},
+{n:"Dotombori Ebisu-bashi",city:"Osaka",cat:"photo",dur:"30min",budget:"Gratuit",desc:"Pont photogénique sur le canal, vue sur les enseignes lumineuses."}
+],
+kh: [
+{n:"Angkor Wat (lever de soleil)",city:"Siem Reap",cat:"monument",dur:"3h",budget:"~37€ (pass 1 jour)",desc:"Le plus grand complexe religieux au monde, incontournable au lever du jour."},
+{n:"Ta Prohm",city:"Siem Reap",cat:"monument",dur:"1h30",budget:"Inclus pass Angkor",desc:"Temple envahi par les racines de fromagers, cadre de Tomb Raider."},
+{n:"Bayon (Angkor Thom)",city:"Siem Reap",cat:"monument",dur:"1h30",budget:"Inclus pass Angkor",desc:"Célèbre pour ses tours à visages souriants sculptés dans la pierre."},
+{n:"Marché de nuit d'Angkor",city:"Siem Reap",cat:"shopping",dur:"1h30",budget:"Variable",desc:"Artisanat local, souvenirs et street food dans une ambiance animée."},
+{n:"Pub Street",city:"Siem Reap",cat:"food",dur:"2h",budget:"Variable",desc:"Rue animée de restaurants et bars au cœur de Siem Reap."},
+{n:"Tonlé Sap (villages flottants)",city:"Siem Reap",cat:"nature",dur:"3h",budget:"~15€",desc:"Excursion en bateau sur le plus grand lac d'Asie du Sud-Est."},
+{n:"Palais Royal de Phnom Penh",city:"Phnom Penh",cat:"monument",dur:"1h30",budget:"~6€",desc:"Résidence officielle du roi, avec la Pagode d'Argent."},
+{n:"Musée du génocide S-21",city:"Phnom Penh",cat:"monument",dur:"2h",budget:"~5€",desc:"Ancien lycée transformé en prison sous les Khmers rouges, lieu de mémoire."},
+{n:"Marché central (Phsar Thmey)",city:"Phnom Penh",cat:"shopping",dur:"1h",budget:"Variable",desc:"Marché Art déco emblématique de la capitale."},
+{n:"Quai du Mékong",city:"Phnom Penh",cat:"walk",dur:"1h",budget:"Gratuit",desc:"Promenade animée le long du fleuve, coucher de soleil."},
+{n:"Kampot et ses plantations de poivre",city:"Kampot",cat:"nature",dur:"3h",budget:"Variable",desc:"Petite ville coloniale au bord de la rivière, célèbre pour son poivre."},
+{n:"Bokor National Park",city:"Kampot",cat:"nature",dur:"4h",budget:"~5€",desc:"Ancienne station d'altitude coloniale abandonnée, vue sur le golfe de Thaïlande."}
+],
+th: [
+{n:"Grand Palais et Wat Phra Kaew",city:"Bangkok",cat:"monument",dur:"2h",budget:"~13€",desc:"Complexe royal abritant le Bouddha d'Émeraude, tenue correcte exigée."},
+{n:"Wat Arun",city:"Bangkok",cat:"monument",dur:"1h",budget:"~3€",desc:"Temple du Bouddha de l'Aube au bord du Chao Phraya, superbe au coucher du soleil."},
+{n:"Marché flottant de Damnoen Saduak",city:"Bangkok",cat:"shopping",dur:"3h",budget:"Variable",desc:"Marché traditionnel sur l'eau, mieux tôt le matin."},
+{n:"Chinatown (Yaowarat)",city:"Bangkok",cat:"food",dur:"2h",budget:"Variable",desc:"Street food réputée, néons et étals animés le soir."},
+{n:"Marché de Chatuchak",city:"Bangkok",cat:"shopping",dur:"3h",budget:"Variable",desc:"Un des plus grands marchés du monde, ouvert le week-end."},
+{n:"Doi Suthep",city:"Chiang Mai",cat:"monument",dur:"2h",budget:"~2€",desc:"Temple sacré perché sur une montagne surplombant Chiang Mai."},
+{n:"Vieille ville de Chiang Mai",city:"Chiang Mai",cat:"walk",dur:"2h",budget:"Gratuit",desc:"Cité fortifiée avec de nombreux temples historiques."},
+{n:"Sanctuaire d'éléphants éthique",city:"Chiang Mai",cat:"nature",dur:"4h",budget:"~50€",desc:"Observation et soins des éléphants sans exploitation, à bien choisir."},
+{n:"Marché de nuit de Chiang Mai",city:"Chiang Mai",cat:"shopping",dur:"2h",budget:"Variable",desc:"Artisanat local et street food, ambiance conviviale."},
+{n:"Railay Beach",city:"Krabi",cat:"nature",dur:"Demi-journée",budget:"Variable",desc:"Plage accessible uniquement en bateau, entourée de falaises calcaires."},
+{n:"4 Islands Tour",city:"Krabi",cat:"nature",dur:"Journée",budget:"~25€",desc:"Excursion en bateau à travers les îles de Krabi, snorkeling."},
+{n:"Maya Bay (Koh Phi Phi)",city:"Krabi",cat:"nature",dur:"Journée",budget:"~40€",desc:"Baie rendue célèbre par le film 'La Plage', accès régulé."},
+{n:"Big Buddha",city:"Koh Samui",cat:"monument",dur:"1h",budget:"Gratuit",desc:"Statue dorée de 12m visible depuis toute l'île."}
+],
+la: [
+{n:"Kuang Si Falls",city:"Luang Prabang",cat:"nature",dur:"3h",budget:"~2€",desc:"Cascades turquoise à étages avec bassins de baignade naturels."},
+{n:"Mont Phousi",city:"Luang Prabang",cat:"photo",dur:"1h",budget:"~2€",desc:"Colline centrale offrant un panorama sur la ville au coucher de soleil."},
+{n:"Cérémonie de l'aumône aux moines",city:"Luang Prabang",cat:"monument",dur:"1h",budget:"Gratuit",desc:"Rituel bouddhiste matinal, à observer avec respect avant 6h."},
+{n:"Wat Xieng Thong",city:"Luang Prabang",cat:"monument",dur:"1h",budget:"~2€",desc:"Le plus beau temple de la ville, chef-d'œuvre de l'architecture lao."},
+{n:"Marché de nuit de Luang Prabang",city:"Luang Prabang",cat:"shopping",dur:"1h30",budget:"Variable",desc:"Artisanat Hmong et lao, ambiance paisible."},
+{n:"Grottes de Pak Ou",city:"Luang Prabang",cat:"nature",dur:"4h",budget:"~15€",desc:"Grottes sacrées abritant des milliers de statues de Bouddha, accès en bateau sur le Mékong."},
+{n:"Blue Lagoon",city:"Vang Vieng",cat:"nature",dur:"3h",budget:"~2€",desc:"Bassin d'eau turquoise entouré de karsts, populaire pour la baignade."},
+{n:"Tubing sur la rivière Nam Song",city:"Vang Vieng",cat:"nature",dur:"Demi-journée",budget:"~7€",desc:"Descente en bouée sur la rivière, activité incontournable de Vang Vieng."},
+{n:"Grotte de Tham Chang",city:"Vang Vieng",cat:"nature",dur:"1h30",budget:"~2€",desc:"Grotte accessible avec vue panoramique sur la vallée karstique."},
+{n:"Arc de Triomphe (Patuxai)",city:"Vientiane",cat:"monument",dur:"1h",budget:"Gratuit",desc:"Monument emblématique inspiré de l'Arc de Triomphe parisien."},
+{n:"That Luang",city:"Vientiane",cat:"monument",dur:"1h",budget:"~1€",desc:"Stupa doré, symbole national du Laos."}
+],
+vn: [
+{n:"Ancienne cité de Hoi An",city:"Hoi An",cat:"walk",dur:"3h",budget:"~5€ (billet ville)",desc:"Vieille ville classée UNESCO, lanternes colorées et architecture historique."},
+{n:"Pont Japonais",city:"Hoi An",cat:"monument",dur:"30min",budget:"Inclus billet ville",desc:"Pont couvert emblématique du XVIe siècle."},
+{n:"Bãi Bien An Bang",city:"Hoi An",cat:"nature",dur:"Demi-journée",budget:"Gratuit",desc:"Plage prisée près de Hoi An, restaurants en bord de mer."},
+{n:"Baie d'Halong",city:"Halong",cat:"nature",dur:"Journée/croisière",budget:"~80€",desc:"Site UNESCO aux milliers d'îlots karstiques, croisière en jonque recommandée."},
+{n:"Vieux quartier de Hanoï (36 rues)",city:"Hanoi",cat:"walk",dur:"3h",budget:"Gratuit",desc:"Dédale de rues commerçantes historiques, cœur battant de la capitale."},
+{n:"Mausolée Ho Chi Minh",city:"Hanoi",cat:"monument",dur:"1h30",budget:"Gratuit",desc:"Lieu de repos du dirigeant vietnamien, tenue correcte exigée."},
+{n:"Lac Hoan Kiem",city:"Hanoi",cat:"walk",dur:"1h",budget:"Gratuit",desc:"Lac emblématique au cœur de Hanoï avec le temple Ngoc Son."},
+{n:"Train Street",city:"Hanoi",cat:"photo",dur:"30min",budget:"Gratuit",desc:"Rue résidentielle traversée par un train à quelques centimètres des habitations."},
+{n:"Rue piétonne et marché de Ben Thanh",city:"Ho Chi Minh-Ville",cat:"shopping",dur:"1h30",budget:"Variable",desc:"Marché couvert emblématique de Saïgon."},
+{n:"Tunnels de Cu Chi",city:"Ho Chi Minh-Ville",cat:"monument",dur:"3h",budget:"~5€",desc:"Réseau de tunnels utilisé pendant la guerre du Vietnam."},
+{n:"Delta du Mékong",city:"Can Tho",cat:"nature",dur:"Journée",budget:"~20€",desc:"Marchés flottants et vie fluviale traditionnelle du sud du Vietnam."},
+{n:"Ba Na Hills et Golden Bridge",city:"Da Nang",cat:"photo",dur:"Demi-journée",budget:"~30€",desc:"Pont doré porté par des mains géantes, vue sur les montagnes."},
+{n:"Vallée de Sapa",city:"Sapa",cat:"nature",dur:"2 jours",budget:"Variable",desc:"Rizières en terrasses et randonnées dans les montagnes du nord."}
+],
+id: [
+{n:"Rizières de Tegalalang",city:"Ubud",cat:"nature",dur:"1h30",budget:"~2€",desc:"Rizières en terrasses emblématiques de Bali, superbe au lever du soleil."},
+{n:"Temple Tanah Lot",city:"Ubud",cat:"monument",dur:"1h30",budget:"~4€",desc:"Temple sur un îlot rocheux, coucher de soleil spectaculaire."},
+{n:"Forêt des singes d'Ubud",city:"Ubud",cat:"nature",dur:"1h",budget:"~5€",desc:"Sanctuaire naturel peuplé de macaques, entre temples et jungle."},
+{n:"Temple Besakih",city:"Ubud",cat:"monument",dur:"2h",budget:"~10€",desc:"Le plus grand temple hindou de Bali, sur les flancs du Mont Agung."},
+{n:"Nusa Penida (Kelingking Beach)",city:"Ubud",cat:"nature",dur:"Journée",budget:"~40€",desc:"Île voisine avec falaises spectaculaires en forme de T-Rex."},
+{n:"Gili Trawangan",city:"Lombok",cat:"nature",dur:"Journée",budget:"Variable",desc:"Île sans véhicules motorisés, snorkeling avec tortues."},
+{n:"Mont Rinjani",city:"Lombok",cat:"nature",dur:"2-3 jours",budget:"Variable",desc:"Volcan emblématique, trek exigeant avec vue sur le lac de cratère."},
+{n:"Bromo (lever de soleil)",city:"Yogyakarta",cat:"photo",dur:"Demi-journée",budget:"~25€",desc:"Volcan actif offrant un lever de soleil mythique sur la mer de sable."},
+{n:"Borobudur",city:"Yogyakarta",cat:"monument",dur:"2h",budget:"~22€",desc:"Plus grand temple bouddhiste au monde, site UNESCO, idéal au lever du soleil."},
+{n:"Prambanan",city:"Yogyakarta",cat:"monument",dur:"1h30",budget:"~18€",desc:"Complexe de temples hindous, sculptures remarquablement préservées."},
+{n:"Marché de Malioboro",city:"Yogyakarta",cat:"shopping",dur:"1h30",budget:"Variable",desc:"Rue commerçante emblématique de Yogyakarta, artisanat batik."}
+],
+ph: [
+{n:"Lagune de Big Lagoon",city:"El Nido",cat:"nature",dur:"Journée (tour A)",budget:"~15€",desc:"Lagon turquoise entouré de falaises calcaires, incontournable d'El Nido."},
+{n:"Secret Lagoon",city:"El Nido",cat:"nature",dur:"Inclus tour",budget:"Inclus tour",desc:"Lagon caché accessible par une petite ouverture dans la roche."},
+{n:"Nacpan Beach",city:"El Nido",cat:"nature",dur:"Demi-journée",budget:"Gratuit",desc:"Plage de sable blanc de 4km, moins fréquentée que le centre-ville."},
+{n:"Cloud 9",city:"Siargao",cat:"nature",dur:"Demi-journée",budget:"Gratuit",desc:"Spot de surf mondialement connu, ambiance décontractée."},
+{n:"Piscine naturelle de Magpupungko",city:"Siargao",cat:"nature",dur:"2h",budget:"~1€",desc:"Piscine de roche formée à marée basse, eau turquoise cristalline."},
+{n:"Chocolate Hills",city:"Bohol",cat:"nature",dur:"2h",budget:"~2€",desc:"Plus de 1200 collines coniques caractéristiques de Bohol."},
+{n:"Sanctuaire des tarsiers",city:"Bohol",cat:"nature",dur:"1h",budget:"~7€",desc:"Réserve dédiée au tarsier, un des plus petits primates au monde."},
+{n:"Rivière Loboc",city:"Bohol",cat:"nature",dur:"1h30",budget:"~15€",desc:"Croisière-déjeuner sur une rivière bordée de jungle."},
+{n:"Fort Santiago (Intramuros)",city:"Manille",cat:"monument",dur:"1h30",budget:"~4€",desc:"Citadelle historique espagnole au cœur du vieux Manille."},
+{n:"Kawasan Falls",city:"Cebu",cat:"nature",dur:"3h",budget:"~2€",desc:"Cascades turquoise à étages dans la jungle de Cebu, canyoning possible."},
+{n:"Sardine Run (Moalboal)",city:"Cebu",cat:"nature",dur:"1h",budget:"~10€",desc:"Snorkeling parmi un banc géant de sardines, proche du rivage."}
+]
+};
+
+function _normalizeCityName(name){
+  return (name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
+}
+function getSuggestedPlacesForCity(countryId, cityName){
+  var pool = PLACES_DB[countryId];
+  if(!pool) return [];
+  var already = {};
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  var cityObj = c && c.cities.find(function(ci){return ci.city===cityName;});
+  if(cityObj){
+    cityObj.acts.forEach(function(a){ already[_normalizeCityName(a.n)]=true; });
+  }
+  var ck = countryId+'_'+cityName;
+  (S.customActs[ck]||[]).forEach(function(a){ already[_normalizeCityName(a.n)]=true; });
+  var targetCity = _normalizeCityName(cityName);
+  return pool.filter(function(p){
+    return _normalizeCityName(p.city)===targetCity && !already[_normalizeCityName(p.n)];
+  });
+}
+var _incontournablesCk = '';
+function openIncontournablesModal(ck){
+  _incontournablesCk = ck;
+  var parts = ck.split('_');
+  var countryId = parts[0];
+  var cityName = parts.slice(1).join('_');
+  var places = getSuggestedPlacesForCity(countryId, cityName);
+  document.getElementById('guideItemModalTitle').textContent = 'Incontournables — '+cityName;
+  document.getElementById('guideItemModalBody').innerHTML =
+    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:10px">Sélection issue de sources touristiques reconnues (UNESCO, offices de tourisme) — coche celles à ajouter à ton programme.</div>'
+    + places.map(function(p, i){
+        var cat = ACTIVITY_CATEGORIES[p.cat];
+        return '<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid rgba(29,29,31,0.06)">'
+          +'<input type="checkbox" class="incontournable-cb" value="'+i+'" checked style="width:18px;height:18px;margin-top:2px;flex-shrink:0"/>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+escHtml(p.n)+'<span style="font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:1px 7px;border-radius:9px;display:inline-flex;align-items:center;gap:3px">'+svgIcon(cat.icon,9)+' '+cat.label+'</span></div>'
+          +'<div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px">'+escHtml(p.desc)+'</div>'
+          +'<div style="font-size:10.5px;color:var(--ink-subtle);margin-top:3px">'+escHtml(p.dur)+' · '+escHtml(p.budget)+'</div>'
+          +'</div></label>';
+      }).join('');
+  _guideModalSaveFn = saveIncontournablesSelection;
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function saveIncontournablesSelection(){
+  var parts = _incontournablesCk.split('_');
+  var countryId = parts[0];
+  var cityName = parts.slice(1).join('_');
+  var places = getSuggestedPlacesForCity(countryId, cityName);
+  var checked = Array.from(document.querySelectorAll('.incontournable-cb:checked')).map(function(el){return parseInt(el.value,10);});
+  closeGuideItemModal();
+  checked.forEach(function(i){
+    var p = places[i];
+    if(!p) return;
+    _createActivityCore(_incontournablesCk, p.n, {meta:p.desc, category:p.cat});
+  });
+}
 function openGuideItemModal(countryId, listField, idx){
   _guideModalCountryId=countryId;
   _guideModalListField=listField;
@@ -4220,7 +4379,11 @@ function renderCityPanelContentBody(c, city){
       trashHTML+='</div>';
     }
 
-    const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;margin-bottom:24px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>';
+    const suggestedPlaces = getSuggestedPlacesForCity(c.id, city.city);
+    const suggestBtn = suggestedPlaces.length
+      ? '<button onclick="openIncontournablesModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('sparkles',15)+' Incontournables suggérés ('+suggestedPlaces.length+')</button>'
+      : '';
+    const addForm=suggestBtn+'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;margin-bottom:24px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>';
 
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
