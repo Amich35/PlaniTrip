@@ -450,8 +450,8 @@ a{color:var(--ink);}
 .detail-chip.cost{background:#FEF9ED;color:#7A5010;border-color:rgba(196,160,58,0.25);}
 .detail-chip.time{background:#EBF4F0;color:#1E5C3A;border-color:rgba(30,100,60,0.15);}
 .detail-map-btn{width:100%;margin-top:var(--sp16);padding:var(--sp16);min-height:52px;border-radius:var(--r16);font-size:14px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(28,24,20,0.18);transition:transform 0.15s;}
-.detail-action-btn{flex:1;padding:12px 6px;border-radius:14px;border:1px solid rgba(29,29,31,0.10);background:#fff;color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:transform 0.15s,background 0.15s;}
-.detail-action-btn span{font-size:11px;font-weight:600;text-align:center;line-height:1.2;}
+.detail-action-btn{flex:1;padding:16px 8px;border-radius:var(--r16);border:1px solid rgba(29,29,31,0.10);background:#fff;color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:transform 0.15s,background 0.15s;}
+.detail-action-btn span{font-size:12px;font-weight:600;text-align:center;line-height:1.2;}
 .detail-action-btn:active{transform:scale(0.96);}
 .detail-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.3);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;}
 .detail-img-wrap{position:relative;}
@@ -2330,7 +2330,7 @@ function openDetail(actKey, actName, cityKey) {
   document.getElementById('detailQuickInfo').innerHTML = quickHTML;
 
   // Actions — toujours visibles, en haut, style grille icône/label
-  document.getElementById('detailMapBtn').innerHTML = svgIcon('map-pin',18)+'<span>Carte</span>';
+  document.getElementById('detailMapBtn').innerHTML = svgIcon('map-pin',20)+'<span>Carte</span>';
   document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(actKey, actName); };
   function fmtDetailDateLabel(iso){
     if(!iso) return 'Date';
@@ -2347,12 +2347,12 @@ function openDetail(actKey, actName, cityKey) {
     var reminder = document.getElementById('detailDateReminder');
     var isDone = !!S.done[actKey];
     var curDate = S.actDate && S.actDate[actKey];
-    dateBtnInner.innerHTML = svgIcon('calendar',18)+'<span>'+fmtDetailDateLabel(curDate)+'</span>';
+    dateBtnInner.innerHTML = svgIcon('calendar',20)+'<span>'+fmtDetailDateLabel(curDate)+'</span>';
     dateBtn.style.background = curDate ? 'var(--accent-pale)' : '#fff';
     dateBtn.style.color = curDate ? 'var(--accent)' : 'var(--ink)';
     dateBtn.style.borderColor = curDate ? 'transparent' : 'rgba(29,29,31,0.10)';
     reminder.textContent = curDate ? ('Prévu le '+fmtDetailDateFull(curDate)) : '';
-    doneBtn.innerHTML = svgIcon('check',18)+'<span>'+(isDone?'Fait':'Marquer fait')+'</span>';
+    doneBtn.innerHTML = svgIcon('check',20)+'<span>'+(isDone?'Fait':'Marquer fait')+'</span>';
     doneBtn.style.background = isDone ? 'var(--accent)' : '#fff';
     doneBtn.style.color = isDone ? '#fff' : 'var(--ink)';
     doneBtn.style.borderColor = isDone ? 'transparent' : 'rgba(29,29,31,0.10)';
