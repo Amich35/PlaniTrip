@@ -4614,7 +4614,37 @@ function renderItinerary(c, embedded){
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div><div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une étape</button>'
-    +cityTrashSectionHTML(c.id)
+    +cityTrashButtonHTML(c.id)
+    +'</div>';
+}
+function cityTrashButtonHTML(countryId){
+  var count = (S.cityTrash||[]).filter(function(t){return t.countryId===countryId;}).length;
+  if(!count) return '';
+  return '<button onclick="showArchivedCitiesScreen(\''+countryId+'\')" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--r12);font-size:12.5px;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:5px">'+svgIcon('trash-2',13)+' Corbeille ('+count+')</button>';
+}
+function showArchivedCitiesScreen(countryId){
+  S.archivedCitiesCountry = countryId;
+  S.tab='archived-cities'; save(); renderContent();
+}
+function renderArchivedCitiesScreen(){
+  var countryId = S.archivedCitiesCountry;
+  var c = COUNTRIES.find(function(x){return x.id===countryId;});
+  var items = (S.cityTrash||[]).filter(function(t){return t.countryId===countryId;});
+  var rows = items.length
+    ? items.map(function(t){
+        var parts=[];
+        if(t.journalEntries&&t.journalEntries.length) parts.push(t.journalEntries.length+' entrée(s) carnet');
+        if(t.expenses&&t.expenses.length) parts.push(t.expenses.length+' dépense(s)');
+        var extra = parts.length ? ' · '+parts.join(' · ') : '';
+        return '<div class="more-row"><span class="more-row-label">'+escHtml(t.cityName)+extra+'</span>'
+          +'<button onclick="restoreCity('+t.id+')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button>'
+          +'<button onclick="deleteCityPermanently('+t.id+')" style="margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer</button></div>';
+      }).join('')
+    : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Corbeille vide.</div>';
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="more-row" onclick="openCountryDetail(\''+countryId+'\',\'guide\');" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour'+(c?' à '+escHtml(c.name):'')+'</div>'
+    +'<div class="section-title" style="margin-bottom:12px">Corbeille'+(c?' — '+escHtml(c.name):'')+'</div>'
+    +'<div class="info-card" style="padding:6px">'+rows+'</div>'
     +'</div>';
 }
 
@@ -8441,7 +8471,7 @@ function updateTopBarSub(){
   el.textContent = name + ' · ' + countryCount + ' pays';
 }
 function syncActiveNavTab(){
-  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   var el = document.getElementById('tab-'+activeId);
   if(el) el.classList.add('active');
@@ -8465,6 +8495,7 @@ function renderContent(){
   else if(S.tab==='documents')html=renderDocuments();
   else if(S.tab==='journal')html=renderCarnetScreen();
   else if(S.tab==='archived-countries')html=renderArchivedCountriesScreen();
+  else if(S.tab==='archived-cities')html=renderArchivedCitiesScreen();
   else if(S.tab==='access-management')html=renderAccessManagementScreen();
   else if(S.tab==='my-account')html=renderMyAccountScreen();
   else html=renderMore();
@@ -8753,7 +8784,7 @@ function removePinFlowApi(){
 
 S.tab = S.tab && NAV_TABS.concat(['country','documents','journal']).indexOf(S.tab)>-1 ? S.tab : 'home';
 document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
-var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail') ? 'countries' : (S.tab==='documents'||S.tab==='journal') ? 'more' : S.tab;
+var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
 var _initTabEl = document.getElementById('tab-'+_initActiveTab);
 if(_initTabEl) _initTabEl.classList.add('active');
 renderContent();
