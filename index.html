@@ -4131,8 +4131,8 @@ function renderItinerary(c, embedded){
 
   var cdHTML = embedded ? '' : renderCountdown();
   if(!embedded) setTimeout(startCountdownTick, 50);
-  var coverHTML = embedded ? '' : '<div class="country-cover" style="background:'+coverColors[c.id]+'"><div class="cover-bg">'+c.flag+'</div>'
-    +'<div class="cover-content"><div class="cover-eyebrow">'+c.dates+'</div><div class="cover-name">'+c.name+'</div><div class="cover-tagline">'+c.tagline+'</div>'
+  var coverHTML = embedded ? '' : '<div class="country-cover" style="background:'+coverColors[c.id]+'">'
+    +'<div class="cover-content"><div class="cover-eyebrow">'+c.dates+'</div><div class="cover-name">'+c.name+' <span style="font-size:26px;vertical-align:middle">'+c.flag+'</span></div><div class="cover-tagline">'+c.tagline+'</div>'
     +'<div class="cover-pills"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
     +weatherSection
@@ -6381,7 +6381,7 @@ function renderGuide(c){
       +'<div style="flex:1"><div class="ir-key" style="margin-bottom:2px">'+escHtml(ph.fr||'')+'</div><div class="status-sub" style="margin-top:1px">'+escHtml(ph.local||'')+'</div></div>'
       +'<span class="ee-del" onclick="event.stopPropagation();removeGuideListItem(\''+c.id+'\',\'phrases\','+i+')">×</span></div>';
   }).join('');
-  return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div><div class="section-meta">'+c.flag+' '+c.name+'</div></div>'
+  return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div></div>'
     +aiBadge
     +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
       :'<div class="info-card"><div class="status-sub" style="line-height:1.5">Deux façons de remplir cette fiche : <strong>à la main</strong> (remplis simplement les champs ci-dessous) ou <strong>avec l\'IA</strong> (recherche web automatique) en configurant une clé API personnelle dans Plus → Réglages avancés.</div></div>')
