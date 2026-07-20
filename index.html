@@ -2647,33 +2647,72 @@ function saveAccomModal(){ saveAccom(_accomModalCk); }
 function renderAccomCard(ck) {
   const esc = escHtml;
   const list = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
-  const addRow = '<div onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer;text-align:center;padding:'+(list.length?'12px 16px':'18px 16px')+'">'
-    +'<div style="font-size:13px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('plus',15)+' '+(list.length?'Ajouter un autre logement':'Ajouter un logement')+'</div>'
+  const addRow = '<div onclick="openAccomModal(\''+jsStrEsc(ck)+'\')" style="cursor:pointer;text-align:center;padding:'+(list.length?'10px 16px':'16px 16px')+'">'
+    +'<div style="font-size:12px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:5px">'+svgIcon('plus',13)+' '+(list.length?'Ajouter un autre logement':'Ajouter un logement')+'</div>'
     +'</div>';
   if(!list.length){
-    return '<div style="padding:0 16px"><div class="accom-header" style="padding-top:14px"><span class="accom-icon" style="display:inline-flex">'+svgIcon('bed',20)+'</span><div><div class="accom-title">Logement</div></div></div></div>'+addRow;
+    return '<div style="padding:0 16px"><div class="accom-header" style="padding-top:14px"><span class="accom-icon" style="display:inline-flex">'+svgIcon('bed',17)+'</span><div><div class="accom-title">Logement</div></div></div></div>'+addRow;
   }
   const entriesHTML = list.map(function(a, i){
     const source = accomSourceLabel(a.link);
     const statusPill = a.status==='pending'
-      ? '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">À réserver</span>'
-      : '<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
+      ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:9px;background:var(--sand-deep);color:var(--ink-muted)">À réserver</span>'
+      : '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:9px;background:var(--accent-pale);color:var(--accent)">Confirmé</span>';
     const datesLine = (a.start && a.end) ? fmtDateRangeFr(a.start, a.end)+(a.nights?(' • '+a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')):'') : (a.nights ? (a.nights+(a.nights==='1'||a.nights===1?' nuit':' nuits')) : '');
     const timesLine = (a.checkin||a.checkout) ? ('Check-in '+(a.checkin||'—')+' · Check-out '+(a.checkout||'—')) : '';
-    const headerBlock = i===0 ? '<div class="accom-header"><span class="accom-icon" style="display:inline-flex">'+svgIcon('bed',20)+'</span><div><div class="accom-title">Logement'+(list.length>1?' ('+list.length+')':'')+'</div></div></div>' : '<div style="height:1px;background:rgba(29,29,31,0.08);margin:12px 0"></div>';
+    const headerBlock = i===0 ? '<div class="accom-header"><span class="accom-icon" style="display:inline-flex">'+svgIcon('bed',17)+'</span><div><div class="accom-title">Logement'+(list.length>1?' ('+list.length+')':'')+'</div></div></div>' : '<div style="height:1px;background:rgba(29,29,31,0.08);margin:10px 0"></div>';
+    const sharedBy = Array.isArray(a.sharedBy) ? a.sharedBy : [];
+    const sharedLabel = sharedBy.length
+      ? sharedBy.map(function(email){ return (PROFILES_MAP[email]||email).split(' ')[0]; }).join(', ')
+      : 'Qui partage ce logement ?';
+    const travelersRow = '<div onclick="event.stopPropagation();openAccomTravelersModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(a.id)+'\')" style="display:flex;align-items:center;gap:5px;margin-top:6px;cursor:pointer;font-size:11px;color:'+(sharedBy.length?'var(--ink-muted)':'var(--accent)')+'">'+svgIcon('users',12)+' '+esc(sharedLabel)+'</div>';
     return headerBlock
       +'<div style="padding:2px 2px 0">'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--ink)">'+esc(a.name||'Sans nom')+'</span>'+statusPill+(source?'<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:var(--sand-deep);color:var(--ink-muted)">'+source+'</span>':'')+'</div>'
-      +(datesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(datesLine)+'</div>':'')
-      +(timesLine?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(timesLine)+'</div>':'')
-      +(a.note?'<div style="font-size:12.5px;color:var(--ink-muted)">'+esc(a.note)+'</div>':'')
-      +'<div style="display:flex;gap:8px;margin-top:10px">'
-      +'<button onclick="event.stopPropagation();openAccomModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(a.id)+'\')" style="flex:1;padding:10px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir réservation</button>'
-      +'<button onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom'+i+'\',\''+esc((a.name||'').replace(/\x27/g,"\\\x27"))+'\')" style="flex:1;padding:10px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--sand-deep);color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px"><span style="font-size:13px;font-weight:700;color:var(--ink)">'+esc(a.name||'Sans nom')+'</span>'+statusPill+(source?'<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:9px;background:var(--sand-deep);color:var(--ink-muted)">'+source+'</span>':'')+'</div>'
+      +(datesLine?'<div style="font-size:11.5px;color:var(--ink-muted)">'+esc(datesLine)+'</div>':'')
+      +(timesLine?'<div style="font-size:11.5px;color:var(--ink-muted)">'+esc(timesLine)+'</div>':'')
+      +(a.note?'<div style="font-size:11.5px;color:var(--ink-muted)">'+esc(a.note)+'</div>':'')
+      +travelersRow
+      +'<div style="display:flex;gap:6px;margin-top:8px">'
+      +'<button onclick="event.stopPropagation();openAccomModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(a.id)+'\')" style="flex:1;padding:7px;border-radius:var(--r10);font-size:11.5px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir réservation</button>'
+      +'<button onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom'+i+'\',\''+esc((a.name||'').replace(/\x27/g,"\\\x27"))+'\')" style="flex:1;padding:7px;border-radius:var(--r10);font-size:11.5px;font-weight:600;border:none;background:var(--sand-deep);color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
       +'</div>'
       +'</div>';
   }).join('');
-  return '<div style="padding:14px 16px 6px">'+entriesHTML+'</div>'+addRow;
+  return '<div style="padding:14px 16px 4px">'+entriesHTML+'</div>'+addRow;
+}
+var _accomTravelersCk = '', _accomTravelersId = null;
+function openAccomTravelersModal(ck, id){
+  _accomTravelersCk = ck; _accomTravelersId = id;
+  var list = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
+  var entry = list.find(function(e){return e.id===id;}) || {};
+  var sharedBy = Array.isArray(entry.sharedBy) ? entry.sharedBy : [];
+  var people = [];
+  if(CURRENT_TRIP && CURRENT_TRIP.owner_email) people.push(CURRENT_TRIP.owner_email);
+  (CURRENT_COLLABORATORS||[]).forEach(function(cl){ if(cl.invited_email && people.indexOf(cl.invited_email)===-1) people.push(cl.invited_email); });
+  document.getElementById('guideItemModalTitle').textContent = 'Qui partage ce logement ?';
+  document.getElementById('guideItemModalBody').innerHTML = people.map(function(email){
+    var checked = sharedBy.indexOf(email)>-1;
+    var label = PROFILES_MAP[email]||email;
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid rgba(29,29,31,0.06);font-size:14px;color:var(--ink)"><input type="checkbox" class="am-traveler-cb" value="'+escHtml(email)+'"'+(checked?' checked':'')+' style="width:18px;height:18px"/>'+escHtml(label)+'</label>';
+  }).join('');
+  _guideModalSaveFn = saveAccomTravelersModal;
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function saveAccomTravelersModal(){
+  var checked = Array.from(document.querySelectorAll('.am-traveler-cb:checked')).map(function(el){return el.value;});
+  var list = Array.isArray(S.accom[_accomTravelersCk]) ? S.accom[_accomTravelersCk] : [];
+  var idx = list.findIndex(function(e){return e.id===_accomTravelersId;});
+  if(idx>-1){
+    list[idx].sharedBy = checked;
+    save();
+    if(sb && CURRENT_TRIP){
+      var countryId = _accomTravelersCk.split('_')[0];
+      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:_accomTravelersCk, country_id:countryId, data:list, updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'}).then(function(){});
+    }
+  }
+  closeGuideItemModal();
+  renderContent();
 }
 
 function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
