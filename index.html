@@ -6597,18 +6597,22 @@ function renderMiniConverter(c){
   var toLabel = dir==='eur' ? c.currency : 'EUR';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
   return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(29,29,31,0.07)">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-    +'<span style="font-size:11px;font-weight:600;color:var(--ink-subtle);display:flex;align-items:center;gap:4px"><span data-icon="coins" data-icon-size="12"></span> Convertisseur</span>'
-    +'<button onclick="toggleConvDir(\''+c.id+'\')" title="Inverser" style="width:20px;height:20px;border-radius:50%;border:1px solid rgba(45,106,79,0.25);background:transparent;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px">⇄</button>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<span style="font-size:13px;color:var(--ink)">Taux indicatif</span>'
+    +'<span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--accent)">1€ = '+rate+' '+escHtml(c.currency||'')+'<span style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block"></span></span>'
     +'</div>'
-    +'<div style="font-size:10.5px;color:var(--ink-subtle);margin-bottom:6px">Taux : 1 '+fromLabel+' = <input type="number" value="'+rate+'" id="convRateMini_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:44px;border:none;border-bottom:1px dashed rgba(29,29,31,0.25);background:transparent;color:var(--ink);font-weight:600;font-size:10.5px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0"/> '+toLabel+' <span style="opacity:0.7">(modifiable)</span></div>'
-    +'<div style="display:flex;align-items:center;gap:6px">'
-    +'<input type="number" value="'+amt+'" id="convAmtMini_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="flex:1;min-width:0;padding:7px 8px;border-radius:var(--r8);border:var(--border);background:var(--sand);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)"/>'
-    +'<span style="font-size:10.5px;color:var(--ink-muted);flex-shrink:0">'+fromLabel+'</span>'
-    +'<span style="color:var(--ink-subtle);font-size:12px;flex-shrink:0">→</span>'
-    +'<span style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+resultStr+'</span>'
-    +'<span style="font-size:10.5px;color:var(--ink-muted);flex-shrink:0">'+toLabel+'</span>'
+    +'<div style="background:var(--sand);border-radius:var(--r16);padding:10px;display:flex;align-items:center;gap:8px">'
+    +'<div style="flex:1;min-width:0;background:#fff;border-radius:var(--r12);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:6px;box-shadow:var(--shadow-sm)">'
+    +'<input type="number" value="'+amt+'" id="convAmtMini_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="width:100%;min-width:0;border:none;background:transparent;font-size:17px;font-weight:700;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0"/>'
+    +'<span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;flex-shrink:0">'+escHtml(fromLabel)+'</span>'
     +'</div>'
+    +'<button onclick="toggleConvDir(\''+c.id+'\')" title="Inverser" style="width:26px;height:26px;flex-shrink:0;border-radius:50%;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px">⇄</button>'
+    +'<div style="flex:1;min-width:0;background:#fff;border-radius:var(--r12);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:6px;box-shadow:var(--shadow-sm)">'
+    +'<span style="font-size:17px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+resultStr+'</span>'
+    +'<span style="font-size:12.5px;color:var(--ink-muted);font-weight:600;flex-shrink:0">'+escHtml(toLabel)+'</span>'
+    +'</div>'
+    +'</div>'
+    +'<div style="font-size:10.5px;color:var(--ink-subtle);margin-top:6px;text-align:center">Taux modifiable : <input type="number" value="'+rate+'" id="convRateMini_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:44px;border:none;border-bottom:1px dashed rgba(29,29,31,0.25);background:transparent;color:var(--ink);font-weight:600;font-size:10.5px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:center"/></div>'
     +'</div>';
 }
 function renderConverterCard(c){
