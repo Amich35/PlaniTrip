@@ -4104,6 +4104,14 @@ function restoreActivity(cityKey, trashIndex) {
   renderContent();
   syncDeletedActs();
 }
+function deleteActivityPermanently(cityKey, trashIndex){
+  if(!S.trash||!S.trash[cityKey]||!S.trash[cityKey][trashIndex]) return;
+  showConfirm('Supprimer définitivement cette activité ? Cette action est irréversible.', function(){
+    S.trash[cityKey].splice(trashIndex,1);
+    save();
+    renderContent();
+  }, 'Supprimer définitivement');
+}
 
 // ── LIVE WEATHER via Open-Meteo (free, no key needed) ───────
 const WEATHER_COORDS = {
@@ -4392,7 +4400,7 @@ function renderCityPanelContentBody(c, city){
       trashHTML='<div class="trash-section"><div class="trash-label">Corbeille ('+cityTrash.length+')</div>';
       cityTrash.forEach(function(item,ti){
         const name=item._builtinIndex!==undefined?(city.acts[item._builtinIndex]||{}).n||'Activité supprimée':item.n||'Activité supprimée';
-        trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><button class="trash-restore" onclick="restoreActivity(\''+jsStrEsc(ck)+'\','+ti+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
+        trashHTML+='<div class="trash-item"><span class="trash-item-name">'+name+'</span><div style="display:flex;gap:10px;flex-shrink:0"><button class="trash-restore" onclick="restoreActivity(\''+jsStrEsc(ck)+'\','+ti+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button><button onclick="deleteActivityPermanently(\''+jsStrEsc(ck)+'\','+ti+')" style="display:flex;align-items:center;gap:4px;color:var(--red-muted);background:none;border:none;cursor:pointer;font-size:inherit">'+svgIcon('trash-2',13)+'</button></div></div>';
       });
       trashHTML+='</div>';
     }
@@ -4401,7 +4409,7 @@ function renderCityPanelContentBody(c, city){
     const suggestBtn = suggestedPlaces.length
       ? '<button onclick="openIncontournablesModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('sparkles',15)+' Incontournables suggérés ('+suggestedPlaces.length+')</button>'
       : '';
-    const addForm=suggestBtn+'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;margin-bottom:24px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>';
+    const addForm=suggestBtn+'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+trashHTML+'<div style="height:24px"></div>';
 
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
@@ -4420,7 +4428,7 @@ function renderCityPanelContentBody(c, city){
         +'</div>';
     }
 
-    return renderDayTabs(ck)+baseActsHTML+trashHTML+addForm;
+    return renderDayTabs(ck)+baseActsHTML+addForm;
 }
 
 function setCityCategory(ck, cat){
@@ -5423,18 +5431,21 @@ function renderCountriesScreen(){
       ? c.cities.map(function(ci){return ci.city;}).join(', ')
       : c.cities.slice(0,2).map(function(ci){return ci.city;}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
-    return '<div class="country-card" onclick="openCountryDetail(\''+c.id+'\',\'guide\')">'
+    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('trash-2',15)+' Archiver</div>'
+      +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'guide\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
       +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
-      +'</div>';
+      +'</div></div>';
   }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
 
+  var archivedCount = ((typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.archived_countries) || []).length;
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Pays</div>'
     +dayHero
     +'<div class="country-card-list">'+cardsHTML+'</div>'
     +'<button onclick="openAddCountryToTripModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un pays</button>'
+    +'<button onclick="S.tab=\'archived-countries\';save();renderContent();" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--r12);font-size:12.5px;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:5px">'+svgIcon('trash-2',13)+' Corbeille'+(archivedCount?' ('+archivedCount+')':'')+'</button>'
     +'</div>';
 }
 function filterCountries(q){ S.countryFilterQuery=q; renderContent(); var i=document.getElementById('countrySearchInput'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
@@ -7262,7 +7273,7 @@ function cityTrashSectionHTML(countryId){
     if(t.journalEntries&&t.journalEntries.length) parts.push(t.journalEntries.length+' entrée(s) carnet');
     if(t.expenses&&t.expenses.length) parts.push(t.expenses.length+' dépense(s)');
     var extra = parts.length ? ' · '+parts.join(' · ') : '';
-    return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><button class="trash-restore" onclick="restoreCity('+t.id+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button></div>';
+    return '<div class="trash-item"><span class="trash-item-name">'+escHtml(t.cityName)+extra+'</span><div style="display:flex;gap:10px;flex-shrink:0"><button class="trash-restore" onclick="restoreCity('+t.id+')" style="display:flex;align-items:center;gap:4px">'+svgIcon('rotate-ccw',13)+' Restaurer</button><button onclick="deleteCityPermanently('+t.id+')" style="display:flex;align-items:center;gap:4px;color:var(--red-muted);background:none;border:none;cursor:pointer;font-size:inherit">'+svgIcon('trash-2',13)+'</button></div></div>';
   }).join('');
   return '<div class="trash-section" style="margin-top:12px">'
     +'<div onclick="toggleAccordion(\''+akey+'\')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
@@ -7414,6 +7425,16 @@ function restoreCity(trashId){
       }
     });
   }
+}
+function deleteCityPermanently(trashId){
+  var t = S.cityTrash.find(function(tt){return tt.id===trashId;});
+  if(!t) return;
+  showConfirm('Supprimer définitivement '+t.cityName+' ? Cette action est irréversible.', function(){
+    var idx = S.cityTrash.findIndex(function(tt){return tt.id===trashId;});
+    if(idx>-1) S.cityTrash.splice(idx,1);
+    save();
+    renderContent();
+  }, 'Supprimer définitivement');
 }
 function getCityOrder(countryId) {
   const c=COUNTRIES.find(function(co){return co.id===countryId;});
