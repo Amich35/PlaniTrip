@@ -455,7 +455,7 @@ a{color:var(--ink);}
 .detail-action-btn.dab-active .dab-circle{background:var(--accent);color:#fff;}
 .detail-action-btn span{font-size:12px;font-weight:600;text-align:center;line-height:1.2;}
 .detail-action-btn:active{transform:scale(0.96);}
-.detail-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.3);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;}
+.detail-close{position:absolute;top:14px;left:14px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.3);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;}
 .detail-img-wrap{position:relative;}
 
 /* ── ACCOMMODATION ── */
@@ -975,7 +975,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   <div class="detail-sheet" id="detailSheet">
     <div class="detail-img-wrap">
       <div class="detail-img" id="detailImg"><span data-icon="camera" data-icon-size="28" style="color:rgba(255,255,255,0.5)"></span></div>
-      <button class="detail-close" onclick="closeDetail()"><span data-icon="x" data-icon-size="16"></span></button>
+      <button class="detail-close" onclick="closeDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>
       <button id="detailPhotoDots" onclick="event.stopPropagation();openPhotoPicker(_currentDetailQuery)" style="position:absolute;bottom:10px;right:10px;z-index:3;width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;">
         <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
         <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
