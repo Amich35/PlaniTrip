@@ -3284,6 +3284,22 @@ function fmtDateRangeFr(startISO, endISO){
   if(sameMonth) return s.getDate()+'–'+e.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
   return s.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
 }
+function autofillMissingCountryDates(){
+  var cursor = null;
+  COUNTRIES.forEach(function(c){
+    if(c.dateStart && c.dateEnd){
+      cursor = c.dateEnd;
+      return;
+    }
+    var start = cursor || toLocalISODate(getTripDepartDate());
+    var days = c.days>0 ? c.days : 1;
+    var endDate = new Date(start+'T00:00:00');
+    endDate.setDate(endDate.getDate()+(days-1));
+    var end = toLocalISODate(endDate);
+    editCountryDateRange(c.id, start, end);
+    cursor = end;
+  });
+}
 function editCountryDateRange(countryId, startVal, endVal){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return;
@@ -6463,8 +6479,6 @@ function renderGuide(c){
     +(c.dateStart&&c.dateEnd
       ? '<div class="status-main">'+fmtDateRangeFr(c.dateStart,c.dateEnd)+'</div>'
       : '<div class="status-sub">À renseigner — touche pour choisir les dates.</div>')
-    +'<div class="info-row" style="margin-top:8px" onclick="event.stopPropagation()"><span class="ir-key" style="display:flex;align-items:center;gap:5px">Jours au programme<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span><input class="ir-input" type="number" style="max-width:60px" value="'+c.days+'" oninput="editCountryField(\''+c.id+'\',\'days\',this.value)"/></div>'
-    +'<div class="status-sub" style="margin-top:2px">Recalculé automatiquement si tu renseignes les deux dates — modifiable ici si besoin.</div>'
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
@@ -8839,6 +8853,7 @@ async function enterTrip(trip, resetTab) {
   await loadProfiles();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
+  autofillMissingCountryDates();
 
   if (COUNTRIES.length === 0) {
     console.warn('[PlaniTrip] Aucun pays visible, réinitialisation de sécurité.');
