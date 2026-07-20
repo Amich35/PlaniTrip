@@ -4236,9 +4236,14 @@ function renderItinerary(c, embedded){
 // ── TRIP STATUS: current day / next transport / tonight's accommodation ──
 var TRANSPORTS=[['jp','kh','Avion'],['kh','th','Bus'],['th','la','Train'],['la','vn','Avion'],['vn','id','Avion'],['id','ph','Avion']];
 function getTripDepartDate(){
-  var firstCountryWithDate = (typeof COUNTRIES !== 'undefined') ? COUNTRIES.find(function(cc){return cc.dateStart;}) : null;
-  if (firstCountryWithDate) {
-    return new Date(firstCountryWithDate.dateStart + 'T00:00:00');
+  var earliestStart = null;
+  if(typeof COUNTRIES !== 'undefined'){
+    COUNTRIES.forEach(function(cc){
+      if(cc.dateStart && (!earliestStart || cc.dateStart<earliestStart)) earliestStart = cc.dateStart;
+    });
+  }
+  if (earliestStart) {
+    return new Date(earliestStart + 'T00:00:00');
   }
   if (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) {
     return new Date(CURRENT_TRIP.start_date + 'T00:00:00');
@@ -4335,9 +4340,11 @@ function renderToday(){
   var tomorrowDate = new Date(refDate); tomorrowDate.setDate(tomorrowDate.getDate()+1);
   var tomorrowStrRef = toLocalISODate(tomorrowDate);
   var c = ts.currentCountry;
-  var firstCountryWithDate = COUNTRIES.find(function(cc){return cc.dateStart;});
-  var lastCountryWithDate = null;
-  for(var li=COUNTRIES.length-1; li>=0; li--){ if(COUNTRIES[li].dateEnd){ lastCountryWithDate=COUNTRIES[li]; break; } }
+  var firstCountryWithDate = null, lastCountryWithDate = null;
+  COUNTRIES.forEach(function(cc){
+    if(cc.dateStart && (!firstCountryWithDate || cc.dateStart<firstCountryWithDate.dateStart)) firstCountryWithDate = cc;
+    if(cc.dateEnd && (!lastCountryWithDate || cc.dateEnd>lastCountryWithDate.dateEnd)) lastCountryWithDate = cc;
+  });
   var totalDaysKnown = !!(firstCountryWithDate && lastCountryWithDate);
   var totalDays = 0;
   if(totalDaysKnown){
