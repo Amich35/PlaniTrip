@@ -2310,19 +2310,54 @@ function openDetail(actKey, actName, cityKey) {
     }
   }
 
-  // Infos rapides — grille de scan ultra-rapide (icône / label / valeur), à la Flighty
+// Détection native (sans IA) d'un lieu fermé maintenant, à partir du texte horaires libre.
+// Retourne true seulement si on est CONFIANT que c'est fermé ; sinon false (par défaut "ouvert").
+function isPlaceClosedNow(hoursText){
+  if(!hoursText) return false;
+  var t = hoursText.toLowerCase();
+  if(t.indexOf('24h/24')>-1 || t.indexOf('24/24')>-1) return false;
+  if(t.indexOf('inconnu')>-1) return false;
+  var matches = t.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/g);
+  if(!matches || matches.length<2) return false;
+  function toMinutes(m){
+    var parts = m.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/);
+    var h = parseInt(parts[1],10);
+    var mm = parts[2] ? parseInt(parts[2],10) : 0;
+    return h*60+mm;
+  }
+  var openMin = toMinutes(matches[0]);
+  var closeMin = toMinutes(matches[1]);
+  var now = new Date();
+  var nowMin = now.getHours()*60+now.getMinutes();
+  if(closeMin===openMin) return false;
+  if(closeMin>openMin){
+    return !(nowMin>=openMin && nowMin<closeMin);
+  } else {
+    // Plage nocturne (ex: 22h - 4h)
+    return !(nowMin>=openMin || nowMin<closeMin);
+  }
+}
+// Infos rapides — grille de scan ultra-rapide (icône / label / valeur), à la Flighty
   var quickItems = [];
   if(d.hours) quickItems.push({icon:'sun', label:'Ouvert', value:d.hours});
   if(d.duration) quickItems.push({icon:'history', label:'Durée', value:d.duration});
   if(d.bookingRequired) quickItems.push({icon:'check-square', label:'Réservation', value:d.bookingRequired});
   if(d.bestTime) quickItems.push({icon:'sparkles', label:'Idéal', value:d.bestTime});
+  var isClosedNow = isPlaceClosedNow(d.hours);
+  var quickCardBg = isClosedNow ? '#FBF1E8' : '#F2F7F4';
+  var quickCardBorder = isClosedNow ? 'rgba(244,162,97,0.28)' : 'rgba(45,106,79,0.10)';
+  var quickCardAccent = isClosedNow ? 'var(--orange,#F4A261)' : 'var(--accent)';
+  var quickCardIconBorder = isClosedNow ? 'rgba(244,162,97,0.35)' : 'rgba(45,106,79,0.18)';
   var quickHTML = '';
   if(quickItems.length){
-    quickHTML = '<div style="display:flex;border:1px solid rgba(45,106,79,0.10);border-radius:16px;padding:16px 8px;background:#F2F7F4">'
+    quickHTML = '<div style="display:flex;border:1px solid '+quickCardBorder+';border-radius:16px;padding:16px 8px;background:'+quickCardBg+'">'
       + quickItems.map(function(item){
+          var isHoursItem = item.label==='Ouvert';
+          var iconColor = (isHoursItem && isClosedNow) ? quickCardAccent : (isHoursItem ? 'var(--accent)' : 'var(--accent)');
+          var iconBorder = (isHoursItem && isClosedNow) ? quickCardIconBorder : 'rgba(45,106,79,0.18)';
           return '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px">'
-            +'<span style="width:38px;height:38px;border-radius:50%;border:1px solid rgba(45,106,79,0.18);display:flex;align-items:center;justify-content:center;color:var(--accent)">'+svgIcon(item.icon,17)+'</span>'
-            +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(item.label)+'</span>'
+            +'<span style="width:38px;height:38px;border-radius:50%;border:1px solid '+iconBorder+';display:flex;align-items:center;justify-content:center;color:'+iconColor+'">'+svgIcon(item.icon,17)+'</span>'
+            +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Fermé':'Ouvert'):item.label)+'</span>'
             +'<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(item.value)+'</span>'
             +'</div>';
         }).join('')
