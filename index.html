@@ -6573,6 +6573,7 @@ function renderGuide(c){
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
     +'<div class="info-row"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +(c._aiGeneratedAt?'<div class="status-sub" style="margin-top:4px">Généré par IA le '+new Date(c._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+'</div>':'')
+    +renderMiniConverter(c)
     +'</div>'
     +renderAlertsManageCard(c)
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_emerg\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'emergency\',null)">+</span><span style="transform:rotate('+(emergOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'+(emergOpen?(emergRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un contact d\'urgence.</div>'):'')+'</div>'
@@ -6588,6 +6589,28 @@ function renderGuide(c){
 }
 
 function getRate(c){ return (S.customRates && S.customRates[c.id]) || c.rateNum || 1; }
+function renderMiniConverter(c){
+  var rate = getRate(c);
+  var dir = S.convDir && S.convDir[c.id] || 'eur';
+  var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
+  var result = dir==='eur' ? (amt*rate) : (amt/rate);
+  var fromLabel = dir==='eur' ? 'EUR' : c.currency;
+  var toLabel = dir==='eur' ? c.currency : 'EUR';
+  var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
+  return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(29,29,31,0.07)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    +'<span style="font-size:11px;font-weight:600;color:var(--ink-subtle);display:flex;align-items:center;gap:4px"><span data-icon="coins" data-icon-size="12"></span> Convertisseur</span>'
+    +'<button onclick="toggleConvDir(\''+c.id+'\')" title="Inverser" style="width:20px;height:20px;border-radius:50%;border:1px solid rgba(45,106,79,0.25);background:transparent;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px">⇄</button>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<input type="number" value="'+amt+'" id="convAmtMini_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="flex:1;min-width:0;padding:7px 8px;border-radius:var(--r8);border:var(--border);background:var(--sand);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)"/>'
+    +'<span style="font-size:10.5px;color:var(--ink-muted);flex-shrink:0">'+fromLabel+'</span>'
+    +'<span style="color:var(--ink-subtle);font-size:12px;flex-shrink:0">→</span>'
+    +'<span style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+resultStr+'</span>'
+    +'<span style="font-size:10.5px;color:var(--ink-muted);flex-shrink:0">'+toLabel+'</span>'
+    +'</div>'
+    +'</div>';
+}
 function renderConverterCard(c){
   var rate = getRate(c);
   var dir = S.convDir && S.convDir[c.id] || 'eur';
