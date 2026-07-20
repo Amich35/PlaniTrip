@@ -3987,7 +3987,7 @@ function renderCityDetailScreen(){
     +'</div>'
     +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
     +'<div class="cdh-tagline">'+taglineTxt+'</div>'
-    +renderTravelerAvatarStack()
+    +renderTravelerAvatarStack(ck)
     +'</div>'
     +'</div>'
     +renderAccomCard(ck)
@@ -3995,10 +3995,12 @@ function renderCityDetailScreen(){
 
   return header+'<div class="section" style="padding-top:14px">'+renderCityPanelContentBody(c, city)+'</div>';
 }
-function renderTravelerAvatarStack(){
+function renderTravelerAvatarStack(ck){
   var people=[];
-  if(CURRENT_TRIP && CURRENT_TRIP.owner_email) people.push(CURRENT_TRIP.owner_email);
-  (CURRENT_COLLABORATORS||[]).forEach(function(cl){ if(cl.invited_email && people.indexOf(cl.invited_email)===-1) people.push(cl.invited_email); });
+  var accomList = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
+  accomList.forEach(function(a){
+    (Array.isArray(a.sharedBy)?a.sharedBy:[]).forEach(function(email){ if(people.indexOf(email)===-1) people.push(email); });
+  });
   if(people.length<2) return '';
   var colors=['#2D6A4F','#4D96FF','#F4A261','#E76F51','#95D5B2'];
   var shown=people.slice(0,4);
