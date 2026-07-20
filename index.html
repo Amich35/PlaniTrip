@@ -4181,13 +4181,6 @@ function renderItinerary(c, embedded){
     'Chocolate Hills':'linear-gradient(135deg,#2d3d00 0%,#1F4D39 100%)',
     'Cloud 9 Siargao':'linear-gradient(135deg,#001a3d 0%,#c4833a 100%)',
   };
-  const photoHTML=c.photo.map(function(p, pi){
-    var grad = _GRADIENTS[p.n] || 'linear-gradient(135deg,#2D2420 0%,#5c4030 100%)';
-    var query = _PLACE_QUERY_OVERRIDES[p.n] || (p.n+' '+c.name);
-    var safeN = p.n.replace(/'/g,"\\'");
-    var safeT = p.t.replace(/'/g,"\\'");
-    return '<div class="photo-spot-card" style="background-image:'+grad+'" data-img-query="'+escHtml(query)+'" onclick="openPhotoSpot(\''+safeN+'\',\''+safeT+'\',\''+escHtml(query)+'\',\''+c.id+'\','+pi+')">'+photoEditBtn(query,'position:absolute;top:8px;right:8px;')+'<div class="psc-content"><div class="psc-name">'+p.n+'</div><div class="psc-tip">'+p.t+'</div></div></div>';
-  }).join('');
   const wc=WEATHER_COORDS[c.id];
   const weatherSection='<div class="section"><div class="section-header">'
     +'<div class="section-title">Météo <span class="weather-live-badge">● Live</span></div>'
@@ -4205,9 +4198,6 @@ function renderItinerary(c, embedded){
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div><div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une étape</button>'
     +cityTrashSectionHTML(c.id)
-    +'</div>'
-    +'<div class="section" style="padding-bottom:20px"><div class="section-header"><div class="section-title">Spots photo</div></div><div class="photo-grid">'+photoHTML+'</div>'
-    +'<div class="add-act-form" style="margin-top:10px"><div class="add-act-row"><input class="add-act-input" id="newphotospot_'+c.id+'" type="text" placeholder="Nom du spot (ex: Chichen Itza)…" autocomplete="off"/><button class="add-act-btn" onclick="addPhotoSpot(\''+c.id+'\')">&#65291;</button></div></div>'
     +'</div>';
 }
 
