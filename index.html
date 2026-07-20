@@ -2532,6 +2532,15 @@ function saveAccom(ck) {
   const note    = document.getElementById('am_note')?.value||'';
   const status  = S._accomModalStatus||'confirmed';
   const nights  = (start && end) ? String(Math.max(0, Math.round((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000))) : '';
+  if(start && end){
+    var countryIdCheck = ck.split('_')[0];
+    var countryCheck = COUNTRIES.find(function(co){return co.id===countryIdCheck;});
+    var countryRangeCheck = countryCheck ? getCountryDateRange(countryCheck) : null;
+    if(countryRangeCheck && (start<countryRangeCheck.start || end>countryRangeCheck.end)){
+      alert('Ces dates doivent rester comprises dans le séjour du pays ('+fmtDateRangeFr(countryRangeCheck.start,countryRangeCheck.end)+').');
+      return;
+    }
+  }
   if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
   var thisId = _accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000));
   if(start && end){
@@ -2650,12 +2659,16 @@ function openAccomModal(ck, id){
   var list = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
   var a = id ? (list.find(function(e){return e.id===id;})||{}) : {};
   var cityStay = S.cityDates && S.cityDates[ck];
+  var countryIdForAccom = ck.split('_')[0];
+  var countryForAccom = COUNTRIES.find(function(co){return co.id===countryIdForAccom;});
+  var countryRangeForAccom = countryForAccom ? getCountryDateRange(countryForAccom) : null;
+  var accomDateBounds = countryRangeForAccom ? (' min="'+countryRangeForAccom.start+'" max="'+countryRangeForAccom.end+'"') : '';
   document.getElementById('accomModalTitle').textContent = a.name ? 'Modifier le logement' : 'Ajouter un logement';
   document.getElementById('accomModalBody').innerHTML =
     '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_name" type="text" placeholder="Nom (ex : Hotel Gracery Osaka)" style="width:100%" value="'+escHtml(a.name||'')+'"/></div>'
     +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_link" type="url" placeholder="Lien Booking / Airbnb / autre" style="width:100%" value="'+escHtml(a.link||'')+'"/></div>'
-    +'<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="am_start" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.start||(cityStay&&cityStay.start)||'')+'"/></div>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="am_end" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.end||(cityStay&&cityStay.end)||'')+'"/></div></div>'
+    +'<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="am_start" type="date"'+accomDateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.start||(cityStay&&cityStay.start)||'')+'"/></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="am_end" type="date"'+accomDateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.end||(cityStay&&cityStay.end)||'')+'"/></div></div>'
     +'<div class="ef-row" style="margin-bottom:8px;display:flex;gap:8px;align-items:flex-end">'
     +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Nuits</div><div id="am_nights_display" style="height:44px;display:flex;align-items:center;padding:0 12px;border-radius:var(--r8);background:var(--sand-deep);color:var(--ink-muted);font-size:13px;font-weight:600">—</div></div>'
     +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Check-in</div><select class="ef-input" id="am_checkin" style="width:100%;height:44px">'+_timeSelectOptions(a.checkin||'')+'</select></div>'
@@ -3347,6 +3360,7 @@ function editCityDateRange(ck, startVal, endVal){
 // manuellement (c.dateStart/dateEnd) uniquement si aucune ville n'a encore de dates.
 function getCountryDateRange(c){
   if(!c) return null;
+  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
   var start=null, end=null;
   (c.cities||[]).forEach(function(city){
     var range = cityStayRange(c.id+'_'+city.city);
@@ -3356,7 +3370,6 @@ function getCountryDateRange(c){
     }
   });
   if(start && end) return {start:start, end:end};
-  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
   return null;
 }
 function cityStayRange(ck){
@@ -6546,7 +6559,7 @@ function renderGuide(c){
     +'<div class="info-card" onclick="openDatesModal(\''+c.id+'\')" style="cursor:pointer"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
     +(function(){
         var dr = getCountryDateRange(c);
-        var derivedFromCities = !!((c.cities||[]).some(function(city){ return cityStayRange(c.id+'_'+city.city); }));
+        var derivedFromCities = !(c.dateStart && c.dateEnd);
         if(!dr) return '<div class="status-sub">À renseigner — touche pour choisir les dates.</div>';
         return '<div class="status-main">'+fmtDateRangeFr(dr.start,dr.end)+'</div>'
           +(derivedFromCities?'<div class="status-sub" style="margin-top:2px">Calculé automatiquement à partir des dates de logement des villes.</div>':'');
