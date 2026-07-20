@@ -6596,7 +6596,7 @@ function renderMiniConverter(c){
   var fromLabel = dir==='eur' ? 'EUR' : c.currency;
   var toLabel = dir==='eur' ? c.currency : 'EUR';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
-  return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(29,29,31,0.07)">'
+  return '<div style="margin-top:10px;padding-top:10px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
     +'<span style="font-size:12px;color:var(--ink)">Taux indicatif</span>'
     +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--accent)">1€ = <input type="number" value="'+rate+'" id="convRateMini_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:36px;border:none;border-bottom:1px dashed rgba(45,106,79,0.35);background:transparent;color:var(--accent);font-weight:700;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:right"/> '+escHtml(c.currency||'')+'<span style="width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block;margin-left:2px"></span></span>'
