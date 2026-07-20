@@ -6567,13 +6567,12 @@ function renderGuide(c){
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Taux indicatif</span><input class="ir-input" type="text" placeholder="ex: 1€ = 155¥" value="'+escHtml(c.rate)+'" oninput="editCountryField(\''+c.id+'\',\'rate\',this.value)"/></div>'
+    +renderMiniConverter(c)
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
     +'<div class="info-row"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +(c._aiGeneratedAt?'<div class="status-sub" style="margin-top:4px">Généré par IA le '+new Date(c._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+'</div>':'')
-    +renderMiniConverter(c)
     +'</div>'
     +renderAlertsManageCard(c)
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_emerg\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="heart-pulse" data-icon-size="16"></span> Urgences</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'emergency\',null)">+</span><span style="transform:rotate('+(emergOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'+(emergOpen?(emergRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un contact d\'urgence.</div>'):'')+'</div>'
@@ -6581,7 +6580,6 @@ function renderGuide(c){
     +(tipsOpen?(tipRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un conseil.</div>'):'')+'</div>'
     +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_phrases\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="message-circle" data-icon-size="16"></span> Mots & expressions</span><span style="display:flex;align-items:center;gap:8px"><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'phrases\',null)">+</span><span style="transform:rotate('+(phrasesOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +(phrasesOpen?(phraseRows||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un mot ou une expression.</div>'):'')+'</div>'
-    +renderConverterCard(c)
     +'<div class="info-card" id="guide-checklist-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\''+c.id+'_checklist\')"><span style="display:inline-flex;align-items:center;gap:6px"><span data-icon="check-square" data-icon-size="16"></span> Checklist avant départ</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;color:var(--accent)">'+clDone+'/'+p.checklist.length+'</span><span class="ee-del" style="color:var(--accent)" onclick="event.stopPropagation();addGuideListItem(\''+c.id+'\',\'checklist\',\'Nouvel item à préparer :\')">+</span><span style="transform:rotate('+(clOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span></div>'
     +'<div class="bh-bar" style="margin:4px 0 '+(clOpen?'10px':'0')+'"><div class="bh-fill" style="width:'+clPct+'%"></div></div>'
     +(clOpen?(clItems||'<div class="status-sub" style="padding:4px 0">À renseigner — touche + pour ajouter un item.</div>'):'')+'</div>'
@@ -6602,6 +6600,7 @@ function renderMiniConverter(c){
     +'<span style="font-size:11px;font-weight:600;color:var(--ink-subtle);display:flex;align-items:center;gap:4px"><span data-icon="coins" data-icon-size="12"></span> Convertisseur</span>'
     +'<button onclick="toggleConvDir(\''+c.id+'\')" title="Inverser" style="width:20px;height:20px;border-radius:50%;border:1px solid rgba(45,106,79,0.25);background:transparent;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px">⇄</button>'
     +'</div>'
+    +'<div style="font-size:10.5px;color:var(--ink-subtle);margin-bottom:6px">Taux : 1 '+fromLabel+' = <input type="number" value="'+rate+'" id="convRateMini_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:44px;border:none;border-bottom:1px dashed rgba(29,29,31,0.25);background:transparent;color:var(--ink);font-weight:600;font-size:10.5px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0"/> '+toLabel+' <span style="opacity:0.7">(modifiable)</span></div>'
     +'<div style="display:flex;align-items:center;gap:6px">'
     +'<input type="number" value="'+amt+'" id="convAmtMini_'+c.id+'" oninput="updateConvAmt(\''+c.id+'\',this.value)" style="flex:1;min-width:0;padding:7px 8px;border-radius:var(--r8);border:var(--border);background:var(--sand);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)"/>'
     +'<span style="font-size:10.5px;color:var(--ink-muted);flex-shrink:0">'+fromLabel+'</span>'
@@ -6645,8 +6644,8 @@ function renderConverterCard(c){
     +'</div>';
 }
 function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
-function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmt_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
-function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=n; save(); renderContent(); var i=document.getElementById('convRate_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmtMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=n; save(); renderContent(); var i=document.getElementById('convRateMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function delExp(id){
   showConfirm('Supprimer cette dépense ?', function(){
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
