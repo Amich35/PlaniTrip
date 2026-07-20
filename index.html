@@ -4718,7 +4718,7 @@ function renderCountryDetailShell(c, innerHtml){
     +'<button class="cdh-back" onclick="backToCountries()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
     +photoEditBtn(query)
     +'<span class="cdh-status cdh-status-'+status+'">'+_countryStatusLabel(status)+'</span>'
-    +'<div class="cdh-content"><div class="cdh-flag">'+c.flag+'</div><div class="cdh-name">'+c.name+'</div><div class="cdh-tagline">'+c.tagline+'</div>'
+    +'<div class="cdh-content"><div class="cdh-name">'+c.name+' <span class="cdh-flag">'+c.flag+'</span></div><div class="cdh-tagline">'+c.tagline+'</div>'
     +'<div class="cover-pills" style="margin-top:8px"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div>'
     +'</div>'
     +'<div class="cdt-subtabs">'+tabsHTML+'</div>'
