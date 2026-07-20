@@ -7910,8 +7910,8 @@ function effectiveTripCountries() {
 function archiveCurrentCountry(countryId) {
   var c = countryId ? COUNTRIES.find(function(co){return co.id===countryId;}) : getC();
   if(!c) return;
-  if(COUNTRIES.length <= 1){ alert("Impossible d'archiver le dernier pays."); return; }
-  showConfirm('Archiver ' + c.name + ' ? Vous pourrez le restaurer à tout moment depuis "Pays archivés".', function(){
+  if(COUNTRIES.length <= 1){ alert("Impossible de supprimer le dernier pays."); return; }
+  showConfirm('Supprimer ' + c.name + ' ? Tu pourras le restaurer à tout moment depuis la Corbeille.', function(){
     if(!S.archivedCountryData) S.archivedCountryData = {};
     S.archivedCountryData[c.id] = JSON.parse(JSON.stringify(c));
     var i = COUNTRIES.findIndex(function(co){ return co.id===c.id; });
