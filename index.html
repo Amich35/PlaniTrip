@@ -4053,8 +4053,9 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
   }catch(e){}
 }
 
-async function deleteActivity(cityKey, index, isCustom) {
-  showConfirm('Supprimer cette activité ? Tu pourras la restaurer à tout moment depuis la Corbeille.', function(){
+async function deleteActivity(cityKey, index, isCustom, actName) {
+  var label = actName ? actName : 'cette activité';
+  showConfirm('Supprimer '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', function(){
     if(!S.trash) S.trash={};
     if(!S.trash[cityKey]) S.trash[cityKey]=[];
     if(isCustom) {
@@ -4358,7 +4359,7 @@ function renderCityPanelContentBody(c, city){
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false)">'+svgIcon('trash-2',15)+' Supprimer</div>'
+        return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false,\''+jsStrEsc(a.n)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
@@ -4383,7 +4384,7 @@ function renderCityPanelContentBody(c, city){
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true)">'+svgIcon('trash-2',15)+' Supprimer</div>'
+        return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true,\''+jsStrEsc(ca.n)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
