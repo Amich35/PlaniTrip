@@ -1009,8 +1009,9 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <div id="detailQuickInfo" style="margin:10px 0"></div>
       <div style="display:flex;gap:8px;margin-bottom:14px" id="detailActionsRow">
         <button class="detail-action-btn" id="detailMapBtn"></button>
-        <button class="detail-action-btn" id="detailFavBtn"></button>
+        <button class="detail-action-btn" id="detailDateBtn"></button>
         <button class="detail-action-btn" id="detailDoneBtn"></button>
+        <input type="date" id="detailDateInput" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;left:-9999px"/>
       </div>
       <div id="detailSections"></div>
     </div>
@@ -2366,21 +2367,35 @@ function openDetail(actKey, actName, cityKey) {
   // Actions — toujours visibles, en haut, style grille icône/label
   document.getElementById('detailMapBtn').innerHTML = svgIcon('map-pin',18)+'<span>Carte</span>';
   document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(actKey, actName); };
+  function fmtDetailDateLabel(iso){
+    if(!iso) return 'Date';
+    return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  }
   function refreshActionButtons(){
-    var favBtn = document.getElementById('detailFavBtn');
+    var dateBtn = document.getElementById('detailDateBtn');
     var doneBtn = document.getElementById('detailDoneBtn');
-    var isFav = !!S.favorites[actKey];
     var isDone = !!S.done[actKey];
-    favBtn.innerHTML = svgIcon('star',18)+'<span>'+(isFav?'Favori':'Favori')+'</span>';
-    favBtn.style.background = isFav ? 'var(--accent-pale)' : '#fff';
-    favBtn.style.color = isFav ? 'var(--accent)' : 'var(--ink)';
-    favBtn.style.borderColor = isFav ? 'transparent' : 'rgba(29,29,31,0.10)';
+    var curDate = S.actDate && S.actDate[actKey];
+    dateBtn.innerHTML = svgIcon('calendar',18)+'<span>'+fmtDetailDateLabel(curDate)+'</span>';
+    dateBtn.style.background = curDate ? 'var(--accent-pale)' : '#fff';
+    dateBtn.style.color = curDate ? 'var(--accent)' : 'var(--ink)';
+    dateBtn.style.borderColor = curDate ? 'transparent' : 'rgba(29,29,31,0.10)';
     doneBtn.innerHTML = svgIcon('check',18)+'<span>'+(isDone?'Fait':'Marquer fait')+'</span>';
     doneBtn.style.background = isDone ? 'var(--accent)' : '#fff';
     doneBtn.style.color = isDone ? '#fff' : 'var(--ink)';
     doneBtn.style.borderColor = isDone ? 'transparent' : 'rgba(29,29,31,0.10)';
   }
-  document.getElementById('detailFavBtn').onclick = function(){ toggleFavorite(actKey); refreshActionButtons(); };
+  var dateInputEl = document.getElementById('detailDateInput');
+  var ckForDate = (cityKey||actKey.replace(/_c?\d+$/,''));
+  var stayRangeForDate = (typeof cityStayRange==='function') ? cityStayRange(ckForDate) : null;
+  dateInputEl.min = stayRangeForDate ? stayRangeForDate.start : '';
+  dateInputEl.max = stayRangeForDate ? stayRangeForDate.end : '';
+  dateInputEl.value = (S.actDate && S.actDate[actKey]) || (stayRangeForDate ? stayRangeForDate.start : '');
+  dateInputEl.onchange = function(){ setActivityDate(actKey, dateInputEl.value); refreshActionButtons(); };
+  document.getElementById('detailDateBtn').onclick = function(){
+    if(typeof dateInputEl.showPicker === 'function'){ try{ dateInputEl.showPicker(); return; }catch(e){} }
+    dateInputEl.click();
+  };
   document.getElementById('detailDoneBtn').onclick = function(){ toggleAct(actKey); refreshActionButtons(); };
   refreshActionButtons();
 
