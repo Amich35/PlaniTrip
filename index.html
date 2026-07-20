@@ -4287,17 +4287,34 @@ function getTripStatus(){
   var now=new Date();
   now.setHours(0,0,0,0); // on ne compare que les dates calendaires, pas l'heure du jour (évite un décalage d'1 jour selon l'heure de consultation)
   var elapsedDays=Math.round((now-DEPART)/86400000);
-  var cumulative=0, currentCountry=null, dayInCountry=0, countryIdx=-1;
+  var todayStr = toLocalISODate(now);
+
+  // Pays courant : celui dont la vraie plage de dates (calculée depuis ses villes) contient aujourd'hui.
+  // Fonctionne pour n'importe quel pays, ancien ou nouveau, sans dépendre de l'ordre du tableau ni d'un
+  // comptage cumulatif de jours qui pouvait se désynchroniser des vraies dates de logement.
+  var currentCountry=null, countryIdx=-1, dayInCountry=0;
+  var currentRange=null;
   for(var i=0;i<COUNTRIES.length;i++){
-    var c=COUNTRIES[i];
-    if(elapsedDays>=cumulative && elapsedDays<cumulative+c.days){
-      currentCountry=c; dayInCountry=elapsedDays-cumulative+1; countryIdx=i; break;
+    var range = getCountryDateRange(COUNTRIES[i]);
+    if(range && todayStr>=range.start && todayStr<=range.end){
+      currentCountry=COUNTRIES[i]; countryIdx=i; currentRange=range;
+      dayInCountry = Math.round((now - new Date(range.start+'T00:00:00'))/86400000)+1;
+      break;
     }
-    cumulative+=c.days;
   }
   if(!currentCountry){
-    if(elapsedDays<0){ currentCountry=COUNTRIES[0]; dayInCountry=0; countryIdx=0; }
-    else { currentCountry=COUNTRIES[COUNTRIES.length-1]; dayInCountry=currentCountry.days; countryIdx=COUNTRIES.length-1; }
+    // Avant le départ ou après le retour (ou pays sans dates) : on retombe sur le premier/dernier
+    // pays par ordre chronologique de ses dates, sinon le premier/dernier du tableau en dernier recours.
+    var withRange = COUNTRIES.map(function(cc){ return {cc:cc, range:getCountryDateRange(cc)}; }).filter(function(x){ return !!x.range; });
+    withRange.sort(function(a,b){ return a.range.start<b.range.start ? -1 : (a.range.start>b.range.start?1:0); });
+    if(elapsedDays<0){
+      var first = withRange[0] || {cc:COUNTRIES[0]};
+      currentCountry = first.cc; countryIdx = COUNTRIES.indexOf(currentCountry); dayInCountry = 0;
+    } else {
+      var last = withRange[withRange.length-1] || {cc:COUNTRIES[COUNTRIES.length-1]};
+      currentCountry = last.cc; countryIdx = COUNTRIES.indexOf(currentCountry);
+      dayInCountry = last.range ? (Math.round((new Date(last.range.end+'T00:00:00')-new Date(last.range.start+'T00:00:00'))/86400000)+1) : (currentCountry?currentCountry.days:0);
+    }
   }
   // Next transport: the one leaving the current (or next) country
   var nextTransport=null;
@@ -4305,22 +4322,29 @@ function getTripStatus(){
   else if(countryIdx>-1 && countryIdx<TRANSPORTS.length){
     nextTransport=TRANSPORTS[countryIdx];
   }
-  // Estimate current city within the country by cumulative city "sub" day counts
+  // Ville courante : celle dont les vraies dates de séjour (logement) contiennent aujourd'hui.
   var currentCity=null;
   if(currentCountry && currentCountry.cities.length){
     var orderedIdx = getCityOrder(currentCountry.id);
     var orderedCities = orderedIdx.map(function(idx){ return currentCountry.cities[idx]; });
-    if(dayInCountry<1){
-      currentCity = orderedCities[0];
-    } else {
-      var cCum=0;
-      for(var j=0;j<orderedCities.length;j++){
-        var city=orderedCities[j];
-        var nDays=parseInt((city.sub||'').match(/\d+/))||1;
-        if(dayInCountry>=cCum+1 && dayInCountry<=cCum+nDays){ currentCity=city; break; }
-        cCum+=nDays;
+    for(var j=0;j<orderedCities.length;j++){
+      var city=orderedCities[j];
+      var cRange = cityStayRange(currentCountry.id+'_'+city.city);
+      if(cRange && todayStr>=cRange.start && todayStr<=cRange.end){ currentCity=city; break; }
+    }
+    if(!currentCity){
+      // Pas de logement daté pile aujourd'hui : ville dont le séjour est le plus proche d'aujourd'hui.
+      var withCityRange = orderedCities.map(function(city){ return {city:city, range:cityStayRange(currentCountry.id+'_'+city.city)}; }).filter(function(x){ return !!x.range; });
+      if(withCityRange.length){
+        withCityRange.sort(function(a,b){
+          var da = Math.abs(new Date(a.range.start+'T00:00:00')-now);
+          var db = Math.abs(new Date(b.range.start+'T00:00:00')-now);
+          return da-db;
+        });
+        currentCity = withCityRange[0].city;
+      } else {
+        currentCity = orderedCities[0];
       }
-      if(!currentCity) currentCity=orderedCities[orderedCities.length-1];
     }
   }
   return {elapsedDays:elapsedDays, currentCountry:currentCountry, dayInCountry:dayInCountry, nextTransport:nextTransport, currentCity:currentCity};
@@ -4474,24 +4498,40 @@ function renderToday(){
   // ── Carte Demain / Ensuite ──
   var tomorrowCard = '';
   if(c){
-    var tomorrowElapsed = refOffset+1;
-    var cumulative=0, tmCountry=null, tmDayInCountry=0;
+    var tmCountry=null, tmDayInCountry=0;
     for(var ti=0; ti<COUNTRIES.length; ti++){
       var cc=COUNTRIES[ti];
-      if(tomorrowElapsed>=cumulative && tomorrowElapsed<cumulative+cc.days){ tmCountry=cc; tmDayInCountry=tomorrowElapsed-cumulative+1; break; }
-      cumulative+=cc.days;
+      var ccRange = getCountryDateRange(cc);
+      if(ccRange && tomorrowStrRef>=ccRange.start && tomorrowStrRef<=ccRange.end){
+        tmCountry=cc;
+        tmDayInCountry = Math.round((new Date(tomorrowStrRef+'T00:00:00')-new Date(ccRange.start+'T00:00:00'))/86400000)+1;
+        break;
+      }
     }
     if(tmCountry && tmCountry.id!==c.id){
       var transp = TRANSPORTS.find(function(t){return t[0]===c.id && t[1]===tmCountry.id;});
-      var tmLandingCityObj = getCityForCountryDay(tmCountry, 1);
-      var tmLandingCity = tmLandingCityObj ? tmLandingCityObj.city : null;
+      var tmOrderedIdx = getCityOrder(tmCountry.id);
+      var tmOrderedCities = tmOrderedIdx.map(function(idx){ return tmCountry.cities[idx]; });
+      var tmLandingCity = null;
+      for(var tj=0;tj<tmOrderedCities.length;tj++){
+        var tCityRange = cityStayRange(tmCountry.id+'_'+tmOrderedCities[tj].city);
+        if(tCityRange && tomorrowStrRef>=tCityRange.start && tomorrowStrRef<=tCityRange.end){ tmLandingCity=tmOrderedCities[tj].city; break; }
+      }
+      if(!tmLandingCity && tmOrderedCities.length) tmLandingCity = tmOrderedCities[0].city;
       var tmOnclick = tmLandingCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmLandingCity)+'\']=true;') : '';
       tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
         +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+tmCountry.flag+' Départ vers '+tmCountry.name+'</div>'
         +(transp?'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(transp[2])+'</div>':'<div class="status-sub" style="margin-top:2px">Moyen de transport à renseigner.</div>')
         +'</div>';
     } else if(tmCountry){
-      var tmCityObj = getCityForCountryDay(tmCountry, tmDayInCountry);
+      var tmOrderedIdx2 = getCityOrder(tmCountry.id);
+      var tmOrderedCities2 = tmOrderedIdx2.map(function(idx){ return tmCountry.cities[idx]; });
+      var tmCityObj = null;
+      for(var tk=0;tk<tmOrderedCities2.length;tk++){
+        var tCityRange2 = cityStayRange(tmCountry.id+'_'+tmOrderedCities2[tk].city);
+        if(tCityRange2 && tomorrowStrRef>=tCityRange2.start && tomorrowStrRef<=tCityRange2.end){ tmCityObj=tmOrderedCities2[tk]; break; }
+      }
+      if(!tmCityObj) tmCityObj = tmOrderedCities2[0] || null;
       var tmActCity = tmCityObj ? tmCityObj.city : null;
       var tmActs = tmCityObj ? getCityActivitiesForToday(tmCountry, tmCityObj, tomorrowStrRef) : [];
       var tmActOnclick = tmActCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmActCity)+'\']=true;') : '';
