@@ -2453,8 +2453,9 @@ function parseAiJson(text){
 async function fetchActivityDetailAI(cityKey, actName, detailKey, customIdx){
   if(!S.apiKey){
     if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
-      S.customActs[cityKey][customIdx].m = '';
-      S.customActs[cityKey][customIdx]._loading = false;
+      var actNoKey = S.customActs[cityKey][customIdx];
+      if(actNoKey.m === 'Chargement des infos…') actNoKey.m = '';
+      actNoKey._loading = false;
       save(); renderContent();
     }
     return;
@@ -2503,7 +2504,7 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     if(info.lat && info.lng) COORDS[detailKey] = [info.lat, info.lng, actName];
     if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
       var act = S.customActs[cityKey][customIdx];
-      act.m = info.m || act.m;
+      if(!act._userMeta) act.m = info.m || act.m;
       act.tags = info.tags || act.tags;
       act._loading = false;
     }
@@ -3087,20 +3088,28 @@ function addPhotoSpot(countryId){
   renderContent();
 }
 
-function _createActivityCore(cityKey, val){
+function _createActivityCore(cityKey, val, opts){
   val = stripHtml(val.trim());
   if(!val) return;
+  opts = opts || {};
   if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
   const newIdx = S.customActs[cityKey].length;
-  const actObj = {n:val, m:'Chargement des infos…', tags:[], custom:true, _loading:true};
+  const actObj = {n:val, m:(opts.meta||'Chargement des infos…'), tags:[], custom:true, _loading:true};
+  if(opts.meta) actObj._userMeta = true;
   S.customActs[cityKey].push(actObj);
+  var actKey = cityKey+'_c'+newIdx;
+  if(opts.category){ if(!S.actCategory) S.actCategory={}; S.actCategory[actKey]=opts.category; }
+  if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
   save();
   renderContent();
-  fetchActivityDetailAI(cityKey, val, cityKey+'_c'+newIdx, newIdx);
+  fetchActivityDetailAI(cityKey, val, actKey, newIdx);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(){});
+    if(opts.date){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    }
   }
 }
 function addActivity(cityKey) {
@@ -3114,14 +3123,35 @@ function addActivity(cityKey) {
   _createActivityCore(cityKey, val);
 }
 var _addActivityModalCk = '';
+var _addActivityModalCat = '';
 function openAddActivityModal(ck){
   _addActivityModalCk = ck;
+  _addActivityModalCat = '';
+  var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
+  var dateBounds = range ? (' min="'+range.start+'" max="'+range.end+'"') : '';
+  var catPills = Object.keys(ACTIVITY_CATEGORIES).map(function(key){
+    var cat = ACTIVITY_CATEGORIES[key];
+    return '<span onclick="event.stopPropagation();selectAddActivityCat(\''+key+'\')" data-cat-pill="'+key+'" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:6px 12px;border-radius:14px;cursor:pointer;margin:0 6px 6px 0">'+svgIcon(cat.icon,13)+' '+cat.label+'</span>';
+  }).join('');
   document.getElementById('guideItemModalTitle').textContent = 'Ajouter une activité';
   document.getElementById('guideItemModalBody').innerHTML =
-    '<div class="ef-row"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
-    +'<div class="suggestions-list" id="guideModalActSuggestions" style="position:static;margin-top:6px"></div>';
+    '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
+    +'<div class="suggestions-list" id="guideModalActSuggestions" style="position:static;margin-bottom:8px"></div>'
+    +'<div class="ef-row" style="margin-bottom:10px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Description courte (optionnel)" style="width:100%"/></div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Catégorie (optionnel)</div>'
+    +'<div style="margin-bottom:10px">'+catPills+'</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date (optionnel)</div>'
+    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/>';
   _guideModalSaveFn = saveAddActivityModal;
   document.getElementById('guideItemModal').classList.add('open');
+}
+function selectAddActivityCat(key){
+  _addActivityModalCat = (_addActivityModalCat===key) ? '' : key;
+  document.querySelectorAll('[data-cat-pill]').forEach(function(el){
+    var active = el.getAttribute('data-cat-pill')===_addActivityModalCat;
+    el.style.background = active ? 'var(--accent-pale)' : 'var(--sand-deep)';
+    el.style.color = active ? 'var(--accent)' : 'var(--ink-subtle)';
+  });
 }
 function showModalActSuggestions(ck){
   var inp = document.getElementById('guideModalActName');
@@ -3152,8 +3182,10 @@ function showModalActSuggestions(ck){
 function saveAddActivityModal(){
   var val = ((document.getElementById('guideModalActName')||{}).value||'').trim();
   if(!val) return;
+  var meta = ((document.getElementById('guideModalActMeta')||{}).value||'').trim();
+  var date = ((document.getElementById('guideModalActDate')||{}).value||'').trim();
   closeGuideItemModal();
-  _createActivityCore(_addActivityModalCk, val);
+  _createActivityCore(_addActivityModalCk, val, {meta:meta, category:_addActivityModalCat, date:date});
 }
 
 async function autofillCountryWithAI(countryId){
