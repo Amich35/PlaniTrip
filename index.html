@@ -213,25 +213,6 @@ a{color:var(--ink);}
 .wc-temp{font-size:13px;font-weight:500;}
 .wc-desc{font-size:9px;color:var(--ink-muted);margin-top:2px;}
 
-.photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
-.photo-spot-card{border-radius:var(--r16);padding:var(--sp16);min-height:140px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;background:#2D2420 center/cover no-repeat;box-shadow:var(--shadow-md);}
-.photo-spot-card::before{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.65) 0%,rgba(0,0,0,0.1) 55%,transparent 100%);z-index:1;}
-.photo-spot-card:active{transform:scale(0.98);}
-.psc-content{position:relative;z-index:2;}
-.psc-name{font-size:13px;font-weight:600;color:#fff;line-height:1.2;}
-.psc-tip{font-size:10px;color:rgba(255,255,255,0.75);margin-top:3px;line-height:1.4;font-style:italic;}
-.photo-spot-card{cursor:pointer;}
-.photo-spot-card.has-photo::before{background:linear-gradient(to top,rgba(0,0,0,0.75) 0%,rgba(0,0,0,0.15) 55%,transparent 100%);}
-
-.photo-lightbox{display:none;position:fixed;inset:0;z-index:230;background:rgba(15,12,10,0.92);align-items:center;justify-content:center;padding:20px;}
-.photo-lightbox.open{display:flex;}
-.pl-card{width:100%;max-width:440px;border-radius:var(--r20);overflow:hidden;background:var(--parchment);box-shadow:0 12px 40px rgba(0,0,0,0.4);}
-.pl-img{width:100%;height:280px;background:#2D2420 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:40px;color:rgba(255,255,255,0.5);}
-.pl-body{padding:18px 20px 22px;}
-.pl-name{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:19px;font-weight:700;color:var(--ink);}
-.pl-tip{font-size:13px;color:var(--ink-muted);margin-top:8px;line-height:1.5;font-style:italic;}
-.pl-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(0,0,0,0.4);color:#fff;font-size:14px;cursor:pointer;z-index:2;}
-
 .info-card{background:var(--parchment);border:var(--border);border-radius:var(--r22);padding:var(--sp16);margin-bottom:var(--sp8);box-shadow:var(--shadow-sm);}
 .rh-card{background:#fff;border:1px solid #ECECEC;border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
 .rh-chip-done{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.08);padding:4px 10px;border-radius:20px;}
@@ -1056,26 +1037,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 </div>
 
 <!-- Photo spot lightbox -->
-<div class="photo-lightbox" id="photoLightbox">
-  <div class="pl-card" style="position:relative;">
-    <button class="pl-close" onclick="closePhotoSpot()">✕</button>
-    <div style="position:relative;">
-      <div class="pl-img" id="plImg"><span data-icon="camera" data-icon-size="32" style="color:rgba(255,255,255,0.5)"></span></div>
-      <button id="plPhotoDots" onclick="event.stopPropagation();openPhotoPicker(_currentSpotQuery)" style="position:absolute;bottom:10px;right:10px;z-index:3;width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;">
-        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
-        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
-        <span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;"></span>
-      </button>
-    </div>
-    <div class="pl-body">
-      <div class="pl-name" id="plName"></div>
-      <input class="ir-input-block" id="plTipInput" type="text" placeholder="Sous-titre du spot" style="margin-top:6px" oninput="onPlTipInput(this.value)"/>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button onclick="deleteCurrentPhotoSpot()" style="flex:1;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Supprimer ce spot</button>
-      </div>
-    </div>
-  </div>
-</div>
+
 
 <script>
 console.log('[PlaniTrip] Version chargée : 2026-07-16-deletecity-fix-v2');
@@ -2805,7 +2767,6 @@ async function fetchPlaceImage(query){
 }
 // ── CUSTOM PHOTO OVERRIDE (manual upload / URL, bypasses auto-fetch) ──
 var _photoModalTarget = null;
-var _currentSpotQuery = null;
 var _currentDetailQuery = null;
 function jsStrEsc(str){ return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function photoEditBtn(query, posStyle){
@@ -2867,10 +2828,6 @@ async function setCustomPhoto(query, url){
   });
   renderContent();
   setTimeout(function(){ loadPlaceImages(); },50);
-  if(_currentSpotQuery===query){
-    var plImg=document.getElementById('plImg');
-    if(plImg){ plImg.style.backgroundImage='url(\''+url+'\')'; plImg.textContent=''; }
-  }
   if(_currentDetailQuery===query){
     var dImg=document.getElementById('detailImg');
     if(dImg){ dImg.style.backgroundImage='url(\''+url+'\')'; dImg.textContent=''; }
@@ -3070,22 +3027,6 @@ function showSuggestions(ck) {
       save(); renderContent();
     });
   });
-}
-
-function addPhotoSpot(countryId){
-  var inp = document.getElementById('newphotospot_'+countryId);
-  if(!inp) return;
-  var val = inp.value.trim();
-  if(!val) return;
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return;
-  if(!c.photo) c.photo = [];
-  c.photo.push({n: val, t: 'Spot photo ajouté par vous'});
-  if(!S.countryEdits[countryId]) S.countryEdits[countryId] = {};
-  S.countryEdits[countryId].photo = c.photo;
-  inp.value = '';
-  save();
-  renderContent();
 }
 
 function _createActivityCore(cityKey, val, opts){
@@ -6716,50 +6657,6 @@ function doSearch(q){
       +'</div>';
   }).join('');
 }
-
-var _currentSpotCountryId = null;
-var _currentSpotIndex = -1;
-function openPhotoSpot(name, tip, query, countryId, index){
-  _currentSpotQuery = query;
-  _currentSpotCountryId = countryId;
-  _currentSpotIndex = index;
-  document.getElementById('plName').textContent = name;
-  var tipInput = document.getElementById('plTipInput');
-  if(tipInput) tipInput.value = tip;
-  var imgEl = document.getElementById('plImg');
-  imgEl.style.backgroundImage = '';
-  imgEl.innerHTML = svgIcon('camera', 32);
-  document.getElementById('photoLightbox').classList.add('open');
-  fetchPlaceImage(query).then(function(url){
-    if(url){
-      imgEl.style.backgroundImage = 'url(\''+url+'\')';
-      imgEl.textContent = '';
-    }
-  });
-}
-function onPlTipInput(val){
-  if(!_currentSpotCountryId || _currentSpotIndex<0) return;
-  var c = COUNTRIES.find(function(co){return co.id===_currentSpotCountryId;});
-  if(!c || !c.photo || !c.photo[_currentSpotIndex]) return;
-  c.photo[_currentSpotIndex].t = val;
-  if(!S.countryEdits[_currentSpotCountryId]) S.countryEdits[_currentSpotCountryId] = {};
-  S.countryEdits[_currentSpotCountryId].photo = c.photo;
-  save();
-}
-function deleteCurrentPhotoSpot(){
-  if(!_currentSpotCountryId || _currentSpotIndex<0) return;
-  showConfirm('Supprimer ce spot photo ?', function(){
-    var c = COUNTRIES.find(function(co){return co.id===_currentSpotCountryId;});
-    if(!c || !c.photo) return;
-    c.photo.splice(_currentSpotIndex, 1);
-    if(!S.countryEdits[_currentSpotCountryId]) S.countryEdits[_currentSpotCountryId] = {};
-    S.countryEdits[_currentSpotCountryId].photo = c.photo;
-    save();
-    closePhotoSpot();
-    renderContent();
-  }, 'Supprimer');
-}
-function closePhotoSpot(){ document.getElementById('photoLightbox').classList.remove('open'); }
 
 function goToSearchResult(countryId, cityName, actKey){
   closeSearch();
