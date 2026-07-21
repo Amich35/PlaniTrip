@@ -6167,6 +6167,47 @@ function toggleDocOpen(id){
 }
 function saveDocField(docId, key, val){ if(!S.documents[docId]) S.documents[docId]={}; S.documents[docId][key]=val; save(); }
 
+// ── Triple-select Jour/Mois/Année générique (remplace <input type="date"> natif,
+// dont le rendu iOS impose sa propre taille de police non maîtrisable en CSS) ──
+function dateTripleHTML(idPrefix, currentISO){
+  var d='', m='', y='';
+  if(currentISO){
+    var p = currentISO.split('-');
+    if(p.length===3){ y=p[0]; m=String(parseInt(p[1],10)); d=String(parseInt(p[2],10)); }
+  }
+  var curYear = new Date().getFullYear();
+  var maxDay = (m && y) ? new Date(parseInt(y,10), parseInt(m,10), 0).getDate() : 31;
+  var dayOpts = '<option value="">Jour</option>' + Array.from({length:maxDay}, function(_,i){
+    var v=i+1; return '<option value="'+v+'"'+(String(v)===d?' selected':'')+'>'+v+'</option>';
+  }).join('');
+  var monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var monthOpts = '<option value="">Mois</option>' + monthNames.map(function(mm,i){
+    var v=i+1; return '<option value="'+v+'"'+(String(v)===m?' selected':'')+'>'+mm+'</option>';
+  }).join('');
+  var yearOpts = '<option value="">Année</option>' + Array.from({length:4}, function(_,i){
+    var v=curYear+i; return '<option value="'+v+'"'+(String(v)===y?' selected':'')+'>'+v+'</option>';
+  }).join('');
+  return '<input type="hidden" id="'+idPrefix+'-hidden" value="'+(currentISO||'')+'">'
+    +'<div class="ct-date-field-row">'
+    +'<div class="ct-date-field"><select id="'+idPrefix+'-day" class="ct-date-select" onchange="syncDateTripleGeneric(\''+idPrefix+'\')">'+dayOpts+'</select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>'
+    +'<div class="ct-date-field ct-date-field-month"><select id="'+idPrefix+'-month" class="ct-date-select" onchange="syncDateTripleGeneric(\''+idPrefix+'\')">'+monthOpts+'</select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>'
+    +'<div class="ct-date-field ct-date-field-year"><select id="'+idPrefix+'-year" class="ct-date-select" onchange="syncDateTripleGeneric(\''+idPrefix+'\')">'+yearOpts+'</select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>'
+    +'</div>';
+}
+function syncDateTripleGeneric(idPrefix){
+  var daySel=document.getElementById(idPrefix+'-day'), monthSel=document.getElementById(idPrefix+'-month'), yearSel=document.getElementById(idPrefix+'-year');
+  var hidden=document.getElementById(idPrefix+'-hidden');
+  if(!daySel||!monthSel||!yearSel||!hidden) return;
+  var d=daySel.value, m=monthSel.value, y=yearSel.value;
+  if(m && y){
+    var maxDay = new Date(parseInt(y,10), parseInt(m,10), 0).getDate();
+    var wanted = daySel.value;
+    daySel.innerHTML = '<option value="">Jour</option>' + Array.from({length:maxDay}, function(_,i){ return '<option value="'+(i+1)+'">'+(i+1)+'</option>'; }).join('');
+    if(wanted && parseInt(wanted,10)<=maxDay) daySel.value = wanted;
+    d = daySel.value;
+  }
+  hidden.value = (d && m && y) ? (y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')) : '';
+}
 function renderFlightsList(flights){
   var people = getPeopleList();
   if(!S.newFlightParticipants || !S.newFlightParticipants.length) S.newFlightParticipants = people.slice();
@@ -6200,9 +6241,9 @@ function renderFlightsList(flights){
     +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" value="'+(editingFlight?escHtml(editingFlight.from||''):'')+'" style="flex:1;min-width:0">'
     +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'" style="flex:1;min-width:0">'
     +'</div>'
-    +'<div style="display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:8px">'
-    +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date du vol<span data-icon="pencil" data-icon-size="11" style="color:var(--ink-subtle)"></span></span>'
-    +'<input id="newFlightDate" type="date" class="ef-input" value="'+(editingFlight?escHtml(editingFlight.date||''):'')+'" style="width:100%;text-align:center">'
+    +'<div style="display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:8px">'
+    +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date du vol</span>'
+    +dateTripleHTML('newFlightDate', editingFlight?(editingFlight.date||''):'')
     +'</div>'
     +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" value="'+(editingFlight?escHtml(editingFlight.link||''):'')+'" style="width:100%;margin-top:6px">'
     +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
@@ -6249,7 +6290,7 @@ function cancelEditFlight(){
 function saveFlight(){
   var from = document.getElementById('newFlightFrom').value.trim();
   var to = document.getElementById('newFlightTo').value.trim();
-  var date = document.getElementById('newFlightDate').value;
+  var date = document.getElementById('newFlightDate-hidden').value;
   var link = document.getElementById('newFlightLink').value.trim();
   if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
   if(!S.documents.tickets) S.documents.tickets = {};
@@ -9084,11 +9125,12 @@ function applyTripCountryFilter(trip) {
       const rateGuess = (window.COUNTRY_RATES && window.COUNTRY_RATES[countryName]) || 1;
       const langGuess = (window.COUNTRY_LANGUAGES && window.COUNTRY_LANGUAGES[countryName]) || '';
       const tzGuess = (window.COUNTRY_TIMEZONES && window.COUNTRY_TIMEZONES[countryName]) || '';
+      const phrasesGuess = getPhrasesForLanguage(langGuess);
       const newCountry = {
         id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
         currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier', lang: langGuess, budget_daily: 50,
         timezone: (tzGuess && tzGuess!=='0h') ? (tzGuess+' par rapport à la France') : (tzGuess==='0h' ? 'Identique à la France' : ''),
-        alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[], phrases:[]}
+        alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[], phrases:phrasesGuess}
       };
       COUNTRIES.push(newCountry);
       if (!S.customCountries) S.customCountries = [];
@@ -9114,6 +9156,10 @@ function applyTripCountryFilter(trip) {
         if (!exists.timezone && window.COUNTRY_TIMEZONES && window.COUNTRY_TIMEZONES[countryName]) {
           var tzExisting = window.COUNTRY_TIMEZONES[countryName];
           exists.timezone = (tzExisting!=='0h') ? (tzExisting+' par rapport à la France') : 'Identique à la France';
+        }
+        if (exists.practical && (!exists.practical.phrases || !exists.practical.phrases.length) && exists.lang) {
+          var phrasesExisting = getPhrasesForLanguage(exists.lang);
+          if(phrasesExisting.length) exists.practical.phrases = phrasesExisting;
         }
       }
     }
@@ -9531,6 +9577,7 @@ window.COUNTRY_CURRENCIES = {};
 window.COUNTRY_RATES = {};
 window.COUNTRY_LANGUAGES = {};
 window.COUNTRY_TIMEZONES = {};
+window.COUNTRY_PHRASES = {};
 
 async function loadCountryFlags() {
   if (Object.keys(window.COUNTRY_FLAGS).length) return;
@@ -9564,6 +9611,24 @@ async function loadCountryFlags() {
   } catch (e) {
     console.error('[PlaniTrip] impossible de charger country_timezones.json', e);
   }
+  try {
+    const res6 = await fetch('country_phrases.json');
+    window.COUNTRY_PHRASES = await res6.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger country_phrases.json', e);
+  }
+}
+// Résout les phrases utiles pour une langue de pays (ex: "Anglais / Français" → essaie chaque
+// langue dans l'ordre jusqu'à en trouver une couverte). Retourne [] si aucune correspondance.
+function getPhrasesForLanguage(langStr){
+  if(!langStr || !window.COUNTRY_PHRASES) return [];
+  var tokens = langStr.split('/').map(function(t){return t.trim();});
+  for(var i=0;i<tokens.length;i++){
+    if(window.COUNTRY_PHRASES[tokens[i]]) return window.COUNTRY_PHRASES[tokens[i]];
+  }
+  // Repli : essaie aussi la chaîne complète telle quelle (ex: "Ourdou / Anglais" en clé exacte)
+  if(window.COUNTRY_PHRASES[langStr]) return window.COUNTRY_PHRASES[langStr];
+  return [];
 }
 
 async function loadCountryList() {
