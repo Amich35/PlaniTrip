@@ -872,11 +872,26 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
     <div class="ct-section">
       <div class="ct-section-label"><span data-icon="calendar" data-icon-size="15"></span> Dates</div>
-      <div class="ct-dates-card">
-        <input type="date" id="ct-start-input" class="ct-date-input">
-        <span class="ct-date-arrow" data-icon="arrow-right" data-icon-size="15"></span>
-        <input type="date" id="ct-end-input" class="ct-date-input">
+      <div class="ct-dates-card" style="flex-direction:column;align-items:stretch;gap:10px">
+        <div>
+          <div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div>
+          <div style="display:flex;gap:6px">
+            <select id="ct-start-day" class="ct-date-input" style="flex:1"></select>
+            <select id="ct-start-month" class="ct-date-input" style="flex:1.6"></select>
+            <select id="ct-start-year" class="ct-date-input" style="flex:1"></select>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Retour</div>
+          <div style="display:flex;gap:6px">
+            <select id="ct-end-day" class="ct-date-input" style="flex:1"></select>
+            <select id="ct-end-month" class="ct-date-input" style="flex:1.6"></select>
+            <select id="ct-end-year" class="ct-date-input" style="flex:1"></select>
+          </div>
+        </div>
       </div>
+      <input type="hidden" id="ct-start-input">
+      <input type="hidden" id="ct-end-input">
       <div id="ct-days-count" class="ct-days-badge" style="display:none"></div>
     </div>
 
@@ -9438,6 +9453,10 @@ function showCreateTripScreen(errorMsg, showBack) {
   document.getElementById('ct-name-input').value = '';
   document.getElementById('ct-start-input').value = '';
   document.getElementById('ct-end-input').value = '';
+  ['ct-start-day','ct-start-month','ct-start-year','ct-end-day','ct-end-month','ct-end-year'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.value = '';
+  });
   document.getElementById('ct-traveler-email-input').value = '';
   document.getElementById('ct-days-count').style.display = 'none';
   CT_COUNTRIES = [];
@@ -9611,7 +9630,49 @@ document.getElementById('ct-country-modal').addEventListener('click', (e) => {
 
 document.getElementById('ct-start-input').addEventListener('input', updateCtDaysCount);
 document.getElementById('ct-end-input').addEventListener('input', updateCtDaysCount);
-wireDateRangeSync('ct-start-input', 'ct-end-input');
+// Sélecteurs Jour/Mois/Année (au lieu d'un <input type="date"> natif) : sur iOS, la roue native
+// pré-affiche toujours la date du jour, ce qui la fait valider par erreur si l'utilisateur ne
+// scrolle pas. Avec des <select> à valeur vide par défaut, aucune date n'est retenue tant que
+// les 3 champs n'ont pas été explicitement choisis.
+var CT_MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+function populateDateTriple(dayId, monthId, yearId){
+  var daySel = document.getElementById(dayId), monthSel = document.getElementById(monthId), yearSel = document.getElementById(yearId);
+  daySel.innerHTML = '<option value="">Jour</option>' + Array.from({length:31}, function(_,i){ return '<option value="'+(i+1)+'">'+(i+1)+'</option>'; }).join('');
+  monthSel.innerHTML = '<option value="">Mois</option>' + CT_MONTHS_FR.map(function(m,i){ return '<option value="'+(i+1)+'">'+m+'</option>'; }).join('');
+  var curYear = new Date().getFullYear();
+  yearSel.innerHTML = '<option value="">Année</option>' + Array.from({length:4}, function(_,i){ var y=curYear+i; return '<option value="'+y+'">'+y+'</option>'; }).join('');
+}
+function daysInMonth(month, year){ return new Date(parseInt(year,10), parseInt(month,10), 0).getDate(); }
+function syncDateTriple(dayId, monthId, yearId, hiddenId){
+  var daySel = document.getElementById(dayId), monthSel = document.getElementById(monthId), yearSel = document.getElementById(yearId);
+  var hidden = document.getElementById(hiddenId);
+  var d = daySel.value, m = monthSel.value, y = yearSel.value;
+  // Ajuste le nombre de jours dispo selon le mois/année choisis (évite les "31 février")
+  if(m && y){
+    var maxDay = daysInMonth(m, y);
+    var wantedDay = daySel.value;
+    daySel.innerHTML = '<option value="">Jour</option>' + Array.from({length:maxDay}, function(_,i){ return '<option value="'+(i+1)+'">'+(i+1)+'</option>'; }).join('');
+    if(wantedDay && parseInt(wantedDay,10)<=maxDay) daySel.value = wantedDay;
+    d = daySel.value;
+  }
+  if(d && m && y){
+    hidden.value = y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  } else {
+    hidden.value = '';
+  }
+  hidden.dispatchEvent(new Event('input'));
+  hidden.dispatchEvent(new Event('change'));
+}
+function wireDateTriple(dayId, monthId, yearId, hiddenId){
+  populateDateTriple(dayId, monthId, yearId);
+  ['change'].forEach(function(evt){
+    [dayId, monthId, yearId].forEach(function(id){
+      document.getElementById(id).addEventListener(evt, function(){ syncDateTriple(dayId, monthId, yearId, hiddenId); });
+    });
+  });
+}
+wireDateTriple('ct-start-day','ct-start-month','ct-start-year','ct-start-input');
+wireDateTriple('ct-end-day','ct-end-month','ct-end-year','ct-end-input');
 document.getElementById('ct-add-traveler-btn').addEventListener('click', addCtTraveler);
 document.getElementById('ct-traveler-email-input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addCtTraveler(); } });
 
@@ -9622,6 +9683,12 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   var name = document.getElementById('ct-name-input').value.trim();
   const start = document.getElementById('ct-start-input').value;
   const end = document.getElementById('ct-end-input').value;
+
+  if (start && end && end < start) {
+    errEl.textContent = "La date de retour doit être postérieure à la date de départ.";
+    errEl.style.display = 'block';
+    return;
+  }
 
   if (CT_COUNTRIES.length === 0) {
     errEl.textContent = 'Ajoute au moins un pays.';
