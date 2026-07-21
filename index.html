@@ -10257,14 +10257,12 @@ document.querySelectorAll('.auth-screen').forEach(enablePullToRefresh);
 // ── PROMPT POST-CRÉATION : préparer le voyage (IA / vide / import) ──
 function showPostCreateModal(trip){
   var hasKey = !!S.apiKey;
-  var aiCardStyle = hasKey ? 'cursor:pointer' : 'cursor:default;opacity:0.5';
-  var aiOnclick = hasKey ? ' onclick="runAiTripPrep()"' : '';
   var body = '<div class="modal-title" style="font-size:18px;margin-bottom:4px">Voulez-vous que PlaniTrip prépare votre voyage ?</div>'
     +'<div style="font-size:13px;color:var(--ink-subtle);margin-bottom:16px">Tu peux tout modifier ensuite.</div>'
     +'<div id="postCreateOptions">'
-    +'<div class="info-card" style="'+aiCardStyle+';margin-bottom:10px"'+aiOnclick+'>'
+    +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="'+(hasKey?'runAiTripPrep()':'showPostCreateAiKeyStep()')+'">'
     +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Générer avec l\'IA</div>'
-    +'<div class="status-sub">Infos pratiques, checklist, budget suggéré et conseils par pays'+(hasKey?'':' — nécessite une clé API (Réglages, après création)')+'</div>'
+    +'<div class="status-sub">Infos pratiques, checklist, budget suggéré et conseils par pays'+(hasKey?'':' — une clé API te sera demandée à l\'étape suivante')+'</div>'
     +'</div>'
     +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="closePostCreateModal()">'
     +'<div class="ic-header">'+svgIcon('file-text',18)+' Partir d\'un voyage vide</div>'
@@ -10277,6 +10275,32 @@ function showPostCreateModal(trip){
     +'</div>';
   document.getElementById('postCreateModalBody').innerHTML = body;
   document.getElementById('postCreateModal').classList.add('open');
+}
+// Étape intermédiaire du workflow IA : demande la clé API sans quitter la modale, puis
+// enchaîne directement sur la génération une fois enregistrée.
+function showPostCreateAiKeyStep(){
+  var optsEl = document.getElementById('postCreateOptions');
+  optsEl.innerHTML = '<div class="info-card">'
+    +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Clé API requise</div>'
+    +'<div class="status-sub" style="margin-bottom:12px;line-height:1.5">Colle ta clé API Anthropic personnelle pour générer le voyage automatiquement (infos pratiques, checklist, budget, conseils). Elle reste privée sur cet appareil.</div>'
+    +'<input class="modal-field api-key-field" type="password" id="postCreateApiKeyInput" placeholder="sk-ant-api03-…" style="font-family:monospace;font-size:12px;width:100%;box-sizing:border-box;margin-bottom:10px">'
+    +'<div id="postCreateAiKeyError" class="auth-error" style="display:none;margin-bottom:10px"></div>'
+    +'<button class="modal-cta" style="width:100%" onclick="submitPostCreateAiKey()">Valider et générer</button>'
+    +'<div onclick="showPostCreateModal()" style="text-align:center;margin-top:10px;font-size:12.5px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Retour</div>'
+    +'</div>';
+  setTimeout(function(){ var i=document.getElementById('postCreateApiKeyInput'); if(i) i.focus(); }, 100);
+}
+function submitPostCreateAiKey(){
+  var val = (document.getElementById('postCreateApiKeyInput').value||'').trim();
+  if(!val){
+    var errEl = document.getElementById('postCreateAiKeyError');
+    errEl.textContent = 'Merci de coller ta clé API.';
+    errEl.style.display = 'block';
+    return;
+  }
+  S.apiKey = val;
+  save();
+  runAiTripPrep();
 }
 function closePostCreateModal(){
   document.getElementById('postCreateModal').classList.remove('open');
