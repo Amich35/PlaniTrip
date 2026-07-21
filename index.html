@@ -6444,7 +6444,7 @@ function renderFeed(){
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
       +'<div style="display:flex;align-items:center;gap:8px">'
       +'<span style="width:30px;height:30px;border-radius:50%;background:'+(isOwner?'var(--accent)':'var(--sand-deep)')+';color:'+(isOwner?'#fff':'var(--ink-muted)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">'+escHtml(getInitials(personDisplayName(p.author)))+'</span>'
-      +'<div><div style="font-size:13.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:5px">'+escHtml(personDisplayName(p.author,'Toi'))+(isOwner?' <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:8px">Organisateur</span>':'')+(p.important?' <span style="font-size:10px;font-weight:700;color:var(--red-muted);background:var(--red-pale);padding:2px 6px;border-radius:8px;display:inline-flex;align-items:center;gap:3px">'+svgIcon('triangle-alert',10)+' Important</span>':'')+'</div>'
+      +'<div><div style="font-size:13.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:5px">'+escHtml(personDisplayName(p.author,'Toi'))+(isOwner?' <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-pale);padding:2px 6px;border-radius:8px">Organisateur</span>':'')+(p.important?(' <span '+(isMine?'onclick="event.stopPropagation();toggleFeedImportant(\''+p.id+'\')" ':'')+'style="font-size:10px;font-weight:700;color:var(--red-muted);background:var(--red-pale);padding:2px 6px;border-radius:8px;display:inline-flex;align-items:center;gap:3px'+(isMine?';cursor:pointer':'')+'">'+svgIcon('triangle-alert',10)+' Important'+(isMine?(' '+svgIcon('x',9)):'')+'</span>'):'')+'</div>'
       +'<div style="font-size:11px;color:var(--ink-subtle)">'+timeAgoLabel(p.createdAt)+'</div></div>'
       +'</div>'
       +(isMine?'<span onclick="removeFeedPost(\''+p.id+'\')" style="color:var(--red-muted);cursor:pointer;font-size:16px;padding:2px 6px">×</span>':'')
@@ -6668,6 +6668,18 @@ function toggleFeedReaction(postId){
   updateFeedBadge();
   if(sb && CURRENT_TRIP){
     sb.from('feed_posts').update({reactions:post.reactions}).eq('id', postId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update feed_posts reactions:', r.error); } });
+  }
+}
+function toggleFeedImportant(postId){
+  var post = (S.feedPosts||[]).find(function(p){ return p.id===postId; });
+  if(!post) return;
+  post.important = !post.important;
+  save();
+  renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('feed_posts').update({important:post.important}).eq('id', postId).then(function(r){
+      if(r&&r.error) console.error('[PlaniTrip] update feed_posts important:', r.error);
+    });
   }
 }
 function removeFeedPost(postId){
