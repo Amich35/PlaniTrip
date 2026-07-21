@@ -6845,6 +6845,29 @@ function renderGuide(c){
 }
 
 function getRate(c){ return Math.round((S.customRates && S.customRates[c.id]) || c.rateNum || 1); }
+var _rateEditCountryId = '';
+function openRateEditModal(countryId){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return;
+  _rateEditCountryId = countryId;
+  document.getElementById('guideItemModalTitle').textContent = 'Modifier le taux';
+  document.getElementById('guideItemModalBody').innerHTML =
+    '<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:12px">Taux appliqué pour tout le voyage (1 € converti en '+escHtml(c.currency||'devise locale')+').</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;background:var(--sand);border-radius:var(--r12);padding:10px 14px">'
+    +'<span style="font-size:15px;font-weight:700;color:var(--ink)">1 € =</span>'
+    +'<input type="number" id="rateEditInput" value="'+getRate(c)+'" style="flex:1;min-width:0;border:none;background:transparent;font-size:17px;font-weight:700;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:right"/>'
+    +'<span style="font-size:14px;color:var(--ink-muted)">'+escHtml(c.currency||'')+'</span>'
+    +'</div>';
+  _guideModalSaveFn = saveRateEdit;
+  document.getElementById('guideItemModal').classList.add('open');
+  setTimeout(function(){ var i=document.getElementById('rateEditInput'); if(i){ i.focus(); i.select(); } }, 100);
+}
+function saveRateEdit(){
+  var input = document.getElementById('rateEditInput');
+  var val = input ? input.value : '';
+  closeGuideItemModal();
+  if(_rateEditCountryId) updateCustomRate(_rateEditCountryId, val);
+}
 function renderMiniConverter(c){
   var rate = getRate(c);
   var dir = S.convDir && S.convDir[c.id] || 'eur';
@@ -6856,7 +6879,7 @@ function renderMiniConverter(c){
   return '<div style="margin-top:10px;padding-top:10px">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
     +'<span style="font-size:12px;font-weight:700;color:var(--ink-muted)">1€ =</span>'
-    +'<span style="display:flex;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--ink-muted)"><input type="number" value="'+rate+'" id="convRateMini_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:46px;border:none;border-bottom:1px dashed rgba(110,110,115,0.35);background:transparent;color:var(--ink-muted);font-weight:700;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:left"/> '+escHtml(c.currency||'')+'</span>'
+    +'<span style="font-size:12px;font-weight:700;color:var(--ink-muted)">'+rate+' '+escHtml(c.currency||'')+'</span>'
     +'</div>'
     +'<div style="background:var(--sand);border-radius:var(--r12);padding:6px;display:flex;align-items:center;gap:6px">'
     +'<div style="flex:1;min-width:0;background:#fff;border-radius:var(--r8);padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:5px">'
@@ -6868,6 +6891,7 @@ function renderMiniConverter(c){
     +'<span style="font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+resultStr+'</span>'
     +'<span style="font-size:10.5px;color:var(--ink-muted);font-weight:600;flex-shrink:0">'+escHtml(toLabel)+'</span>'
     +'</div>'
+    +'<button onclick="openRateEditModal(\''+c.id+'\')" title="Modifier le taux" style="width:32px;height:32px;flex-shrink:0;border-radius:var(--r8);border:1px solid rgba(29,29,31,0.09);background:#fff;color:var(--ink-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">'+svgIcon('pencil',14)+'</button>'
     +'</div>'
     +'</div>';
 }
@@ -9740,25 +9764,6 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     return;
   }
 
-  // Distribuer les dates du voyage équitablement entre les pays
-  if(start && end && CT_COUNTRIES.length > 0){
-    var startD = new Date(start+'T00:00:00');
-    var endD   = new Date(end+'T00:00:00');
-    var totalDays = Math.round((endD - startD)/86400000)+1;
-    var perC = Math.floor(totalDays / CT_COUNTRIES.length);
-    var extras = totalDays - perC * CT_COUNTRIES.length;
-    var settingsRows = CT_COUNTRIES.map(function(cid, i){
-      var offset = i * perC + Math.min(i, extras);
-      var cDays  = perC + (i < extras ? 1 : 0);
-      var cS = new Date(startD); cS.setDate(cS.getDate() + offset);
-      var cE = new Date(cS);    cE.setDate(cE.getDate() + cDays - 1);
-      var ds = cS.toISOString().split('T')[0];
-      var de = cE.toISOString().split('T')[0];
-      return {trip_id: data.id, country_id: cid, data: {dateStart: ds, dateEnd: de, days: cDays, dates: ds+' – '+de}};
-    });
-    try { await sb.from('country_settings').insert(settingsRows); } catch(e){}
-  }
-
   // Invitations optionnelles des voyageurs saisis à la création (scope "tous les pays" par défaut,
   // affinable ensuite depuis l'écran Voyageurs)
   if(CT_TRAVELERS.length > 0){
@@ -9778,6 +9783,27 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   }
 
   await enterTrip(data, true);
+
+  // Distribuer les dates du voyage équitablement entre les pays. Fait APRÈS enterTrip() car
+  // c'est à ce moment que les pays reçoivent leur identifiant réel (ex: "albanie_175...") —
+  // le faire avant, avec le nom du pays en guise d'id, désynchronisait les dates du bon pays.
+  if(start && end && CT_COUNTRIES.length > 0){
+    var startD = new Date(start+'T00:00:00');
+    var endD   = new Date(end+'T00:00:00');
+    var totalDays = Math.round((endD - startD)/86400000)+1;
+    var perC = Math.floor(totalDays / CT_COUNTRIES.length);
+    var extras = totalDays - perC * CT_COUNTRIES.length;
+    CT_COUNTRIES.forEach(function(countryName, i){
+      var realCountry = COUNTRIES.find(function(co){ return co.name === countryName; });
+      if(!realCountry) return;
+      var offset = i * perC + Math.min(i, extras);
+      var cDays  = perC + (i < extras ? 1 : 0);
+      var cS = new Date(startD); cS.setDate(cS.getDate() + offset);
+      var cE = new Date(cS);    cE.setDate(cE.getDate() + cDays - 1);
+      editCountryDateRange(realCountry.id, toLocalISODate(cS), toLocalISODate(cE));
+    });
+  }
+
   showPostCreateModal(data);
 });
 
