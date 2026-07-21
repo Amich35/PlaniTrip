@@ -9218,7 +9218,7 @@ async function verifyTripAccess(tripId){
     return true;
   }
 }
-async function enterTrip(trip, resetTab) {
+async function enterTrip(trip, resetTab, skipAutofillDates) {
   var accessOk = await verifyTripAccess(trip.id);
   if(!accessOk){
     try{ localStorage.removeItem('planitrip_trip_' + trip.id); }catch(e){}
@@ -9266,7 +9266,7 @@ async function enterTrip(trip, resetTab) {
   await loadProfiles();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
-  autofillMissingCountryDates();
+  if(!skipAutofillDates) autofillMissingCountryDates();
 
   if (COUNTRIES.length === 0) {
     console.warn('[PlaniTrip] Aucun pays visible, réinitialisation de sécurité.');
@@ -9778,11 +9778,13 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     }
   }
 
-  await enterTrip(data, true);
+  await enterTrip(data, true, true);
 
   // Distribuer les dates du voyage équitablement entre les pays. Fait APRÈS enterTrip() car
   // c'est à ce moment que les pays reçoivent leur identifiant réel (ex: "albanie_175...") —
   // le faire avant, avec le nom du pays en guise d'id, désynchronisait les dates du bon pays.
+  // enterTrip() est appelé avec skipAutofillDates=true pour éviter une course entre l'autofill
+  // (qui écrirait un repli "1 jour" au serveur) et cette répartition réelle des dates.
   if(start && end && CT_COUNTRIES.length > 0){
     var startD = new Date(start+'T00:00:00');
     var endD   = new Date(end+'T00:00:00');
@@ -9799,6 +9801,8 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
       editCountryDateRange(realCountry.id, toLocalISODate(cS), toLocalISODate(cE));
     });
   }
+  // Filet de sécurité : pays non couverts ci-dessus (ex: dates de voyage laissées vides à la création)
+  autofillMissingCountryDates();
 
   showPostCreateModal(data);
 });
