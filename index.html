@@ -3282,7 +3282,7 @@ Sources a privilegier selon le type d'information (dans cet ordre de confiance) 
 - Patrimoine / sites classes : UNESCO World Heritage List
 - Budget / cout de la vie : Numbeo
 Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels, evenements ou risques actuels a signaler). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","alerts":[{"t":"alerte courte et factuelle","url":""}],"tips":[{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"}],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":[{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"}],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
+{"tagline":"accroche courte 4-6 mots MAXIMUM","currency":"nom complet de la devise suivi du CODE ISO 4217 entre parentheses, ex: Yen (JPY) — jamais le symbole comme ¥","rate":"1€ = X devise (taux actuel)","visa":"1 phrase courte et concrete (15 mots maximum), pas de paragraphe","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","alerts":[{"t":"alerte courte et factuelle, 15 mots maximum","url":""}],"tips":[{"t":"conseil concis, 12 mots maximum, style note pratique pas phrase redigee","cat":"categorie"},{"t":"conseil concis, 12 mots maximum","cat":"categorie"},{"t":"conseil concis, 12 mots maximum","cat":"categorie"}],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":[{"t":"item concis, 8 mots maximum","cat":"categorie"},{"t":"item concis, 8 mots maximum","cat":"categorie"},{"t":"item concis, 8 mots maximum","cat":"categorie"},{"t":"item concis, 8 mots maximum","cat":"categorie"},{"t":"item concis, 8 mots maximum","cat":"categorie"}],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
 budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes factuelles et actuelles a surveiller pour ce pays specifique (evenement saisonnier majeur, periode a risque, affluence, conditions meteo extremes selon la periode) — laisse le tableau vide si rien de notable, n'invente rien. Chaque "cat" de tips DOIT etre exactement l'une de ces valeurs : Incontournable, Transport, Santé, Argent, Restauration, Hébergement, Culture, Sécurité, Bon plan, Autre (n'utilise "Autre" qu'en dernier recours si aucune autre categorie ne convient). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement) ; chaque "cat" de checklist DOIT etre exactement l'une de ces valeurs : Santé, Équipement, Documents, Argent, Vêtements, Transport, Autre (n'utilise "Autre" qu'en dernier recours). phrases = 10 mots ou expressions de base les plus utiles pour un touriste (bonjour, merci, oui, non, combien ca coute, l'addition svp, aide, ou sont les toilettes, delicieux, au revoir) traduits dans la/les langue(s) locale(s) principale(s).`
         }]
       })
@@ -3817,11 +3817,10 @@ function openGuideItemModal(countryId, listField, idx){
     document.getElementById('guideItemModalBody').innerHTML=
       '<div class="ef-row" style="margin-bottom:4px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%" autocomplete="off" oninput="showCityNameSuggestions(\''+jsStrEsc(countryId)+'\')"/></div>'
       +'<div class="suggestions-list" id="guideModalCitySuggestions" style="position:static;margin-bottom:8px"></div>'
-      +'<div class="ef-row" style="gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalCityDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cityAnchor||'')+'"/></div>'
-      +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalCityDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div></div>';
+      +'<div class="ef-row" style="gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div>'+dateTripleHTML('guideModalCityDateStart', cityAnchor||'')+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div>'+dateTripleHTML('guideModalCityDateEnd', '')+'</div></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
-    wireDateRangeSync('guideModalCityDateStart', 'guideModalCityDateEnd');
     showCityNameSuggestions(countryId);
     return;
   }
@@ -3873,8 +3872,8 @@ function saveGuideItem(){
 
   if(_guideModalListField==='city'){
     var cname=((document.getElementById('guideModalCityName')||{}).value||'').trim();
-    var cdStart=((document.getElementById('guideModalCityDateStart')||{}).value||'').trim();
-    var cdEnd=((document.getElementById('guideModalCityDateEnd')||{}).value||'').trim();
+    var cdStart=((document.getElementById('guideModalCityDateStart-hidden')||{}).value||'').trim();
+    var cdEnd=((document.getElementById('guideModalCityDateEnd-hidden')||{}).value||'').trim();
     closeGuideItemModal();
     _createCityFromModal(_guideModalCountryId, cname, '', cdStart, cdEnd);
     return;
@@ -4422,6 +4421,11 @@ function selectCategoryForAct(catKey){
   save();
   document.getElementById('categoryModal').classList.remove('open');
   renderContent();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){
+      if(r&&r.error) console.error('[PlaniTrip] sync actCategory:', r.error);
+    });
+  }
 }
 
 function renderCityPanelContentBody(c, city){
@@ -7099,6 +7103,7 @@ function renderGuide(c){
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (JPY)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
     +'<div class="info-row" style="border-bottom:none"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:10px 0"></div>'
@@ -9599,6 +9604,8 @@ async function loadActivityDetails(){
     // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
     if(row.detail_key === '__planitrip__actDate'){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
+    } else if(row.detail_key === '__planitrip__actCategory'){
+      if(row.data && typeof row.data === 'object'){ S.actCategory = row.data; }
     } else if(row.detail_key === '__planitrip__cityDates'){
       if(row.data && typeof row.data === 'object'){ S.cityDates = row.data; }
     } else if(row.detail_key === '__planitrip__actDay'){
@@ -9749,8 +9756,14 @@ function showTripSelectorScreen(trips) {
   document.getElementById('main-app').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'flex';
 
-  const owned = trips.filter(t => t.owner_id === CURRENT_USER.id);
-  const shared = trips.filter(t => t.owner_id !== CURRENT_USER.id);
+  function byDepartureDesc(a, b){
+    if(!a.start_date && !b.start_date) return 0;
+    if(!a.start_date) return 1; // sans date connue : relégué en fin de liste
+    if(!b.start_date) return -1;
+    return b.start_date.localeCompare(a.start_date);
+  }
+  const owned = trips.filter(t => t.owner_id === CURRENT_USER.id).sort(byDepartureDesc);
+  const shared = trips.filter(t => t.owner_id !== CURRENT_USER.id).sort(byDepartureDesc);
 
   const list = document.getElementById('ts-trip-list');
   list.innerHTML = '';
