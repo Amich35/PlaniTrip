@@ -6806,8 +6806,7 @@ function renderGuide(c){
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
-    +'<div class="info-row"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
-    +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:10px 0"></div>'
+    +'<div class="info-row" style="border-bottom:none"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +renderMiniConverter(c)
     +(c._aiGeneratedAt?'<div class="status-sub" style="margin-top:4px">Généré par IA le '+new Date(c._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+'</div>':'')
     +'</div>'
@@ -6823,7 +6822,7 @@ function renderGuide(c){
     +'</div>';
 }
 
-function getRate(c){ return (S.customRates && S.customRates[c.id]) || c.rateNum || 1; }
+function getRate(c){ return Math.round((S.customRates && S.customRates[c.id]) || c.rateNum || 1); }
 function renderMiniConverter(c){
   var rate = getRate(c);
   var dir = S.convDir && S.convDir[c.id] || 'eur';
@@ -6884,7 +6883,7 @@ function renderConverterCard(c){
 }
 function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
 function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmtMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
-function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=n; save(); renderContent(); var i=document.getElementById('convRateMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=Math.round(n); save(); renderContent(); var i=document.getElementById('convRateMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function delExp(id){
   showConfirm('Supprimer cette dépense ?', function(){
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
@@ -8989,7 +8988,7 @@ async function fetchAndApplyLiveRates(entries){
     var applied = false;
     entries.forEach(function(e){
       var r = data.rates[e.code];
-      if(r && r>0){ S.customRates[e.id] = r; applied = true; }
+      if(r && r>0){ S.customRates[e.id] = Math.round(r); applied = true; }
     });
     if(applied){ save(); renderContent(); }
   }catch(err){
