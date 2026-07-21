@@ -3291,23 +3291,33 @@ budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes 
     const text = extractAiText(data);
     if(!text) throw new Error('empty response');
     const info = deepSanitize(parseAiJson(text));
-    c.tagline = info.tagline || c.tagline;
+    // Filet de sécurité : l'IA ne respecte pas toujours les limites de longueur demandées dans
+    // le prompt. On tronque proprement (sur un mot entier) plutôt que de laisser passer des pavés.
+    function trunc(s, maxLen){
+      s = String(s||'').trim();
+      if(s.length<=maxLen) return s;
+      var cut = s.slice(0, maxLen);
+      var lastSpace = cut.lastIndexOf(' ');
+      if(lastSpace>maxLen*0.6) cut = cut.slice(0, lastSpace);
+      return cut+'…';
+    }
+    c.tagline = info.tagline ? trunc(info.tagline, 40) : c.tagline;
     c.currency = info.currency || c.currency;
     c.rate = info.rate || c.rate;
-    c.visa = info.visa || c.visa;
+    c.visa = info.visa ? trunc(info.visa, 110) : c.visa;
     c.lang = info.lang || c.lang;
     c.budget_daily = info.budget_daily || c.budget_daily;
     c.timezone = (info.timezone && info.timezone!=='Inconnu') ? info.timezone : c.timezone;
     if(info.alerts && info.alerts.length){
-      c.alerts = info.alerts.filter(function(a){ return a && a.t; }).map(function(a){ return {t:String(a.t), url:String(a.url||'')}; });
+      c.alerts = info.alerts.filter(function(a){ return a && a.t; }).map(function(a){ return {t:trunc(a.t,110), url:String(a.url||'')}; });
     }
     if(info.tips && info.tips.length){
       c.practical.tips = info.tips.map(function(t){
         if(typeof t==='object' && t.t){
           var cat = TIP_CATEGORIES.indexOf(t.cat)>-1 ? t.cat : 'Autre';
-          return {t:String(t.t), cat:cat};
+          return {t:trunc(t.t,90), cat:cat};
         }
-        return {t:String(t||''), cat:'Autre'};
+        return {t:trunc(t||'',90), cat:'Autre'};
       });
     }
     c.practical.emergency = info.emergency || c.practical.emergency;
@@ -3315,9 +3325,9 @@ budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes 
       c.practical.checklist = info.checklist.map(function(item){
         if(typeof item==='object' && item.t){
           var clCat = _CL_KNOWN_CATS.indexOf(item.cat)>-1 ? item.cat : 'Autre';
-          return {t:String(item.t), cat:clCat};
+          return {t:trunc(item.t,60), cat:clCat};
         }
-        return {t:String(item||''), cat:'Autre'};
+        return {t:trunc(item||'',60), cat:'Autre'};
       });
     }
     c.practical.phrases = (info.phrases && info.phrases.length) ? info.phrases : c.practical.phrases;
@@ -4057,7 +4067,7 @@ function personaPromptContext(){
 }
 async function suggestActivitiesWithAI(countryId, cityName){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c || !S.apiKey) return;
+  if(!c || !S.apiKey) return false;
   var ck = countryId+'_'+cityName;
   try{
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -4076,17 +4086,22 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
         }]
       })
     });
+    if(!resp.ok){
+      var errBody = await resp.text();
+      console.error('[PlaniTrip] suggestActivitiesWithAI: HTTP '+resp.status, errBody);
+      return false;
+    }
     const data = await resp.json();
     const text = extractAiText(data);
-    if(!text){ console.error('[PlaniTrip] suggestActivitiesWithAI: réponse IA vide', data); return; }
+    if(!text){ console.error('[PlaniTrip] suggestActivitiesWithAI: réponse IA vide', data); return false; }
     var info;
     try{
       info = deepSanitize(parseAiJson(text));
     }catch(parseErr){
       console.error('[PlaniTrip] suggestActivitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
-      return;
+      return false;
     }
-    if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); return; }
+    if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); return false; }
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
       var idx = S.customActs[ck].length;
@@ -4101,7 +4116,8 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
         sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi}).then(function(){});
       });
     }
-  }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); }
+    return true;
+  }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); return false; }
 }
 
 async function deleteActivity(cityKey, index, isCustom, actName) {
@@ -7154,8 +7170,9 @@ function renderMiniConverter(c){
   var dir = S.convDir && S.convDir[c.id] || 'eur';
   var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
-  var fromLabel = dir==='eur' ? 'EUR' : c.currency;
-  var toLabel = dir==='eur' ? c.currency : 'EUR';
+  var currencyCode = (c.currency.match(/\(([^)]+)\)/)||[,c.currency])[1];
+  var fromLabel = dir==='eur' ? 'EUR' : currencyCode;
+  var toLabel = dir==='eur' ? currencyCode : 'EUR';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
   return '<div>'
     +'<div style="background:var(--sand);border-radius:var(--r12);padding:6px;display:flex;align-items:center;gap:6px">'
@@ -7177,8 +7194,9 @@ function renderConverterCard(c){
   var dir = S.convDir && S.convDir[c.id] || 'eur';
   var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
-  var fromLabel = dir==='eur' ? 'EUR' : c.currency;
-  var toLabel = dir==='eur' ? c.currency : 'EUR';
+  var currencyCode = (c.currency.match(/\(([^)]+)\)/)||[,c.currency])[1];
+  var fromLabel = dir==='eur' ? 'EUR' : currencyCode;
+  var toLabel = dir==='eur' ? currencyCode : 'EUR';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
   var quickAmounts = [5,10,20,50];
   var quickRow = '<div style="display:flex;gap:6px;margin-top:12px">'
@@ -10460,6 +10478,11 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
         }]
       })
     });
+    if(!resp.ok){
+      var errBody = await resp.text();
+      console.error('[PlaniTrip] suggestCitiesWithAI: HTTP '+resp.status, errBody);
+      return null;
+    }
     const data = await resp.json();
     const text = extractAiText(data);
     if(!text){ console.error('[PlaniTrip] suggestCitiesWithAI: réponse IA vide', data); return null; }
@@ -10501,9 +10524,16 @@ async function generateProgramForCountry(countryId, onProgress){
     var endStr = toLocalISODate(endDate);
     _createCityFromModal(countryId, entry.name, '', cursor, endStr, true);
     cursor = toLocalISODate(new Date(endDate.getTime()+86400000));
-    try{ await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
-    // Petite pause entre chaque ville pour rester raisonnable sur le rythme des appels IA
-    await new Promise(function(resolve){ setTimeout(resolve, 400); });
+    // Pause avant l'appel (laisse le temps entre l'appel "villes" qui vient de se terminer et
+    // celui-ci, sinon le tout premier appel activités part immédiatement à la suite)
+    await new Promise(function(resolve){ setTimeout(resolve, 700); });
+    var ok = false;
+    try{ ok = await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
+    if(!ok){
+      // Une tentative de plus après une pause plus longue (en cas de limite de débit ponctuelle)
+      await new Promise(function(resolve){ setTimeout(resolve, 1500); });
+      try{ await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
+    }
   }
 }
 async function runAiTripPrep(){
