@@ -5024,7 +5024,7 @@ function renderToday(){
       +'<div style="padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="ic-header" style="color:var(--red-muted);margin:0">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div><span style="font-size:11px;color:var(--ink-subtle);flex-shrink:0">'+timeAgoLabel(p.createdAt)+'</span></div>'
       +(p.photo?('<img src="'+p.photo+'" style="width:100%;display:block;max-height:220px;object-fit:cover"/>'):'')
       +(pText||pTagged?('<div style="padding:'+(p.photo?'10px':'0')+' 16px 14px">'
-      +(pText?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+escHtml(pText)+'</div>':'')
+      +(pText?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+linkifyText(pText)+'</div>':'')
       +pTagged
       +'</div>'):(p.photo?'<div style="height:8px"></div>':''))
       +'</div>';
@@ -6414,6 +6414,17 @@ function timeAgoLabel(iso){
   if(days<7) return 'il y a '+days+'j';
   return new Date(iso).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
 }
+// Échappe le texte puis transforme les URLs détectées en liens cliquables (ouvre l'app
+// correspondante si installée — comportement natif iOS/Android sur les liens http(s) —
+// sinon le navigateur). Échappement d'abord pour éviter toute injection HTML via l'URL.
+function linkifyText(text){
+  var escaped = escHtml(text);
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, function(url){
+    var clean = url.replace(/[.,;:!?)]+$/, '');
+    var trail = url.slice(clean.length);
+    return '<a href="'+clean+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="color:var(--accent);text-decoration:underline;word-break:break-all">'+clean+'</a>'+trail;
+  });
+}
 function renderFeed(){
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
@@ -6440,7 +6451,7 @@ function renderFeed(){
       +'</div>'
       +(p.photo?photoHTML:'')
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:'+(p.photo?'8px':'0')+'">'
-      +(displayText?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap;flex:1">'+escHtml(displayText)+'</div>':'<div style="flex:1"></div>')
+      +(displayText?'<div style="font-size:14px;color:var(--ink);line-height:1.4;white-space:pre-wrap;flex:1">'+linkifyText(displayText)+'</div>':'<div style="flex:1"></div>')
       +(isMine?('<span onclick="openEditPostTextModal(\''+p.id+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-subtle);cursor:pointer">'+svgIcon('pencil',11)+(displayText?' Modifier':' Ajouter texte')+'</span>'):'')
       +'</div>'
       +taggedHTML
