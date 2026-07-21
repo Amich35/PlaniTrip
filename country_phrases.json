@@ -1,0 +1,2942 @@
+{
+"Français": [
+{
+"fr": "Bonjour",
+"local": "Bonjour"
+},
+{
+"fr": "Merci",
+"local": "Merci"
+},
+{
+"fr": "Oui",
+"local": "Oui"
+},
+{
+"fr": "Non",
+"local": "Non"
+},
+{
+"fr": "S'il vous plaît",
+"local": "S'il vous plaît"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Combien ça coûte ?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "L'addition s'il vous plaît"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Où sont les toilettes ?"
+},
+{
+"fr": "Délicieux",
+"local": "Délicieux"
+},
+{
+"fr": "Au revoir",
+"local": "Au revoir"
+}
+],
+"Anglais": [
+{
+"fr": "Bonjour",
+"local": "Hello"
+},
+{
+"fr": "Merci",
+"local": "Thank you"
+},
+{
+"fr": "Oui",
+"local": "Yes"
+},
+{
+"fr": "Non",
+"local": "No"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Please"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "How much is it?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "The bill, please"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Where is the toilet?"
+},
+{
+"fr": "Délicieux",
+"local": "Delicious"
+},
+{
+"fr": "Au revoir",
+"local": "Goodbye"
+}
+],
+"Espagnol": [
+{
+"fr": "Bonjour",
+"local": "Hola"
+},
+{
+"fr": "Merci",
+"local": "Gracias"
+},
+{
+"fr": "Oui",
+"local": "Sí"
+},
+{
+"fr": "Non",
+"local": "No"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Por favor"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "¿Cuánto cuesta?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "La cuenta, por favor"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "¿Dónde está el baño?"
+},
+{
+"fr": "Délicieux",
+"local": "Delicioso"
+},
+{
+"fr": "Au revoir",
+"local": "Adiós"
+}
+],
+"Allemand": [
+{
+"fr": "Bonjour",
+"local": "Hallo"
+},
+{
+"fr": "Merci",
+"local": "Danke"
+},
+{
+"fr": "Oui",
+"local": "Ja"
+},
+{
+"fr": "Non",
+"local": "Nein"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Bitte"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Wie viel kostet das?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Die Rechnung, bitte"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Wo ist die Toilette?"
+},
+{
+"fr": "Délicieux",
+"local": "Lecker"
+},
+{
+"fr": "Au revoir",
+"local": "Auf Wiedersehen"
+}
+],
+"Italien": [
+{
+"fr": "Bonjour",
+"local": "Ciao"
+},
+{
+"fr": "Merci",
+"local": "Grazie"
+},
+{
+"fr": "Oui",
+"local": "Sì"
+},
+{
+"fr": "Non",
+"local": "No"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Per favore"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Quanto costa?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Il conto, per favore"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Dov'è il bagno?"
+},
+{
+"fr": "Délicieux",
+"local": "Delizioso"
+},
+{
+"fr": "Au revoir",
+"local": "Arrivederci"
+}
+],
+"Portugais": [
+{
+"fr": "Bonjour",
+"local": "Olá"
+},
+{
+"fr": "Merci",
+"local": "Obrigado"
+},
+{
+"fr": "Oui",
+"local": "Sim"
+},
+{
+"fr": "Non",
+"local": "Não"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Por favor"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Quanto custa?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "A conta, por favor"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Onde é o banheiro?"
+},
+{
+"fr": "Délicieux",
+"local": "Delicioso"
+},
+{
+"fr": "Au revoir",
+"local": "Adeus"
+}
+],
+"Néerlandais": [
+{
+"fr": "Bonjour",
+"local": "Hallo"
+},
+{
+"fr": "Merci",
+"local": "Dank je wel"
+},
+{
+"fr": "Oui",
+"local": "Ja"
+},
+{
+"fr": "Non",
+"local": "Nee"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Alstublieft"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Hoeveel kost het?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "De rekening, alstublieft"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Waar is het toilet?"
+},
+{
+"fr": "Délicieux",
+"local": "Heerlijk"
+},
+{
+"fr": "Au revoir",
+"local": "Tot ziens"
+}
+],
+"Russe": [
+{
+"fr": "Bonjour",
+"local": "Здравствуйте (Zdravstvuyte)"
+},
+{
+"fr": "Merci",
+"local": "Спасибо (Spasibo)"
+},
+{
+"fr": "Oui",
+"local": "Да (Da)"
+},
+{
+"fr": "Non",
+"local": "Нет (Nyet)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Пожалуйста (Pozhaluysta)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Сколько это стоит? (Skolko eto stoit?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Счёт, пожалуйста (Schyot, pozhaluysta)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Где туалет? (Gde tualet?)"
+},
+{
+"fr": "Délicieux",
+"local": "Вкусно (Vkusno)"
+},
+{
+"fr": "Au revoir",
+"local": "До свидания (Do svidaniya)"
+}
+],
+"Mandarin": [
+{
+"fr": "Bonjour",
+"local": "Nǐ hǎo (你好)"
+},
+{
+"fr": "Merci",
+"local": "Xièxiè (谢谢)"
+},
+{
+"fr": "Oui",
+"local": "Shì (是)"
+},
+{
+"fr": "Non",
+"local": "Bù (不)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Qǐng (请)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Duōshǎo qián? (多少钱？)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Mǎidān (买单)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Cèsuǒ zài nǎlǐ? (厕所在哪里？)"
+},
+{
+"fr": "Délicieux",
+"local": "Hǎochī (好吃)"
+},
+{
+"fr": "Au revoir",
+"local": "Zàijiàn (再见)"
+}
+],
+"Coréen": [
+{
+"fr": "Bonjour",
+"local": "Annyeonghaseyo (안녕하세요)"
+},
+{
+"fr": "Merci",
+"local": "Gamsahamnida (감사합니다)"
+},
+{
+"fr": "Oui",
+"local": "Ne (네)"
+},
+{
+"fr": "Non",
+"local": "Aniyo (아니요)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Juseyo (주세요)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Eolmayeyo? (얼마예요?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Gyesanseo juseyo (계산서 주세요)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hwajangsiri eodiyeyo? (화장실이 어디예요?)"
+},
+{
+"fr": "Délicieux",
+"local": "Masisseoyo (맛있어요)"
+},
+{
+"fr": "Au revoir",
+"local": "Annyeonghi gaseyo (안녕히 가세요)"
+}
+],
+"Arabe": [
+{
+"fr": "Bonjour",
+"local": "Marhaban (مرحبا)"
+},
+{
+"fr": "Merci",
+"local": "Choukran (شكرا)"
+},
+{
+"fr": "Oui",
+"local": "Naam (نعم)"
+},
+{
+"fr": "Non",
+"local": "La (لا)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Min fadlik (من فضلك)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bikam? (بكم؟)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Al hisab min fadlik (الحساب من فضلك)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Ayna al hammam? (أين الحمام؟)"
+},
+{
+"fr": "Délicieux",
+"local": "Lazeez (لذيذ)"
+},
+{
+"fr": "Au revoir",
+"local": "Maa salama (مع السلامة)"
+}
+],
+"Turc": [
+{
+"fr": "Bonjour",
+"local": "Merhaba"
+},
+{
+"fr": "Merci",
+"local": "Teşekkür ederim"
+},
+{
+"fr": "Oui",
+"local": "Evet"
+},
+{
+"fr": "Non",
+"local": "Hayır"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Lütfen"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ne kadar?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Hesap, lütfen"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Tuvalet nerede?"
+},
+{
+"fr": "Délicieux",
+"local": "Lezzetli"
+},
+{
+"fr": "Au revoir",
+"local": "Hoşça kal"
+}
+],
+"Grec": [
+{
+"fr": "Bonjour",
+"local": "Geia sas (Γεια σας)"
+},
+{
+"fr": "Merci",
+"local": "Efcharistó (Ευχαριστώ)"
+},
+{
+"fr": "Oui",
+"local": "Nai (Ναι)"
+},
+{
+"fr": "Non",
+"local": "Óchi (Όχι)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Parakaló (Παρακαλώ)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Póso kánei? (Πόσο κάνει;)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Ton logariasmó, parakaló (Τον λογαριασμό, παρακαλώ)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Pou eínai i toualéta? (Πού είναι η τουαλέτα;)"
+},
+{
+"fr": "Délicieux",
+"local": "Nostimo (Νόστιμο)"
+},
+{
+"fr": "Au revoir",
+"local": "Antío (Αντίο)"
+}
+],
+"Polonais": [
+{
+"fr": "Bonjour",
+"local": "Dzień dobry"
+},
+{
+"fr": "Merci",
+"local": "Dziękuję"
+},
+{
+"fr": "Oui",
+"local": "Tak"
+},
+{
+"fr": "Non",
+"local": "Nie"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Proszę"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ile to kosztuje?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Poproszę rachunek"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Gdzie jest toaleta?"
+},
+{
+"fr": "Délicieux",
+"local": "Pyszne"
+},
+{
+"fr": "Au revoir",
+"local": "Do widzenia"
+}
+],
+"Roumain": [
+{
+"fr": "Bonjour",
+"local": "Bună ziua"
+},
+{
+"fr": "Merci",
+"local": "Mulțumesc"
+},
+{
+"fr": "Oui",
+"local": "Da"
+},
+{
+"fr": "Non",
+"local": "Nu"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Vă rog"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Cât costă?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Nota de plată, vă rog"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Unde este toaleta?"
+},
+{
+"fr": "Délicieux",
+"local": "Delicios"
+},
+{
+"fr": "Au revoir",
+"local": "La revedere"
+}
+],
+"Hongrois": [
+{
+"fr": "Bonjour",
+"local": "Jó napot"
+},
+{
+"fr": "Merci",
+"local": "Köszönöm"
+},
+{
+"fr": "Oui",
+"local": "Igen"
+},
+{
+"fr": "Non",
+"local": "Nem"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Kérem"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Mennyibe kerül?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "A számlát kérem"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hol van a mosdó?"
+},
+{
+"fr": "Délicieux",
+"local": "Finom"
+},
+{
+"fr": "Au revoir",
+"local": "Viszontlátásra"
+}
+],
+"Tchèque": [
+{
+"fr": "Bonjour",
+"local": "Dobrý den"
+},
+{
+"fr": "Merci",
+"local": "Děkuji"
+},
+{
+"fr": "Oui",
+"local": "Ano"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Prosím"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Kolik to stojí?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Účet, prosím"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Kde je toaleta?"
+},
+{
+"fr": "Délicieux",
+"local": "Chutné"
+},
+{
+"fr": "Au revoir",
+"local": "Na shledanou"
+}
+],
+"Slovaque": [
+{
+"fr": "Bonjour",
+"local": "Dobrý deň"
+},
+{
+"fr": "Merci",
+"local": "Ďakujem"
+},
+{
+"fr": "Oui",
+"local": "Áno"
+},
+{
+"fr": "Non",
+"local": "Nie"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Prosím"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Koľko to stojí?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Účet, prosím"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Kde je toaleta?"
+},
+{
+"fr": "Délicieux",
+"local": "Chutné"
+},
+{
+"fr": "Au revoir",
+"local": "Dovidenia"
+}
+],
+"Suédois": [
+{
+"fr": "Bonjour",
+"local": "Hej"
+},
+{
+"fr": "Merci",
+"local": "Tack"
+},
+{
+"fr": "Oui",
+"local": "Ja"
+},
+{
+"fr": "Non",
+"local": "Nej"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Snälla"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Hur mycket kostar det?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Notan, tack"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Var är toaletten?"
+},
+{
+"fr": "Délicieux",
+"local": "Gott"
+},
+{
+"fr": "Au revoir",
+"local": "Hej då"
+}
+],
+"Norvégien": [
+{
+"fr": "Bonjour",
+"local": "Hei"
+},
+{
+"fr": "Merci",
+"local": "Takk"
+},
+{
+"fr": "Oui",
+"local": "Ja"
+},
+{
+"fr": "Non",
+"local": "Nei"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Vær så snill"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Hvor mye koster det?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Regningen, takk"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hvor er toalettet?"
+},
+{
+"fr": "Délicieux",
+"local": "Deilig"
+},
+{
+"fr": "Au revoir",
+"local": "Ha det"
+}
+],
+"Danois": [
+{
+"fr": "Bonjour",
+"local": "Hej"
+},
+{
+"fr": "Merci",
+"local": "Tak"
+},
+{
+"fr": "Oui",
+"local": "Ja"
+},
+{
+"fr": "Non",
+"local": "Nej"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Vær venlig"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Hvor meget koster det?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Regningen, tak"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hvor er toilettet?"
+},
+{
+"fr": "Délicieux",
+"local": "Lækkert"
+},
+{
+"fr": "Au revoir",
+"local": "Farvel"
+}
+],
+"Finnois": [
+{
+"fr": "Bonjour",
+"local": "Hei"
+},
+{
+"fr": "Merci",
+"local": "Kiitos"
+},
+{
+"fr": "Oui",
+"local": "Kyllä"
+},
+{
+"fr": "Non",
+"local": "Ei"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Ole hyvä"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Paljonko tämä maksaa?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Lasku, kiitos"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Missä on vessa?"
+},
+{
+"fr": "Délicieux",
+"local": "Herkullista"
+},
+{
+"fr": "Au revoir",
+"local": "Näkemiin"
+}
+],
+"Japonais": [
+{
+"fr": "Bonjour",
+"local": "Konnichiwa (こんにちは)"
+},
+{
+"fr": "Merci",
+"local": "Arigatou gozaimasu (ありがとうございます)"
+},
+{
+"fr": "Oui",
+"local": "Hai (はい)"
+},
+{
+"fr": "Non",
+"local": "Iie (いいえ)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Onegaishimasu (お願いします)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ikura desu ka (いくらですか)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Okaikei onegaishimasu (お会計お願いします)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Toire wa doko desu ka (トイレはどこですか)"
+},
+{
+"fr": "Délicieux",
+"local": "Oishii (美味しい)"
+},
+{
+"fr": "Au revoir",
+"local": "Sayonara (さようなら)"
+}
+],
+"Khmer": [
+{
+"fr": "Bonjour",
+"local": "Suostei (សួស្តី)"
+},
+{
+"fr": "Merci",
+"local": "Arkoun (អរគុណ)"
+},
+{
+"fr": "Oui",
+"local": "Baat / Chaa (បាទ/ចាស)"
+},
+{
+"fr": "Non",
+"local": "Ott te (អត់ទេ)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Saum (សូម)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Tlai ponman (ថ្លៃប៉ុន្មាន)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Saum kit loy (សូមគិតលុយ)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Bantop teuk noeu eina (បន្ទប់ទឹកនៅឯណា)"
+},
+{
+"fr": "Délicieux",
+"local": "Chgnanh nah (ឆ្ងាញ់ណាស់)"
+},
+{
+"fr": "Au revoir",
+"local": "Lea haery (លាហើយ)"
+}
+],
+"Thaï": [
+{
+"fr": "Bonjour",
+"local": "Sawadee khrap/kha (สวัสดี)"
+},
+{
+"fr": "Merci",
+"local": "Khop khun khrap/kha (ขอบคุณ)"
+},
+{
+"fr": "Oui",
+"local": "Chai (ใช่)"
+},
+{
+"fr": "Non",
+"local": "Mai chai (ไม่ใช่)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Karuna (กรุณา)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Tao rai (เท่าไหร่)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Check bin (เช็คบิล)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hong nam yu thi nai (ห้องน้ำอยู่ที่ไหน)"
+},
+{
+"fr": "Délicieux",
+"local": "Aroi (อร่อย)"
+},
+{
+"fr": "Au revoir",
+"local": "La kon (ลาก่อน)"
+}
+],
+"Lao": [
+{
+"fr": "Bonjour",
+"local": "Sabaidee (ສະບາຍດີ)"
+},
+{
+"fr": "Merci",
+"local": "Khob chai (ຂອບໃຈ)"
+},
+{
+"fr": "Oui",
+"local": "Doi / Chao (ໃຊ່)"
+},
+{
+"fr": "Non",
+"local": "Bo (ບໍ່)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Ka lu na (ກະລຸນາ)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Thao dai (ເທົ່າໃດ)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Kep ngeun (ເກັບເງິນ)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hong nam yu sai (ຫ້ອງນ້ຳຢູ່ໃສ)"
+},
+{
+"fr": "Délicieux",
+"local": "Saeb (ແຊບ)"
+},
+{
+"fr": "Au revoir",
+"local": "Sok dee (ໂຊກດີ)"
+}
+],
+"Vietnamien": [
+{
+"fr": "Bonjour",
+"local": "Xin chào"
+},
+{
+"fr": "Merci",
+"local": "Cảm ơn"
+},
+{
+"fr": "Oui",
+"local": "Vâng / Dạ"
+},
+{
+"fr": "Non",
+"local": "Không"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Làm ơn"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bao nhiêu tiền"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Tính tiền"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Nhà vệ sinh ở đâu"
+},
+{
+"fr": "Délicieux",
+"local": "Ngon"
+},
+{
+"fr": "Au revoir",
+"local": "Tạm biệt"
+}
+],
+"Bahasa Indonésien": [
+{
+"fr": "Bonjour",
+"local": "Halo"
+},
+{
+"fr": "Merci",
+"local": "Terima kasih"
+},
+{
+"fr": "Oui",
+"local": "Ya"
+},
+{
+"fr": "Non",
+"local": "Tidak"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Tolong"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Berapa harganya?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Minta bon"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Di mana toilet?"
+},
+{
+"fr": "Délicieux",
+"local": "Enak"
+},
+{
+"fr": "Au revoir",
+"local": "Selamat tinggal"
+}
+],
+"Malais": [
+{
+"fr": "Bonjour",
+"local": "Helo"
+},
+{
+"fr": "Merci",
+"local": "Terima kasih"
+},
+{
+"fr": "Oui",
+"local": "Ya"
+},
+{
+"fr": "Non",
+"local": "Tidak"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Tolong"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Berapa harganya?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Boleh minta bil?"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Di mana tandas?"
+},
+{
+"fr": "Délicieux",
+"local": "Sedap"
+},
+{
+"fr": "Au revoir",
+"local": "Selamat tinggal"
+}
+],
+"Filipino": [
+{
+"fr": "Bonjour",
+"local": "Kumusta"
+},
+{
+"fr": "Merci",
+"local": "Salamat"
+},
+{
+"fr": "Oui",
+"local": "Oo"
+},
+{
+"fr": "Non",
+"local": "Hindi"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Pakiusap"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Magkano ito?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Pakiusap, ang bill"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Nasaan ang banyo?"
+},
+{
+"fr": "Délicieux",
+"local": "Masarap"
+},
+{
+"fr": "Au revoir",
+"local": "Paalam"
+}
+],
+"Hindi": [
+{
+"fr": "Bonjour",
+"local": "Namaste (नमस्ते)"
+},
+{
+"fr": "Merci",
+"local": "Dhanyavaad (धन्यवाद)"
+},
+{
+"fr": "Oui",
+"local": "Haan (हाँ)"
+},
+{
+"fr": "Non",
+"local": "Nahin (नहीं)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Kripya (कृपया)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Yeh kitne ka hai? (यह कितने का है?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill dijiye (बिल दीजिये)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Toilet kahan hai? (टॉयलेट कहाँ है?)"
+},
+{
+"fr": "Délicieux",
+"local": "Swadisht (स्वादिष्ट)"
+},
+{
+"fr": "Au revoir",
+"local": "Alvida (अलविदा)"
+}
+],
+"Ourdou / Anglais": [
+{
+"fr": "Bonjour",
+"local": "Assalamu alaikum (السلام علیکم)"
+},
+{
+"fr": "Merci",
+"local": "Shukriya (شکریہ)"
+},
+{
+"fr": "Oui",
+"local": "Haan (ہاں)"
+},
+{
+"fr": "Non",
+"local": "Nahin (نہیں)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Meherbani (مہربانی)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Yeh kitne ka hai? (یہ کتنے کا ہے؟)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill dijiye (بل دیں)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Washroom kahan hai? (واش روم کہاں ہے؟)"
+},
+{
+"fr": "Délicieux",
+"local": "Lazeez (لذیذ)"
+},
+{
+"fr": "Au revoir",
+"local": "Khuda hafiz (خدا حافظ)"
+}
+],
+"Bengali": [
+{
+"fr": "Bonjour",
+"local": "Nomoshkar (নমস্কার)"
+},
+{
+"fr": "Merci",
+"local": "Dhonnobad (ধন্যবাদ)"
+},
+{
+"fr": "Oui",
+"local": "Ha (হ্যাঁ)"
+},
+{
+"fr": "Non",
+"local": "Na (না)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Doya kore (দয়া করে)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ei ta koto? (এইটার দাম কত?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill din (বিল দিন)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Toilet kothay? (টয়লেট কোথায়?)"
+},
+{
+"fr": "Délicieux",
+"local": "Sushadu (সুস্বাদু)"
+},
+{
+"fr": "Au revoir",
+"local": "Bidae (বিদায়)"
+}
+],
+"Persan": [
+{
+"fr": "Bonjour",
+"local": "Salaam (سلام)"
+},
+{
+"fr": "Merci",
+"local": "Mersi (مرسی)"
+},
+{
+"fr": "Oui",
+"local": "Baleh (بله)"
+},
+{
+"fr": "Non",
+"local": "Na (نه)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Lotfan (لطفا)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Chand ast? (چند است؟)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Sourat hesab lotfan (صورت‌حساب لطفا)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Dastshouyi kojast? (دستشویی کجاست؟)"
+},
+{
+"fr": "Délicieux",
+"local": "Khoshmaze (خوشمزه)"
+},
+{
+"fr": "Au revoir",
+"local": "Khodahafez (خداحافظ)"
+}
+],
+"Hébreu": [
+{
+"fr": "Bonjour",
+"local": "Shalom (שלום)"
+},
+{
+"fr": "Merci",
+"local": "Toda (תודה)"
+},
+{
+"fr": "Oui",
+"local": "Ken (כן)"
+},
+{
+"fr": "Non",
+"local": "Lo (לא)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Bevakasha (בבקשה)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Kama ze ole? (כמה זה עולה?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Cheshbon bevakasha (חשבון בבקשה)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Eifo hasherutim? (איפה השירותים?)"
+},
+{
+"fr": "Délicieux",
+"local": "Ta'im (טעים)"
+},
+{
+"fr": "Au revoir",
+"local": "Lehitraot (להתראות)"
+}
+],
+"Ukrainien": [
+{
+"fr": "Bonjour",
+"local": "Вітаю (Vitayu)"
+},
+{
+"fr": "Merci",
+"local": "Дякую (Dyakuyu)"
+},
+{
+"fr": "Oui",
+"local": "Так (Tak)"
+},
+{
+"fr": "Non",
+"local": "Ні (Ni)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Будь ласка (Bud laska)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Скільки коштує? (Skilky koshtuye?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Рахунок, будь ласка (Rakhunok, bud laska)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Де туалет? (De tualet?)"
+},
+{
+"fr": "Délicieux",
+"local": "Смачно (Smachno)"
+},
+{
+"fr": "Au revoir",
+"local": "До побачення (Do pobachennya)"
+}
+],
+"Bulgare": [
+{
+"fr": "Bonjour",
+"local": "Здравейте (Zdraveyte)"
+},
+{
+"fr": "Merci",
+"local": "Благодаря (Blagodarya)"
+},
+{
+"fr": "Oui",
+"local": "Да (Da)"
+},
+{
+"fr": "Non",
+"local": "Не (Ne)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Моля (Molya)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Колко струва? (Kolko struva?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Сметката, моля (Smetkata, molya)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Къде е тоалетната? (Kade e toaletnata?)"
+},
+{
+"fr": "Délicieux",
+"local": "Вкусно (Vkusno)"
+},
+{
+"fr": "Au revoir",
+"local": "Довиждане (Dovizhdane)"
+}
+],
+"Serbe": [
+{
+"fr": "Bonjour",
+"local": "Zdravo"
+},
+{
+"fr": "Merci",
+"local": "Hvala"
+},
+{
+"fr": "Oui",
+"local": "Da"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Molim"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Koliko košta?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Račun, molim"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Gde je toalet?"
+},
+{
+"fr": "Délicieux",
+"local": "Ukusno"
+},
+{
+"fr": "Au revoir",
+"local": "Doviđenja"
+}
+],
+"Croate": [
+{
+"fr": "Bonjour",
+"local": "Bok"
+},
+{
+"fr": "Merci",
+"local": "Hvala"
+},
+{
+"fr": "Oui",
+"local": "Da"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Molim"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Koliko košta?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Račun, molim"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Gdje je zahod?"
+},
+{
+"fr": "Délicieux",
+"local": "Ukusno"
+},
+{
+"fr": "Au revoir",
+"local": "Doviđenja"
+}
+],
+"Bosnien": [
+{
+"fr": "Bonjour",
+"local": "Zdravo"
+},
+{
+"fr": "Merci",
+"local": "Hvala"
+},
+{
+"fr": "Oui",
+"local": "Da"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Molim"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Koliko košta?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Račun, molim"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Gdje je toalet?"
+},
+{
+"fr": "Délicieux",
+"local": "Ukusno"
+},
+{
+"fr": "Au revoir",
+"local": "Doviđenja"
+}
+],
+"Monténégrin": [
+{
+"fr": "Bonjour",
+"local": "Zdravo"
+},
+{
+"fr": "Merci",
+"local": "Hvala"
+},
+{
+"fr": "Oui",
+"local": "Da"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Molim"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Koliko košta?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Račun, molim"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Gdje je toalet?"
+},
+{
+"fr": "Délicieux",
+"local": "Ukusno"
+},
+{
+"fr": "Au revoir",
+"local": "Doviđenja"
+}
+],
+"Slovène": [
+{
+"fr": "Bonjour",
+"local": "Živjo"
+},
+{
+"fr": "Merci",
+"local": "Hvala"
+},
+{
+"fr": "Oui",
+"local": "Da"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Prosim"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Koliko stane?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Račun, prosim"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Kje je stranišče?"
+},
+{
+"fr": "Délicieux",
+"local": "Okusno"
+},
+{
+"fr": "Au revoir",
+"local": "Nasvidenje"
+}
+],
+"Macédonien": [
+{
+"fr": "Bonjour",
+"local": "Здраво (Zdravo)"
+},
+{
+"fr": "Merci",
+"local": "Благодарам (Blagodaram)"
+},
+{
+"fr": "Oui",
+"local": "Да (Da)"
+},
+{
+"fr": "Non",
+"local": "Не (Ne)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Молам (Molam)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Колку чини? (Kolku chini?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Сметка, молам (Smetka, molam)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Каде е тоалетот? (Kade e toaletot?)"
+},
+{
+"fr": "Délicieux",
+"local": "Вкусно (Vkusno)"
+},
+{
+"fr": "Au revoir",
+"local": "До гледање (Do gleduvanje)"
+}
+],
+"Albanais": [
+{
+"fr": "Bonjour",
+"local": "Përshëndetje"
+},
+{
+"fr": "Merci",
+"local": "Faleminderit"
+},
+{
+"fr": "Oui",
+"local": "Po"
+},
+{
+"fr": "Non",
+"local": "Jo"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Ju lutem"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Sa kushton?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Faturën, ju lutem"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Ku është tualeti?"
+},
+{
+"fr": "Délicieux",
+"local": "Shijshëm"
+},
+{
+"fr": "Au revoir",
+"local": "Mirupafshim"
+}
+],
+"Islandais": [
+{
+"fr": "Bonjour",
+"local": "Halló"
+},
+{
+"fr": "Merci",
+"local": "Takk fyrir"
+},
+{
+"fr": "Oui",
+"local": "Já"
+},
+{
+"fr": "Non",
+"local": "Nei"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Vinsamlegast"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Hvað kostar þetta?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Reikninginn, takk"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hvar er klósettið?"
+},
+{
+"fr": "Délicieux",
+"local": "Ljúffengt"
+},
+{
+"fr": "Au revoir",
+"local": "Bless"
+}
+],
+"Maltais / Anglais": [
+{
+"fr": "Bonjour",
+"local": "Bonġu"
+},
+{
+"fr": "Merci",
+"local": "Grazzi"
+},
+{
+"fr": "Oui",
+"local": "Iva"
+},
+{
+"fr": "Non",
+"local": "Le"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Jekk jogħġbok"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Kemm jiswa?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Il-kont, jekk jogħġbok"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Fejn hu t-toilet?"
+},
+{
+"fr": "Délicieux",
+"local": "Delizzjuż"
+},
+{
+"fr": "Au revoir",
+"local": "Saħħa"
+}
+],
+"Luxembourgeois / Français": [
+{
+"fr": "Bonjour",
+"local": "Moien"
+},
+{
+"fr": "Merci",
+"local": "Merci"
+},
+{
+"fr": "Oui",
+"local": "Jo"
+},
+{
+"fr": "Non",
+"local": "Nee"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Wann ech gelift"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Wéivill kascht dat?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "D'Rechnung, wann ech gelift"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Wou ass d'Toilette?"
+},
+{
+"fr": "Délicieux",
+"local": "Lecker"
+},
+{
+"fr": "Au revoir",
+"local": "Äddi"
+}
+],
+"Swahili / Anglais": [
+{
+"fr": "Bonjour",
+"local": "Habari"
+},
+{
+"fr": "Merci",
+"local": "Asante"
+},
+{
+"fr": "Oui",
+"local": "Ndiyo"
+},
+{
+"fr": "Non",
+"local": "Hapana"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Tafadhali"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bei gani?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bili, tafadhali"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Choo kiko wapi?"
+},
+{
+"fr": "Délicieux",
+"local": "Kitamu"
+},
+{
+"fr": "Au revoir",
+"local": "Kwaheri"
+}
+],
+"Amharique": [
+{
+"fr": "Bonjour",
+"local": "Selam (ሰላም)"
+},
+{
+"fr": "Merci",
+"local": "Ameseginalehu (አመሰግናለሁ)"
+},
+{
+"fr": "Oui",
+"local": "Awo (አዎ)"
+},
+{
+"fr": "Non",
+"local": "Aydelem (አይደለም)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Ebakih (እባክህ)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Sint new? (ስንት ነው?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill yamt'alegn (ቢል ያምጡልኝ)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Shint bét yet new? (ሽንት ቤት የት ነው?)"
+},
+{
+"fr": "Délicieux",
+"local": "Konjo (ጣፋጭ)"
+},
+{
+"fr": "Au revoir",
+"local": "Dehna hun (ደህና ሁን)"
+}
+],
+"Malgache / Français": [
+{
+"fr": "Bonjour",
+"local": "Manao ahoana"
+},
+{
+"fr": "Merci",
+"local": "Misaotra"
+},
+{
+"fr": "Oui",
+"local": "Eny"
+},
+{
+"fr": "Non",
+"local": "Tsia"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Azafady"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ohatrinona ny vidiny?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Ny fatoran-bola azafady"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Aiza ny WC?"
+},
+{
+"fr": "Délicieux",
+"local": "Tsara tsara"
+},
+{
+"fr": "Au revoir",
+"local": "Veloma"
+}
+],
+"Mongol": [
+{
+"fr": "Bonjour",
+"local": "Sain baina uu (Сайн байна уу)"
+},
+{
+"fr": "Merci",
+"local": "Bayarlalaa (Баярлалаа)"
+},
+{
+"fr": "Oui",
+"local": "Tiim (Тийм)"
+},
+{
+"fr": "Non",
+"local": "Ügüi (Үгүй)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Guilj (Гуйж)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ali üneteige ve? (Хэд вэ?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Nekhemjlekh, guilj (Нэхэмжлэх, гуйж)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Zhorlon khaana baina? (Жорлон хаана байна?)"
+},
+{
+"fr": "Délicieux",
+"local": "Amttai (Амттай)"
+},
+{
+"fr": "Au revoir",
+"local": "Bayartai (Баяртай)"
+}
+],
+"Birman": [
+{
+"fr": "Bonjour",
+"local": "Mingalarbar (မင်္ဂလာပါ)"
+},
+{
+"fr": "Merci",
+"local": "Kyay zu tin ba de (ကျေးဇူးတင်ပါတယ်)"
+},
+{
+"fr": "Oui",
+"local": "Hote kae (ဟုတ်ကဲ့)"
+},
+{
+"fr": "Non",
+"local": "Ma hote phu (မဟုတ်ဘူး)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Kyay zu pyuပီး (ကျေးဇူးပြု၍)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Beh laut le? (ဘယ်လောက်လဲ?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Ngwe shin pay pa (ငွေရှင်းပေးပါ)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Ein tha bea nay? (အိမ်သာဘယ်နားလဲ?)"
+},
+{
+"fr": "Délicieux",
+"local": "Sar kaung de (စားကောင်းတယ်)"
+},
+{
+"fr": "Au revoir",
+"local": "Twe: me: (တွေ့မယ်)"
+}
+],
+"Népalais": [
+{
+"fr": "Bonjour",
+"local": "Namaste (नमस्ते)"
+},
+{
+"fr": "Merci",
+"local": "Dhanyabad (धन्यवाद)"
+},
+{
+"fr": "Oui",
+"local": "Ho (हो)"
+},
+{
+"fr": "Non",
+"local": "Hoina (होइन)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Kripaya (कृपया)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Yo kati ho? (यो कति हो?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill dinuhos (बिल दिनुहोस्)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Toilet kaha cha? (टोइलेट कहाँ छ?)"
+},
+{
+"fr": "Délicieux",
+"local": "Mitho (मिठो)"
+},
+{
+"fr": "Au revoir",
+"local": "Namaste (नमस्ते)"
+}
+],
+"Cingalais / Tamoul": [
+{
+"fr": "Bonjour",
+"local": "Ayubowan (ආයුබෝවන්)"
+},
+{
+"fr": "Merci",
+"local": "Sthuthiyi (ස්තුතියි)"
+},
+{
+"fr": "Oui",
+"local": "Ow (ඔව්)"
+},
+{
+"fr": "Non",
+"local": "Naee (නෑ)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Karunakara (කරුණාකර)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Meeka keeyada? (මේක කීයද?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill eka, karunakara (බිල් එක කරුණාකර)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Vesikilaya koheda? (වැසිකිළිය කොහෙද?)"
+},
+{
+"fr": "Délicieux",
+"local": "Rasai (රසයි)"
+},
+{
+"fr": "Au revoir",
+"local": "Ayubowan (ආයුබෝවන්)"
+}
+],
+"Divehi": [
+{
+"fr": "Bonjour",
+"local": "Assalaam alaikum"
+},
+{
+"fr": "Merci",
+"local": "Shukuriyaa"
+},
+{
+"fr": "Oui",
+"local": "Aan"
+},
+{
+"fr": "Non",
+"local": "Noon"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Kraeh gothun"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Mee kihaa vareh?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill eba genesheh?"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Faucet koba?"
+},
+{
+"fr": "Délicieux",
+"local": "Kaana miytha"
+},
+{
+"fr": "Au revoir",
+"local": "Dhathuru salaam"
+}
+],
+"Dzongkha": [
+{
+"fr": "Bonjour",
+"local": "Kuzu zangpo"
+},
+{
+"fr": "Merci",
+"local": "Kadinche"
+},
+{
+"fr": "Oui",
+"local": "Ing"
+},
+{
+"fr": "Non",
+"local": "Meshu"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Ngachala"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Di gademchi mo?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Ngultrum tenchoe"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Chaptshang gatinang?"
+},
+{
+"fr": "Délicieux",
+"local": "Zhimpa"
+},
+{
+"fr": "Au revoir",
+"local": "Log jogay"
+}
+],
+"Dari / Pachto": [
+{
+"fr": "Bonjour",
+"local": "Salaam (سلام)"
+},
+{
+"fr": "Merci",
+"local": "Tashakor (تشکر)"
+},
+{
+"fr": "Oui",
+"local": "Baleh (بلی)"
+},
+{
+"fr": "Non",
+"local": "Nakhair (نخیر)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Lotfan (لطفاً)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Cheqadar ast? (چقدر است؟)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Bill lotfan (بل لطفاً)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Tashnab kojast? (تشناب کجاست؟)"
+},
+{
+"fr": "Délicieux",
+"local": "Lazeez (لذیذ)"
+},
+{
+"fr": "Au revoir",
+"local": "Khuda hafez (خدا حافظ)"
+}
+],
+"Kazakh / Russe": [
+{
+"fr": "Bonjour",
+"local": "Salemetsizbe"
+},
+{
+"fr": "Merci",
+"local": "Rakhmet"
+},
+{
+"fr": "Oui",
+"local": "I,ya"
+},
+{
+"fr": "Non",
+"local": "Zhok"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Otinemin"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bagasy qansha?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Shot, otinemin"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Dәretkhana qaida?"
+},
+{
+"fr": "Délicieux",
+"local": "Dәmdi"
+},
+{
+"fr": "Au revoir",
+"local": "Sau bolynyz"
+}
+],
+"Ouzbek": [
+{
+"fr": "Bonjour",
+"local": "Assalomu alaykum"
+},
+{
+"fr": "Merci",
+"local": "Rahmat"
+},
+{
+"fr": "Oui",
+"local": "Ha"
+},
+{
+"fr": "Non",
+"local": "Yo'q"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Iltimos"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bu qancha turadi?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Hisob-kitob, iltimos"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hojatxona qayerda?"
+},
+{
+"fr": "Délicieux",
+"local": "Mazali"
+},
+{
+"fr": "Au revoir",
+"local": "Xayr"
+}
+],
+"Kirghiz / Russe": [
+{
+"fr": "Bonjour",
+"local": "Salamatsyzby"
+},
+{
+"fr": "Merci",
+"local": "Rakhmat"
+},
+{
+"fr": "Oui",
+"local": "Ooba"
+},
+{
+"fr": "Non",
+"local": "Zhok"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Suranam"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bul kancha turat?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Эsep, suranam"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Даараткана кайда?"
+},
+{
+"fr": "Délicieux",
+"local": "Даамдуу"
+},
+{
+"fr": "Au revoir",
+"local": "Кош болуңуз"
+}
+],
+"Tadjik": [
+{
+"fr": "Bonjour",
+"local": "Salom"
+},
+{
+"fr": "Merci",
+"local": "Tashakkur"
+},
+{
+"fr": "Oui",
+"local": "Ha"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Lutfan"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "In chand pul ast?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Hisobnoma, lutfan"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hojatkhona kujost?"
+},
+{
+"fr": "Délicieux",
+"local": "Lazizze"
+},
+{
+"fr": "Au revoir",
+"local": "Khudo hofiz"
+}
+],
+"Turkmène": [
+{
+"fr": "Bonjour",
+"local": "Salam"
+},
+{
+"fr": "Merci",
+"local": "Sag boluň"
+},
+{
+"fr": "Oui",
+"local": "Hawa"
+},
+{
+"fr": "Non",
+"local": "Ýok"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Haýyş"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bu näçä durýar?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Hasap, haýyş"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Hajathana nirede?"
+},
+{
+"fr": "Délicieux",
+"local": "Tagamly"
+},
+{
+"fr": "Au revoir",
+"local": "Sag boluň"
+}
+],
+"Azéri": [
+{
+"fr": "Bonjour",
+"local": "Salam"
+},
+{
+"fr": "Merci",
+"local": "Sağ olun"
+},
+{
+"fr": "Oui",
+"local": "Bəli"
+},
+{
+"fr": "Non",
+"local": "Xeyr"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Zəhmət olmasa"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Bu neçəyədir?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Hesab, zəhmət olmasa"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Tualet haradadır?"
+},
+{
+"fr": "Délicieux",
+"local": "Dadlı"
+},
+{
+"fr": "Au revoir",
+"local": "Sağ olun"
+}
+],
+"Géorgien": [
+{
+"fr": "Bonjour",
+"local": "Gamarjoba (გამარჯობა)"
+},
+{
+"fr": "Merci",
+"local": "Madloba (მადლობა)"
+},
+{
+"fr": "Oui",
+"local": "Diakh (დიახ)"
+},
+{
+"fr": "Non",
+"local": "Ara (არა)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Tu sheidzleba (თუ შეიძლება)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Ra ghirs? (რა ღირს?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Angarishi, tu sheidzleba (ანგარიში, თუ შეიძლება)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Sad aris tualeti? (სად არის ტუალეტი?)"
+},
+{
+"fr": "Délicieux",
+"local": "Gemrieli (გემრიელი)"
+},
+{
+"fr": "Au revoir",
+"local": "Nakhvamdis (ნახვამდის)"
+}
+],
+"Arménien": [
+{
+"fr": "Bonjour",
+"local": "Barev (Բարև)"
+},
+{
+"fr": "Merci",
+"local": "Shnorhakalutyun (Շնորհակալություն)"
+},
+{
+"fr": "Oui",
+"local": "Ayo (Այո)"
+},
+{
+"fr": "Non",
+"local": "Voch (Ոչ)"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Khndrum em (Խնդրում եմ)"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Inch arje? (Ինչ արժե?)"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Hashive, khndrum em (Հաշիվը, խնդրում եմ)"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Zugaranu vortegh e? (Զուգարանը որտե՞ղ է)"
+},
+{
+"fr": "Délicieux",
+"local": "Համեղ (Hameghe)"
+},
+{
+"fr": "Au revoir",
+"local": "Ցտեսություն (Ts'tesut'yun)"
+}
+],
+"Somali / Arabe": [
+{
+"fr": "Bonjour",
+"local": "Salaan"
+},
+{
+"fr": "Merci",
+"local": "Mahadsanid"
+},
+{
+"fr": "Oui",
+"local": "Haa"
+},
+{
+"fr": "Non",
+"local": "Maya"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Fadlan"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Immisa qiimahani?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Biilka fadlan"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Musqusha xagee?"
+},
+{
+"fr": "Délicieux",
+"local": "Macaan"
+},
+{
+"fr": "Au revoir",
+"local": "Nabadgelyo"
+}
+],
+"Estonien": [
+{
+"fr": "Bonjour",
+"local": "Tere"
+},
+{
+"fr": "Merci",
+"local": "Aitäh"
+},
+{
+"fr": "Oui",
+"local": "Jah"
+},
+{
+"fr": "Non",
+"local": "Ei"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Palun"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Kui palju see maksab?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Arve, palun"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Kus on tualett?"
+},
+{
+"fr": "Délicieux",
+"local": "Maitsev"
+},
+{
+"fr": "Au revoir",
+"local": "Head aega"
+}
+],
+"Lituanien": [
+{
+"fr": "Bonjour",
+"local": "Labas"
+},
+{
+"fr": "Merci",
+"local": "Ačiū"
+},
+{
+"fr": "Oui",
+"local": "Taip"
+},
+{
+"fr": "Non",
+"local": "Ne"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Prašau"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Kiek kainuoja?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Sąskaitą, prašau"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Kur yra tualetas?"
+},
+{
+"fr": "Délicieux",
+"local": "Skanu"
+},
+{
+"fr": "Au revoir",
+"local": "Viso gero"
+}
+],
+"Letton": [
+{
+"fr": "Bonjour",
+"local": "Sveiki"
+},
+{
+"fr": "Merci",
+"local": "Paldies"
+},
+{
+"fr": "Oui",
+"local": "Jā"
+},
+{
+"fr": "Non",
+"local": "Nē"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Lūdzu"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Cik tas maksā?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "Rēķinu, lūdzu"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "Kur ir tualete?"
+},
+{
+"fr": "Délicieux",
+"local": "Garšīgi"
+},
+{
+"fr": "Au revoir",
+"local": "Uz redzēšanos"
+}
+],
+"Catalan": [
+{
+"fr": "Bonjour",
+"local": "Hola"
+},
+{
+"fr": "Merci",
+"local": "Gràcies"
+},
+{
+"fr": "Oui",
+"local": "Sí"
+},
+{
+"fr": "Non",
+"local": "No"
+},
+{
+"fr": "S'il vous plaît",
+"local": "Si us plau"
+},
+{
+"fr": "Combien ça coûte ?",
+"local": "Quant costa?"
+},
+{
+"fr": "L'addition s'il vous plaît",
+"local": "El compte, si us plau"
+},
+{
+"fr": "Où sont les toilettes ?",
+"local": "On és el lavabo?"
+},
+{
+"fr": "Délicieux",
+"local": "Deliciós"
+},
+{
+"fr": "Au revoir",
+"local": "Adéu"
+}
+]
+}
