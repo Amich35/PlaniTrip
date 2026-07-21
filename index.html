@@ -4082,7 +4082,7 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
     }
     save(); renderContent();
     syncDeletedActs();
-  }, 'Archiver');
+  }, 'Supprimer');
 }
 if(!S.deletedActs) S.deletedActs={};
 if(!S.trash) S.trash={};
@@ -7337,7 +7337,7 @@ function cityTrashSectionHTML(countryId){
 function deleteCityConfirm(countryId, cityName){
   showConfirm('Supprimer '+cityName+' ? Tu pourras la restaurer à tout moment depuis la Corbeille. Ses activités, dépenses et entrées de carnet liées seront aussi mises en corbeille.', function(){
     deleteCity(countryId, cityName);
-  }, 'Archiver');
+  }, 'Supprimer');
 }
 function deleteCity(countryId, cityName){
   if(!S.cityTrash) S.cityTrash=[]; // filet de sécurité si ensureStateDefaults() n'a pas encore tourné
