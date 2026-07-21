@@ -4036,6 +4036,25 @@ function _createCityFromModal(countryId, name, sub, dateStart, dateEnd){
     sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}).then(function(){});
   }
 }
+// Traduit les réponses du questionnaire persona (S.tripPersona) en contexte textuel pour les
+// prompts IA. Retourne '' si aucune réponse n'a été donnée (génération neutre par défaut).
+function personaPromptContext(){
+  var p = S.tripPersona;
+  if(!p) return '';
+  var bits = [];
+  var paceLabels = {intense:'rythme intense, veut voir un maximum de choses', equilibre:'rythme équilibré', detente:'rythme détente, pas envie de courir'};
+  var interestLabels = {nature:'nature et randonnée', culture:'culture et histoire', gastronomie:'vie nocturne et gastronomie', plages:'plages et farniente'};
+  var budgetLabels = {backpacker:'petit budget (style backpacker)', confort:'budget confort', luxe:'budget élevé (voyage haut de gamme)'};
+  var withWhoLabels = {solo:'voyage en solo', couple:'voyage en couple', famille_jeunes:'voyage en famille avec de jeunes enfants — privilégier des activités courtes, adaptées et peu fatigantes, éviter les randonnées longues/difficiles et les visites trop tardives', famille_ados:'voyage en famille avec des ados/grands enfants', amis:'voyage entre amis', seniors:'voyage avec des personnes âgées — privilégier un rythme plus lent, éviter les journées trop chargées, prioriser le confort de transport et d\'hébergement, limiter la marche prolongée'};
+  if(p.withWho && withWhoLabels[p.withWho]) bits.push(withWhoLabels[p.withWho]);
+  if(p.pace && paceLabels[p.pace]) bits.push(paceLabels[p.pace]);
+  if(p.interests && p.interests.length) bits.push('intérêts principaux : '+p.interests.map(function(i){return interestLabels[i]||i;}).join(', '));
+  if(p.budget && budgetLabels[p.budget]) bits.push(budgetLabels[p.budget]);
+  if(p.reducedMobility) bits.push('voyageur à mobilité réduite — privilégier des lieux et itinéraires accessibles, éviter escaliers nombreux, terrains accidentés et randonnées difficiles, signaler si un lieu proposé n\'est pas accessible');
+  if(p.dietary) bits.push('restrictions alimentaires (végétarien/végan/allergies) — en tenir compte pour les conseils Restauration et éviter de suggérer des lieux inadaptés');
+  if(!bits.length) return '';
+  return 'Profil du voyageur à prendre en compte : '+bits.join(' ; ')+'. ';
+}
 async function suggestActivitiesWithAI(countryId, cityName){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c || !S.apiKey) return;
@@ -4051,7 +4070,7 @@ async function suggestActivitiesWithAI(countryId, cityName){
         messages:[{role:'user', content:
 `Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables et immediatement exploitables — pas un texte marketing. Ne deduis jamais une information absente ; si une coordonnee GPS est incertaine, ne l'inclus pas plutot que de l'inventer.
 
-Cherche sur le web les activites/lieux incontournables actuels pour la ville de "${cityName}" (${c.name}). Puis suggere les 5 meilleurs et reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
+${personaPromptContext()}Cherche sur le web les activites/lieux incontournables actuels pour la ville de "${cityName}" (${c.name}), en priorite sur Wikivoyage, Lonely Planet et sites officiels de tourisme. Puis suggere les 5 meilleurs et reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
 {"activities":[{"n":"nom du lieu","m":"description courte 1 phrase incluant si pertinent la duree de visite et le prix","tags":["photo"],"lat":0.0,"lng":0.0}]}
 Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnees GPS precises du lieu.`
         }]
@@ -4070,6 +4089,12 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     });
     save();
     renderContent();
+    if(sb && CURRENT_TRIP){
+      var whoAi=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+      info.activities.forEach(function(a){
+        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi}).then(function(){});
+      });
+    }
   }catch(e){}
 }
 
@@ -10329,12 +10354,13 @@ function submitPostCreateAiKey(){
 }
 // Questionnaire persona (3 questions), pour orienter la future generation du Programme
 // (villes/activites). La saison n'est pas redemandee : deduite des dates deja saisies.
-var _personaAnswers = {pace:'', interests:[], budget:''};
+var _personaAnswers = {pace:'', interests:[], budget:'', withWho:'', reducedMobility:false, dietary:false};
 function showPostCreatePersonaStep(){
   var optsEl = document.getElementById('postCreateOptions');
   var paceOpts = [['intense','Intense — voir un maximum'],['equilibre','Équilibré'],['detente','Détente']];
   var interestOpts = [['nature','Nature & randonnée'],['culture','Culture & histoire'],['gastronomie','Vie nocturne & gastronomie'],['plages','Plages & farniente']];
   var budgetOpts = [['backpacker','Backpacker'],['confort','Confort'],['luxe','Luxe']];
+  var withWhoOpts = [['solo','Solo'],['couple','Couple'],['famille_jeunes','Famille — enfants en bas âge'],['famille_ados','Famille — ados/grands enfants'],['amis','Entre amis'],['seniors','Personnes âgées']];
   function chipRow(name, opts, multi){
     return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'
       +opts.map(function(o){
@@ -10346,14 +10372,32 @@ function showPostCreatePersonaStep(){
   optsEl.innerHTML = '<div class="info-card">'
     +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Quelques infos pour toi</div>'
     +'<div class="status-sub" style="margin-bottom:14px">Ça aide PlaniTrip à proposer un programme qui te ressemble.</div>'
+    +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Avec qui pars-tu ?</div>'
+    +chipRow('withWho', withWhoOpts, false)
     +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Rythme du voyage</div>'
     +chipRow('pace', paceOpts, false)
     +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Centres d\'intérêt</div>'
     +chipRow('interests', interestOpts, true)
     +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Budget</div>'
     +chipRow('budget', budgetOpts, false)
+    +'<label style="display:flex;align-items:center;gap:8px;padding:10px 2px;cursor:pointer" onclick="event.preventDefault();toggleReducedMobility()">'
+    +'<span style="width:20px;height:20px;border-radius:6px;border:1.5px solid '+(_personaAnswers.reducedMobility?'var(--accent)':'rgba(29,29,31,0.2)')+';background:'+(_personaAnswers.reducedMobility?'var(--accent)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(_personaAnswers.reducedMobility?svgIcon('check',13):'')+'</span>'
+    +'<span style="font-size:12.5px;color:var(--ink)">Voyageur à mobilité réduite — privilégier des lieux accessibles</span>'
+    +'</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;padding:10px 2px;cursor:pointer;margin-bottom:4px" onclick="event.preventDefault();toggleDietary()">'
+    +'<span style="width:20px;height:20px;border-radius:6px;border:1.5px solid '+(_personaAnswers.dietary?'var(--accent)':'rgba(29,29,31,0.2)')+';background:'+(_personaAnswers.dietary?'var(--accent)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(_personaAnswers.dietary?svgIcon('check',13):'')+'</span>'
+    +'<span style="font-size:12.5px;color:var(--ink)">Restrictions alimentaires (végétarien/végan/allergies)</span>'
+    +'</label>'
     +'<button class="modal-cta" style="width:100%;margin-top:4px" onclick="submitPersonaAndGenerate()">Générer mon voyage</button>'
     +'</div>';
+}
+function toggleReducedMobility(){
+  _personaAnswers.reducedMobility = !_personaAnswers.reducedMobility;
+  showPostCreatePersonaStep();
+}
+function toggleDietary(){
+  _personaAnswers.dietary = !_personaAnswers.dietary;
+  showPostCreatePersonaStep();
 }
 function setPersonaAnswer(name, val, multi){
   if(multi){
@@ -10372,6 +10416,67 @@ function submitPersonaAndGenerate(){
 function closePostCreateModal(){
   document.getElementById('postCreateModal').classList.remove('open');
 }
+// ── Programme (villes + répartition des jours) — propose une liste de villes cohérente avec
+// le nombre de jours déjà alloué au pays (fixé à la création du voyage, jamais redéfini ici).
+async function suggestCitiesWithAI(countryId){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c || !S.apiKey || !c.days || c.days<1) return null;
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:900,
+        tools:[{type:'web_search_20250305', name:'web_search'}],
+        messages:[{role:'user', content:
+`Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de proposer un itineraire de villes realiste et geographiquement coherent (pas de zigzags inutiles), pas un texte marketing.
+
+${personaPromptContext()}Le voyageur dispose exactement de ${c.days} jour(s) au total pour visiter "${c.name}". Propose une liste de villes/etapes a visiter, dans l'ordre de visite recommande (itineraire logique, en boucle ou en ligne, evite les allers-retours inutiles), en t'appuyant en priorite sur Wikivoyage, Lonely Planet et offices de tourisme officiels. Adapte le nombre de villes a la duree : environ 1 ville pour 2 a 4 jours (jamais moins d'1 jour par ville, jamais plus de 6 jours d'affilee dans la meme ville sauf si le pays est petit). Reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
+{"cities":[{"name":"nom de la ville (orthographe usuelle francaise)","days":2}]}
+La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de ville qui n'existe pas.`
+        }]
+      })
+    });
+    const data = await resp.json();
+    const text = extractAiText(data);
+    if(!text) return null;
+    const info = deepSanitize(parseAiJson(text));
+    if(!info.cities || !info.cities.length) return null;
+    // Garde-fou : si la somme ne correspond pas exactement (arrondi IA), on réajuste la dernière ville
+    var sum = info.cities.reduce(function(s,ci){ return s+(parseInt(ci.days,10)||0); }, 0);
+    if(sum!==c.days && info.cities.length){
+      var diff = c.days - sum;
+      var lastIdx = info.cities.length-1;
+      info.cities[lastIdx].days = Math.max(1, (parseInt(info.cities[lastIdx].days,10)||1) + diff);
+    }
+    return info.cities.filter(function(ci){ return ci.name && ci.days>0; });
+  }catch(e){ return null; }
+}
+// Orchestration complète pour un pays : propose les villes, les crée dans l'ordre avec les
+// bonnes dates (chaînées depuis c.dateStart), ce qui déclenche automatiquement la génération
+// des activités pour chacune (suggestActivitiesWithAI, déjà appelée par _createCityFromModal).
+async function generateProgramForCountry(countryId, onProgress){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c || !S.apiKey) return;
+  if(c.cities && c.cities.length) return; // des villes existent déjà, on ne duplique/écrase rien
+  if(!c.dateStart || !c.dateEnd) return; // dates du pays pas encore connues, rien à répartir
+  var cityPlan = await suggestCitiesWithAI(countryId);
+  if(!cityPlan || !cityPlan.length) return;
+  var cursor = c.dateStart;
+  for(var i=0;i<cityPlan.length;i++){
+    var entry = cityPlan[i];
+    if(onProgress) onProgress(entry.name, i+1, cityPlan.length);
+    var startDate = new Date(cursor+'T00:00:00');
+    var endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + (entry.days-1));
+    var endStr = toLocalISODate(endDate);
+    _createCityFromModal(countryId, entry.name, '', cursor, endStr);
+    cursor = toLocalISODate(new Date(endDate.getTime()+86400000));
+    // Petite pause entre chaque ville pour rester raisonnable sur le rythme des appels IA
+    await new Promise(function(resolve){ setTimeout(resolve, 400); });
+  }
+}
 async function runAiTripPrep(){
   var optsEl = document.getElementById('postCreateOptions');
   var countries = COUNTRIES.slice();
@@ -10382,6 +10487,22 @@ async function runAiTripPrep(){
       +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[i].flag+' '+countries[i].name)+' — recherche des infos pratiques…</div>'
       +'</div>';
     try{ await autofillCountryWithAI(countries[i].id); }catch(e){}
+  }
+  for(var j=0;j<countries.length;j++){
+    optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
+      +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('sparkles',28)+'</div>'
+      +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Construction du programme…</div>'
+      +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[j].flag+' '+countries[j].name)+' — choix des villes…</div>'
+      +'</div>';
+    try{
+      await generateProgramForCountry(countries[j].id, function(cityName, idx, total){
+        optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
+          +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('sparkles',28)+'</div>'
+          +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Construction du programme…</div>'
+          +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[j].flag+' '+countries[j].name)+' — '+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'
+          +'</div>';
+      });
+    }catch(e){}
   }
   optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
     +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('check',28)+'</div>'
