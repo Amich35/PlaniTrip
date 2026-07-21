@@ -4883,7 +4883,7 @@ function renderToday(){
     var visibleActsCount = Math.min(todayActs.length, 3 + todayDoneCount);
     var visibleActs = todayActs.slice(0, visibleActsCount);
     var actsHTML = visibleActs.map(function(a){
-      return '<div class="check-item'+(a.done?' checked':'')+'" style="display:flex;align-items:center;gap:8px"><div class="ci-box" onclick="event.stopPropagation();toggleAct(\''+a.key+'\')">'+(a.done?'✓':'')+'</div><span class="ci-text" style="flex:1;cursor:pointer" onclick="event.stopPropagation();openDetail(\''+a.key+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.ck+'\')">'+escHtml(a.name)+(a.meta?' <span style="color:var(--ink-subtle);font-size:12px">· '+escHtml(a.meta)+'</span>':'')+'</span></div>';
+      return '<div class="check-item'+(a.done?' checked':'')+'" style="display:flex;align-items:flex-start;gap:8px"><div class="ci-box" style="margin-top:1px" onclick="event.stopPropagation();toggleAct(\''+a.key+'\')">'+(a.done?'✓':'')+'</div><div style="flex:1;cursor:pointer" onclick="event.stopPropagation();openDetail(\''+a.key+'\',\''+a.name.replace(/'/g,"\\'")+'\',\''+a.ck+'\')"><span class="ci-text">'+escHtml(a.name)+'</span>'+(a.meta?'<div style="color:var(--ink-subtle);font-size:12px;margin-top:1px">'+escHtml(a.meta)+'</div>':'')+'</div></div>';
     }).join('');
     actsCard = '<div class="info-card" style="cursor:'+(c?'pointer':'default')+'"'+todayOnclick+'><div class="ic-header">'+(c?icHeaderChevron('calendar', todayCardTitle):('<span data-icon="calendar" data-icon-size="16"></span> '+todayCardTitle))+'</div>'+todayCityLabel+actsHTML+'</div>';
   } else {
