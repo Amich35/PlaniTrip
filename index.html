@@ -4876,7 +4876,7 @@ function renderToday(){
 
   // ── Carte Aujourd'hui / Prochainement ──
   var actsCard;
-  var todayOnclick = c && ts.currentCity ? (' onclick="S.openCities[\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\']=true;openCountryDetail(\''+c.id+'\',\'lieux\')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
+  var todayOnclick = c && ts.currentCity ? (' onclick="openCityDetail(\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
   var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>') : '';
   if(todayActs.length){
     var todayDoneCount = todayActs.filter(function(a){return a.done;}).length;
@@ -4892,7 +4892,7 @@ function renderToday(){
       +(ts.currentCity?('<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>'):'')
       +'<div style="color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('calendar',28)+'</div>'
       +'<div style="font-size:14px;color:var(--ink-muted);margin-bottom:14px">À renseigner — aucune activité datée pour l\'instant.</div>'
-      +(c?'<button onclick="event.stopPropagation();'+(emptyBtnCity?('S.openCities[\''+c.id+'_'+emptyBtnCity.replace(/'/g,"\\'")+'\']=true;'):'')+'openCountryDetail(\''+c.id+'\',\'lieux\')" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir '+(emptyBtnCity?escHtml(emptyBtnCity):'les lieux')+'</button>':'')
+      +(c?'<button onclick="event.stopPropagation();'+(emptyBtnCity?('openCityDetail(\''+c.id+'_'+emptyBtnCity.replace(/'/g,"\\'")+'\')'):('openCountryDetail(\''+c.id+'\',\'lieux\')'))+'" style="padding:9px 18px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir '+(emptyBtnCity?escHtml(emptyBtnCity):'les lieux')+'</button>':'')
       +'</div>';
   }
 
@@ -4944,8 +4944,8 @@ function renderToday(){
         if(tCityRange && tomorrowStrRef>=tCityRange.start && tomorrowStrRef<=tCityRange.end){ tmLandingCity=tmOrderedCities[tj].city; break; }
       }
       if(!tmLandingCity && tmOrderedCities.length) tmLandingCity = tmOrderedCities[0].city;
-      var tmOnclick = tmLandingCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmLandingCity)+'\']=true;') : '';
-      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
+      var tmOnclick = tmLandingCity ? ('openCityDetail(\''+tmCountry.id+'_'+jsStrEsc(tmLandingCity)+'\')') : ('openCountryDetail(\''+tmCountry.id+'\',\'lieux\')');
+      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmOnclick+'"><div class="ic-header">'+icHeaderChevron('plane', tomorrowCardTitle)+'</div>'
         +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+tmCountry.flag+' Départ vers '+tmCountry.name+'</div>'
         +(transp?'<div style="font-size:12px;color:var(--ink-subtle);margin-top:2px">'+escHtml(transp[2])+'</div>':'<div class="status-sub" style="margin-top:2px">Moyen de transport à renseigner.</div>')
         +'</div>';
@@ -4960,8 +4960,8 @@ function renderToday(){
       if(!tmCityObj) tmCityObj = tmOrderedCities2[0] || null;
       var tmActCity = tmCityObj ? tmCityObj.city : null;
       var tmActs = tmCityObj ? getCityActivitiesForToday(tmCountry, tmCityObj, tomorrowStrRef) : [];
-      var tmActOnclick = tmActCity ? ('S.openCities[\''+tmCountry.id+'_'+jsStrEsc(tmActCity)+'\']=true;') : '';
-      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmActOnclick+'openCountryDetail(\''+tmCountry.id+'\',\'lieux\')"><div class="ic-header">'+icHeaderChevron('calendar', tomorrowCardTitle)+'</div>'
+      var tmActOnclick = tmActCity ? ('openCityDetail(\''+tmCountry.id+'_'+jsStrEsc(tmActCity)+'\')') : ('openCountryDetail(\''+tmCountry.id+'\',\'lieux\')');
+      tomorrowCard = '<div class="info-card" style="cursor:pointer" onclick="'+tmActOnclick+'"><div class="ic-header">'+icHeaderChevron('calendar', tomorrowCardTitle)+'</div>'
         +(tmActs.length
           ? '<div style="font-size:13px;color:var(--ink)">'+tmActs.length+' activité'+(tmActs.length>1?'s':'')+' prévue'+(tmActs.length>1?'s':'')+(tmActCity?' à '+escHtml(tmActCity):'')+'</div>'
           : '<div class="status-sub">'+(tmActCity?('À renseigner — rien de prévu à '+escHtml(tmActCity)+' pour l\'instant.'):'À renseigner — rien de prévu pour l\'instant.')+'</div>')
@@ -4980,16 +4980,15 @@ function renderToday(){
       var hashSeed = (todayStr+c.id).split('').reduce(function(h,ch){return ((h<<5)-h+ch.charCodeAt(0))|0;},0);
       var pickIdx = Math.abs(hashSeed) % todayCandidates.length;
       var pick0 = todayCandidates[pickIdx];
-      var pick = {name:pick0.name, meta:pick0.meta, cityName:pick0.city, actKey:pick0.key};
+      var pick = {name:pick0.name, meta:pick0.meta, cityName:pick0.city, actKey:pick0.key, ck:pick0.ck};
       var spotQuery = _PLACE_QUERY_OVERRIDES[pick.name] || (pick.name+' '+pick.cityName);
-      photoSpotCard = '<div class="info-card" style="padding:0;overflow:hidden">'
+      photoSpotCard = '<div class="info-card" style="padding:0;overflow:hidden;cursor:pointer" onclick="openDetail(\''+jsStrEsc(pick.actKey)+'\',\''+jsStrEsc(pick.name)+'\',\''+jsStrEsc(pick.ck)+'\')">'
         +'<div class="home-hero" data-img-query="'+escHtml(spotQuery)+'" style="height:150px;border-radius:0;justify-content:center;align-items:center"><span class="home-hero-fallback-icon" style="color:rgba(255,255,255,0.35)">'+svgIcon('camera',30)+'</span></div>'
         +'<div style="padding:14px 16px">'
         +'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-muted);margin-bottom:6px;display:flex;align-items:center;gap:6px">'+svgIcon('camera',14)+' À ne pas manquer aujourd\'hui</div>'
         +'<div style="font-size:16px;font-weight:700;color:var(--ink)">'+escHtml(pick.name)+'</div>'
         +(pick.meta?'<div style="font-size:12.5px;color:var(--ink-subtle);margin-top:2px">'+escHtml(pick.meta)+'</div>':'')
         +'<div style="font-size:11.5px;color:var(--ink-subtle);margin-top:2px">'+escHtml(pick.cityName)+'</div>'
-        +'<button onclick="openMap(\''+jsStrEsc(pick.actKey)+'\',\''+jsStrEsc(pick.name)+'\')" style="margin-top:10px;padding:9px 16px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
         +'</div></div>';
     }
   }
