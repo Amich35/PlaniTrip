@@ -4819,12 +4819,12 @@ function getTripStatus(){
     var withRange = COUNTRIES.map(function(cc){ return {cc:cc, range:getCountryDateRange(cc)}; }).filter(function(x){ return !!x.range; });
     withRange.sort(function(a,b){ return a.range.start<b.range.start ? -1 : (a.range.start>b.range.start?1:0); });
     if(elapsedDays<0){
-      var first = withRange[0] || {cc:COUNTRIES[0]};
-      currentCountry = first.cc; countryIdx = COUNTRIES.indexOf(currentCountry); dayInCountry = 0;
+      var first = withRange[0] || (COUNTRIES[0] ? {cc:COUNTRIES[0]} : null);
+      currentCountry = first ? first.cc : null; countryIdx = currentCountry ? COUNTRIES.indexOf(currentCountry) : -1; dayInCountry = 0;
     } else {
-      var last = withRange[withRange.length-1] || {cc:COUNTRIES[COUNTRIES.length-1]};
-      currentCountry = last.cc; countryIdx = COUNTRIES.indexOf(currentCountry);
-      dayInCountry = last.range ? (Math.round((new Date(last.range.end+'T00:00:00')-new Date(last.range.start+'T00:00:00'))/86400000)+1) : (currentCountry?currentCountry.days:0);
+      var last = withRange[withRange.length-1] || (COUNTRIES.length ? {cc:COUNTRIES[COUNTRIES.length-1]} : null);
+      currentCountry = last ? last.cc : null; countryIdx = currentCountry ? COUNTRIES.indexOf(currentCountry) : -1;
+      dayInCountry = (last && last.range) ? (Math.round((new Date(last.range.end+'T00:00:00')-new Date(last.range.start+'T00:00:00'))/86400000)+1) : (currentCountry?currentCountry.days:0);
     }
   }
   // Next transport: the one leaving the current (or next) country
@@ -5411,7 +5411,9 @@ function renderCountriesScreen(){
   var heroCountry = ts.currentCountry || COUNTRIES[0];
   var heroQuery = heroCountry ? getCountryImageQuery(heroCountry) : 'travel landscape';
   var dayHero;
-  if(ts.elapsedDays<0){
+  if(!ts.currentCountry){
+    dayHero = '';
+  } else if(ts.elapsedDays<0){
     dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
       +photoEditBtn(heroQuery)
       +'<div class="home-hero-overlay"><div class="home-hero-greeting">Départ dans '+Math.abs(ts.elapsedDays)+' jours '+ts.currentCountry.flag+'</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé · '+tripRecap+'</div></div></div>';
