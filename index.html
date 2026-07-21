@@ -3341,19 +3341,41 @@ function fmtDateRangeFr(startISO, endISO){
   return s.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
 }
 function autofillMissingCountryDates(){
-  var cursor = null;
+  var withDates = [], missing = [];
   COUNTRIES.forEach(function(c){
-    if(c.dateStart && c.dateEnd){
-      cursor = c.dateEnd;
-      return;
-    }
-    var start = cursor || toLocalISODate(getTripDepartDate());
-    var days = c.days>0 ? c.days : 1;
+    if(c.dateStart && c.dateEnd) withDates.push(c); else missing.push(c);
+  });
+  if(!missing.length) return;
+
+  // Durée totale du voyage si connue (dates saisies à la création ou depuis), pour répartir
+  // les jours RESTANTS entre les pays sans date — plutôt qu'un filet de sécurité fixe à 1 jour,
+  // qui écrasait silencieusement la durée réelle (ex: pays ré-ajouté après suppression).
+  var tripStart = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) ? CURRENT_TRIP.start_date : toLocalISODate(getTripDepartDate());
+  var tripEnd = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.end_date) ? CURRENT_TRIP.end_date : null;
+
+  var usedDays = withDates.reduce(function(s,c){
+    var d1=new Date(c.dateStart+'T00:00:00'), d2=new Date(c.dateEnd+'T00:00:00');
+    return s + Math.max(1, Math.round((d2-d1)/86400000)+1);
+  }, 0);
+  var totalDays = tripEnd ? (Math.round((new Date(tripEnd+'T00:00:00') - new Date(tripStart+'T00:00:00'))/86400000)+1) : null;
+  var remainingDays = totalDays!==null ? Math.max(missing.length, totalDays - usedDays) : null;
+  var perMissing = remainingDays!==null ? Math.floor(remainingDays / missing.length) : 1;
+  var extraDays = remainingDays!==null ? (remainingDays - perMissing*missing.length) : 0;
+
+  var latestEnd = null;
+  withDates.forEach(function(c){ if(!latestEnd || c.dateEnd>latestEnd) latestEnd=c.dateEnd; });
+  var cursor = latestEnd
+    ? toLocalISODate(new Date(new Date(latestEnd+'T00:00:00').setDate(new Date(latestEnd+'T00:00:00').getDate()+1)))
+    : tripStart;
+
+  missing.forEach(function(c, idx){
+    var days = (perMissing>0 ? perMissing : (c.days>0?c.days:1)) + (idx<extraDays ? 1 : 0);
+    var start = cursor;
     var endDate = new Date(start+'T00:00:00');
     endDate.setDate(endDate.getDate()+(days-1));
     var end = toLocalISODate(endDate);
     editCountryDateRange(c.id, start, end);
-    cursor = end;
+    cursor = toLocalISODate(new Date(endDate.getTime()+86400000));
   });
 }
 function editCountryDateRange(countryId, startVal, endVal){
@@ -9782,6 +9804,7 @@ async function addCountryToCurrentTrip(countryName) {
   CURRENT_TRIP.countries = updatedCountries;
   rebuildCountriesFromState();
   applyTripCountryFilter(CURRENT_TRIP);
+  autofillMissingCountryDates();
   save();
   renderContent();
 }
