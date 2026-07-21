@@ -4870,6 +4870,7 @@ function renderToday(){
   } else {
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochain vol</div><div class="status-sub">À renseigner — aucun vol à venir enregistré.</div></div>';
   }
+  var isFlightSoon = upcomingFlights.length>0 && (upcomingFlights[0].date===todayStr || upcomingFlights[0].date===tomorrowStrRef);
 
   // ── Carte Demain / Ensuite ──
   var tomorrowCard = '';
@@ -4985,8 +4986,9 @@ function renderToday(){
     +heroHTML
     +summaryHTML
     +importantCard
+    +(isFlightSoon?flightCard:'')
     +actsCard
-    +flightCard
+    +(isFlightSoon?'':flightCard)
     +photoSpotCard
     +tomorrowCard
     +forgetCard
