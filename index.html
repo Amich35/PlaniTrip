@@ -8114,6 +8114,7 @@ function renderArchivedCountriesScreen(){
 
 var _acmScopeAll = true;
 var _acmScopeCountries = [];
+var _acmScopeCities = {}; // {countryName: [cityName, ...]} — vide/absent = accès à tout le pays
 var _acmSuccessMsg = '';
 var _acmShowCopyLink = false;
 var _acmLastInvitedEmail = '';
@@ -8299,7 +8300,7 @@ async function logoutUser(){
 
 function showAccessManagementScreen(){
   S.tab='access-management'; save();
-  _acmScopeAll = true; _acmScopeCountries = [];
+  _acmScopeAll = true; _acmScopeCountries = []; _acmScopeCities = {};
   renderContent();
   loadCollaborators().then(function(){ if(S.tab==='access-management') renderContent(); });
 }
@@ -8310,8 +8311,25 @@ function toggleAcmScope(mode){
 }
 function toggleAcmCountry(name){
   var idx = _acmScopeCountries.indexOf(name);
-  if(idx===-1) _acmScopeCountries.push(name); else _acmScopeCountries.splice(idx,1);
+  if(idx===-1) _acmScopeCountries.push(name); else { _acmScopeCountries.splice(idx,1); delete _acmScopeCities[name]; }
   renderContent();
+}
+function toggleAcmCity(countryName, cityName){
+  if(!_acmScopeCities[countryName]) _acmScopeCities[countryName]=[];
+  var idx = _acmScopeCities[countryName].indexOf(cityName);
+  if(idx===-1) _acmScopeCities[countryName].push(cityName); else _acmScopeCities[countryName].splice(idx,1);
+  renderContent();
+}
+// Construit les entrées de scope pour un pays coché : "Pays" si toutes les villes (ou aucune
+// sélection précise) sont autorisées, sinon une entrée "Pays:Ville" par ville cochée.
+function buildScopeEntriesForCountry(countryName){
+  var picked = _acmScopeCities[countryName] || [];
+  var country = COUNTRIES.find(function(c){ return c.name===countryName; });
+  var allCities = country ? country.cities.map(function(ci){ return ci.city; }) : [];
+  if(!picked.length || !allCities.length || picked.length>=allCities.length){
+    return [countryName];
+  }
+  return picked.map(function(city){ return countryName+':'+city; });
 }
 
 async function addCollaboratorSubmit(){
@@ -8329,7 +8347,7 @@ async function addCollaboratorSubmit(){
   }
   if(!sb || !CURRENT_TRIP){ errEl.textContent='Erreur de connexion.'; errEl.style.display='block'; return; }
 
-  var scope = _acmScopeAll ? ['all'] : _acmScopeCountries.slice();
+  var scope = _acmScopeAll ? ['all'] : _acmScopeCountries.reduce(function(acc, name){ return acc.concat(buildScopeEntriesForCountry(name)); }, []);
   var btn = document.getElementById('acm-add-btn');
   btn.disabled = true; btn.textContent = 'Ajout...';
 
@@ -8370,7 +8388,7 @@ async function addCollaboratorSubmit(){
   } else {
     _acmSuccessMsg = 'Invitation envoyée à ' + email;
   }
-  input.value=''; _acmScopeAll=true; _acmScopeCountries=[];
+  input.value=''; _acmScopeAll=true; _acmScopeCountries=[]; _acmScopeCities={};
   await loadCollaborators();
   renderContent();
 }
@@ -8392,6 +8410,97 @@ async function removeCollaboratorAction(id){
     const { error } = await sb.from('collaborators').delete().eq('id', id);
     if(!error){ await loadCollaborators(); renderContent(); }
   }, 'Retirer');
+}
+
+// ── Modifier l'accès d'un voyageur déjà invité (pays + villes) ──
+var _editAccessCollabId = '';
+var _editAccessScopeAll = true;
+var _editAccessCountries = [];
+var _editAccessCities = {};
+function openEditAccessModal(collabId){
+  if(!(CURRENT_TRIP && CURRENT_USER && CURRENT_TRIP.owner_id === CURRENT_USER.id)) return; // sécurité: propriétaire uniquement
+  var c = CURRENT_COLLABORATORS.find(function(cc){ return cc.id===collabId; });
+  if(!c) return;
+  _editAccessCollabId = collabId;
+  _editAccessScopeAll = !c.scope || c.scope.indexOf('all')>-1;
+  _editAccessCountries = [];
+  _editAccessCities = {};
+  if(!_editAccessScopeAll){
+    (c.scope||[]).forEach(function(s){
+      var parts = s.split(':');
+      if(_editAccessCountries.indexOf(parts[0])===-1) _editAccessCountries.push(parts[0]);
+      if(parts[1]){ if(!_editAccessCities[parts[0]]) _editAccessCities[parts[0]]=[]; _editAccessCities[parts[0]].push(parts[1]); }
+    });
+  }
+  renderEditAccessModalBody();
+  document.getElementById('guideItemModalTitle').textContent = 'Modifier l\'accès';
+  _guideModalSaveFn = saveEditAccessScope;
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function toggleEditAccessScope(mode){
+  _editAccessScopeAll = (mode==='all');
+  renderEditAccessModalBody();
+}
+function toggleEditAccessCountry(name){
+  var idx = _editAccessCountries.indexOf(name);
+  if(idx===-1) _editAccessCountries.push(name); else { _editAccessCountries.splice(idx,1); delete _editAccessCities[name]; }
+  renderEditAccessModalBody();
+}
+function toggleEditAccessCity(countryName, cityName){
+  if(!_editAccessCities[countryName]) _editAccessCities[countryName]=[];
+  var idx = _editAccessCities[countryName].indexOf(cityName);
+  if(idx===-1) _editAccessCities[countryName].push(cityName); else _editAccessCities[countryName].splice(idx,1);
+  renderEditAccessModalBody();
+}
+function renderEditAccessModalBody(){
+  var tripCountriesEA = effectiveTripCountries();
+  var countryChecks = tripCountriesEA.map(function(name){
+    var checked = _editAccessCountries.indexOf(name)>-1;
+    var flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[name]) || '🌍';
+    var countryObj = COUNTRIES.find(function(co){ return co.name===name; });
+    var cityChecks = '';
+    if(checked && countryObj && countryObj.cities.length){
+      var pickedCities = _editAccessCities[name] || [];
+      cityChecks = '<div style="margin:2px 0 6px 30px;display:flex;flex-wrap:wrap;gap:6px">'
+        +countryObj.cities.map(function(ci){
+          var cChecked = pickedCities.indexOf(ci.city)>-1;
+          return '<span onclick="event.stopPropagation();toggleEditAccessCity(\''+jsStrEsc(name)+'\',\''+jsStrEsc(ci.city)+'\')" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;font-size:11.5px;font-weight:600;cursor:pointer;background:'+(cChecked?'var(--accent)':'var(--sand-deep)')+';color:'+(cChecked?'#fff':'var(--ink-muted)')+'">'+(cChecked?svgIcon('check',10):'')+' '+escHtml(ci.city)+'</span>';
+        }).join('')
+        +'</div>'
+        +'<div style="margin:0 0 8px 30px;font-size:10.5px;color:var(--ink-subtle)">'+(pickedCities.length?'Accès limité aux villes cochées':'Aucune ville cochée = accès à tout le pays')+'</div>';
+    }
+    return '<div onclick="toggleEditAccessCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:8px 0;cursor:pointer">'
+      +'<div style="display:flex;align-items:center"><span style="font-size:16px;margin-right:8px">'+flag+'</span><span class="more-row-label" style="flex:1">'+escHtml(name)+'</span>'
+      +'<span style="font-size:16px;color:'+(checked?'var(--accent)':'var(--ink-subtle)')+'">'+(checked?'✓':'')+'</span></div>'
+      +cityChecks
+      +'</div>';
+  }).join('');
+  var body = '<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<button onclick="toggleEditAccessScope(\'all\')" style="flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid '+(_editAccessScopeAll?'var(--accent)':'rgba(29,29,31,0.12)')+';background:'+(_editAccessScopeAll?'var(--accent-pale)':'transparent')+';color:'+(_editAccessScopeAll?'var(--accent)':'var(--ink-muted)')+'">Tous les pays</button>'
+    +'<button onclick="toggleEditAccessScope(\'custom\')" style="flex:1;padding:9px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid '+(!_editAccessScopeAll?'var(--accent)':'rgba(29,29,31,0.12)')+';background:'+(!_editAccessScopeAll?'var(--accent-pale)':'transparent')+';color:'+(!_editAccessScopeAll?'var(--accent)':'var(--ink-muted)')+'">Pays spécifiques</button>'
+    +'</div>'
+    +(_editAccessScopeAll ? '' : '<div style="max-height:280px;overflow-y:auto">'+countryChecks+'</div>')
+    +'<div id="edit-access-error" class="auth-error" style="display:none;margin-top:8px"></div>';
+  document.getElementById('guideItemModalBody').innerHTML = body;
+}
+async function saveEditAccessScope(){
+  if(!_editAccessScopeAll && _editAccessCountries.length===0){
+    var errEl = document.getElementById('edit-access-error');
+    if(errEl){ errEl.textContent = 'Sélectionne au moins un pays, ou choisis "Tous les pays".'; errEl.style.display='block'; }
+    return;
+  }
+  var newScope = _editAccessScopeAll ? ['all'] : _editAccessCountries.reduce(function(acc, name){
+    var picked = _editAccessCities[name] || [];
+    var countryObj = COUNTRIES.find(function(co){ return co.name===name; });
+    var allCities = countryObj ? countryObj.cities.map(function(ci){ return ci.city; }) : [];
+    if(!picked.length || !allCities.length || picked.length>=allCities.length) return acc.concat([name]);
+    return acc.concat(picked.map(function(city){ return name+':'+city; }));
+  }, []);
+  closeGuideItemModal();
+  const { error } = await sb.from('collaborators').update({ scope: newScope }).eq('id', _editAccessCollabId);
+  if(error){ alert('Erreur : ' + error.message); return; }
+  await loadCollaborators();
+  renderContent();
 }
 
 var _editPseudoUserId = '';
@@ -8457,17 +8566,31 @@ function renderAccessManagementScreen(){
     +'<div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(ownerSubtitle)+'</div></div></div>';
 
   var collabRows = CURRENT_COLLABORATORS.map(function(c){
-    var scopeLabel = (c.scope && c.scope.indexOf('all')>-1) ? 'Tous les pays' : ((c.scope||[]).join(', ')||'Aucun pays');
+    var scopeLabel;
+    if(c.scope && c.scope.indexOf('all')>-1){ scopeLabel='Tous les pays'; }
+    else {
+      var byCountry = {};
+      (c.scope||[]).forEach(function(s){
+        var parts = s.split(':');
+        if(!byCountry[parts[0]]) byCountry[parts[0]]=[];
+        if(parts[1]) byCountry[parts[0]].push(parts[1]);
+      });
+      var pieces = Object.keys(byCountry).map(function(cn){
+        return byCountry[cn].length ? (cn+' ('+byCountry[cn].join(', ')+')') : cn;
+      });
+      scopeLabel = pieces.length ? pieces.join(', ') : 'Aucun pays';
+    }
     var statusLabel = c.user_id ? '' : ' · en attente';
     var label = c.invited_email || c.user_id;
     var isMe = (CURRENT_USER && (c.user_id === CURRENT_USER.id || c.invited_email === CURRENT_USER.email));
     var displayLabel = isMe ? 'Vous' : personDisplayName(label);
     var avatarName = isMe ? personDisplayName(label) : displayLabel; // initiales du vrai nom, pas de "Vous"
     var editBtn = (isOwner && !isMe && c.user_id) ? '<button onclick="openEditPseudoModal(\''+c.user_id+'\',\''+jsStrEsc(c.invited_email||'')+'\',\''+jsStrEsc(displayLabel)+'\')" style="border:none;background:none;color:var(--ink-muted);font-size:12px;cursor:pointer;margin-left:8px;display:inline-flex;align-items:center;gap:3px">'+svgIcon('pencil',12)+' Pseudo</button>' : '';
+    var accessBtn = (isOwner && !isMe) ? '<button onclick="openEditAccessModal(\''+c.id+'\')" style="border:none;background:none;color:var(--accent);font-size:12px;cursor:pointer;margin-left:8px;display:inline-flex;align-items:center;gap:3px">'+svgIcon('map-pin',12)+' Accès</button>' : '';
     var removeBtn = isOwner && !isMe ? '<button onclick="removeCollaboratorAction(\''+c.id+'\')" style="border:none;background:none;color:var(--red-muted);font-size:12px;cursor:pointer;margin-left:8px">Retirer</button>' : '';
-    return '<div class="more-row" style="padding:8px 4px">'+avatarCircle(avatarName,36)
+    return '<div class="more-row" style="padding:8px 4px;flex-wrap:wrap">'+avatarCircle(avatarName,36)
       +'<div style="flex:1;min-width:0;margin-left:10px"><div class="more-row-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(displayLabel)+(isMe ? '' : '')+'</div><div style="font-size:11.5px;color:var(--ink-muted)">'+escHtml(scopeLabel)+statusLabel+'</div></div>'
-      +editBtn+removeBtn+'</div>';
+      +editBtn+accessBtn+removeBtn+'</div>';
   }).join('');
 
   var inviteForm = '';
@@ -8475,9 +8598,23 @@ function renderAccessManagementScreen(){
     var countryChecks = tripCountries.map(function(name){
       var checked = _acmScopeCountries.indexOf(name)>-1;
       var flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[name]) || '🌍';
-      return '<div class="more-row" onclick="toggleAcmCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:8px 0;cursor:pointer">'
-        +'<span style="font-size:16px;margin-right:8px">'+flag+'</span><span class="more-row-label">'+escHtml(name)+'</span>'
-        +'<span style="font-size:16px;color:'+(checked?'var(--accent)':'var(--ink-subtle)')+'">'+(checked?'✓':'')+'</span></div>';
+      var countryObj = COUNTRIES.find(function(co){ return co.name===name; });
+      var cityChecks = '';
+      if(checked && countryObj && countryObj.cities.length){
+        var pickedCities = _acmScopeCities[name] || [];
+        cityChecks = '<div style="margin:2px 0 6px 30px;display:flex;flex-wrap:wrap;gap:6px">'
+          +countryObj.cities.map(function(ci){
+            var cChecked = pickedCities.indexOf(ci.city)>-1;
+            return '<span onclick="event.stopPropagation();toggleAcmCity(\''+jsStrEsc(name)+'\',\''+jsStrEsc(ci.city)+'\')" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;font-size:11.5px;font-weight:600;cursor:pointer;background:'+(cChecked?'var(--accent)':'var(--sand-deep)')+';color:'+(cChecked?'#fff':'var(--ink-muted)')+'">'+(cChecked?svgIcon('check',10):'')+' '+escHtml(ci.city)+'</span>';
+          }).join('')
+          +'</div>'
+          +'<div style="margin:0 0 8px 30px;font-size:10.5px;color:var(--ink-subtle)">'+(pickedCities.length?'Accès limité aux villes cochées':'Aucune ville cochée = accès à tout le pays')+'</div>';
+      }
+      return '<div onclick="toggleAcmCountry(\''+escHtml(name).replace(/'/g,"\\'")+'\')" style="padding:8px 0;cursor:pointer">'
+        +'<div style="display:flex;align-items:center"><span style="font-size:16px;margin-right:8px">'+flag+'</span><span class="more-row-label" style="flex:1">'+escHtml(name)+'</span>'
+        +'<span style="font-size:16px;color:'+(checked?'var(--accent)':'var(--ink-subtle)')+'">'+(checked?'✓':'')+'</span></div>'
+        +cityChecks
+        +'</div>';
     }).join('');
 
     inviteForm = '<div class="info-card"><div class="ic-header"><span data-icon="plus" data-icon-size="16"></span> Inviter quelqu\'un</div>'
@@ -9119,11 +9256,13 @@ async function checkUserTrips(user, freshLogin) {
 function applyTripCountryFilter(trip) {
   let tripCountries = trip.countries || [];
 
-  // Si l'utilisateur connecté est un collaborateur (pas le propriétaire), restreindre encore selon SON scope
+  // Si l'utilisateur connecté est un collaborateur (pas le propriétaire), restreindre encore selon SON scope.
+  // Un item de scope peut être "Pays" (accès complet) ou "Pays:Ville" (accès limité à cette ville) —
+  // on ne garde que la partie pays ici pour la liste des pays visibles.
   if (CURRENT_USER && trip.owner_id !== CURRENT_USER.id) {
     const myCollab = CURRENT_COLLABORATORS.find(c => c.user_id === CURRENT_USER.id);
     if (myCollab && myCollab.scope && myCollab.scope.indexOf('all') === -1) {
-      tripCountries = myCollab.scope;
+      tripCountries = Array.from(new Set(myCollab.scope.map(s => s.split(':')[0])));
     }
   }
 
@@ -9193,6 +9332,25 @@ function applyTripCountryFilter(trip) {
   }
   save();
   rebuildCountriesFromState();
+  // Restriction par ville : si le collaborateur n'a accès qu'à certaines villes d'un pays (scope
+  // "Pays:Ville" plutôt que "Pays" en entier), on filtre c.cities ici — une seule fois, en aval de
+  // tout le reste (itinéraire, Aujourd'hui, carte, budget par ville...) qui lit c.cities pour afficher
+  // son contenu. Le pays reste visible, mais seules les villes autorisées y apparaissent.
+  if (CURRENT_USER && trip.owner_id !== CURRENT_USER.id) {
+    const myCollabCities = CURRENT_COLLABORATORS.find(c => c.user_id === CURRENT_USER.id);
+    if (myCollabCities && myCollabCities.scope && myCollabCities.scope.indexOf('all') === -1) {
+      COUNTRIES.forEach(function(c){
+        var hasFullCountryAccess = myCollabCities.scope.indexOf(c.name) > -1;
+        if (hasFullCountryAccess) return;
+        var allowedCities = myCollabCities.scope
+          .filter(function(s){ return s.indexOf(c.name+':')===0; })
+          .map(function(s){ return s.slice(c.name.length+1); });
+        if (allowedCities.length) {
+          c.cities = c.cities.filter(function(city){ return allowedCities.indexOf(city.city) > -1; });
+        }
+      });
+    }
+  }
   if(_newCountriesForLiveRate.length) fetchAndApplyLiveRates(_newCountriesForLiveRate);
 }
 // Taux de change en direct (API publique gratuite, sans clé) — appliqué une fois à la création
