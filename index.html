@@ -6833,8 +6833,7 @@ function renderMiniConverter(c){
   var toLabel = dir==='eur' ? c.currency : 'EUR';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
   return '<div style="margin-top:10px;padding-top:10px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-    +'<span style="font-size:12px;color:var(--ink)">Taux indicatif</span>'
+    +'<div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:8px">'
     +'<span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--ink-muted)">1€ = <input type="number" value="'+rate+'" id="convRateMini_'+c.id+'" oninput="updateCustomRate(\''+c.id+'\',this.value)" style="width:56px;border:none;border-bottom:1px dashed rgba(110,110,115,0.35);background:transparent;color:var(--ink-muted);font-weight:700;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:right"/> '+escHtml(c.currency||'')+'</span>'
     +'</div>'
     +'<div style="background:var(--sand);border-radius:var(--r12);padding:6px;display:flex;align-items:center;gap:6px">'
@@ -8926,6 +8925,7 @@ function applyTripCountryFilter(trip) {
   });
 
   // Créer les pays du trip qui n'existent pas encore dans COUNTRIES
+  var _newCountriesForLiveRate = [];
   tripCountries.forEach(countryName => {
     const exists = COUNTRIES.find(c => c.name === countryName);
     if (!exists) {
@@ -8944,6 +8944,8 @@ function applyTripCountryFilter(trip) {
       COUNTRIES.push(newCountry);
       if (!S.customCountries) S.customCountries = [];
       S.customCountries.push(newCountry);
+      var _liveCode = (currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1];
+      if(_liveCode) _newCountriesForLiveRate.push({id:id, code:_liveCode});
     } else {
       const idx = S.deletedCountryIds.indexOf(exists.id);
       if (idx !== -1) S.deletedCountryIds.splice(idx, 1);
@@ -8974,6 +8976,25 @@ function applyTripCountryFilter(trip) {
   }
   save();
   rebuildCountriesFromState();
+  if(_newCountriesForLiveRate.length) fetchAndApplyLiveRates(_newCountriesForLiveRate);
+}
+// Taux de change en direct (API publique gratuite, sans clé) — appliqué une fois à la création
+// du pays puis figé pour tout le voyage (reste éditable manuellement ensuite).
+async function fetchAndApplyLiveRates(entries){
+  try{
+    var res = await fetch('https://open.er-api.com/v6/latest/EUR');
+    var data = await res.json();
+    if(!data || data.result!=='success' || !data.rates) return;
+    if(!S.customRates) S.customRates={};
+    var applied = false;
+    entries.forEach(function(e){
+      var r = data.rates[e.code];
+      if(r && r>0){ S.customRates[e.id] = r; applied = true; }
+    });
+    if(applied){ save(); renderContent(); }
+  }catch(err){
+    console.error('[PlaniTrip] taux en direct indisponible, taux statique conservé:', err);
+  }
 }
 
 let CURRENT_COLLABORATORS = [];
