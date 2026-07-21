@@ -3281,8 +3281,8 @@ Sources a privilegier selon le type d'information (dans cet ordre de confiance) 
 - Patrimoine / sites classes : UNESCO World Heritage List
 - Budget / cout de la vie : Numbeo
 Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels, evenements ou risques actuels a signaler). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","alerts":[{"t":"alerte courte et factuelle","url":""}],"tips":[{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"}],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
-budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes factuelles et actuelles a surveiller pour ce pays specifique (evenement saisonnier majeur, periode a risque, affluence, conditions meteo extremes selon la periode) — laisse le tableau vide si rien de notable, n'invente rien. Chaque "cat" de tips DOIT etre exactement l'une de ces valeurs : Incontournable, Transport, Santé, Argent, Restauration, Hébergement, Culture, Sécurité, Bon plan, Autre (n'utilise "Autre" qu'en dernier recours si aucune autre categorie ne convient). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement). phrases = 10 mots ou expressions de base les plus utiles pour un touriste (bonjour, merci, oui, non, combien ca coute, l'addition svp, aide, ou sont les toilettes, delicieux, au revoir) traduits dans la/les langue(s) locale(s) principale(s).`
+{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","alerts":[{"t":"alerte courte et factuelle","url":""}],"tips":[{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"}],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":[{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"},{"t":"item concis","cat":"categorie"}],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
+budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes factuelles et actuelles a surveiller pour ce pays specifique (evenement saisonnier majeur, periode a risque, affluence, conditions meteo extremes selon la periode) — laisse le tableau vide si rien de notable, n'invente rien. Chaque "cat" de tips DOIT etre exactement l'une de ces valeurs : Incontournable, Transport, Santé, Argent, Restauration, Hébergement, Culture, Sécurité, Bon plan, Autre (n'utilise "Autre" qu'en dernier recours si aucune autre categorie ne convient). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement) ; chaque "cat" de checklist DOIT etre exactement l'une de ces valeurs : Santé, Équipement, Documents, Argent, Vêtements, Transport, Autre (n'utilise "Autre" qu'en dernier recours). phrases = 10 mots ou expressions de base les plus utiles pour un touriste (bonjour, merci, oui, non, combien ca coute, l'addition svp, aide, ou sont les toilettes, delicieux, au revoir) traduits dans la/les langue(s) locale(s) principale(s).`
         }]
       })
     });
@@ -3310,7 +3310,15 @@ budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes 
       });
     }
     c.practical.emergency = info.emergency || c.practical.emergency;
-    c.practical.checklist = (info.checklist && info.checklist.length) ? info.checklist : c.practical.checklist;
+    if(info.checklist && info.checklist.length){
+      c.practical.checklist = info.checklist.map(function(item){
+        if(typeof item==='object' && item.t){
+          var clCat = _CL_KNOWN_CATS.indexOf(item.cat)>-1 ? item.cat : 'Autre';
+          return {t:String(item.t), cat:clCat};
+        }
+        return {t:String(item||''), cat:'Autre'};
+      });
+    }
     c.practical.phrases = (info.phrases && info.phrases.length) ? info.phrases : c.practical.phrases;
     c._aiGenerated = true;
     c._aiGeneratedAt = new Date().toISOString();
@@ -10277,7 +10285,7 @@ function showPostCreateModal(trip){
   var body = '<div class="modal-title" style="font-size:18px;margin-bottom:4px">Voulez-vous que PlaniTrip prépare votre voyage ?</div>'
     +'<div style="font-size:13px;color:var(--ink-subtle);margin-bottom:16px">Tu peux tout modifier ensuite.</div>'
     +'<div id="postCreateOptions">'
-    +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="'+(hasKey?'runAiTripPrep()':'showPostCreateAiKeyStep()')+'">'
+    +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="'+(hasKey?'showPostCreatePersonaStep()':'showPostCreateAiKeyStep()')+'">'
     +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Générer avec l\'IA</div>'
     +'<div class="status-sub">Infos pratiques, checklist, budget suggéré et conseils par pays'+(hasKey?'':' — une clé API te sera demandée à l\'étape suivante')+'</div>'
     +'</div>'
@@ -10316,6 +10324,48 @@ function submitPostCreateAiKey(){
     return;
   }
   S.apiKey = val;
+  save();
+  showPostCreatePersonaStep();
+}
+// Questionnaire persona (3 questions), pour orienter la future generation du Programme
+// (villes/activites). La saison n'est pas redemandee : deduite des dates deja saisies.
+var _personaAnswers = {pace:'', interests:[], budget:''};
+function showPostCreatePersonaStep(){
+  var optsEl = document.getElementById('postCreateOptions');
+  var paceOpts = [['intense','Intense — voir un maximum'],['equilibre','Équilibré'],['detente','Détente']];
+  var interestOpts = [['nature','Nature & randonnée'],['culture','Culture & histoire'],['gastronomie','Vie nocturne & gastronomie'],['plages','Plages & farniente']];
+  var budgetOpts = [['backpacker','Backpacker'],['confort','Confort'],['luxe','Luxe']];
+  function chipRow(name, opts, multi){
+    return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'
+      +opts.map(function(o){
+        var selected = multi ? _personaAnswers[name].indexOf(o[0])>-1 : _personaAnswers[name]===o[0];
+        return '<span onclick="setPersonaAnswer(\''+name+'\',\''+o[0]+'\','+(multi?'true':'false')+')" style="padding:8px 13px;border-radius:16px;font-size:12.5px;font-weight:600;cursor:pointer;background:'+(selected?'var(--accent)':'var(--sand-deep)')+';color:'+(selected?'#fff':'var(--ink-muted)')+'">'+o[1]+'</span>';
+      }).join('')
+      +'</div>';
+  }
+  optsEl.innerHTML = '<div class="info-card">'
+    +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Quelques infos pour toi</div>'
+    +'<div class="status-sub" style="margin-bottom:14px">Ça aide PlaniTrip à proposer un programme qui te ressemble.</div>'
+    +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Rythme du voyage</div>'
+    +chipRow('pace', paceOpts, false)
+    +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Centres d\'intérêt</div>'
+    +chipRow('interests', interestOpts, true)
+    +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Budget</div>'
+    +chipRow('budget', budgetOpts, false)
+    +'<button class="modal-cta" style="width:100%;margin-top:4px" onclick="submitPersonaAndGenerate()">Générer mon voyage</button>'
+    +'</div>';
+}
+function setPersonaAnswer(name, val, multi){
+  if(multi){
+    var idx = _personaAnswers[name].indexOf(val);
+    if(idx===-1) _personaAnswers[name].push(val); else _personaAnswers[name].splice(idx,1);
+  } else {
+    _personaAnswers[name] = (_personaAnswers[name]===val) ? '' : val;
+  }
+  showPostCreatePersonaStep();
+}
+function submitPersonaAndGenerate(){
+  S.tripPersona = Object.assign({}, _personaAnswers);
   save();
   runAiTripPrep();
 }
