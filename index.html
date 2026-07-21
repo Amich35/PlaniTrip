@@ -6989,7 +6989,6 @@ function renderGuide(c){
       })()
     +'</div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
-    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (¥)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
     +renderMiniConverter(c)
     +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:10px 0"></div>'
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
