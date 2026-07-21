@@ -3269,14 +3269,20 @@ async function autofillCountryWithAI(countryId){
       headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:1600,
+        max_tokens:1800,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es le Travel Data Engine de PlaniTrip. Ton objectif n'est pas de rediger un guide touristique mais de produire des donnees structurees, fiables, a jour et immediatement exploitables. Chaque information doit etre concise et factuelle. Privilegie les sources officielles (gouvernements, offices de tourisme) lorsqu'elles existent. Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
+`Tu es le Travel Data Engine de PlaniTrip. Ton objectif n'est pas de rediger un guide touristique mais de produire des donnees structurees, fiables, a jour et immediatement exploitables. Chaque information doit etre concise et factuelle. Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer.
 
-Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
-{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","tips":["conseil 1","conseil 2","conseil 3"],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
-budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement). phrases = 10 mots ou expressions de base les plus utiles pour un touriste (bonjour, merci, oui, non, combien ca coute, l'addition svp, aide, ou sont les toilettes, delicieux, au revoir) traduits dans la/les langue(s) locale(s) principale(s).`
+Sources a privilegier selon le type d'information (dans cet ordre de confiance) :
+- Securite / "a surveiller" : diplomatie.gouv.fr (Conseils aux voyageurs), sites gouvernementaux officiels du pays
+- Visa / entree / sante : sites gouvernementaux officiels (ambassade, ministere du tourisme)
+- Incontournables / conseils pratiques : Wikivoyage, Lonely Planet, Rough Guides
+- Patrimoine / sites classes : UNESCO World Heritage List
+- Budget / cout de la vie : Numbeo
+Cherche sur le web des informations actuelles pour le pays "${c.name}" (devise, taux de change actuel, politique de visa en vigueur pour un voyageur francais, numeros d'urgence reels, evenements ou risques actuels a signaler). Puis reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
+{"tagline":"accroche courte 4-6 mots","currency":"nom devise (code)","rate":"1€ = X devise (taux actuel)","visa":"politique visa actuelle pour un voyageur francais court sejour","lang":"langue(s) principale(s)","budget_daily":50,"timezone":"decalage horaire par rapport a la France, ex: +7h en ete","alerts":[{"t":"alerte courte et factuelle","url":""}],"tips":[{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"},{"t":"conseil concis","cat":"categorie"}],"emergency":[{"k":"Police","v":"numero reel"},{"k":"Ambulance","v":"numero reel"}],"checklist":["item 1","item 2","item 3","item 4","item 5"],"phrases":[{"fr":"Bonjour","local":"traduction locale avec prononciation simplifiee si utile"},{"fr":"Merci","local":"..."}]}
+budget_daily = budget backpacker/jour en euros (nombre). alerts = 1 a 3 alertes factuelles et actuelles a surveiller pour ce pays specifique (evenement saisonnier majeur, periode a risque, affluence, conditions meteo extremes selon la periode) — laisse le tableau vide si rien de notable, n'invente rien. Chaque "cat" de tips DOIT etre exactement l'une de ces valeurs : Incontournable, Transport, Santé, Argent, Restauration, Hébergement, Culture, Sécurité, Bon plan, Autre (n'utilise "Autre" qu'en dernier recours si aucune autre categorie ne convient). checklist = 5 a 6 choses concretes a faire/preparer avant le depart pour ce pays specifique (papiers, sante, equipement). phrases = 10 mots ou expressions de base les plus utiles pour un touriste (bonjour, merci, oui, non, combien ca coute, l'addition svp, aide, ou sont les toilettes, delicieux, au revoir) traduits dans la/les langue(s) locale(s) principale(s).`
         }]
       })
     });
@@ -3291,7 +3297,18 @@ budget_daily = budget backpacker/jour en euros (nombre). checklist = 5 a 6 chose
     c.lang = info.lang || c.lang;
     c.budget_daily = info.budget_daily || c.budget_daily;
     c.timezone = (info.timezone && info.timezone!=='Inconnu') ? info.timezone : c.timezone;
-    c.practical.tips = info.tips || c.practical.tips;
+    if(info.alerts && info.alerts.length){
+      c.alerts = info.alerts.filter(function(a){ return a && a.t; }).map(function(a){ return {t:String(a.t), url:String(a.url||'')}; });
+    }
+    if(info.tips && info.tips.length){
+      c.practical.tips = info.tips.map(function(t){
+        if(typeof t==='object' && t.t){
+          var cat = TIP_CATEGORIES.indexOf(t.cat)>-1 ? t.cat : 'Autre';
+          return {t:String(t.t), cat:cat};
+        }
+        return {t:String(t||''), cat:'Autre'};
+      });
+    }
     c.practical.emergency = info.emergency || c.practical.emergency;
     c.practical.checklist = (info.checklist && info.checklist.length) ? info.checklist : c.practical.checklist;
     c.practical.phrases = (info.phrases && info.phrases.length) ? info.phrases : c.practical.phrases;
