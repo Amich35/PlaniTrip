@@ -4013,7 +4013,7 @@ function removeGuideListItem(countryId, listField, idx){
 function addCityToCountry(countryId){
   openGuideItemModal(countryId, 'city', null);
 }
-function _createCityFromModal(countryId, name, sub, dateStart, dateEnd){
+function _createCityFromModal(countryId, name, sub, dateStart, dateEnd, skipAutoActivities){
   name = stripHtml(name||'');
   sub = stripHtml(sub||'');
   if(!name || !name.trim()) return;
@@ -4031,7 +4031,7 @@ function _createCityFromModal(countryId, name, sub, dateStart, dateEnd){
   } else {
     renderContent();
   }
-  if(S.apiKey) suggestActivitiesWithAI(countryId, newCity.city);
+  if(S.apiKey && !skipAutoActivities) suggestActivitiesWithAI(countryId, newCity.city);
   if(sb && CURRENT_TRIP){
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}).then(function(){});
@@ -4079,9 +4079,15 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     });
     const data = await resp.json();
     const text = extractAiText(data);
-    if(!text) return;
-    const info = deepSanitize(parseAiJson(text));
-    if(!info.activities || !info.activities.length) return;
+    if(!text){ console.error('[PlaniTrip] suggestActivitiesWithAI: réponse IA vide', data); return; }
+    var info;
+    try{
+      info = deepSanitize(parseAiJson(text));
+    }catch(parseErr){
+      console.error('[PlaniTrip] suggestActivitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
+      return;
+    }
+    if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); return; }
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
       var idx = S.customActs[ck].length;
@@ -4096,7 +4102,7 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
         sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi}).then(function(){});
       });
     }
-  }catch(e){}
+  }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); }
 }
 
 async function deleteActivity(cityKey, index, isCustom, actName) {
@@ -10478,8 +10484,9 @@ async function generateProgramForCountry(countryId, onProgress){
     var endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + (entry.days-1));
     var endStr = toLocalISODate(endDate);
-    _createCityFromModal(countryId, entry.name, '', cursor, endStr);
+    _createCityFromModal(countryId, entry.name, '', cursor, endStr, true);
     cursor = toLocalISODate(new Date(endDate.getTime()+86400000));
+    try{ await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
     // Petite pause entre chaque ville pour rester raisonnable sur le rythme des appels IA
     await new Promise(function(resolve){ setTimeout(resolve, 400); });
   }
