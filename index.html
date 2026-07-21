@@ -4158,18 +4158,43 @@ const WMO_DESC = {
 const DAYS_FR = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 const MONTHS_FR = ['Janv','Févr','Mars','Avr','Mai','Juin','Juil','Août','Sept','Oct','Nov','Déc'];
 
-// Cache weather per country, expires after 1h
+// Cache weather per country (ou par pays+ville), expire après 1h
 const weatherCache = {};
+// Cache des coordonnées déjà géocodées par ville, pour éviter de refaire l'appel à chaque fois
+const cityGeoCache = {};
+async function geocodeCity(cityName, countryName){
+  var cacheKey = cityName+'|'+countryName;
+  if(cityGeoCache[cacheKey]) return cityGeoCache[cacheKey];
+  try{
+    const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(cityName)+'&count=3&language=fr');
+    const json = await res.json();
+    if(json && json.results && json.results.length){
+      // Si plusieurs résultats homonymes, privilégie celui du bon pays
+      var match = json.results.find(function(r){ return countryName && r.country && (r.country.toLowerCase()===countryName.toLowerCase() || getEnglishCountryName(countryName).toLowerCase()===r.country.toLowerCase()); }) || json.results[0];
+      var coords = {lat:match.latitude, lng:match.longitude, name:match.name};
+      cityGeoCache[cacheKey] = coords;
+      return coords;
+    }
+  } catch(e){}
+  return null;
+}
 
-async function fetchWeather(countryId) {
+async function fetchWeather(countryId, cityName) {
+  const country = COUNTRIES.find(function(c){return c.id===countryId;});
+  const cacheKey = cityName ? (countryId+'|'+cityName) : countryId;
   const now = Date.now();
-  if(weatherCache[countryId] && now - weatherCache[countryId].ts < 3600000) {
-    return weatherCache[countryId].data;
+  if(weatherCache[cacheKey] && now - weatherCache[cacheKey].ts < 3600000) {
+    return weatherCache[cacheKey].data;
   }
-  var wc = WEATHER_COORDS[countryId];
+  var wc = null;
+  // Priorité à la ville où le voyageur se trouve réellement (sinon la météo pays ne reflète
+  // qu'un seul point fixe, ex: toujours Tokyo pour tout le Japon même à Kyoto ou Osaka)
+  if(cityName && country){
+    wc = await geocodeCity(cityName, country.name);
+  }
+  if(!wc) wc = WEATHER_COORDS[countryId];
   if(!wc){
     // Pays hors catalogue (ex: Mexique) : géocodage automatique du nom via Open-Meteo (gratuit, sans clé)
-    var country = COUNTRIES.find(function(c){return c.id===countryId;});
     if(!country) return null;
     try{
       const geoRes = await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(country.name)+'&count=1&language=fr');
@@ -4200,15 +4225,15 @@ async function fetchWeather(countryId) {
       +'&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5';
     const res = await fetch(url);
     const json = await res.json();
-    weatherCache[countryId] = {ts:now, data:json};
+    weatherCache[cacheKey] = {ts:now, data:json};
     return json;
   } catch(e) { return null; }
 }
 
-async function loadWeatherSection(countryId) {
+async function loadWeatherSection(countryId, cityName) {
   const el = document.getElementById('weather-row-'+countryId);
   if(!el) return;
-  const data = await fetchWeather(countryId);
+  const data = await fetchWeather(countryId, cityName);
   if(!data || !data.daily) {
     el.innerHTML='<span class="weather-loading">Météo indisponible hors connexion</span>';
     return;
@@ -4594,11 +4619,13 @@ function renderItinerary(c, embedded){
     'Cloud 9 Siargao':'linear-gradient(135deg,#001a3d 0%,#c4833a 100%)',
   };
   const wc=WEATHER_COORDS[c.id];
+  const weatherTs = getTripStatus();
+  const weatherCityName = (weatherTs.currentCountry && weatherTs.currentCountry.id===c.id && weatherTs.currentCity) ? weatherTs.currentCity.city : null;
   const weatherSection='<div class="section"><div class="section-header">'
     +'<div class="section-title">Météo <span class="weather-live-badge">● Live</span></div>'
-    +(wc&&wc.name?'<div class="section-meta">'+escHtml(wc.name)+'</div>':'')
+    +'<div class="section-meta">'+escHtml(weatherCityName || (wc&&wc.name) || '')+'</div>'
     +'</div><div class="weather-row" id="weather-row-'+c.id+'"><span class="weather-loading">Chargement…</span></div></div>';
-  setTimeout(function(){loadWeatherSection(c.id);},50);
+  setTimeout(function(){loadWeatherSection(c.id, weatherCityName);},50);
 
   var cdHTML = embedded ? '' : renderCountdown();
   if(!embedded) setTimeout(startCountdownTick, 50);
@@ -4822,7 +4849,7 @@ function renderToday(){
   }
   var tripDay=totalDaysKnown ? Math.max(1, Math.min(totalDays, ts.elapsedDays+1)) : 0;
   if(c){
-    setTimeout(function(){ fillTodayHeroWeather(c.id); }, 50);
+    setTimeout(function(){ fillTodayHeroWeather(c.id, ts.currentCity ? ts.currentCity.city : null); }, 50);
   }
   var todayActs = [];
   if(c){
@@ -5042,10 +5069,10 @@ function renderToday(){
     +forgetCard
     +'</div>';
 }
-async function fillTodayHeroWeather(countryId){
+async function fillTodayHeroWeather(countryId, cityName){
   var el = document.getElementById('today-hero-temp');
   if(!el) return;
-  var data = await fetchWeather(countryId);
+  var data = await fetchWeather(countryId, cityName);
   if(!el || !document.body.contains(el)) return;
   if(data && data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[0]!==undefined){
     var t = Math.round(data.daily.temperature_2m_max[0]);
