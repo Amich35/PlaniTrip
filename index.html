@@ -4075,6 +4075,15 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
         if(COORDS[oldKey]){ COORDS[newKey]=COORDS[oldKey]; delete COORDS[oldKey]; } else { delete COORDS[newKey]; }
       }
       S.customDetails = window._customDetails;
+      // Suppression serveur : sinon loadCitiesActivities() (serveur autoritaire) re-synchronise
+      // cette activité au prochain chargement et elle "revient" après actualisation.
+      if(sb && CURRENT_TRIP && act){
+        var cpParts = cityKey.split('_');
+        var cpCountryId = cpParts[0], cpCityName = cpParts.slice(1).join('_');
+        sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',cpCountryId).eq('city',cpCityName).eq('name',act.n).then(function(r){
+          if(r&&r.error){ console.error('[PlaniTrip] delete activity:', r.error); }
+        });
+      }
     } else {
       if(!S.deletedActs) S.deletedActs={};
       S.deletedActs[cityKey+'_'+index]=true;
@@ -4097,6 +4106,14 @@ function restoreActivity(cityKey, trashIndex) {
     if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
     delete item._wasCustom;
     S.customActs[cityKey].push(item);
+    if(sb && CURRENT_TRIP){
+      var rpParts = cityKey.split('_');
+      var rpCountryId = rpParts[0], rpCityName = rpParts.slice(1).join('_');
+      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||item.addedBy||'';
+      sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:rpCountryId,city:rpCityName,name:item.n,tip:item.m||null,added_by_label:who}).then(function(r){
+        if(r&&r.error){ console.error('[PlaniTrip] restore activity:', r.error); }
+      });
+    }
   } else {
     // Restore built-in
     if(S.deletedActs) delete S.deletedActs[item._cityKey+'_'+item._builtinIndex];
