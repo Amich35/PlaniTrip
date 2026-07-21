@@ -4066,7 +4066,7 @@ async function suggestActivitiesWithAI(countryId, cityName){
       headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:900,
+        max_tokens:1600,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
 `Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables et immediatement exploitables — pas un texte marketing. Ne deduis jamais une information absente ; si une coordonnee GPS est incertaine, ne l'inclus pas plutot que de l'inventer.
@@ -10428,7 +10428,7 @@ async function suggestCitiesWithAI(countryId){
       headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:900,
+        max_tokens:1800,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
 `Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de proposer un itineraire de villes realiste et geographiquement coherent (pas de zigzags inutiles), pas un texte marketing.
@@ -10441,9 +10441,15 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
     });
     const data = await resp.json();
     const text = extractAiText(data);
-    if(!text) return null;
-    const info = deepSanitize(parseAiJson(text));
-    if(!info.cities || !info.cities.length) return null;
+    if(!text){ console.error('[PlaniTrip] suggestCitiesWithAI: réponse IA vide', data); return null; }
+    var info;
+    try{
+      info = deepSanitize(parseAiJson(text));
+    }catch(parseErr){
+      console.error('[PlaniTrip] suggestCitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
+      return null;
+    }
+    if(!info.cities || !info.cities.length){ console.error('[PlaniTrip] suggestCitiesWithAI: aucune ville dans la réponse', info); return null; }
     // Garde-fou : si la somme ne correspond pas exactement (arrondi IA), on réajuste la dernière ville
     var sum = info.cities.reduce(function(s,ci){ return s+(parseInt(ci.days,10)||0); }, 0);
     if(sum!==c.days && info.cities.length){
@@ -10452,7 +10458,7 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
       info.cities[lastIdx].days = Math.max(1, (parseInt(info.cities[lastIdx].days,10)||1) + diff);
     }
     return info.cities.filter(function(ci){ return ci.name && ci.days>0; });
-  }catch(e){ return null; }
+  }catch(e){ console.error('[PlaniTrip] suggestCitiesWithAI: échec appel API', e); return null; }
 }
 // Orchestration complète pour un pays : propose les villes, les crée dans l'ordre avec les
 // bonnes dates (chaînées depuis c.dateStart), ce qui déclenche automatiquement la génération
