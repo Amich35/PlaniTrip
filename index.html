@@ -3706,58 +3706,6 @@ ph: [
 function _normalizeCityName(name){
   return (name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
 }
-function getSuggestedPlacesForCity(countryId, cityName){
-  var pool = PLACES_DB[countryId];
-  if(!pool) return [];
-  var already = {};
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  var cityObj = c && c.cities.find(function(ci){return ci.city===cityName;});
-  if(cityObj){
-    cityObj.acts.forEach(function(a){ already[_normalizeCityName(a.n)]=true; });
-  }
-  var ck = countryId+'_'+cityName;
-  (S.customActs[ck]||[]).forEach(function(a){ already[_normalizeCityName(a.n)]=true; });
-  var targetCity = _normalizeCityName(cityName);
-  return pool.filter(function(p){
-    return _normalizeCityName(p.city)===targetCity && !already[_normalizeCityName(p.n)];
-  });
-}
-var _incontournablesCk = '';
-function openIncontournablesModal(ck){
-  _incontournablesCk = ck;
-  var parts = ck.split('_');
-  var countryId = parts[0];
-  var cityName = parts.slice(1).join('_');
-  var places = getSuggestedPlacesForCity(countryId, cityName);
-  document.getElementById('guideItemModalTitle').textContent = 'Incontournables — '+cityName;
-  document.getElementById('guideItemModalBody').innerHTML =
-    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:10px">Sélection issue de sources touristiques reconnues (UNESCO, offices de tourisme) — coche celles à ajouter à ton programme.</div>'
-    + places.map(function(p, i){
-        var cat = ACTIVITY_CATEGORIES[p.cat];
-        return '<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid rgba(29,29,31,0.06)">'
-          +'<input type="checkbox" class="incontournable-cb" value="'+i+'" checked style="width:18px;height:18px;margin-top:2px;flex-shrink:0"/>'
-          +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:13.5px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+escHtml(p.n)+'<span style="font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:1px 7px;border-radius:9px;display:inline-flex;align-items:center;gap:3px">'+svgIcon(cat.icon,9)+' '+cat.label+'</span></div>'
-          +'<div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px">'+escHtml(p.desc)+'</div>'
-          +'<div style="font-size:10.5px;color:var(--ink-subtle);margin-top:3px">'+escHtml(p.dur)+' · '+escHtml(p.budget)+'</div>'
-          +'</div></label>';
-      }).join('');
-  _guideModalSaveFn = saveIncontournablesSelection;
-  document.getElementById('guideItemModal').classList.add('open');
-}
-function saveIncontournablesSelection(){
-  var parts = _incontournablesCk.split('_');
-  var countryId = parts[0];
-  var cityName = parts.slice(1).join('_');
-  var places = getSuggestedPlacesForCity(countryId, cityName);
-  var checked = Array.from(document.querySelectorAll('.incontournable-cb:checked')).map(function(el){return parseInt(el.value,10);});
-  closeGuideItemModal();
-  checked.forEach(function(i){
-    var p = places[i];
-    if(!p) return;
-    _createActivityCore(_incontournablesCk, p.n, {meta:p.desc, category:p.cat});
-  });
-}
 function openGuideItemModal(countryId, listField, idx){
   _guideModalCountryId=countryId;
   _guideModalListField=listField;
@@ -4414,11 +4362,7 @@ function renderCityPanelContentBody(c, city){
 
     const activityTrashBtn = activityTrashButtonHTML(ck);
 
-    const suggestedPlaces = getSuggestedPlacesForCity(c.id, city.city);
-    const suggestBtn = suggestedPlaces.length
-      ? '<button onclick="openIncontournablesModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('sparkles',15)+' Incontournables suggérés ('+suggestedPlaces.length+')</button>'
-      : '';
-    const addForm=suggestBtn+'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+activityTrashBtn+'<div style="height:24px"></div>';
+    const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+activityTrashBtn+'<div style="height:24px"></div>';
 
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
@@ -4977,34 +4921,16 @@ function renderToday(){
     }
   }
 
-  // ── Carte "À ne pas manquer aujourd'hui" — 1 spot photo non coché, stable sur la journée ──
+  // ── Carte "À ne pas manquer aujourd'hui" — activité réellement prévue aujourd'hui, stable sur la journée ──
   var photoSpotCard = '';
   if(c){
-    var allPhotoSpots = [];
-    c.cities.forEach(function(city){
-      var ck = c.id+'_'+city.city;
-      (city.acts||[]).forEach(function(a, ai){
-        if(a.tags && a.tags.indexOf('photo')>-1){
-          var actKey = ck+'_'+ai;
-          if(!S.done[actKey]){
-            allPhotoSpots.push({name:a.n, meta:a.m, cityName:city.city, actKey:actKey});
-          }
-        }
-      });
-      (S.customActs[ck]||[]).forEach(function(a, ai){
-        if(a.tags && a.tags.indexOf('photo')>-1){
-          var custKey = ck+'_c'+ai;
-          if(!S.done[custKey]){
-            allPhotoSpots.push({name:a.n, meta:a.m, cityName:city.city, actKey:custKey});
-          }
-        }
-      });
-    });
-    if(allPhotoSpots.length){
+    var todayCandidates = todayActs.filter(function(a){return !a.done;});
+    if(todayCandidates.length){
       // Sélection stable par jour : hash simple sur la date + pays, jamais aléatoire à chaque rendu
       var hashSeed = (todayStr+c.id).split('').reduce(function(h,ch){return ((h<<5)-h+ch.charCodeAt(0))|0;},0);
-      var pickIdx = Math.abs(hashSeed) % allPhotoSpots.length;
-      var pick = allPhotoSpots[pickIdx];
+      var pickIdx = Math.abs(hashSeed) % todayCandidates.length;
+      var pick0 = todayCandidates[pickIdx];
+      var pick = {name:pick0.name, meta:pick0.meta, cityName:pick0.city, actKey:pick0.key};
       var spotQuery = _PLACE_QUERY_OVERRIDES[pick.name] || (pick.name+' '+pick.cityName);
       photoSpotCard = '<div class="info-card" style="padding:0;overflow:hidden">'
         +'<div class="home-hero" data-img-query="'+escHtml(spotQuery)+'" style="height:150px;border-radius:0;justify-content:center;align-items:center"><span class="home-hero-fallback-icon" style="color:rgba(255,255,255,0.35)">'+svgIcon('camera',30)+'</span></div>'
