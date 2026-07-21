@@ -5258,6 +5258,9 @@ function renderCountryDetailShell(c, innerHtml){
     +innerHtml;
 }
 
+function icHeaderChevron(icon, label){
+  return '<span data-icon="'+icon+'" data-icon-size="16"></span> '+label+'<span class="ic-chevron">›</span>';
+}
 // PROFILES_MAP : email -> pseudo actuel (résolution d'affichage uniquement).
 // REVERSE_ALIAS_MAP : ancien pseudo (ou tout texte utilisé comme identité avant ce système) -> email.
 // Permet de fusionner automatiquement les vieux enregistrements ("Sam" tapé en dur) avec la
