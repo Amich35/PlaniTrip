@@ -5261,6 +5261,317 @@ function renderCountryDetailShell(c, innerHtml){
 function icHeaderChevron(icon, label){
   return '<span data-icon="'+icon+'" data-icon-size="16"></span> '+label+'<span class="ic-chevron">›</span>';
 }
+function openDocumentType(docId){
+  S.tab='documents';
+  S.openDocType=docId;
+  save();
+  renderContent();
+}
+
+function renderCountriesScreen(){
+  var ts = getTripStatus();
+  const totalDays=COUNTRIES.reduce(function(s,c){return s+c.days;},0);
+  const tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
+  const tripPct=totalDays>0?Math.round((tripDay/totalDays)*100):0;
+  var tripRecap=COUNTRIES.length+' pays';
+  var heroCountry = ts.currentCountry || COUNTRIES[0];
+  var heroQuery = heroCountry ? getCountryImageQuery(heroCountry) : 'travel landscape';
+  var dayHero;
+  if(ts.elapsedDays<0){
+    dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
+      +photoEditBtn(heroQuery)
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Départ dans '+Math.abs(ts.elapsedDays)+' jours '+ts.currentCountry.flag+'</div><div class="home-hero-sub">Le voyage n\'a pas encore commencé · '+tripRecap+'</div></div></div>';
+  } else {
+    dayHero='<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:16px">'
+      +photoEditBtn(heroQuery)
+      +'<div class="home-hero-overlay"><div class="home-hero-greeting">Jour '+tripDay+' / '+totalDays+'</div><div class="home-hero-sub">'+ts.currentCountry.flag+' Jour '+ts.dayInCountry+' en '+ts.currentCountry.name+' · '+tripPct+'% · '+tripRecap+'</div></div></div>';
+  }
+
+  var list = COUNTRIES;
+
+  var cardsHTML = list.map(function(c){
+    var status = getCountryStatus(c.id);
+    var citiesPreview = c.cities.length<=2
+      ? c.cities.map(function(ci){return ci.city;}).join(', ')
+      : c.cities.slice(0,2).map(function(ci){return ci.city;}).join(', ')+' +'+(c.cities.length-2);
+    var imgQuery = getCountryImageQuery(c);
+    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+      +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'guide\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+      +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
+      +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
+      +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
+      +'</div></div>';
+  }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
+
+  var archivedCount = ((typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.archived_countries) || []).length;
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="section-title" style="margin-bottom:12px">Pays</div>'
+    +dayHero
+    +'<div class="country-card-list">'+cardsHTML+'</div>'
+    +'<button onclick="openAddCountryToTripModal()" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un pays</button>'
+    +'<button onclick="S.tab=\'archived-countries\';save();renderContent();" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--r12);font-size:12.5px;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:5px">'+svgIcon('trash-2',13)+' Corbeille'+(archivedCount?' ('+archivedCount+')':'')+'</button>'
+    +'</div>';
+}
+function filterCountries(q){ S.countryFilterQuery=q; renderContent(); var i=document.getElementById('countrySearchInput'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+function setCountryFilterStatus(s){ S.countryFilterStatus=s; save(); renderContent(); }
+
+function renderProgressRing(pct, size, stroke, color, trackColor, textColor, label){
+  size=size||72; stroke=stroke||7; color=color||'#95D5B2';
+  trackColor=trackColor||'rgba(255,255,255,0.15)'; textColor=textColor||'#fff';
+  var r=(size-stroke)/2;
+  var circ=2*Math.PI*r;
+  var offset=circ*(1-Math.min(100,Math.max(0,pct))/100);
+  var txt = (label!==undefined && label!==null && label!=='') ? label : pct+'%';
+  var fontSize = (label!==undefined && label!==null && label!=='') ? size*0.26 : size*0.28;
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" style="flex-shrink:0">'
+    +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+trackColor+'" stroke-width="'+stroke+'"/>'
+    +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+stroke+'" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+offset+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')"/>'
+    +'<text x="'+(size/2)+'" y="'+(size/2)+'" text-anchor="middle" dominant-baseline="central" fill="'+textColor+'" font-size="'+fontSize+'" font-weight="700" font-family="-apple-system,sans-serif">'+txt+'</text>'
+    +'</svg>';
+}
+function renderBudgetOverview(){
+  var sub = S.budgetSubTab||'resume';
+  var totalSpent = S.expenses.filter(function(e){return e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+  var totalBudget = COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
+  var pct = totalBudget>0 ? Math.min(100, Math.round((totalSpent/totalBudget)*100)) : 0;
+  var tabsHTML = ['resume','remb'].map(function(t){
+    var lbl = t==='resume'?'Dépenses':'Remboursements';
+    return '<button class="cf-tab'+(sub===t?' active':'')+'" onclick="setBudgetSubTab(\''+t+'\')">'+lbl+'</button>';
+  }).join('');
+
+  var body='';
+  var fabHTML = '<button class="budget-fab" onclick="openAddExpenseModal()" title="Ajouter une dépense">'+svgIcon('plus',24)+'</button>';
+
+  if(sub==='resume'){
+    if(S.budgetCountryView){
+      var cv = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
+      if(!cv){ S.budgetCountryView=null; }
+    }
+    if(S.budgetPersonView){
+      var myLabelP = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+      var pExps = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===S.budgetPersonView && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var pTotal = pExps.reduce(function(s,e){return s+e.amount;},0);
+      var byDateP = {}; var dateOrderP = [];
+      pExps.forEach(function(e){
+        if(!byDateP[e.date]){ byDateP[e.date]=[]; dateOrderP.push(e.date); }
+        byDateP[e.date].push(e);
+      });
+      var groupsHTMLP = dateOrderP.map(function(d){
+        var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+        var rows = byDateP[d].map(function(e){
+          var c3 = COUNTRIES.find(function(co){return co.id===e.country;});
+          var catIcon = getExpenseCategoryIcon(e.category);
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span style="font-size:14px;margin-right:2px">'+(c3?c3.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+        }).join('');
+        return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
+      }).join('');
+      // Exception : mes propres dépenses peuvent se comparer au budget PRÉVU (règle validée).
+      // Pour tout le monde d'autre : comparaison avec les dépenses RÉELLES du groupe, jamais une estimation.
+      var isSelfView = S.budgetPersonView===myLabelP;
+      var myTotalBudget = getMyTotalPlannedBudget();
+      var pDenom = isSelfView ? myTotalBudget : totalSpent;
+      var pPctReal = pDenom>0 ? Math.round((pTotal/pDenom)*100) : 0;
+      var pOver = isSelfView && pPctReal>100;
+      var pSubLabel = isSelfView ? ('sur '+fmtEUR(myTotalBudget)+' prévu au total') : ('sur '+fmtEUR(totalSpent)+' dépensés au total par le groupe');
+      body = '<div class="more-row" onclick="S.budgetPersonView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+        +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
+        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Payé par '+escHtml(S.budgetPersonView===myLabelP?'moi':personDisplayName(S.budgetPersonView))+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(pTotal)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">'+pSubLabel+'</div></div>'
+        +renderProgressRing(pPctReal, 72, 7, pOver?'#E76F51':'#95D5B2')
+        +'</div></div>'
+        +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
+        +fabHTML;
+    } else if(S.budgetCountryView){
+      var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
+      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+      var cBudget = getCountryPlannedBudget(c2);
+      var cExps = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var byDate = {};
+      var dateOrder = [];
+      cExps.forEach(function(e){
+        if(!byDate[e.date]){ byDate[e.date]=[]; dateOrder.push(e.date); }
+        byDate[e.date].push(e);
+      });
+      var groupsHTML = dateOrder.map(function(d){
+        var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+        var rows = byDate[d].map(function(e){
+          var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
+          var catIcon = getExpenseCategoryIcon(e.category);
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+        }).join('');
+        return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
+      }).join('');
+      var cPctReal = cBudget>0 ? Math.round((cSpent/cBudget)*100) : 0;
+      var cOver = cPctReal>100;
+      // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
+      body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+        +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
+        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpent)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' prévu</div></div>'
+        +renderProgressRing(cPctReal, 72, 7, cOver?'#E76F51':'#95D5B2')
+        +'</div></div>'
+        +(cExps.length ? groupsHTML : '<div class="fav-empty">Aucune dépense enregistrée pour ce pays.</div>')
+        +fabHTML;
+    } else {
+    var rows = COUNTRIES.map(function(c){
+      // Barre de progression = dépenses TOTALES du groupe dans ce pays / budget prévu pour ce pays (cohérent avec la fiche détail)
+      var countrySpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+      var budget = getCountryPlannedBudget(c);
+      var pReal = budget>0 ? Math.round((countrySpent/budget)*100) : 0;
+      var isOver = pReal>100;
+      var p = Math.min(100, pReal);
+      var barColor = isOver ? '#E76F51' : '';
+      return '<div class="budget-country-row" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'
+        +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0"><span class="bcr-amt">'+fmtEUR(countrySpent)+' / '+fmtEUR(budget)+'</span><div class="bh-bar" style="margin-top:7px;width:100%;height:7px;border-radius:3.5px"><div class="bh-fill" style="width:'+p+'%;border-radius:3.5px'+(barColor?';background:'+barColor:'')+'"></div></div></div>'
+        +'<span class="bcr-pct"'+(isOver?' style="color:#E76F51"':'')+'>'+pReal+'%</span></div>'
+        +'</div>';
+    }).join('');
+    var paidBalances = computeBalances();
+    var myLabel3 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
+      return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';save();renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Moi':personDisplayName(b.person))+'</span></div>'
+        +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
+        +'</div>';
+    }).join('');
+    // ── Carte "Mes depenses vs Total groupe" : un seul encart moderne, degrade, texte adaptatif ──
+    var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var mySpent = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+    var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
+    var dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'
+      +'<div style="display:flex;align-items:flex-end;gap:16px">'
+      +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Mes depenses</div>'
+      +'<div style="display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-size:34px;font-weight:700;letter-spacing:-1px">'+fmtEUR(mySpent)+'</span><span style="color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',18)+'</span></div></div>'
+      +'<div style="width:1px;align-self:stretch;background:rgba(255,255,255,0.18)"></div>'
+      +'<div style="flex:1;text-align:right"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total groupe</div>'
+      +'<div style="font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-top:6px;color:rgba(255,255,255,0.92)">'+fmtEUR(totalSpent)+'</div></div>'
+      +'</div>'
+      +'<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+mySharePct+'%;background:#95D5B2;border-radius:2px"></div></div>'
+      +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">Tu representes '+mySharePct+'% des depenses du groupe</div>'
+      +'</div>';
+    body = dashRow
+      +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
+      +fabHTML;
+    }
+  } else if(sub==='remb'){
+    var balances = computeBalances();
+    var txns = simplifyDebts(balances);
+    var myLabel2 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+    var balanceCards = balances.map(function(b){
+      var isPos = b.balance>0.01, isNeg = b.balance<-0.01;
+      var color = isPos?'var(--accent)':(isNeg?'var(--red-muted)':'var(--ink-subtle)');
+      var bg = isPos?'var(--accent-pale)':(isNeg?'var(--red-pale)':'var(--sand-deep)');
+      var lbl = isPos?'doit recevoir':(isNeg?'doit':'est à jour');
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:'+bg+';margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+escHtml(b.person===myLabel2?'Moi':personDisplayName(b.person))+'</span></div>'
+        +'<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:'+color+'">'+fmtEUR(Math.abs(b.balance))+'</div><div style="font-size:11px;color:var(--ink-subtle)">'+lbl+'</div></div>'
+        +'</div>';
+    }).join('');
+    var txnRows = txns.length ? txns.map(function(t){
+      var fromLabel = t.from===myLabel2 ? 'Moi' : personDisplayName(t.from);
+      var toLabel = t.to===myLabel2 ? 'Moi' : personDisplayName(t.to);
+      return '<div class="settle-card">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(fromLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
+        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(toLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
+        +'</div>'
+        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#C9762E;flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
+        +'</div>'
+        +'<div style="display:flex;justify-content:flex-end;margin-top:6px">'
+        +'<button class="settle-btn" onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')">'+svgIcon('check',12)+' Marqué remboursé</button>'
+        +'</div>'
+        +'</div>';
+    }).join('') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
+    var reimbHistory = S.expenses.filter(function(e){return e.category==='reimbursement';}).sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+    var reimbHistoryByMonth = {};
+    var reimbHistoryMonthOrder = [];
+    reimbHistory.forEach(function(e){
+      var monthKey = e.date.slice(0,7); // 'YYYY-MM'
+      if(!reimbHistoryByMonth[monthKey]){ reimbHistoryByMonth[monthKey]=[]; reimbHistoryMonthOrder.push(monthKey); }
+      reimbHistoryByMonth[monthKey].push(e);
+    });
+    var reimbHistHTML = reimbHistoryMonthOrder.map(function(monthKey, monthIdx){
+      var monthLabel = new Date(monthKey+'-01T00:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+      monthLabel = monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+      var accKey = 'reimb_month_'+monthKey;
+      var isOpen = S.uiAccordion && S.uiAccordion[accKey]!==undefined ? !!S.uiAccordion[accKey] : monthIdx===0;
+      var itemsHTML = reimbHistoryByMonth[monthKey].map(function(e){
+      var toP = (e.participants&&e.participants[0]) || '?';
+      var fromName = e.personLabel===myLabel2 ? 'Moi' : personDisplayName(e.personLabel);
+      var toName = toP===myLabel2 ? 'Moi' : personDisplayName(toP);
+      var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+      return '<div class="rh-card">'
+        // Ligne 1 : participants (gauche) / montant (droite, mis en valeur)
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(fromName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
+        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
+        +'</div>'
+        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
+        +'</div>'
+        // Ligne 2 : date + pastille de statut discrète
+        +'<div style="display:flex;align-items:center;gap:5px;margin-top:8px">'
+        +'<span style="width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>'
+        +'<span style="font-size:11px;color:var(--ink-subtle)">'+dLabel+' · réglé</span>'
+        +'</div>'
+        // Séparateur discret intégré à la carte
+        +'<div style="height:1px;background:#F0F0F0;margin:10px 0"></div>'
+        // Ligne 3 : actions
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<span class="rh-btn rh-btn-edit" onclick="editReimbursement('+e.id+')">'+svgIcon('pencil',11)+' Modifier</span>'
+        +'<span class="rh-btn rh-btn-restore" onclick="restoreReimbursement('+e.id+')">'+svgIcon('rotate-ccw',11)+' Restaurer</span>'
+        +'</div>'
+        +'</div>';
+      }).join('');
+      return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;cursor:pointer" onclick="toggleAccordion(\''+accKey+'\')"><span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(monthLabel)+'</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--ink-subtle)">'+reimbHistoryByMonth[monthKey].length+'</span><span style="transform:rotate('+(isOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></span></div>'+(isOpen?itemsHTML:'')+'</div>';
+    }).join('');
+    var reimbHistCard = reimbHistHTML ? '<div style="margin-top:18px"><div class="ic-header" style="display:flex;align-items:center;gap:6px"><span data-icon="history" data-icon-size="15"></span> Historique des remboursements</div>'+reimbHistHTML+'</div>' : '';
+    var reimbSuggOpen = S.uiAccordion && S.uiAccordion['reimb_suggested'];
+    var settledCount = reimbHistory.length, pendingCount = txns.length;
+    var progressBadge = '<div style="display:flex;align-items:center;gap:14px;margin-top:6px">'
+      +'<span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--accent)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>'+settledCount+' réglé'+(settledCount>1?'s':'')+'</span>'
+      +(pendingCount>0?'<span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#F4A261"><span style="width:7px;height:7px;border-radius:50%;background:#F4A261;flex-shrink:0"></span>'+pendingCount+' en attente</span>':'')
+      +'</div>';
+    body = '<div class="info-card" style="margin-bottom:14px"><div class="ic-header">Soldes</div>'+balanceCards+'</div>'
+      +'<div class="info-card"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleAccordion(\'reimb_suggested\')"><span>À régler</span><span style="transform:rotate('+(reimbSuggOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'+progressBadge+(reimbSuggOpen?'<div style="margin-top:10px">'+txnRows+'</div>':'')+'</div>'
+      +reimbHistCard;
+  }
+
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+    +'<div class="section-title" style="margin-bottom:12px">Budget</div>'
+    +'<div class="cf-tabs">'+tabsHTML+'</div>'
+    +body
+    +'</div>';
+}
+const EXPENSE_CATEGORIES = [
+  {id:'food', label:'Repas & restaurants', icon:'utensils'},
+  {id:'lodging', label:'Hébergement', icon:'bed'},
+  {id:'transport', label:'Transport (local)', icon:'car'},
+  {id:'flight', label:'Vols / trajets longue distance', icon:'plane'},
+  {id:'activity', label:'Activités & visites', icon:'compass'},
+  {id:'shopping', label:'Shopping / souvenirs', icon:'shopping-bag'},
+  {id:'health', label:'Santé / pharmacie', icon:'heart-pulse'},
+  {id:'comm', label:'Communication (SIM, wifi)', icon:'wifi'},
+  {id:'nightlife', label:'Sorties / vie nocturne', icon:'moon'},
+  {id:'other', label:'Autre', icon:'ellipsis'},
+  {id:'reimbursement', label:'Remboursement', icon:'repeat'},
+];
+function getExpenseCategoryOptions(selected){
+  return EXPENSE_CATEGORIES.map(function(cat){
+    return '<option value="'+cat.id+'"'+(selected===cat.id?' selected':'')+'>'+cat.label+'</option>';
+  }).join('');
+}
+function getExpenseCategoryIcon(catId){
+  var cat = EXPENSE_CATEGORIES.find(function(c){return c.id===catId;});
+  return cat ? cat.icon : 'ellipsis';
+}
+function getExpenseCategoryLabel(catId){
+  var cat = EXPENSE_CATEGORIES.find(function(c){return c.id===catId;});
+  return cat ? cat.label : 'Autre';
+}
+
 // PROFILES_MAP : email -> pseudo actuel (résolution d'affichage uniquement).
 // REVERSE_ALIAS_MAP : ancien pseudo (ou tout texte utilisé comme identité avant ce système) -> email.
 // Permet de fusionner automatiquement les vieux enregistrements ("Sam" tapé en dur) avec la
