@@ -9415,7 +9415,15 @@ function applyTripCountryFilter(trip) {
   tripCountries.forEach(countryName => {
     const exists = COUNTRIES.find(c => c.name === countryName);
     if (!exists) {
-      const id = countryName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) + '_' + Date.now() + Math.floor(Math.random()*1000);
+      // ID déterministe (dérivé du voyage + nom du pays, jamais aléatoire) : si ce pays doit être
+      // recréé un jour (perte des données locales de l'appareil, reconnexion, autre appareil...),
+      // il retombe TOUJOURS sur le même identifiant — ce qui reconnecte automatiquement tout ce qui
+      // était déjà lié à ce pays côté serveur (infos IA, villes, activités, logements...) au lieu de
+      // créer un doublon orphelin avec un nouvel id aléatoire.
+      var _idSeed = (trip.id||'')+'|'+countryName;
+      var _idHash = 0;
+      for(var _hi=0; _hi<_idSeed.length; _hi++){ _idHash = ((_idHash<<5)-_idHash+_idSeed.charCodeAt(_hi))|0; }
+      const id = countryName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) + '_' + Math.abs(_idHash);
       const flagEmoji = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[countryName]) || '🌍';
       const currencyGuess = (window.COUNTRY_CURRENCIES && window.COUNTRY_CURRENCIES[countryName]) || '';
       const rateGuess = (window.COUNTRY_RATES && window.COUNTRY_RATES[countryName]) || 1;
