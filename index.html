@@ -2431,7 +2431,7 @@ function isPlaceClosedNow(hoursText){
       html = '<div class="detail-section" id="detailAiStatus"><div class="detail-text">Génération des détails avec l\'IA…</div></div>';
       fetchActivityDetailAI(cityKey, actName, actKey);
     } else {
-      html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée pour cette activité. Configure une clé API (Plus → Réglages avancés) pour la générer automatiquement avec l\'IA.</div></div>';
+      html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée. <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">Configure ta clé API dans Mon compte</span> pour la générer avec l\'IA.</div></div>';
     }
   }
   if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
@@ -4734,13 +4734,11 @@ function renderItinerary(c, embedded){
         +'background:transparent;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
         +'Villes seules</button>'
         +'</div>'
-        +'<div class="status-sub" style="margin-top:8px">\u00c0 partir des dates du pays \u2014 \u00e0 v\u00e9rifier.</div>'
+        +'<div class="status-sub" style="margin-top:8px">Villes et activit\u00e9s \u00e0 partir des dates du pays \u2014 \u00e0 v\u00e9rifier.</div>'
         +'</div>'
       : '<div class="info-card">'
         +'<div class="ic-header" style="color:var(--accent)">G\u00e9n\u00e9rer avec l\'IA</div>'
-        +'<div class="status-sub" style="line-height:1.5">Cl\u00e9 API non configur\u00e9e \u2014 '
-        +'<span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">'
-        +'configure-la dans Mon compte</span> pour utiliser cette fonctionnalit\u00e9.</div>'
+        +'<div class="status-sub">Cl\u00e9 API requise \u2014 <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
         +'</div>'
     )
     +'</div>'
@@ -7140,8 +7138,14 @@ function renderGuide(c){
   }).join('');
   return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div></div>'
     +aiBadge
-    +(S.apiKey?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">'+(isEmpty?'Auto-remplir avec l\'IA':'Régénérer avec l\'IA')+'</div><div class="status-sub" id="guide-autofill-status">Recherche web + nom du pays — à vérifier avant de partir.</div></div>'
-      :'<div class="info-card"><div class="status-sub" style="line-height:1.5">Deux façons de remplir cette fiche : <strong>à la main</strong> (remplis simplement les champs ci-dessous) ou <strong>avec l\'IA</strong> (recherche web automatique) en configurant une clé API personnelle dans Plus → Réglages avancés.</div></div>')
+    +(S.apiKey
+      ?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')">'
+        +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
+        +'<div class="status-sub" id="guide-autofill-status">Visa, conseils, urgences, checklist — à vérifier avant de partir.</div></div>'
+      :'<div class="info-card">'
+        +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
+        +'<div class="status-sub">Clé API requise — <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
+        +'</div>')
     +'<div class="info-card" onclick="openDatesModal(\''+c.id+'\')" style="cursor:pointer"><div class="ic-header" style="display:flex;justify-content:space-between;align-items:center"><span><span data-icon="calendar" data-icon-size="16"></span> Dates du séjour</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
     +(function(){
         var dr = getCountryDateRange(c);
@@ -8274,7 +8278,10 @@ function toggleMgCtry(cid){
 function renderManageCountriesScreen(){
   var hasKey = !!S.apiKey;
   var noKeyHTML = !hasKey
-    ? '<div class="info-card"><div class="status-sub" style="line-height:1.5">Aucune clé API configurée — <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span> pour utiliser cette fonctionnalité.</div></div>'
+    ? '<div class="info-card">'
+      +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
+      +'<div class="status-sub">Clé API requise — <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
+      +'</div>'
     : '';
   var countriesHTML = COUNTRIES.map(function(c){
     var checked = _mgCtrySelected.indexOf(c.id)>-1;
