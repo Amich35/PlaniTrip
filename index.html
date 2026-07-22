@@ -3290,7 +3290,7 @@ async function autofillCountryWithAI(countryId){
         max_tokens:700,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:
-`Tu es le Travel Data Engine de PlaniTrip. Produis des donnees structurees, fiables, a jour. Sois ultra-concis. Ne deduis jamais une information absente.\n\nSources (par ordre de confiance) :\n- Securite / alertes : diplomatie.gouv.fr, sites gouvernementaux officiels\n- Visa : ambassade de France dans le pays, ministere des affaires etrangeres francais\n- Conseils pratiques : Wikivoyage, Lonely Planet\n\nCherche sur le web les informations actuelles pour \"${c.name}\" (voyageur francais). Reponds UNIQUEMENT avec un JSON a la toute fin, sans markdown :\n{\"visa\":\"6 mots MAX — ex: \'Libre ≤90j\' ou \'VOA — 30 USD\' ou \'e-Visa requis — 30 USD\' ou \'Visa consulat obligatoire\'\",\"alerts\":[{\"t\":\"alerte factuelle 10 mots max\",\"url\":\"\"}],\"tips\":[{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"}],\"emergency\":[{\"k\":\"Police\",\"v\":\"numero\"},{\"k\":\"Ambulance\",\"v\":\"numero\"}],\"checklist\":[{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"}]}\nalerts = 1 a 3 alertes actuelles (risques, meteo extreme, evenement majeur) — tableau vide si rien de notable, n\'invente rien. Cat tips : Incontournable, Transport, Sante, Argent, Restauration, Hebergement, Culture, Securite, Bon plan, Autre. Cat checklist : Sante, Equipement, Documents, Argent, Vetements, Transport, Autre.`
+`Tu es le Travel Data Engine de PlaniTrip. Produis des donnees structurees, fiables, a jour. Sois ultra-concis. Ne deduis jamais une information absente.\n\nSources (par ordre de confiance) :\n- Securite / alertes : diplomatie.gouv.fr, sites gouvernementaux officiels\n- Visa : ambassade de France dans le pays, ministere des affaires etrangeres francais\n- Conseils pratiques : Wikivoyage, Lonely Planet\n\nCherche sur le web les informations actuelles pour \"${c.name}\" (voyageur francais). Reponds UNIQUEMENT avec un JSON a la toute fin, sans markdown :\n{\"visa\":\"6 mots MAX — ex: \'Libre ≤90j\' ou \'VOA — 30 USD\' ou \'e-Visa requis — 30 USD\' ou \'Visa consulat obligatoire\'\",\"alerts\":[{\"t\":\"alerte factuelle 10 mots max\",\"url\":\"\"}],\"tips\":[{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"}],,\"checklist\":[{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"}]}\nalerts = 1 a 3 alertes actuelles (risques, meteo extreme, evenement majeur) — tableau vide si rien de notable, n\'invente rien. Cat tips : Incontournable, Transport, Sante, Argent, Restauration, Hebergement, Culture, Securite, Bon plan, Autre. Cat checklist : Sante, Equipement, Documents, Argent, Vetements, Transport, Autre. Urgences fournies par table statique, ne pas generer.`
         }]
       })
     });
@@ -3321,7 +3321,6 @@ async function autofillCountryWithAI(countryId){
         return {t:trunc(t||'',80), cat:'Autre'};
       });
     }
-    if(info.emergency && info.emergency.length) c.practical.emergency = info.emergency;
     if(info.checklist && info.checklist.length){
       c.practical.checklist = info.checklist.map(function(item){
         if(typeof item==='object' && item.t){
@@ -3331,6 +3330,7 @@ async function autofillCountryWithAI(countryId){
         return {t:trunc(item||'',50), cat:'Autre'};
       });
     }
+    applyEmergencyFromTable(c);
     c._aiGenerated = true;
     c._aiGeneratedAt = new Date().toISOString();
     saveCountryEdit(c.id);
@@ -3339,6 +3339,11 @@ async function autofillCountryWithAI(countryId){
   }catch(e){
     if(badge) badge.textContent="Échec de la génération — vérifie ta clé API.";
   }
+}
+function applyEmergencyFromTable(c){
+  if(!window.COUNTRY_EMERGENCY) return;
+  var entry = window.COUNTRY_EMERGENCY[c.name];
+  if(entry && entry.length){ if(!c.practical) c.practical={}; c.practical.emergency = entry.slice(); }
 }
 function saveCountryEdit(countryId){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
@@ -9849,6 +9854,9 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     S.country = COUNTRIES[0] ? COUNTRIES[0].id : null;
     save();
   }
+  COUNTRIES.forEach(function(c){
+    if(!c.practical.emergency || !c.practical.emergency.length) applyEmergencyFromTable(c);
+  });
   // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
   // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
   if(CURRENT_USER && trip.owner_id === CURRENT_USER.id){
@@ -10001,6 +10009,7 @@ window.COUNTRY_RATES = {};
 window.COUNTRY_LANGUAGES = {};
 window.COUNTRY_TIMEZONES = {};
 window.COUNTRY_PHRASES = {};
+window.COUNTRY_EMERGENCY = {};
 
 async function loadCountryFlags() {
   if (Object.keys(window.COUNTRY_FLAGS).length) return;
@@ -10039,6 +10048,12 @@ async function loadCountryFlags() {
     window.COUNTRY_PHRASES = await res6.json();
   } catch (e) {
     console.error('[PlaniTrip] impossible de charger country_phrases.json', e);
+  }
+  try {
+    const res7 = await fetch('country_emergency.json');
+    window.COUNTRY_EMERGENCY = await res7.json();
+  } catch (e) {
+    console.error('[PlaniTrip] impossible de charger country_emergency.json', e);
   }
 }
 // Résout les phrases utiles pour une langue de pays (ex: "Anglais / Français" → essaie chaque
