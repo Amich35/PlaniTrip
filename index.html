@@ -4065,7 +4065,9 @@ function personaPromptContext(){
   if(!bits.length) return '';
   return 'Profil du voyageur à prendre en compte : '+bits.join(' ; ')+'. ';
 }
+var _lastAiError = '';
 async function suggestActivitiesWithAI(countryId, cityName){
+  _lastAiError='';
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c || !S.apiKey) return false;
   var ck = countryId+'_'+cityName;
@@ -4089,19 +4091,21 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     if(!resp.ok){
       var errBody = await resp.text();
       console.error('[PlaniTrip] suggestActivitiesWithAI: HTTP '+resp.status, errBody);
+      _lastAiError = 'Erreur '+resp.status+' (activités)';
       return false;
     }
     const data = await resp.json();
     const text = extractAiText(data);
-    if(!text){ console.error('[PlaniTrip] suggestActivitiesWithAI: réponse IA vide', data); return false; }
+    if(!text){ console.error('[PlaniTrip] suggestActivitiesWithAI: réponse IA vide', data); _lastAiError='Réponse vide (activités)'; return false; }
     var info;
     try{
       info = deepSanitize(parseAiJson(text));
     }catch(parseErr){
       console.error('[PlaniTrip] suggestActivitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
+      _lastAiError='JSON invalide (activités)';
       return false;
     }
-    if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); return false; }
+    if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); _lastAiError='Aucune activité renvoyée'; return false; }
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
       var idx = S.customActs[ck].length;
@@ -4117,7 +4121,7 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
       });
     }
     return true;
-  }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); return false; }
+  }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); _lastAiError='Échec réseau: '+(e&&e.message||e); return false; }
 }
 
 async function deleteActivity(cityKey, index, isCustom, actName) {
@@ -10459,6 +10463,7 @@ function closePostCreateModal(){
 // ── Programme (villes + répartition des jours) — propose une liste de villes cohérente avec
 // le nombre de jours déjà alloué au pays (fixé à la création du voyage, jamais redéfini ici).
 async function suggestCitiesWithAI(countryId){
+  _lastAiError='';
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c || !S.apiKey || !c.days || c.days<1) return null;
   try{
@@ -10481,19 +10486,21 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
     if(!resp.ok){
       var errBody = await resp.text();
       console.error('[PlaniTrip] suggestCitiesWithAI: HTTP '+resp.status, errBody);
+      _lastAiError = 'Erreur '+resp.status+' (villes)';
       return null;
     }
     const data = await resp.json();
     const text = extractAiText(data);
-    if(!text){ console.error('[PlaniTrip] suggestCitiesWithAI: réponse IA vide', data); return null; }
+    if(!text){ console.error('[PlaniTrip] suggestCitiesWithAI: réponse IA vide', data); _lastAiError='Réponse vide (villes)'; return null; }
     var info;
     try{
       info = deepSanitize(parseAiJson(text));
     }catch(parseErr){
       console.error('[PlaniTrip] suggestCitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
+      _lastAiError='JSON invalide (villes)';
       return null;
     }
-    if(!info.cities || !info.cities.length){ console.error('[PlaniTrip] suggestCitiesWithAI: aucune ville dans la réponse', info); return null; }
+    if(!info.cities || !info.cities.length){ console.error('[PlaniTrip] suggestCitiesWithAI: aucune ville dans la réponse', info); _lastAiError='Aucune ville renvoyée'; return null; }
     // Garde-fou : si la somme ne correspond pas exactement (arrondi IA), on réajuste la dernière ville
     var sum = info.cities.reduce(function(s,ci){ return s+(parseInt(ci.days,10)||0); }, 0);
     if(sum!==c.days && info.cities.length){
@@ -10502,18 +10509,21 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
       info.cities[lastIdx].days = Math.max(1, (parseInt(info.cities[lastIdx].days,10)||1) + diff);
     }
     return info.cities.filter(function(ci){ return ci.name && ci.days>0; });
-  }catch(e){ console.error('[PlaniTrip] suggestCitiesWithAI: échec appel API', e); return null; }
+  }catch(e){ console.error('[PlaniTrip] suggestCitiesWithAI: échec appel API', e); _lastAiError='Échec réseau: '+(e&&e.message||e); return null; }
 }
 // Orchestration complète pour un pays : propose les villes, les crée dans l'ordre avec les
 // bonnes dates (chaînées depuis c.dateStart), ce qui déclenche automatiquement la génération
 // des activités pour chacune (suggestActivitiesWithAI, déjà appelée par _createCityFromModal).
-async function generateProgramForCountry(countryId, onProgress){
+async function generateProgramForCountry(countryId, onProgress, errorsOut){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c || !S.apiKey) return;
   if(c.cities && c.cities.length) return; // des villes existent déjà, on ne duplique/écrase rien
   if(!c.dateStart || !c.dateEnd) return; // dates du pays pas encore connues, rien à répartir
   var cityPlan = await suggestCitiesWithAI(countryId);
-  if(!cityPlan || !cityPlan.length) return;
+  if(!cityPlan || !cityPlan.length){
+    if(errorsOut) errorsOut.push(c.name+' — villes : '+(_lastAiError||'échec inconnu'));
+    return;
+  }
   var cursor = c.dateStart;
   for(var i=0;i<cityPlan.length;i++){
     var entry = cityPlan[i];
@@ -10532,13 +10542,15 @@ async function generateProgramForCountry(countryId, onProgress){
     if(!ok){
       // Une tentative de plus après une pause plus longue (en cas de limite de débit ponctuelle)
       await new Promise(function(resolve){ setTimeout(resolve, 1500); });
-      try{ await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
+      try{ ok = await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
     }
+    if(!ok && errorsOut) errorsOut.push(c.name+' — '+entry.name+' : '+(_lastAiError||'échec inconnu'));
   }
 }
 async function runAiTripPrep(){
   var optsEl = document.getElementById('postCreateOptions');
   var countries = COUNTRIES.slice();
+  var genErrors = [];
   for(var i=0;i<countries.length;i++){
     optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
       +'<div class="ai-spinner"></div>'
@@ -10560,14 +10572,21 @@ async function runAiTripPrep(){
           +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Construction du programme…</div>'
           +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[j].flag+' '+countries[j].name)+' — '+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'
           +'</div>';
-      });
-    }catch(e){}
+      }, genErrors);
+    }catch(e){ genErrors.push(countries[j].name+' : '+(e&&e.message||e)); }
   }
+  var errBlock = genErrors.length
+    ? '<div style="margin-top:14px;padding:12px;border-radius:var(--r12);background:rgba(231,111,81,0.08);text-align:left">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--red-muted);margin-bottom:6px">Programme incomplet pour :</div>'
+      +genErrors.map(function(e){ return '<div style="font-size:11.5px;color:var(--ink-subtle);margin-bottom:2px">• '+escHtml(e)+'</div>'; }).join('')
+      +'</div>'
+    : '';
   optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
     +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('check',28)+'</div>'
     +'<div style="font-size:14px;font-weight:600;color:var(--ink)">Voyage prêt !</div>'
+    +errBlock
     +'</div>';
-  setTimeout(closePostCreateModal, 900);
+  if(!genErrors.length) setTimeout(closePostCreateModal, 900);
 }
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
