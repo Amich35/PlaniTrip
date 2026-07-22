@@ -4732,9 +4732,10 @@ function renderItinerary(c, embedded){
     +'<div class="cover-pills"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
     +weatherSection
-    +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div><div class="country-card-list">'+citiesHTML+'</div>'
+    +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'
+    +((S.apiKey && (!c.cities || !c.cities.length)) ? '<div id="lieux-ai-gen-'+c.id+'"><div class="info-card" style="cursor:pointer;margin-bottom:14px" onclick="generateProgramForCountryUI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">Générer le programme avec l\'IA</div><div class="status-sub">Villes + activités, à partir des dates du pays — à vérifier avant de partir.</div></div></div>' : '')
+    +'<div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une étape</button>'
-    +((S.apiKey && (!c.cities || !c.cities.length)) ? '<div id="lieux-ai-gen-'+c.id+'"><button onclick="generateProgramForCountryUI(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('sparkles',15)+' Générer le programme avec l\'IA</button></div>' : '')
     +cityTrashButtonHTML(c.id)
     +'</div>';
 }
