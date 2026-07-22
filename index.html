@@ -4734,6 +4734,7 @@ function renderItinerary(c, embedded){
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div><div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une étape</button>'
+    +((S.apiKey && (!c.cities || !c.cities.length)) ? '<div id="lieux-ai-gen-'+c.id+'"><button onclick="generateProgramForCountryUI(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;font-weight:600;border:none;background:var(--accent-pale);color:var(--accent);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">'+svgIcon('sparkles',15)+' Générer le programme avec l\'IA</button></div>' : '')
     +cityTrashButtonHTML(c.id)
     +'</div>';
 }
@@ -10570,6 +10571,34 @@ async function generateProgramForCountry(countryId, onProgress, errorsOut){
       try{ ok = await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
     }
     if(!ok && errorsOut) errorsOut.push(c.name+' — '+entry.name+' : '+(_lastAiError||'échec inconnu'));
+  }
+}
+// Déclenché depuis le bouton "Générer le programme avec l'IA" sur l'onglet Lieux — génère
+// villes + activités pour CE pays uniquement, avec sa propre progression inline (pas besoin
+// de repasser par la modale de création/Réglages avancés).
+async function generateProgramForCountryUI(countryId){
+  var container = document.getElementById('lieux-ai-gen-'+countryId);
+  if(!container) return;
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  var genErrors = [];
+  container.innerHTML = '<div class="info-card" style="text-align:center;padding:20px 16px;margin-top:8px">'
+    +'<div class="ai-spinner"></div>'
+    +'<div style="font-size:13px;font-weight:600;color:var(--ink)">Choix des villes…</div>'
+    +'</div>';
+  await generateProgramForCountry(countryId, function(cityName, idx, total){
+    container.innerHTML = '<div class="info-card" style="text-align:center;padding:20px 16px;margin-top:8px">'
+      +'<div class="ai-spinner"></div>'
+      +'<div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'
+      +'</div>';
+  }, genErrors);
+  if(genErrors.length){
+    container.innerHTML = '<div class="info-card" style="padding:14px 16px;margin-top:8px;text-align:left">'
+      +'<div style="font-size:12.5px;font-weight:700;color:var(--red-muted);margin-bottom:4px">Échec de la génération</div>'
+      +genErrors.map(function(e){ return '<div style="font-size:11.5px;color:var(--ink-subtle)">• '+escHtml(e)+'</div>'; }).join('')
+      +'<button onclick="generateProgramForCountryUI(\''+countryId+'\')" style="margin-top:8px;width:100%;padding:9px;border-radius:var(--r12);border:none;background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Réessayer</button>'
+      +'</div>';
+  } else {
+    renderContent();
   }
 }
 async function runAiTripPrep(){
