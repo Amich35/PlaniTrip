@@ -3259,6 +3259,23 @@ function saveAddActivityModal(){
   _createActivityCore(_addActivityModalCk, val, {meta:meta, category:_addActivityModalCat, date:date});
 }
 
+function saveApiKeyFromSettingsModal(){
+  S.apiKey = document.getElementById('apiKeyModal').value;
+  save();
+  document.getElementById('apiModal').classList.remove('open');
+  renderContent();
+  if(!S.apiKey || !CURRENT_TRIP) return;
+  var toPrepare = COUNTRIES.filter(function(c){ return !c._aiGenerated || !c.cities || !c.cities.length; });
+  if(!toPrepare.length) return;
+  showConfirm(
+    'Certains pays de ce voyage n\'ont pas encore été préparés par l\'IA ('+toPrepare.map(function(c){return c.name;}).join(', ')+'). Veux-tu lancer la génération maintenant, comme à la création du voyage ?',
+    function(){
+      showPostCreateModal();
+      showPostCreatePersonaStep();
+    },
+    'Générer maintenant'
+  );
+}
 async function autofillCountryWithAI(countryId){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c || !S.apiKey) return;
@@ -10557,31 +10574,33 @@ async function generateProgramForCountry(countryId, onProgress, errorsOut){
 }
 async function runAiTripPrep(){
   var optsEl = document.getElementById('postCreateOptions');
-  var countries = COUNTRIES.slice();
+  var allCountries = COUNTRIES.slice();
+  var countriesNeedingInfo = allCountries.filter(function(c){ return !c._aiGenerated; });
+  var countriesNeedingProgram = allCountries.filter(function(c){ return !c.cities || !c.cities.length; });
   var genErrors = [];
-  for(var i=0;i<countries.length;i++){
+  for(var i=0;i<countriesNeedingInfo.length;i++){
     optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
       +'<div class="ai-spinner"></div>'
       +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Préparation du voyage…</div>'
-      +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[i].flag+' '+countries[i].name)+' — recherche des infos pratiques…</div>'
+      +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countriesNeedingInfo[i].flag+' '+countriesNeedingInfo[i].name)+' — recherche des infos pratiques…</div>'
       +'</div>';
-    try{ await autofillCountryWithAI(countries[i].id); }catch(e){}
+    try{ await autofillCountryWithAI(countriesNeedingInfo[i].id); }catch(e){}
   }
-  for(var j=0;j<countries.length;j++){
+  for(var j=0;j<countriesNeedingProgram.length;j++){
     optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
       +'<div class="ai-spinner"></div>'
       +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Construction du programme…</div>'
-      +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[j].flag+' '+countries[j].name)+' — choix des villes…</div>'
+      +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countriesNeedingProgram[j].flag+' '+countriesNeedingProgram[j].name)+' — choix des villes…</div>'
       +'</div>';
     try{
-      await generateProgramForCountry(countries[j].id, function(cityName, idx, total){
+      await generateProgramForCountry(countriesNeedingProgram[j].id, function(cityName, idx, total){
         optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
           +'<div class="ai-spinner"></div>'
           +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Construction du programme…</div>'
-          +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countries[j].flag+' '+countries[j].name)+' — '+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'
+          +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countriesNeedingProgram[j].flag+' '+countriesNeedingProgram[j].name)+' — '+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'
           +'</div>';
       }, genErrors);
-    }catch(e){ genErrors.push(countries[j].name+' : '+(e&&e.message||e)); }
+    }catch(e){ genErrors.push(countriesNeedingProgram[j].name+' : '+(e&&e.message||e)); }
   }
   var errBlock = genErrors.length
     ? '<div style="margin-top:14px;padding:12px;border-radius:var(--r12);background:rgba(231,111,81,0.08);text-align:left">'
@@ -10978,7 +10997,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-title" style="font-size:18px">Clé API Anthropic</div>
     <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px;line-height:1.5">Stockée uniquement sur cet appareil. Jamais partagée.</div>
     <input class="modal-field api-key-field" type="password" id="apiKeyModal" placeholder="sk-ant-api03-…" style="font-family:monospace;font-size:12px"/>
-    <button class="modal-cta" onclick="S.apiKey=document.getElementById('apiKeyModal').value;save();document.getElementById('apiModal').classList.remove('open');renderContent();">Enregistrer</button>
+    <button class="modal-cta" onclick="saveApiKeyFromSettingsModal()">Enregistrer</button>
     <button class="modal-cancel-btn" onclick="document.getElementById('apiModal').classList.remove('open')">Annuler</button>
   </div>
 </div>
