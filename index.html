@@ -4720,7 +4720,7 @@ function renderItinerary(c, embedded){
   return cdHTML+coverHTML
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'
-    +((S.apiKey && (!c.cities || !c.cities.length)) ? '<div id="lieux-ai-gen-'+c.id+'"><div class="info-card" style="cursor:pointer;margin-bottom:14px" onclick="generateProgramForCountryUI(\''+c.id+'\')"><div class="ic-header" style="color:var(--accent)">Générer le programme avec l\'IA</div><div class="status-sub">Villes + activités, à partir des dates du pays — à vérifier avant de partir.</div></div></div>' : '')
+    +(S.apiKey ? '<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px"><div class="info-card"><div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',false)" style="padding:10px 8px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Villes + activités</button><button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',true)" style="padding:10px 8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Villes seules</button></div><div class="status-sub" style="margin-top:8px">À partir des dates du pays — à vérifier.</div></div></div>' : '')
     +'<div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une étape</button>'
     +cityTrashButtonHTML(c.id)
@@ -6957,7 +6957,7 @@ function renderMore(){
     +'</div>'
     +'<div class="info-card" style="padding:6px">'
     +'<div class="more-row" onclick="showAccessManagementScreen()"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">Voyageurs</span><span style="font-size:12px;color:var(--ink-muted);margin-right:4px">'+(1+CURRENT_COLLABORATORS.length)+'</span><span class="more-row-chevron">›</span></div>'
-    +'<div class="more-row" onclick="showArchivedCountriesScreen()"><span class="more-row-icon" data-icon="globe" data-icon-size="19"></span><span class="more-row-label">Gérer les pays</span><span class="more-row-chevron">›</span></div>'
+    +'<div class="more-row" onclick="showManageCountriesScreen()"><span class="more-row-icon" data-icon="globe" data-icon-size="19"></span><span class="more-row-label">Gérer les pays</span><span class="more-row-chevron">›</span></div>'
     +(isTripOwner()?'<div class="more-row" onclick="showManageTripScreen()"><span class="more-row-icon" data-icon="settings" data-icon-size="19"></span><span class="more-row-label">Gérer le voyage</span><span class="more-row-chevron">›</span></div>':'')
     +'<div class="more-row" onclick="backToTripSelector()"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
@@ -8235,6 +8235,61 @@ async function backToTripSelector() {
   }
 }
 
+
+var _mgCtrySelected = [];
+
+function showManageCountriesScreen(){
+  _mgCtrySelected = [];
+  S.tab='manage-countries'; save(); renderContent();
+}
+function toggleMgCtry(cid){
+  var idx = _mgCtrySelected.indexOf(cid);
+  if(idx>-1) _mgCtrySelected.splice(idx,1);
+  else _mgCtrySelected.push(cid);
+  renderContent();
+}
+function renderManageCountriesScreen(){
+  var hasKey = !!S.apiKey;
+  var noKeyHTML = !hasKey
+    ? '<div class="info-card"><div class="status-sub" style="line-height:1.5">Aucune clé API configurée — <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span> pour utiliser cette fonctionnalité.</div></div>'
+    : '';
+  var countriesHTML = COUNTRIES.map(function(c){
+    var checked = _mgCtrySelected.indexOf(c.id)>-1;
+    return '<div class="more-row" style="cursor:pointer" onclick="toggleMgCtry(\''+jsStrEsc(c.id)+'\')">'      +'<span style="font-size:18px;margin-right:8px">'+escHtml(c.flag)+'</span>'      +'<span class="more-row-label">'+escHtml(c.name)+'</span>'      +'<span style="width:20px;height:20px;border-radius:6px;flex-shrink:0;border:1.5px solid '+(checked?'var(--accent)':'rgba(29,29,31,0.2)')+';background:'+(checked?'var(--accent)':'transparent')+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">'+(checked?'✓':'')+'</span>'      +'</div>';
+  }).join('');
+  var btnBase = 'width:100%;padding:11px;border-radius:var(--r12);font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'    +'<div class="more-row" onclick="S.tab=\'more\';save();renderContent();" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'    +'<div class="section-title" style="margin-bottom:12px">Gérer les pays</div>'    +noKeyHTML    +(hasKey && COUNTRIES.length ? '<div class="info-card" style="padding:6px;margin-bottom:12px">'+countriesHTML+'</div>' : '')    +(hasKey ? '<div id="manage-countries-progress"></div>' : '')    +(hasKey && COUNTRIES.length      ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'        +'<button onclick="runMgCtryAI(false)" style="'+btnBase+'border:none;background:var(--accent);color:#fff">Villes + activités</button>'        +'<button onclick="runMgCtryAI(true)" style="'+btnBase+'border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent)">Villes seules</button>'        +'</div>'      : '')    +'</div>';
+}
+async function runMgCtryAI(citiesOnly){
+  if(!_mgCtrySelected.length){ alert('Sélectionne au moins un pays.'); return; }
+  var selected = _mgCtrySelected.slice();
+  var genErrors = [];
+  for(var i=0;i<selected.length;i++){
+    var cid = selected[i];
+    var c = COUNTRIES.find(function(co){return co.id===cid;});
+    if(!c) continue;
+    var cFlag = c.flag, cName = c.name;
+    var prog = document.getElementById('manage-countries-progress');
+    if(prog) prog.innerHTML = '<div class="info-card" style="text-align:center;padding:20px 16px;margin-bottom:12px">'      +'<div class="ai-spinner"></div>'      +'<div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(cFlag+' '+cName)+'…</div>'      +'</div>';
+    await generateProgramForCountry(cid, (function(cf, cn){
+      return function(cityName, idx, total){
+        var p = document.getElementById('manage-countries-progress');
+        if(p) p.innerHTML = '<div class="info-card" style="text-align:center;padding:20px 16px;margin-bottom:12px">'          +'<div class="ai-spinner"></div>'          +'<div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(cf+' '+cn)+' — '+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'          +'</div>';
+      };
+    })(cFlag, cName), genErrors, citiesOnly);
+  }
+  _mgCtrySelected = [];
+  var progEl = document.getElementById('manage-countries-progress');
+  if(progEl){
+    if(genErrors.length){
+      progEl.innerHTML = '<div class="info-card" style="padding:14px 16px;margin-bottom:12px">'        +'<div style="font-size:12.5px;font-weight:700;color:var(--red-muted);margin-bottom:4px">Erreurs</div>'        +genErrors.map(function(e){ return '<div style="font-size:11.5px;color:var(--ink-subtle)">• '+escHtml(e)+'</div>'; }).join('')        +'</div>';
+      renderContent();
+    } else {
+      progEl.innerHTML = '<div class="info-card" style="text-align:center;padding:16px;margin-bottom:12px">'        +'<div style="font-size:22px;color:var(--accent);margin-bottom:6px">'+svgIcon('check-circle',24)+'</div>'        +'<div style="font-size:13px;font-weight:600;color:var(--ink)">Programme généré !</div>'        +'</div>';
+      setTimeout(function(){ renderContent(); }, 1200);
+    }
+  }
+}
 function renderArchivedCountriesScreen(){
   var names = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.archived_countries) ? CURRENT_TRIP.archived_countries : [];
   var rows = names.length
@@ -8792,7 +8847,7 @@ function updateTopBarSub(){
   el.textContent = name + ' · ' + countryCount + ' pays';
 }
 function syncActiveNavTab(){
-  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   var el = document.getElementById('tab-'+activeId);
   if(el) el.classList.add('active');
@@ -8816,6 +8871,7 @@ function renderContent(){
   else if(S.tab==='documents')html=renderDocuments();
   else if(S.tab==='journal')html=renderCarnetScreen();
   else if(S.tab==='archived-countries')html=renderArchivedCountriesScreen();
+  else if(S.tab==='manage-countries')html=renderManageCountriesScreen();
   else if(S.tab==='archived-cities')html=renderArchivedCitiesScreen();
   else if(S.tab==='archived-activities')html=renderArchivedActivitiesScreen();
   else if(S.tab==='access-management')html=renderAccessManagementScreen();
@@ -9108,7 +9164,7 @@ function removePinFlowApi(){
 
 S.tab = S.tab && NAV_TABS.concat(['country','documents','journal']).indexOf(S.tab)>-1 ? S.tab : 'home';
 document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
-var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
 var _initTabEl = document.getElementById('tab-'+_initActiveTab);
 if(_initTabEl) _initTabEl.classList.add('active');
 renderContent();
@@ -10530,7 +10586,7 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
 // Orchestration complète pour un pays : propose les villes, les crée dans l'ordre avec les
 // bonnes dates (chaînées depuis c.dateStart), ce qui déclenche automatiquement la génération
 // des activités pour chacune (suggestActivitiesWithAI, déjà appelée par _createCityFromModal).
-async function generateProgramForCountry(countryId, onProgress, errorsOut){
+async function generateProgramForCountry(countryId, onProgress, errorsOut, citiesOnly){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c || !S.apiKey) return;
   if(c.cities && c.cities.length) return; // des villes existent déjà, on ne duplique/écrase rien
@@ -10553,20 +10609,21 @@ async function generateProgramForCountry(countryId, onProgress, errorsOut){
     // Pause avant l'appel (laisse le temps entre l'appel "villes" qui vient de se terminer et
     // celui-ci, sinon le tout premier appel activités part immédiatement à la suite)
     await new Promise(function(resolve){ setTimeout(resolve, 700); });
-    var ok = false;
-    try{ ok = await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
-    if(!ok){
-      // Une tentative de plus après une pause plus longue (en cas de limite de débit ponctuelle)
-      await new Promise(function(resolve){ setTimeout(resolve, 1500); });
+    if(!citiesOnly){
+      var ok = false;
       try{ ok = await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
+      if(!ok){
+        await new Promise(function(resolve){ setTimeout(resolve, 1500); });
+        try{ ok = await suggestActivitiesWithAI(countryId, entry.name); }catch(e){}
+      }
+      if(!ok && errorsOut) errorsOut.push(c.name+' — '+entry.name+' : '+(_lastAiError||'échec inconnu'));
     }
-    if(!ok && errorsOut) errorsOut.push(c.name+' — '+entry.name+' : '+(_lastAiError||'échec inconnu'));
   }
 }
 // Déclenché depuis le bouton "Générer le programme avec l'IA" sur l'onglet Lieux — génère
 // villes + activités pour CE pays uniquement, avec sa propre progression inline (pas besoin
 // de repasser par la modale de création/Réglages avancés).
-async function generateProgramForCountryUI(countryId){
+async function generateProgramForCountryUI(countryId, citiesOnly){
   var container = document.getElementById('lieux-ai-gen-'+countryId);
   if(!container) return;
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
@@ -10580,12 +10637,12 @@ async function generateProgramForCountryUI(countryId){
       +'<div class="ai-spinner"></div>'
       +'<div style="font-size:13px;font-weight:600;color:var(--ink)">'+escHtml(cityName)+' ('+idx+'/'+total+')…</div>'
       +'</div>';
-  }, genErrors);
+  }, genErrors, citiesOnly);
   if(genErrors.length){
     container.innerHTML = '<div class="info-card" style="padding:14px 16px;margin-top:8px;text-align:left">'
       +'<div style="font-size:12.5px;font-weight:700;color:var(--red-muted);margin-bottom:4px">Échec de la génération</div>'
       +genErrors.map(function(e){ return '<div style="font-size:11.5px;color:var(--ink-subtle)">• '+escHtml(e)+'</div>'; }).join('')
-      +'<button onclick="generateProgramForCountryUI(\''+countryId+'\')" style="margin-top:8px;width:100%;padding:9px;border-radius:var(--r12);border:none;background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Réessayer</button>'
+      +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(countryId)+'\','+!!citiesOnly+')" style="margin-top:8px;width:100%;padding:9px;border-radius:var(--r12);border:none;background:var(--accent-pale);color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Réessayer</button>'
       +'</div>';
   } else {
     renderContent();
