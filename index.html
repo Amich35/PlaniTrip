@@ -4108,7 +4108,9 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     if(!resp.ok){
       var errBody = await resp.text();
       console.error('[PlaniTrip] suggestActivitiesWithAI: HTTP '+resp.status, errBody);
-      _lastAiError = 'Erreur '+resp.status+' (activités)';
+      var errDetail = '';
+      try{ var errJson = JSON.parse(errBody); errDetail = (errJson.error && errJson.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
+      _lastAiError = 'Erreur '+resp.status+' (activités)'+(errDetail?' — '+errDetail:'');
       return false;
     }
     const data = await resp.json();
@@ -10515,7 +10517,9 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
     if(!resp.ok){
       var errBody = await resp.text();
       console.error('[PlaniTrip] suggestCitiesWithAI: HTTP '+resp.status, errBody);
-      _lastAiError = 'Erreur '+resp.status+' (villes)';
+      var errDetail = '';
+      try{ var errJson = JSON.parse(errBody); errDetail = (errJson.error && errJson.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
+      _lastAiError = 'Erreur '+resp.status+' (villes)'+(errDetail?' — '+errDetail:'');
       return null;
     }
     const data = await resp.json();
