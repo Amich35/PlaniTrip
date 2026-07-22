@@ -4039,7 +4039,7 @@ function removeGuideListItem(countryId, listField, idx){
 function addCityToCountry(countryId){
   openGuideItemModal(countryId, 'city', null);
 }
-function _createCityFromModal(countryId, name, sub, dateStart, dateEnd, skipAutoActivities){
+async function _createCityFromModal(countryId, name, sub, dateStart, dateEnd, skipAutoActivities){
   name = stripHtml(name||'');
   sub = stripHtml(sub||'');
   if(!name || !name.trim()) return;
@@ -4057,11 +4057,11 @@ function _createCityFromModal(countryId, name, sub, dateStart, dateEnd, skipAuto
   } else {
     renderContent();
   }
-  if(S.apiKey && !skipAutoActivities) suggestActivitiesWithAI(countryId, newCity.city);
   if(sb && CURRENT_TRIP){
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}).then(function(){});
+    try{ await sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}); }catch(e){ console.error('[PlaniTrip] insert cities:', e); }
   }
+  if(S.apiKey && !skipAutoActivities) suggestActivitiesWithAI(countryId, newCity.city);
 }
 // Traduit les réponses du questionnaire persona (S.tripPersona) en contexte textuel pour les
 // prompts IA. Retourne '' si aucune réponse n'a été donnée (génération neutre par défaut).
@@ -4133,9 +4133,11 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     renderContent();
     if(sb && CURRENT_TRIP){
       var whoAi=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-      info.activities.forEach(function(a){
-        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi}).then(function(){});
-      });
+      try{
+        await Promise.all(info.activities.map(function(a){
+          return sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi});
+        }));
+      }catch(syncErr){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec sync serveur', syncErr); }
     }
     return true;
   }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); _lastAiError='Échec réseau: '+(e&&e.message||e); return false; }
@@ -10559,7 +10561,7 @@ async function generateProgramForCountry(countryId, onProgress, errorsOut){
     var endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + (entry.days-1));
     var endStr = toLocalISODate(endDate);
-    _createCityFromModal(countryId, entry.name, '', cursor, endStr, true);
+    await _createCityFromModal(countryId, entry.name, '', cursor, endStr, true);
     cursor = toLocalISODate(new Date(endDate.getTime()+86400000));
     // Pause avant l'appel (laisse le temps entre l'appel "villes" qui vient de se terminer et
     // celui-ci, sinon le tout premier appel activités part immédiatement à la suite)
