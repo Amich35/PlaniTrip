@@ -3312,7 +3312,8 @@ function saveApiKeyFromSettingsModal(){
       showPostCreateModal();
       showPostCreatePersonaStep();
     },
-    'Générer maintenant'
+    'Générer maintenant',
+    'Plus tard'
   );
 }
 async function autofillCountryWithAI(countryId){
@@ -9272,9 +9273,10 @@ function renderIcons() {
 
 // ── CUSTOM CONFIRM ────────────────────────────────────────────
 var _confirmCallback = null;
-function showConfirm(msg, onOk, okLabel) {
+function showConfirm(msg, onOk, okLabel, cancelLabel) {
   document.getElementById('confirmMsg').textContent = msg;
   document.getElementById('confirmOkBtn').textContent = okLabel || 'Supprimer';
+  document.getElementById('confirmCancelBtn').textContent = cancelLabel || 'Annuler';
   document.getElementById('confirmOverlay').classList.add('open');
   _confirmCallback = onOk;
 }
@@ -11253,7 +11255,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="confirm-title" id="confirmTitle">Confirmer</div>
     <div class="confirm-msg" id="confirmMsg"></div>
     <div class="confirm-btns">
-      <button class="confirm-cancel" onclick="confirmResolve(false)">Annuler</button>
+      <button class="confirm-cancel" id="confirmCancelBtn" onclick="confirmResolve(false)">Annuler</button>
       <button class="confirm-ok" id="confirmOkBtn" onclick="confirmResolve(true)">Supprimer</button>
     </div>
   </div>
