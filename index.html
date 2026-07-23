@@ -9526,7 +9526,7 @@ function removePinFlowApi(){
   });
 }
 
-S.tab = S.tab && NAV_TABS.concat(['country','documents','journal']).indexOf(S.tab)>-1 ? S.tab : 'home';
+S.tab = S.tab || 'home';
 document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
 var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
 var _initTabEl = document.getElementById('tab-'+_initActiveTab);
