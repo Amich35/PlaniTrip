@@ -4935,6 +4935,13 @@ function renderTravelerAvatarStack(ck){
   return html;
 }
 
+function toggleLieuxAiGen(countryId){
+  if(!S.uiAccordion) S.uiAccordion={};
+  var key = 'lieuxAiGen_'+countryId;
+  S.uiAccordion[key] = !S.uiAccordion[key];
+  save();
+  renderContent();
+}
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
   var tripStarted = _depart ? (new Date() >= _depart) : false;
@@ -5040,18 +5047,20 @@ function renderItinerary(c, embedded){
     +'<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px">'
     +(S.apiKey
       ? '<div class="info-card">'
-        +'<div class="ic-header" style="color:var(--accent)">G\u00e9n\u00e9rer avec l\'IA <span data-icon="chevron-right" data-icon-size="12" style="margin-left:auto"></span></div>'
-        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
-        +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',false)" '
-        +'style="padding:10px 8px;border-radius:var(--r12);border:none;background:var(--accent);'
-        +'color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
-        +'Villes + activit\u00e9s</button>'
-        +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',true)" '
-        +'style="padding:10px 8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.3);'
-        +'background:transparent;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
-        +'Villes seules</button>'
-        +'</div>'
-        +'<div class="status-sub" style="margin-top:8px">Villes et activit\u00e9s \u00e0 partir des dates du pays \u2014 \u00e0 v\u00e9rifier.</div>'
+        +'<div class="ic-header" style="color:var(--accent);cursor:pointer" onclick="toggleLieuxAiGen(\''+jsStrEsc(c.id)+'\')">G\u00e9n\u00e9rer avec l\'IA <span data-icon="chevron-right" data-icon-size="12" style="margin-left:auto;transition:transform .2s ease;transform:rotate('+((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id])?'90deg':'0deg')+')"></span></div>'
+        +((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id]) ?
+          ('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
+          +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',false)" '
+          +'style="padding:10px 8px;border-radius:var(--r12);border:none;background:var(--accent);'
+          +'color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
+          +'Villes + activit\u00e9s</button>'
+          +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',true)" '
+          +'style="padding:10px 8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.3);'
+          +'background:transparent;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
+          +'Villes seules</button>'
+          +'</div>'
+          +'<div class="status-sub" style="margin-top:8px">Villes et activit\u00e9s \u00e0 partir des dates du pays \u2014 \u00e0 v\u00e9rifier.</div>')
+          : '')
         +'</div>'
       : '<div class="info-card">'
         +'<div class="ic-header" style="color:var(--accent)">G\u00e9n\u00e9rer avec l\'IA</div>'
@@ -10150,7 +10159,11 @@ async function verifyTripAccess(tripId){
     return true;
   }
 }
+var _enterTripLock = null;
 async function enterTrip(trip, resetTab, skipAutofillDates) {
+  if (_enterTripLock === trip.id) { console.warn('[PlaniTrip] enterTrip ignoré (appel concurrent déjà en cours) pour', trip.id); return; }
+  _enterTripLock = trip.id;
+  try {
   var accessOk = await verifyTripAccess(trip.id);
   if(!accessOk){
     try{ localStorage.removeItem('planitrip_trip_' + trip.id); }catch(e){}
@@ -10239,6 +10252,9 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   renderContent();
+  } finally {
+    _enterTripLock = null;
+  }
 }
 
 // ---- Écran sélecteur de trips ----
