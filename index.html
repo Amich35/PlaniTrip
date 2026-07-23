@@ -9198,8 +9198,12 @@ function syncActiveNavTab(){
   var el = document.getElementById('tab-'+activeId);
   if(el) el.classList.add('active');
 }
+var _lastScreenKey = null;
 function renderContent(){
   const c=getC();let html='';
+  var screenKey = S.tab+'|'+(S.countryDetailTab||'')+'|'+(S.country||'')+'|'+(S.currentCityKey||'');
+  var screenChanged = (_lastScreenKey!==null && _lastScreenKey!==screenKey);
+  _lastScreenKey = screenKey;
   if(S.tab==='home')html=renderToday();
   else if(S.tab==='today')html=renderToday();
   else if(S.tab==='countries')html=renderCountriesScreen();
@@ -9238,6 +9242,10 @@ function renderContent(){
   setTimeout(function(){ loadPlaceImages(document.getElementById('mainContent')); }, 30);
   updateTopBarSub();
   syncActiveNavTab();
+  if(screenChanged){
+    var mainEl = document.getElementById('mainContent');
+    if(mainEl) mainEl.scrollTop = 0;
+  }
 }
 
 // ── ICON LIBRARY — 24×24, 2px stroke, round cap/join, no fill ──
