@@ -3477,6 +3477,17 @@ function migrateCountryTipsCategories(){
   dirty.forEach(function(cid){ saveCountryEdit(cid); });
   if(dirty.length) console.log('[PlaniTrip] migrateCountryTipsCategories: fixed', dirty.length, 'countries');
 }
+function migrateBudgetDailyDefault(){
+  var dirty = [];
+  COUNTRIES.forEach(function(c){
+    if(c.budget_daily===50 && BUDGET_DAILY_TABLE[c.name]!==undefined && BUDGET_DAILY_TABLE[c.name]!==50){
+      c.budget_daily = BUDGET_DAILY_TABLE[c.name];
+      dirty.push(c.id);
+    }
+  });
+  dirty.forEach(function(cid){ saveCountryEdit(cid); });
+  if(dirty.length) console.log('[PlaniTrip] migrateBudgetDailyDefault: fixed', dirty.length, 'countries');
+}
 function applyEmergencyFromTable(c){
   if(!window.COUNTRY_EMERGENCY) return;
   var entry = window.COUNTRY_EMERGENCY[c.name];
@@ -10029,6 +10040,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   });
   migrateCountryCategoryAccents();
   migrateCountryTipsCategories();
+  migrateBudgetDailyDefault();
   // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
   // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
   if(CURRENT_USER && trip.owner_id === CURRENT_USER.id){
