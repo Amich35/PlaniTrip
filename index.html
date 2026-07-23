@@ -6925,7 +6925,7 @@ function renderFeed(){
   var draftTextVal = window._feedDraftText || '';
   var canPublish = !!(draftTextVal.trim() || window._feedDraftPhoto);
   var extraOpen = draftTextVal.trim().length>0 || !!window._feedDraftPhoto;
-  var composer = '<div class="info-card" style="padding:12px 14px 14px">'
+  var composer = '<div class="info-card" style="padding:14px">'
     +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="'+(window._feedDraftPhoto?'Décrire cette photo…':'Partager une nouvelle avec le groupe…')+'" rows="1">'+escHtml(draftTextVal)+'</textarea>'
     +'<div id="feedComposerExtra" class="feed-composer-extra'+(extraOpen?' open':'')+'">'
     +feedPhotoPreview
