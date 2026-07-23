@@ -11341,8 +11341,9 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   </div>
 </div>
 
-<div class="share-modal" id="postCreateModal">
-  <div class="share-sheet" style="max-height:85vh;overflow-y:auto">
+<div class="share-modal" id="postCreateModal" onclick="if(event.target.id==='postCreateModal') closePostCreateModal();">
+  <div class="share-sheet" style="max-height:85vh;overflow-y:auto;position:relative">
+    <button onclick="closePostCreateModal()" style="position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;border:none;background:var(--sand-deep,#F0ECE4);color:var(--ink-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1">✕</button>
     <div class="modal-handle"></div>
     <div id="postCreateModalBody"></div>
   </div>
