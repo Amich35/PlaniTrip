@@ -3404,6 +3404,78 @@ function migrateCountryCategoryAccents(){
   dirty.forEach(function(cid){ saveCountryEdit(cid); });
   if(dirty.length) console.log('[PlaniTrip] migrateCountryCategoryAccents: fixed', dirty.length, 'countries');
 }
+function migrateCountryTipsCategories(){
+  var TIP_RULES = [
+    ['Transport', ['grab','bus','train','avion','vol ','aéroport','aeroport','taxi','tuk-tuk','jr pass','sim ','esim','métro','metro','ferry','bateau']],
+    ['Argent', ['cash','usd','espèces','especes','carte bancaire','budget','retrait','monnaie']],
+    ['Santé', ['crème solaire','creme solaire','médicament','medicament','vaccin','moustique']],
+    ['Culture', ['temple','tenue','cérémonie','ceremonie','religieu']],
+    ['Sécurité', ['arnaque','danger','prudence','attention aux vols','pickpocket']],
+    ['Restauration', ['street food','restaurant','cuisine','plat ','dîner','diner']],
+    ['Hébergement', ['hôtel','hotel','hébergement','hebergement','logement','auberge','guesthouse']],
+    ['Bon plan', ['meilleure saison','meilleure période','meilleure periode','éviter','eviter']],
+    ['Incontournable', ['incontournable','coup de cœur','coup de coeur','célèbre','celebre']]
+  ];
+  var CL_RULES = [
+    ['Documents', ['passeport','visa','assurance','billet','photo d\'identité','photo d\'identite','sortie du','sortie de']],
+    ['Argent', ['cash','usd','carte bancaire','espèces','especes']],
+    ['Santé', ['médicament','medicament','crème solaire','creme solaire','vaccin','trousse']],
+    ['Équipement', ['batterie','application','app ','carte hors-ligne','adaptateur','snorkeling']],
+    ['Vêtements', ['vêtements','vetements','couvrant','imperméable','impermeable']],
+    ['Transport', ['sim','esim','grab','jr pass']]
+  ];
+  function matchCat(text, rules){
+    var low = String(text||'').toLowerCase();
+    for(var i=0;i<rules.length;i++){
+      var kws = rules[i][1];
+      for(var j=0;j<kws.length;j++){
+        if(low.indexOf(kws[j])>-1) return rules[i][0];
+      }
+    }
+    return null;
+  }
+  var dirty = [];
+  COUNTRIES.forEach(function(c){
+    var changed = false;
+    if(c.practical && c.practical.tips && c.practical.tips.length){
+      c.practical.tips.forEach(function(tip, idx){
+        var isObj = typeof tip==='object' && tip!==null && tip.t!==undefined;
+        var text = isObj ? tip.t : String(tip||'');
+        var curCat = isObj ? tip.cat : null;
+        if(!curCat || curCat==='Autre'){
+          var found = matchCat(text, TIP_RULES);
+          if(found){
+            c.practical.tips[idx] = {t:text, cat:found};
+            changed = true;
+          } else if(!isObj){
+            c.practical.tips[idx] = {t:text, cat:'Autre'};
+            changed = true;
+          }
+        }
+      });
+    }
+    if(c.practical && c.practical.checklist && c.practical.checklist.length){
+      c.practical.checklist.forEach(function(item, idx){
+        var isObj2 = typeof item==='object' && item!==null && item.t!==undefined;
+        var text2 = isObj2 ? item.t : String(item||'');
+        var curCat2 = isObj2 ? item.cat : null;
+        if(!curCat2 || curCat2==='Autre'){
+          var found2 = matchCat(text2, CL_RULES);
+          if(found2){
+            c.practical.checklist[idx] = {t:text2, cat:found2};
+            changed = true;
+          } else if(!isObj2){
+            c.practical.checklist[idx] = {t:text2, cat:'Autre'};
+            changed = true;
+          }
+        }
+      });
+    }
+    if(changed) dirty.push(c.id);
+  });
+  dirty.forEach(function(cid){ saveCountryEdit(cid); });
+  if(dirty.length) console.log('[PlaniTrip] migrateCountryTipsCategories: fixed', dirty.length, 'countries');
+}
 function applyEmergencyFromTable(c){
   if(!window.COUNTRY_EMERGENCY) return;
   var entry = window.COUNTRY_EMERGENCY[c.name];
@@ -9955,6 +10027,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     if(!c.practical.emergency || !c.practical.emergency.length) applyEmergencyFromTable(c);
   });
   migrateCountryCategoryAccents();
+  migrateCountryTipsCategories();
   // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
   // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
   if(CURRENT_USER && trip.owner_id === CURRENT_USER.id){
