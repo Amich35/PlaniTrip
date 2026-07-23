@@ -719,10 +719,10 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ct-primary-btn:active{transform:scale(0.98);box-shadow:0 4px 12px rgba(45,106,79,0.22);}
 .ct-primary-btn:disabled{opacity:0.6;}
 .ct-modal{position:fixed;inset:0;z-index:10000;background:rgba(29,29,31,0.35);display:flex;align-items:flex-end;}
-.ct-modal-sheet{background:#FFFFFF;width:100%;max-height:70vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);}
+.ct-modal-sheet{background:#FFFFFF;width:100%;max-height:70vh;max-height:70dvh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);}
 .ct-modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 10px;font-size:16px;font-weight:600;color:#1D1D1F;}
 .ct-modal-close{border:none;background:#F8F6F2;width:30px;height:30px;border-radius:50%;font-size:14px;color:#6E6E73;cursor:pointer;}
-.ct-country-options{overflow-y:auto;padding:0 16px 16px;}
+.ct-country-options{overflow-y:auto;padding:0 16px 16px;min-height:0;flex:1;}
 .ct-country-option{padding:12px 8px;font-size:15px;color:#1D1D1F;cursor:pointer;border-bottom:1px solid #F0ECE4;}
 .ct-country-option:hover{background:#F8F6F2;}
 .ts-trip-item{display:flex;align-items:center;justify-content:space-between;background:#F8F6F2;border-radius:14px;padding:14px;font-size:15px;font-weight:500;color:#1D1D1F;cursor:pointer;margin-bottom:8px;transition:background .15s;}
@@ -10476,11 +10476,25 @@ async function openCountryModal() {
 }
 
 document.getElementById('ct-add-country-btn').addEventListener('click', openCountryModal);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const sheet = document.querySelector('#ct-country-modal .ct-modal-sheet');
+    if (!sheet || document.getElementById('ct-country-modal').style.display === 'none') return;
+    const vh = window.visualViewport.height;
+    sheet.style.maxHeight = Math.round(vh * 0.9) + 'px';
+  });
+}
 document.getElementById('ct-country-modal-close').addEventListener('click', () => {
   document.getElementById('ct-country-modal').style.display = 'none';
+  const sheet = document.querySelector('#ct-country-modal .ct-modal-sheet');
+  if (sheet) sheet.style.maxHeight = '';
 });
 document.getElementById('ct-country-modal').addEventListener('click', (e) => {
-  if (e.target.id === 'ct-country-modal') e.currentTarget.style.display = 'none';
+  if (e.target.id === 'ct-country-modal') {
+    e.currentTarget.style.display = 'none';
+    const sheet = e.currentTarget.querySelector('.ct-modal-sheet');
+    if (sheet) sheet.style.maxHeight = '';
+  }
 });
 
 document.getElementById('ct-start-input').addEventListener('input', updateCtDaysCount);
