@@ -1223,40 +1223,40 @@ const COORDS = {
 
 
 
-// ── Budget journalier indicatif par pays (€/personne/jour, voyageur français, mid-range) ──
-// Mise à jour annuelle recommandée. Priorité : valeurs hardcodées dans COUNTRIES > table > fallback 50.
+// ── Budget journalier indicatif par pays (€/personne/jour, voyageur budget) ──
+// Sources : Budget Your Trip + Topologica/Numbeo 2026 (budget voyageur, hors vols).
+// Mise à jour annuelle recommandée. Priorité : COUNTRIES hardcodé > table > fallback 50.
 var BUDGET_DAILY_TABLE = {
   // Europe occidentale
-  'France':100,'Italie':90,'Espagne':85,'Portugal':75,'Grèce':70,
-  'Allemagne':95,'Pays-Bas':100,'Belgique':90,'Autriche':95,'Suisse':150,
-  'Royaume-Uni':110,'Irlande':100,'Finlande':120,'Suède':125,'Norvège':130,'Danemark':130,
-  'Islande':120,'Malte':80,'Chypre':75,'Luxembourg':110,
+  'France':175,'Italie':155,'Espagne':130,'Portugal':110,'Grèce':135,
+  'Allemagne':160,'Pays-Bas':200,'Belgique':140,'Autriche':150,'Suisse':175,
+  'Royaume-Uni':175,'Irlande':150,'Finlande':130,'Suède':135,'Norvège':135,'Danemark':135,
+  'Islande':95,'Malte':100,'Chypre':90,'Luxembourg':140,
   // Europe centrale & orientale
-  'Pologne':55,'République tchèque':60,'Slovaquie':55,'Hongrie':55,
-  'Roumanie':45,'Bulgarie':40,'Croatie':65,'Slovénie':70,
-  'Serbie':40,'Bosnie-Herzégovine':40,'Monténégro':55,'Albanie':45,'Macédoine du Nord':40,
-  'Kosovo':35,
+  'Pologne':90,'République tchèque':75,'Slovaquie':65,'Hongrie':80,
+  'Roumanie':65,'Bulgarie':55,'Croatie':80,'Slovénie':85,
+  'Serbie':50,'Bosnie-Herzégovine':45,'Monténégro':65,'Albanie':50,'Macédoine du Nord':45,'Kosovo':40,
   // Afrique du Nord & Moyen-Orient
-  'Maroc':35,'Tunisie':35,'Algérie':40,'Égypte':30,'Libye':40,
-  'Turquie':45,'Liban':50,'Jordanie':60,'Israël':100,
-  'Émirats arabes unis':110,'Qatar':120,'Arabie saoudite':90,'Oman':70,'Koweït':100,
+  'Maroc':75,'Tunisie':45,'Algérie':50,'Égypte':60,
+  'Turquie':80,'Liban':55,'Jordanie':95,'Israël':165,
+  'Émirats arabes unis':120,'Qatar':130,'Arabie saoudite':100,'Oman':85,'Koweït':110,
   // Afrique subsaharienne
-  'Sénégal':45,'Cap Vert':55,'Mali':35,'Ghana':45,'Côte d\'Ivoire':50,
-  'Kenya':55,'Tanzanie':55,'Ouganda':50,'Rwanda':70,'Éthiopie':40,
-  'Madagascar':35,'Maurice':90,'Réunion':100,'Afrique du Sud':50,
-  'Namibie':60,'Botswana':70,'Zimbabwe':45,'Mozambique':40,'Zambie':50,
+  'Sénégal':50,'Cap Vert':65,'Mali':40,'Ghana':50,'Côte d\'Ivoire':55,
+  'Kenya':50,'Tanzanie':65,'Ouganda':50,'Rwanda':70,'Éthiopie':30,
+  'Madagascar':35,'Maurice':90,'Réunion':110,'Afrique du Sud':55,
+  'Namibie':65,'Botswana':75,'Zimbabwe':45,'Mozambique':40,'Zambie':50,
   // Asie (compléments hors liste statique)
-  'Malaisie':50,'Singapour':110,'Myanmar':30,'Inde':25,'Sri Lanka':40,
-  'Népal':35,'Bhoutan':200,'Chine':60,'Corée du Sud':65,'Taïwan':55,
-  'Hong Kong':100,'Macao':90,'Mongolie':45,'Kazakhstan':45,'Ouzbékistan':40,
-  'Géorgie':45,'Arménie':40,'Azerbaïdjan':45,
+  'Malaisie':45,'Singapour':130,'Myanmar':30,'Inde':25,'Sri Lanka':40,
+  'Népal':20,'Bhoutan':200,'Chine':110,'Corée du Sud':155,'Taïwan':65,
+  'Hong Kong':120,'Macao':100,'Mongolie':45,'Kazakhstan':45,'Ouzbékistan':40,
+  'Géorgie':40,'Arménie':40,'Azerbaïdjan':45,
   // Amériques
-  'États-Unis':130,'Canada':110,'Mexique':55,'Cuba':50,'République dominicaine':60,
-  'Jamaïque':65,'Costa Rica':70,'Panama':65,'Guatemala':45,'Belize':70,
-  'Colombie':45,'Venezuela':40,'Équateur':45,'Pérou':40,'Bolivie':35,
-  'Brésil':55,'Argentine':40,'Chili':60,'Uruguay':65,'Paraguay':35,
+  'États-Unis':245,'Canada':220,'Mexique':95,'Cuba':55,'République dominicaine':65,
+  'Jamaïque':70,'Costa Rica':80,'Panama':70,'Guatemala':40,'Belize':75,
+  'Colombie':65,'Venezuela':40,'Équateur':55,'Pérou':45,'Bolivie':35,
+  'Brésil':90,'Argentine':80,'Chili':70,'Uruguay':70,'Paraguay':35,
   // Pacifique & Océanie
-  'Australie':130,'Nouvelle-Zélande':120,'Fidji':100,'Polynésie française':150,
+  'Australie':230,'Nouvelle-Zélande':210,'Fidji':100,'Polynésie française':150,
   'Nouvelle-Calédonie':130,'Vanuatu':85,'îles Cook':110,
 };
 
