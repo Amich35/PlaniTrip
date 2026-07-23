@@ -728,7 +728,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ts-trip-item{display:flex;align-items:center;justify-content:space-between;background:#F8F6F2;border-radius:14px;padding:14px;font-size:15px;font-weight:500;color:#1D1D1F;cursor:pointer;margin-bottom:8px;transition:background .15s;}
 .ts-trip-item:hover{background:#F0ECE4;}
 .ts-trip-item .ts-arrow{color:#6E6E73;font-size:14px;}
-.feed-textarea{width:100%;box-sizing:border-box;border:1.5px solid transparent;background:var(--sand);border-radius:16px;padding:13px 14px;font-size:15px;line-height:1.4;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:72px;transition:border-color .2s ease,box-shadow .2s ease;}
+.feed-textarea{width:100%;box-sizing:border-box;border:1.5px solid transparent;background:var(--sand);border-radius:var(--r12);padding:10px 12px;font-size:15px;line-height:1.4;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);resize:none;min-height:42px;transition:border-color .2s ease,box-shadow .2s ease;}
 .feed-textarea::placeholder{color:var(--ink-subtle);}
 .feed-textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,106,79,0.10);background:#fff;}
 .feed-toggle{width:44px;height:26px;border-radius:13px;background:var(--sand-deep);position:relative;flex-shrink:0;cursor:pointer;transition:background .2s ease;}
@@ -6925,8 +6925,8 @@ function renderFeed(){
   var draftTextVal = window._feedDraftText || '';
   var canPublish = !!(draftTextVal.trim() || window._feedDraftPhoto);
   var extraOpen = draftTextVal.trim().length>0 || !!window._feedDraftPhoto;
-  var composer = '<div class="info-card" style="padding:14px 16px 16px">'
-    +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="'+(window._feedDraftPhoto?'Décrire cette photo…':'Partager une nouvelle avec le groupe…')+'" rows="2">'+escHtml(draftTextVal)+'</textarea>'
+  var composer = '<div class="info-card" style="padding:12px 14px 14px">'
+    +'<textarea id="feedTextInput" class="feed-textarea" oninput="onFeedTextInput(this)" placeholder="'+(window._feedDraftPhoto?'Décrire cette photo…':'Partager une nouvelle avec le groupe…')+'" rows="1">'+escHtml(draftTextVal)+'</textarea>'
     +'<div id="feedComposerExtra" class="feed-composer-extra'+(extraOpen?' open':'')+'">'
     +feedPhotoPreview
     +tagChips
