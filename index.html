@@ -10747,6 +10747,7 @@ function submitPostCreateAiKey(){
 // Questionnaire persona (3 questions), pour orienter la future generation du Programme
 // (villes/activites). La saison n'est pas redemandee : deduite des dates deja saisies.
 var _personaAnswers = {pace:'', interests:[], budget:'', withWho:'', reducedMobility:false, dietary:false};
+var _personaValidationError = '';
 function showPostCreatePersonaStep(){
   var optsEl = document.getElementById('postCreateOptions');
   var paceOpts = [['intense','Intense — voir un maximum'],['equilibre','Équilibré'],['detente','Détente']];
@@ -10780,7 +10781,8 @@ function showPostCreatePersonaStep(){
     +'<span style="width:20px;height:20px;border-radius:6px;border:1.5px solid '+(_personaAnswers.dietary?'var(--accent)':'rgba(29,29,31,0.2)')+';background:'+(_personaAnswers.dietary?'var(--accent)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(_personaAnswers.dietary?svgIcon('check',13):'')+'</span>'
     +'<span style="font-size:12.5px;color:var(--ink)">Restrictions alimentaires (végétarien/végan/allergies)</span>'
     +'</label>'
-    +'<button class="modal-cta" style="width:100%;margin-top:4px" onclick="submitPersonaAndGenerate()">Générer mon voyage</button>'
+    +(_personaValidationError ? '<div style="font-size:12px;color:var(--red-muted);margin:6px 2px 0;font-weight:600">'+escHtml(_personaValidationError)+'</div>' : '')
+    +'<button class="modal-cta" style="width:100%;margin-top:10px" onclick="submitPersonaAndGenerate()">Générer mon voyage</button>'
     +'<button style="width:100%;margin-top:10px;padding:12px;border-radius:var(--r12);font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif" onclick="closePostCreateModal()">Annuler</button>'
     +'</div>';
 }
@@ -10793,6 +10795,7 @@ function toggleDietary(){
   showPostCreatePersonaStep();
 }
 function setPersonaAnswer(name, val, multi){
+  _personaValidationError = '';
   if(multi){
     var idx = _personaAnswers[name].indexOf(val);
     if(idx===-1) _personaAnswers[name].push(val); else _personaAnswers[name].splice(idx,1);
@@ -10802,6 +10805,12 @@ function setPersonaAnswer(name, val, multi){
   showPostCreatePersonaStep();
 }
 function submitPersonaAndGenerate(){
+  if(!_personaAnswers.withWho || !_personaAnswers.pace || !_personaAnswers.budget || !_personaAnswers.interests.length){
+    _personaValidationError = 'Merci de répondre à toutes les questions (au moins un centre d\'intérêt) avant de générer.';
+    showPostCreatePersonaStep();
+    return;
+  }
+  _personaValidationError = '';
   S.tripPersona = Object.assign({}, _personaAnswers);
   save();
   runAiTripPrep();
