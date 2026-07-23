@@ -3334,9 +3334,16 @@ async function autofillCountryWithAI(countryId){
         }]
       })
     });
+    if(!resp.ok){
+      var errBody = await resp.text();
+      console.error('[PlaniTrip] autofillCountryWithAI: HTTP '+resp.status, errBody);
+      var errDetail = '';
+      try{ var errJson = JSON.parse(errBody); errDetail = (errJson.error && errJson.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
+      throw new Error('Erreur '+resp.status+' (infos pratiques)'+(errDetail?' — '+errDetail:''));
+    }
     const data = await resp.json();
     const text = extractAiText(data);
-    if(!text) throw new Error('empty response');
+    if(!text) throw new Error('Réponse vide (infos pratiques)');
     const info = deepSanitize(parseAiJson(text));
     // Filet de sécurité : tronque sur mot entier. currency/rate/lang/budget_daily/timezone/phrases
     // ne sont jamais écrasés — seuls les champs dynamiques sont mis à jour.
@@ -3378,6 +3385,7 @@ async function autofillCountryWithAI(countryId){
     renderContent();
   }catch(e){
     if(badge) badge.textContent="Échec de la génération — vérifie ta clé API.";
+    throw e;
   }
 }
 
@@ -10939,7 +10947,7 @@ async function runAiTripPrep(){
       +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Préparation du voyage…</div>'
       +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countriesNeedingInfo[i].flag+' '+countriesNeedingInfo[i].name)+' — recherche des infos pratiques…</div>'
       +'</div>';
-    try{ await autofillCountryWithAI(countriesNeedingInfo[i].id); }catch(e){ genErrors.push(countriesNeedingInfo[i].name+' — infos pratiques : '+(e&&e.message||e)); }
+    try{ await autofillCountryWithAI(countriesNeedingInfo[i].id); }catch(e){ genErrors.push(countriesNeedingInfo[i].name+' : '+(e&&e.message||e)); }
   }
   for(var j=0;j<countriesNeedingProgram.length;j++){
     optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
