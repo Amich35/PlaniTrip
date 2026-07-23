@@ -10476,14 +10476,6 @@ async function openCountryModal() {
 }
 
 document.getElementById('ct-add-country-btn').addEventListener('click', openCountryModal);
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    const sheet = document.querySelector('#ct-country-modal .ct-modal-sheet');
-    if (!sheet || document.getElementById('ct-country-modal').style.display === 'none') return;
-    const vh = window.visualViewport.height;
-    sheet.style.maxHeight = Math.round(vh * 0.9) + 'px';
-  });
-}
 document.getElementById('ct-country-modal-close').addEventListener('click', () => {
   document.getElementById('ct-country-modal').style.display = 'none';
   const sheet = document.querySelector('#ct-country-modal .ct-modal-sheet');
