@@ -2981,10 +2981,8 @@ function openPhotoPicker(query){
   if(resetBtn) resetBtn.style.display = (S.customPhotos && S.customPhotos[query]) ? 'flex' : 'none';
   var pos = (S.customPhotoPos && S.customPhotoPos[query]) || {x:50,y:50,zoom:0};
   var sliderY = document.getElementById('photoPosSliderY');
-  var sliderX = document.getElementById('photoPosSliderX');
   var sliderZ = document.getElementById('photoZoomSlider');
   if(sliderY) sliderY.value = pos.y;
-  if(sliderX) sliderX.value = pos.x;
   if(sliderZ) sliderZ.value = pos.zoom||0;
   var currentUrl = (S.customPhotos && S.customPhotos[query]) || (window._imgCache && window._imgCache[query]) || '';
   var preview = document.getElementById('photoPreviewBox');
@@ -3005,12 +3003,11 @@ function closePhotoPicker(){
 }
 function updatePhotoPos(){
   var sliderY = document.getElementById('photoPosSliderY');
-  var sliderX = document.getElementById('photoPosSliderX');
   var sliderZ = document.getElementById('photoZoomSlider');
   var preview = document.getElementById('photoPreviewBox');
   if(!preview) return;
-  var x = sliderX?sliderX.value:50, y = sliderY?sliderY.value:50, zoom = sliderZ?sliderZ.value:0;
-  preview.style.backgroundPosition = x+'% '+y+'%';
+  var y = sliderY?sliderY.value:50, zoom = sliderZ?sliderZ.value:0;
+  preview.style.backgroundPosition = '50% '+y+'%';
   if(_photoPreviewNatural){
     var size = computeCoverZoomSize(preview.clientWidth, preview.clientHeight, _photoPreviewNatural.w, _photoPreviewNatural.h, zoom);
     if(size) preview.style.backgroundSize = size.w+'px '+size.h+'px';
@@ -3057,32 +3054,30 @@ function handlePhotoFileSelected(e){
 async function confirmPhotoPicker(){
   if(!_photoModalTarget) return;
   var sliderY = document.getElementById('photoPosSliderY');
-  var sliderX = document.getElementById('photoPosSliderX');
   var sliderZ = document.getElementById('photoZoomSlider');
   var posY = sliderY ? parseInt(sliderY.value,10) : 50;
-  var posX = sliderX ? parseInt(sliderX.value,10) : 50;
   var zoom = sliderZ ? parseInt(sliderZ.value,10) : 0;
-  await savePhotoPosition(_photoModalTarget, posX, posY, zoom);
+  await savePhotoPosition(_photoModalTarget, posY, zoom);
   if(_pendingPhotoData){
     await setCustomPhoto(_photoModalTarget, _pendingPhotoData);
   } else {
     closePhotoPicker();
-    applyPhotoPositionToDom(_photoModalTarget, posX, posY, zoom);
+    applyPhotoPositionToDom(_photoModalTarget, posY, zoom);
   }
   _pendingPhotoData = null;
 }
-async function savePhotoPosition(query, posX, posY, zoom){
+async function savePhotoPosition(query, posY, zoom){
   if(!S.customPhotoPos) S.customPhotoPos={};
-  S.customPhotoPos[query] = {x:posX, y:posY, zoom:zoom||0};
+  S.customPhotoPos[query] = {x:50, y:posY, zoom:zoom||0};
   save();
   if(sb && CURRENT_TRIP){
-    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query+'__pos', photo_data:posX+','+posY+','+(zoom||0), updated_at:new Date().toISOString()}); }catch(e){ console.error('[PlaniTrip] sync error (photo position):', e); }
+    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query+'__pos', photo_data:'50,'+posY+','+(zoom||0), updated_at:new Date().toISOString()}); }catch(e){ console.error('[PlaniTrip] sync error (photo position):', e); }
   }
 }
-function applyPhotoPositionToDom(query, posX, posY, zoom){
+function applyPhotoPositionToDom(query, posY, zoom){
   var url = (S.customPhotos && S.customPhotos[query]) || (window._imgCache && window._imgCache[query]) || '';
   document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
-    el.style.backgroundPosition = posX+'% '+posY+'%';
+    el.style.backgroundPosition = '50% '+posY+'%';
     if(url){
       getImgNaturalSize(url, function(sz){
         if(!sz) return;
@@ -3110,7 +3105,7 @@ async function setCustomPhoto(query, url){
     var dImg=document.getElementById('detailImg');
     if(dImg){
       dImg.style.backgroundImage='url(\''+url+'\')';
-      dImg.style.backgroundPosition = ((S.customPhotoPos && S.customPhotoPos[query]) ? S.customPhotoPos[query].x+'% '+S.customPhotoPos[query].y+'%' : '50% 50%');
+      dImg.style.backgroundPosition = ((S.customPhotoPos && S.customPhotoPos[query]) ? '50% '+S.customPhotoPos[query].y+'%' : '50% 50%');
       dImg.textContent='';
     }
   }
@@ -3150,7 +3145,7 @@ function loadPlaceImages(root){
       img.onload=function(){
         el.style.backgroundImage='url(\''+url+'\')';
         var pos = (S.customPhotoPos && S.customPhotoPos[q]) || {x:50,y:50,zoom:0};
-        el.style.backgroundPosition = pos.x+'% '+pos.y+'%';
+        el.style.backgroundPosition = '50% '+pos.y+'%';
         _imgNaturalSize[url] = {w:img.naturalWidth||1, h:img.naturalHeight||1};
         if(pos.zoom){
           var size = computeCoverZoomSize(el.clientWidth, el.clientHeight, img.naturalWidth, img.naturalHeight, pos.zoom);
@@ -11520,11 +11515,6 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
       <span style="font-size:11px;color:var(--ink-subtle)">Haut</span>
       <input type="range" id="photoPosSliderY" min="0" max="100" value="50" style="flex:1" oninput="updatePhotoPos()"/>
       <span style="font-size:11px;color:var(--ink-subtle)">Bas</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-      <span style="font-size:11px;color:var(--ink-subtle)">Gauche</span>
-      <input type="range" id="photoPosSliderX" min="0" max="100" value="50" style="flex:1" oninput="updatePhotoPos()"/>
-      <span style="font-size:11px;color:var(--ink-subtle)">Droite</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <span style="font-size:11px;color:var(--ink-subtle)">Zoom</span>
