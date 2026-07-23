@@ -9526,15 +9526,18 @@ function removePinFlowApi(){
   });
 }
 
-S.tab = S.tab || 'home';
-document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
-var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
-var _initTabEl = document.getElementById('tab-'+_initActiveTab);
-if(_initTabEl) _initTabEl.classList.add('active');
-renderContent();
-renderIcons();
-updateFeedBadge();
-checkForSharedDataOnLoad();
+try{
+  var VALID_TABS = ['home','today','countries','country','cityDetail','favorites','_manageTrip','feed','budget','documents','journal','archived-countries','manage-countries','archived-cities','archived-activities','access-management','my-account','more'];
+  S.tab = (S.tab && VALID_TABS.indexOf(S.tab)>-1) ? S.tab : 'home';
+  document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
+  var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var _initTabEl = document.getElementById('tab-'+_initActiveTab);
+  if(_initTabEl) _initTabEl.classList.add('active');
+  renderContent();
+  renderIcons();
+  updateFeedBadge();
+  checkForSharedDataOnLoad();
+}catch(e){ console.error('[PlaniTrip] erreur au rendu initial (non bloquante):', e); }
 
 // ── PULL TO REFRESH (fonctionne aussi en PWA standalone) ──
 (function(){
