@@ -2937,6 +2937,8 @@ async function fetchPlaceImage(query){
 // ── CUSTOM PHOTO OVERRIDE (manual upload / URL, bypasses auto-fetch) ──
 var _photoModalTarget = null;
 var _currentDetailQuery = null;
+var _pendingPhotoData = null; // photo pas encore enregistrée, en attente de validation avec sa position
+if(!S.customPhotoPos) S.customPhotoPos={};
 function jsStrEsc(str){ return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function photoEditBtn(query, posStyle){
   var pos = posStyle || 'position:absolute;bottom:10px;right:10px;';
@@ -2948,13 +2950,37 @@ function photoEditBtn(query, posStyle){
 }
 function openPhotoPicker(query){
   _photoModalTarget = query;
+  _pendingPhotoData = null;
   var urlInput = document.getElementById('photoUrlInput');
   if(urlInput) urlInput.value='';
   var resetBtn = document.getElementById('photoResetBtn');
   if(resetBtn) resetBtn.style.display = (S.customPhotos && S.customPhotos[query]) ? 'flex' : 'none';
+  var posY = (S.customPhotoPos && S.customPhotoPos[query]!=null) ? S.customPhotoPos[query] : 50;
+  var slider = document.getElementById('photoPosSlider');
+  if(slider) slider.value = posY;
+  var currentUrl = (S.customPhotos && S.customPhotos[query]) || (window._imgCache && window._imgCache[query]) || '';
+  var preview = document.getElementById('photoPreviewBox');
+  if(preview){
+    preview.style.backgroundImage = currentUrl ? 'url(\''+currentUrl+'\')' : 'none';
+    preview.style.backgroundPosition = 'center '+posY+'%';
+  }
   document.getElementById('photoModal').classList.add('open');
 }
-function closePhotoPicker(){ document.getElementById('photoModal').classList.remove('open'); }
+function closePhotoPicker(){
+  document.getElementById('photoModal').classList.remove('open');
+  _pendingPhotoData = null;
+}
+function updatePhotoPos(val){
+  var preview = document.getElementById('photoPreviewBox');
+  if(preview) preview.style.backgroundPosition = 'center '+val+'%';
+}
+function previewPhotoUrl(){
+  var url = (document.getElementById('photoUrlInput').value||'').trim();
+  if(!url) return;
+  _pendingPhotoData = url;
+  var preview = document.getElementById('photoPreviewBox');
+  if(preview) preview.style.backgroundImage = 'url(\''+url+'\')';
+}
 function triggerPhotoFileInput(){ document.getElementById('photoFileInput').click(); }
 function handlePhotoFileSelected(e){
   var file = e.target.files && e.target.files[0];
@@ -2971,17 +2997,40 @@ function handlePhotoFileSelected(e){
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       var compressed = canvas.toDataURL('image/jpeg', 0.7);
-      setCustomPhoto(_photoModalTarget, compressed);
+      _pendingPhotoData = compressed;
+      var preview = document.getElementById('photoPreviewBox');
+      if(preview) preview.style.backgroundImage = 'url(\''+compressed+'\')';
     };
     img.src = evt.target.result;
   };
   reader.readAsDataURL(file);
   e.target.value='';
 }
-function useCustomPhotoUrl(){
-  var url = (document.getElementById('photoUrlInput').value||'').trim();
-  if(!url || !_photoModalTarget) return;
-  setCustomPhoto(_photoModalTarget, url);
+async function confirmPhotoPicker(){
+  if(!_photoModalTarget) return;
+  var slider = document.getElementById('photoPosSlider');
+  var posY = slider ? parseInt(slider.value,10) : 50;
+  await savePhotoPosition(_photoModalTarget, posY);
+  if(_pendingPhotoData){
+    await setCustomPhoto(_photoModalTarget, _pendingPhotoData);
+  } else {
+    closePhotoPicker();
+    applyPhotoPositionToDom(_photoModalTarget, posY);
+  }
+  _pendingPhotoData = null;
+}
+async function savePhotoPosition(query, posY){
+  if(!S.customPhotoPos) S.customPhotoPos={};
+  S.customPhotoPos[query] = posY;
+  save();
+  if(sb && CURRENT_TRIP){
+    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query+'__posY', photo_data:String(posY), updated_at:new Date().toISOString()}); }catch(e){ console.error('[PlaniTrip] sync error (photo position):', e); }
+  }
+}
+function applyPhotoPositionToDom(query, posY){
+  document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
+    el.style.backgroundPosition = 'center '+posY+'%';
+  });
 }
 async function setCustomPhoto(query, url){
   if(!S.customPhotos) S.customPhotos={};
@@ -2999,7 +3048,11 @@ async function setCustomPhoto(query, url){
   setTimeout(function(){ loadPlaceImages(); },50);
   if(_currentDetailQuery===query){
     var dImg=document.getElementById('detailImg');
-    if(dImg){ dImg.style.backgroundImage='url(\''+url+'\')'; dImg.textContent=''; }
+    if(dImg){
+      dImg.style.backgroundImage='url(\''+url+'\')';
+      dImg.style.backgroundPosition = 'center '+((S.customPhotoPos && S.customPhotoPos[query]!=null) ? S.customPhotoPos[query] : 50)+'%';
+      dImg.textContent='';
+    }
   }
 }
 async function resetCustomPhoto(){
@@ -3036,6 +3089,8 @@ function loadPlaceImages(root){
       var img=new Image();
       img.onload=function(){
         el.style.backgroundImage='url(\''+url+'\')';
+        var posY = (S.customPhotoPos && S.customPhotoPos[q]!=null) ? S.customPhotoPos[q] : 50;
+        el.style.backgroundPosition = 'center '+posY+'%';
         el.classList.add('has-photo');
       };
       img.src=url;
@@ -9969,8 +10024,13 @@ async function loadCustomPhotos(){
   // pour eviter qu'une photo supprimee (reset) ne survive dans le localStorage,
   // et pour garantir que les photos posees par un autre voyageur sont bien recues.
   S.customPhotos = {};
+  S.customPhotoPos = {};
   (data||[]).forEach(function(row){
-    S.customPhotos[row.query] = row.photo_data;
+    if(row.query && row.query.slice(-6)==='__posY'){
+      S.customPhotoPos[row.query.slice(0,-6)] = parseInt(row.photo_data,10)||50;
+    } else {
+      S.customPhotos[row.query] = row.photo_data;
+    }
   });
   save();
 }
@@ -11382,10 +11442,16 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   <div class="share-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title" style="font-size:18px">Changer la photo</div>
-    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px;line-height:1.5">Remplace la photo automatique par une photo de ton choix (stockée sur cet appareil).</div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5">Remplace la photo automatique par une photo de ton choix (stockée sur cet appareil).</div>
+    <div id="photoPreviewBox" style="width:100%;height:140px;border-radius:var(--r16);background:var(--sand-deep,#F0ECE4) center/cover no-repeat;margin-bottom:8px;background-position:center 50%;"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <span style="font-size:11px;color:var(--ink-subtle)">Haut</span>
+      <input type="range" id="photoPosSlider" min="0" max="100" value="50" style="flex:1" oninput="updatePhotoPos(this.value)"/>
+      <span style="font-size:11px;color:var(--ink-subtle)">Bas</span>
+    </div>
     <button class="modal-cta" onclick="triggerPhotoFileInput()" style="margin-bottom:8px">Choisir depuis la galerie</button>
-    <input class="modal-field" type="text" id="photoUrlInput" placeholder="ou colle une URL d'image…" style="margin-bottom:8px"/>
-    <button class="modal-cta" onclick="useCustomPhotoUrl()" style="margin-bottom:8px">Utiliser cette URL</button>
+    <input class="modal-field" type="text" id="photoUrlInput" placeholder="ou colle une URL d'image…" style="margin-bottom:8px" oninput="previewPhotoUrl()"/>
+    <button class="modal-cta" onclick="confirmPhotoPicker()" style="margin-bottom:8px">Enregistrer</button>
     <button class="modal-cancel-btn" id="photoResetBtn" onclick="resetCustomPhoto()" style="display:none;color:var(--red-muted);margin-bottom:4px;align-items:center;justify-content:center;gap:5px"><span data-icon="rotate-ccw" data-icon-size="13"></span> Revenir à la photo automatique</button>
     <button class="modal-cancel-btn" onclick="closePhotoPicker()">Annuler</button>
   </div>
