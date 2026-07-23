@@ -9239,12 +9239,21 @@ function renderContent(){
   // delete handled via inline onclick
   bindDragEvents();
   setTimeout(renderIcons, 10);
-  setTimeout(function(){ loadPlaceImages(document.getElementById('mainContent')); }, 30);
+  setTimeout(function(){
+    loadPlaceImages(document.getElementById('mainContent'));
+    if(screenChanged){
+      var mainEl2 = document.getElementById('mainContent');
+      if(mainEl2) mainEl2.scrollTop = 0;
+    }
+  }, 30);
   updateTopBarSub();
   syncActiveNavTab();
   if(screenChanged){
     var mainEl = document.getElementById('mainContent');
     if(mainEl) mainEl.scrollTop = 0;
+    window.scrollTo(0,0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }
 }
 
