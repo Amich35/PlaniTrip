@@ -1222,6 +1222,44 @@ const COORDS = {
 
 
 
+
+// ── Budget journalier indicatif par pays (€/personne/jour, voyageur français, mid-range) ──
+// Mise à jour annuelle recommandée. Priorité : valeurs hardcodées dans COUNTRIES > table > fallback 50.
+var BUDGET_DAILY_TABLE = {
+  // Europe occidentale
+  'France':100,'Italie':90,'Espagne':85,'Portugal':75,'Grèce':70,
+  'Allemagne':95,'Pays-Bas':100,'Belgique':90,'Autriche':95,'Suisse':150,
+  'Royaume-Uni':110,'Irlande':100,'Finlande':120,'Suède':125,'Norvège':130,'Danemark':130,
+  'Islande':120,'Malte':80,'Chypre':75,'Luxembourg':110,
+  // Europe centrale & orientale
+  'Pologne':55,'République tchèque':60,'Slovaquie':55,'Hongrie':55,
+  'Roumanie':45,'Bulgarie':40,'Croatie':65,'Slovénie':70,
+  'Serbie':40,'Bosnie-Herzégovine':40,'Monténégro':55,'Albanie':45,'Macédoine du Nord':40,
+  'Kosovo':35,
+  // Afrique du Nord & Moyen-Orient
+  'Maroc':35,'Tunisie':35,'Algérie':40,'Égypte':30,'Libye':40,
+  'Turquie':45,'Liban':50,'Jordanie':60,'Israël':100,
+  'Émirats arabes unis':110,'Qatar':120,'Arabie saoudite':90,'Oman':70,'Koweït':100,
+  // Afrique subsaharienne
+  'Sénégal':45,'Cap Vert':55,'Mali':35,'Ghana':45,'Côte d\'Ivoire':50,
+  'Kenya':55,'Tanzanie':55,'Ouganda':50,'Rwanda':70,'Éthiopie':40,
+  'Madagascar':35,'Maurice':90,'Réunion':100,'Afrique du Sud':50,
+  'Namibie':60,'Botswana':70,'Zimbabwe':45,'Mozambique':40,'Zambie':50,
+  // Asie (compléments hors liste statique)
+  'Malaisie':50,'Singapour':110,'Myanmar':30,'Inde':25,'Sri Lanka':40,
+  'Népal':35,'Bhoutan':200,'Chine':60,'Corée du Sud':65,'Taïwan':55,
+  'Hong Kong':100,'Macao':90,'Mongolie':45,'Kazakhstan':45,'Ouzbékistan':40,
+  'Géorgie':45,'Arménie':40,'Azerbaïdjan':45,
+  // Amériques
+  'États-Unis':130,'Canada':110,'Mexique':55,'Cuba':50,'République dominicaine':60,
+  'Jamaïque':65,'Costa Rica':70,'Panama':65,'Guatemala':45,'Belize':70,
+  'Colombie':45,'Venezuela':40,'Équateur':45,'Pérou':40,'Bolivie':35,
+  'Brésil':55,'Argentine':40,'Chili':60,'Uruguay':65,'Paraguay':35,
+  // Pacifique & Océanie
+  'Australie':130,'Nouvelle-Zélande':120,'Fidji':100,'Polynésie française':150,
+  'Nouvelle-Calédonie':130,'Vanuatu':85,'îles Cook':110,
+};
+
 const COUNTRIES=[
   {id:'jp',flag:'🇯🇵',name:'Japon',tagline:'Temples, pixels & Mont Fuji',dates:'10–24 sept',days:14,color:'#3D1C12',currency:'Yen (¥)',rate:'1€ = 155¥',rateNum:155,visa:'Non (≤ 90 jours)',lang:'Japonais',budget_daily:70,
     alerts:[
@@ -9549,7 +9587,7 @@ function applyTripCountryFilter(trip) {
       const phrasesGuess = getPhrasesForLanguage(langGuess);
       const newCountry = {
         id: id, flag: flagEmoji, name: countryName, tagline: '', dates: 'À définir', days: 0, color: '#2D2D2D',
-        currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier', lang: langGuess, budget_daily: 50,
+        currency: currencyGuess, rate: (rateGuess ? ('1€ = '+rateGuess+' '+(currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1]) : ''), rateNum: rateGuess, visa: 'À vérifier', lang: langGuess, budget_daily: (BUDGET_DAILY_TABLE[countryName] || 50),
         timezone: (tzGuess && tzGuess!=='0h') ? (tzGuess+' par rapport à la France') : (tzGuess==='0h' ? 'Identique à la France' : ''),
         alerts: [], weather: [], cities: [], photo: [], practical: {transport:'', sim:'', tips:[], emergency:[], checklist:[], phrases:phrasesGuess}
       };
