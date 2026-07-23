@@ -5048,10 +5048,12 @@ function renderToday(){
   } else {
     heroSubText = (ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
   }
-  var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'" style="margin-bottom:12px">'
+  var heroClickable = !!c;
+  var heroHref = heroClickable ? ' onclick="openCountryDetail(\''+jsStrEsc(c.id)+'\',\'guide\')" style="margin-bottom:12px;cursor:pointer"' : ' style="margin-bottom:12px"';
+  var heroHTML = '<div class="home-hero" data-img-query="'+escHtml(heroQuery)+'"'+heroHref+'>'
     +photoEditBtn(heroQuery)
     +'<div class="home-hero-overlay"><div class="home-hero-greeting">'+(c?c.name+' '+c.flag:'Ton voyage')+'</div>'
-    +'<div class="home-hero-sub">'+heroSubText+'</div>'
+    +'<div class="home-hero-sub">'+heroSubText+(heroClickable?' '+svgIcon('chevron-right',14):'')+' </div>'
     +'</div></div>';
 
   // ── Encart résumé du jour (jour X/Y, météo, budget, activités) — badges modernes ──
