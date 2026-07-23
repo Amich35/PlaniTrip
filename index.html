@@ -10546,18 +10546,7 @@ async function openAddCountryToTripModal() {
       optionsEl.appendChild(opt);
     });
     const typed = (filter || '').trim();
-    if (typed && !filtered.some(c => normCountryStr(c) === f)) {
-      const custom = document.createElement('div');
-      custom.className = 'ct-country-option';
-      custom.style.cssText = 'color:var(--green,#2D6A4F);font-weight:600;';
-      custom.textContent = 'Ajouter « ' + typed + ' » comme nouveau pays';
-      custom.addEventListener('click', async () => {
-        modal.style.display = 'none';
-        await addCountryToCurrentTrip(typed);
-      });
-      optionsEl.appendChild(custom);
-    }
-    if (filtered.length === 0 && !typed) {
+    if (filtered.length === 0){
       optionsEl.innerHTML = '<div class="ct-country-option" style="color:#6E6E73;">Aucun résultat</div>';
     }
   }
@@ -10606,20 +10595,7 @@ async function openCountryModal() {
       });
       optionsEl.appendChild(opt);
     });
-    const typed = (filter || '').trim();
-    if (typed && !filtered.some(c => normCountryStr(c) === f)) {
-      const custom = document.createElement('div');
-      custom.className = 'ct-country-option';
-      custom.style.cssText = 'color:var(--green,#2D6A4F);font-weight:600;';
-      custom.textContent = 'Ajouter « ' + typed + ' » comme nouveau pays';
-      custom.addEventListener('click', () => {
-        CT_COUNTRIES.push(typed);
-        renderCtCountries();
-        modal.style.display = 'none';
-      });
-      optionsEl.appendChild(custom);
-    }
-    if (filtered.length === 0 && !typed) {
+    if (filtered.length === 0){
       optionsEl.innerHTML = '<div class="ct-country-option" style="color:#6E6E73;">Aucun résultat</div>';
     }
   }
