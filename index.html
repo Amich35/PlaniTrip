@@ -2189,9 +2189,9 @@ function toggleFavorite(k){
     var countryId = k.split('_')[0];
     if(S.favorites[k]){
       var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-      sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(){});
+      sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     } else {
-      sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(){});
+      sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
   }
   renderContent();
@@ -2204,9 +2204,9 @@ function toggleCL(k){
     var countryId = k.split('_')[0];
     if(S.checklist[k]){
       var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-      sb.from('checklist_items').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(){});
+      sb.from('checklist_items').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     } else {
-      sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(){});
+      sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
   }
   renderContent();
@@ -2557,7 +2557,7 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     };
     S.customDetails = window._customDetails;
     if(sb && CURRENT_TRIP){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:detailKey, data:window._customDetails[detailKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:detailKey, data:window._customDetails[detailKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
     if(info.lat && info.lng) COORDS[detailKey] = [info.lat, info.lng, actName];
     if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
@@ -2648,7 +2648,7 @@ function saveAccom(ck) {
   save();
   if(sb && CURRENT_TRIP){
     var countryId = ck.split('_')[0];
-    sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(){});
+    sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
   document.getElementById('accomModal').classList.remove('open');
   renderContent();
@@ -2683,7 +2683,7 @@ function shiftActivityDatesForCity(ck, oldRange, newRange){
     if(newDate!==d){ S.actDate[k] = newDate; changed = true; }
   });
   if(changed && sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function deleteAccomEntry(ck, id){
@@ -2699,7 +2699,7 @@ function deleteAccomEntry(ck, id){
     renderContent();
     if(sb && CURRENT_TRIP){
       var countryId = ck.split('_')[0];
-      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(){});
+      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
   }, 'Supprimer');
 }
@@ -2840,7 +2840,7 @@ function saveAccomTravelersModal(){
     save();
     if(sb && CURRENT_TRIP){
       var countryId = _accomTravelersCk.split('_')[0];
-      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:_accomTravelersCk, country_id:countryId, data:list, updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'}).then(function(){});
+      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:_accomTravelersCk, country_id:countryId, data:list, updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
   }
   closeGuideItemModal();
@@ -3071,7 +3071,7 @@ function removeDay(ck) {
   if(S.activeDay[ck]===last) S.activeDay[ck]= days.length>1 ? days[days.length-1] : 'Tous';
   save(); renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function setActiveDay(ck, day) { S.activeDay[ck]=day; save(); renderContent(); }
@@ -3080,7 +3080,7 @@ function assignDay(actKey, ck, day) {
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 
@@ -3216,9 +3216,9 @@ function _createActivityCore(cityKey, val, opts){
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(){});
+    sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     if(opts.date){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
   }
 }
@@ -3493,7 +3493,7 @@ function saveCountryEdit(countryId){
   };
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()},{onConflict:'trip_id,country_id'}).then(function(){});
+    sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()},{onConflict:'trip_id,country_id'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function toLocalISODate(d){
@@ -3595,7 +3595,7 @@ function editCityDateRange(ck, startVal, endVal){
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 // Dates réelles d'un pays = étendue min/max des séjours réels de ses villes (logements),
@@ -5442,7 +5442,7 @@ function setActivityDate(actKey, dateVal){
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 
@@ -6028,7 +6028,7 @@ function setMyCountryBudget(countryId, amount){
   // (perte de focus/curseur, donc impossible de taper plus d'un chiffre). L'écran se rafraîchira
   // naturellement à la prochaine navigation.
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__travelerBudget_'+countryId,data:S.travelerBudgets[countryId],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__travelerBudget_'+countryId,data:S.travelerBudgets[countryId],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function getPeopleList(){
@@ -7048,14 +7048,14 @@ function addJournalEntry(){
   renderContent();
   if(sb && CURRENT_TRIP){
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    sb.from('journal_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,entry_date:date,text_content:text,location:location,photo:photo,added_by_label:who}).then(function(){});
+    sb.from('journal_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,entry_date:date,text_content:text,location:location,photo:photo,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function deleteJournalEntry(id){
   showConfirm('Supprimer cette entrée du carnet ?', function(){
     S.journal=S.journal.filter(function(e){return e.id!==id;});
     save(); renderContent();
-    if(sb && CURRENT_TRIP) sb.from('journal_entries').delete().eq('trip_id',CURRENT_TRIP.id).eq('id', id).then(function(){});
+    if(sb && CURRENT_TRIP) sb.from('journal_entries').delete().eq('trip_id',CURRENT_TRIP.id).eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }, 'Supprimer');
 }
 function renderCarnetScreen(){
@@ -7440,7 +7440,7 @@ function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return;
 function delExp(id){
   showConfirm('Supprimer cette dépense ?', function(){
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
-    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(){});
+    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     save();renderContent();
   }, 'Supprimer');
 }
@@ -7457,7 +7457,7 @@ function markAsReimbursed(fromPerson, toPerson, amount){
     S.expenses.push(entry);
     save(); renderContent();
     if(sb && CURRENT_TRIP){
-      sb.from('budget_entries').insert({id:newId, trip_id:CURRENT_TRIP.id, country_id:entry.country, city:null, activity:null, category:'reimbursement', description:'Remboursement', amount:amount, person_label:fromPerson, participants:[toPerson], splits:null, entry_date:todayStr}).then(function(){});
+      sb.from('budget_entries').insert({id:newId, trip_id:CURRENT_TRIP.id, country_id:entry.country, city:null, activity:null, category:'reimbursement', description:'Remboursement', amount:amount, person_label:fromPerson, participants:[toPerson], splits:null, entry_date:todayStr}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
   }, 'Confirmer');
 }
@@ -7472,14 +7472,14 @@ function editReimbursement(id){
   e.amount = amt;
   save(); renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('budget_entries').update({amount:amt}).eq('id', id).then(function(){});
+    sb.from('budget_entries').update({amount:amt}).eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function restoreReimbursement(id){
   showConfirm('Annuler ce remboursement ? La dette sera restaurée.', function(){
     S.expenses = S.expenses.filter(function(e){return e.id!==id;});
     save(); renderContent();
-    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(){});
+    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }, 'Restaurer la dette');
 }
 function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
@@ -7766,12 +7766,12 @@ function deleteCity(countryId, cityName){
   if(journalMatches.length){
     var idsToRemove = journalMatches.map(function(e){return e.id;});
     S.journal = S.journal.filter(function(e){return idsToRemove.indexOf(e.id)===-1;});
-    if(sb && CURRENT_TRIP) sb.from('journal_entries').delete().in('id', idsToRemove).then(function(){});
+    if(sb && CURRENT_TRIP) sb.from('journal_entries').delete().in('id', idsToRemove).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
   if(expenseMatches.length){
     var expIdsToRemove = expenseMatches.map(function(e){return e.id;});
     S.expenses = S.expenses.filter(function(e){return expIdsToRemove.indexOf(e.id)===-1;});
-    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().in('id', expIdsToRemove).then(function(){});
+    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().in('id', expIdsToRemove).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
   if(S.cityOrder) delete S.cityOrder[countryId];
 
@@ -7779,9 +7779,9 @@ function deleteCity(countryId, cityName){
   renderContent();
   syncDeletedActs(); syncCityOrder();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     // La ville et ses activités personnalisées doivent aussi être supprimées côté serveur,
     // sinon loadCitiesActivities() (serveur autoritaire) les fait réapparaître au chargement suivant.
     sb.from('cities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',countryId).eq('city',cityName).then(function(r){
@@ -7828,15 +7828,15 @@ function restoreCity(trashId){
   renderContent();
   syncDeletedActs(); syncCityOrder();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     // Réinsérer la ville (et ses activités personnalisées) côté serveur, symétriquement à deleteCity()
     var whoRestore=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,added_by_label:whoRestore}).then(function(){});
+    sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,added_by_label:whoRestore}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     (t.customActs||[]).forEach(function(act){
       if(act.custom){
-        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,name:act.n,tip:act.m||null,added_by_label:whoRestore}).then(function(){});
+        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:t.countryId,city:t.cityName,name:act.n,tip:act.m||null,added_by_label:whoRestore}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
       }
     });
   }
@@ -7894,17 +7894,17 @@ if(!S.customDetails) S.customDetails={};
 if(!window._customDetails) window._customDetails=S.customDetails||{};
 function syncActOrder(){
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function syncCityOrder(){
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function syncDeletedActs(){
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(){});
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function getOrder(ck,totalBase,totalCustom){
@@ -8399,11 +8399,11 @@ function deleteCountryPermanently(name){
         else CURRENT_TRIP.archived_countries = archivedCountries;
       });
       if(archivedId){
-        sb.from('cities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
-        sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
-        sb.from('budget_entries').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
-        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
-        sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(){});
+        sb.from('cities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+        sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+        sb.from('budget_entries').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+        sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',archivedId).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
       }
     }
     renderContent();
@@ -9593,7 +9593,7 @@ async function onAuthenticated(user, freshLogin) {
         alert("Ce compte a été supprimé.");
         return;
       }
-      sb.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id).then(function(){});
+      sb.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     } catch(e) { console.warn('[PlaniTrip] profile check failed:', e); }
   }
   checkUserTrips(user, freshLogin);
@@ -10035,12 +10035,12 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     if(trip.owner_email !== CURRENT_USER.email){
       trip.owner_email = CURRENT_USER.email;
       CURRENT_TRIP.owner_email = CURRENT_USER.email;
-      if(sb) sb.from('trips').update({owner_email: CURRENT_USER.email}).eq('id', trip.id).then(function(){});
+      if(sb) sb.from('trips').update({owner_email: CURRENT_USER.email}).eq('id', trip.id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
     if(sb){
       sb.from('profiles').select('id').eq('id', CURRENT_USER.id).maybeSingle().then(function(res){
         if(!res.data){
-          sb.from('profiles').upsert({id:CURRENT_USER.id, email:CURRENT_USER.email, updated_at:new Date().toISOString()}).then(function(){});
+          sb.from('profiles').upsert({id:CURRENT_USER.id, email:CURRENT_USER.email, updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
         }
       });
     }
