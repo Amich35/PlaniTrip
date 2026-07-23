@@ -8549,9 +8549,10 @@ function deleteCountryPermanently(name){
 }
 
 var _lastActiveTrip = null;
+var _lastActiveTab = null;
 async function backToTripSelector() {
   if (!sb || !CURRENT_USER) return;
-  if (CURRENT_TRIP) _lastActiveTrip = CURRENT_TRIP;
+  if (CURRENT_TRIP) { _lastActiveTrip = CURRENT_TRIP; _lastActiveTab = S.tab; }
   document.getElementById('main-app').style.display = 'none';
   CURRENT_TRIP = null;
   localStorage.removeItem('planitrip_last_trip_id');
@@ -10209,9 +10210,13 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
 function returnToPreviousTrip(){
   if(!_lastActiveTrip) return;
   var trip = _lastActiveTrip;
+  var tab = _lastActiveTab;
   _lastActiveTrip = null;
+  _lastActiveTab = null;
   document.getElementById('trip-selector-screen').style.display = 'none';
-  enterTrip(trip, true);
+  enterTrip(trip, false).then(function(){
+    if(tab){ S.tab = tab; save(); renderContent(); }
+  });
 }
 function showTripSelectorScreen(trips) {
   document.getElementById('auth-screen').style.display = 'none';
