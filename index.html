@@ -5039,22 +5039,22 @@ function renderItinerary(c, embedded){
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'
     +'<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px">'
     +(S.apiKey
-      ? '<div class="info-card" style="padding:12px 14px">'
-        +'<div class="ic-header">G\u00e9n\u00e9rer avec l\'IA</div>'
-        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+      ? '<div class="info-card">'
+        +'<div class="ic-header" style="color:var(--accent)">G\u00e9n\u00e9rer avec l\'IA <span data-icon="chevron-right" data-icon-size="12" style="margin-left:auto"></span></div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
         +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',false)" '
-        +'style="padding:8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.25);background:transparent;'
-        +'color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
+        +'style="padding:10px 8px;border-radius:var(--r12);border:none;background:var(--accent);'
+        +'color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
         +'Villes + activit\u00e9s</button>'
         +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',true)" '
-        +'style="padding:8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.25);'
-        +'background:transparent;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
+        +'style="padding:10px 8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.3);'
+        +'background:transparent;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
         +'Villes seules</button>'
         +'</div>'
         +'<div class="status-sub" style="margin-top:8px">Villes et activit\u00e9s \u00e0 partir des dates du pays \u2014 \u00e0 v\u00e9rifier.</div>'
         +'</div>'
-      : '<div class="info-card" style="padding:12px 14px">'
-        +'<div class="ic-header">G\u00e9n\u00e9rer avec l\'IA</div>'
+      : '<div class="info-card">'
+        +'<div class="ic-header" style="color:var(--accent)">G\u00e9n\u00e9rer avec l\'IA</div>'
         +'<div class="status-sub">Cl\u00e9 API requise \u2014 <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
         +'</div>'
     )
@@ -6832,16 +6832,17 @@ function markFeedSeen(){
 function hasFeedNotification(){
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   if(!myEmail) return false;
-  var lastSeen = S.feedLastSeenAt;
+  var lastSeenTs = S.feedLastSeenAt ? new Date(S.feedLastSeenAt).getTime() : 0;
   var seenReactions = S.feedSeenReactionCounts || {};
   return (S.feedPosts||[]).some(function(p){
     var isMine = canonicalPerson(p.author)===myEmail;
+    var createdTs = p.createdAt ? new Date(p.createdAt).getTime() : 0;
     // Nouveau post d'un autre voyageur
-    if(!isMine && (!lastSeen || (p.createdAt && p.createdAt>lastSeen))) return true;
+    if(!isMine && createdTs>lastSeenTs) return true;
     // Nouvelle réaction sur un de mes posts
     if(isMine && (p.reactions||[]).length > (seenReactions[p.id]||0)) return true;
     // Je suis tagué dans un post pas encore vu
-    if(!isMine && (p.tagged||[]).map(canonicalPerson).indexOf(myEmail)>-1 && (!lastSeen || (p.createdAt && p.createdAt>lastSeen))) return true;
+    if(!isMine && (p.tagged||[]).map(canonicalPerson).indexOf(myEmail)>-1 && createdTs>lastSeenTs) return true;
     return false;
   });
 }
@@ -6885,8 +6886,22 @@ function renderFeed(){
     var reactions = p.reactions || [];
     var myReacted = reactions.map(canonicalPerson).indexOf(myEmail)>-1;
     var taggedHTML = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--accent);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
+    var reactorAvatars = '';
+    if(reactions.length){
+      var avColors = ['#4D96FF','#F4A261','#2D6A4F','#E76F51','#95D5B2'];
+      var shown = reactions.slice(0,5);
+      reactorAvatars = '<span style="display:inline-flex;margin-left:2px">'
+        +shown.map(function(email,i){
+          var nm = personDisplayName(email,'Toi');
+          var init = stripHtml(nm).slice(0,2).toUpperCase();
+          return '<span title="'+escHtml(nm)+'" style="width:18px;height:18px;border-radius:50%;background:'+avColors[i%avColors.length]+';border:1.5px solid var(--parchment,#fff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;margin-left:'+(i===0?'0':'-6px')+';flex-shrink:0">'+escHtml(init)+'</span>';
+        }).join('')
+        +(reactions.length>5 ? '<span style="font-size:10px;color:var(--ink-subtle);margin-left:4px;align-self:center">+'+(reactions.length-5)+'</span>' : '')
+        +'</span>';
+    }
     var reactionPill = '<div style="margin-top:8px;display:flex;align-items:center;gap:6px">'
       +'<span onclick="toggleFeedReaction(\''+p.id+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:14px;cursor:pointer;font-size:12.5px;font-weight:600;background:'+(myReacted?'var(--red-pale)':'var(--sand-deep)')+';color:'+(myReacted?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('heart',13)+(reactions.length?(' '+reactions.length):'')+'</span>'
+      +reactorAvatars
       +'</div>';
     return '<div class="info-card" style="padding:14px 16px'+(p.important?';border:1.5px solid var(--red-muted)':'')+'">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
@@ -9678,7 +9693,7 @@ async function initAuth() {
       }
       if (event === 'SIGNED_IN' && session) {
         if (IN_PASSWORD_RECOVERY) return; // en cours de définition de mot de passe : ne pas naviguer
-        if (CURRENT_TRIP && LAST_HANDLED_USER_ID === session.user.id) return; // vrai retour d'onglet : même session déjà chargée, on ignore
+        if (LAST_HANDLED_USER_ID === session.user.id) return; // vrai retour d'onglet : même session déjà en cours de chargement ou chargée, on ignore
         LAST_HANDLED_USER_ID = session.user.id;
         onAuthenticated(session.user, true);
       } else if (event === 'SIGNED_OUT') {
