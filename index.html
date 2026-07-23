@@ -2938,8 +2938,31 @@ async function fetchPlaceImage(query){
 var _photoModalTarget = null;
 var _currentDetailQuery = null;
 var _pendingPhotoData = null; // photo pas encore enregistrée, en attente de validation avec sa position
+var _photoPreviewNatural = null; // {w,h} de l'image actuellement dans la modale de recadrage
+var _imgNaturalSize = {}; // cache url -> {w,h} pour appliquer le meme calcul de cadrage partout
 if(!S.customPhotoPos) S.customPhotoPos={};
 function jsStrEsc(str){ return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function getImgNaturalSize(url, cb){
+  if(_imgNaturalSize[url]){ cb(_imgNaturalSize[url]); return; }
+  var im = new Image();
+  im.onload = function(){
+    var sz = {w:im.naturalWidth||1, h:im.naturalHeight||1};
+    _imgNaturalSize[url] = sz;
+    cb(sz);
+  };
+  im.onerror = function(){ cb(null); };
+  im.src = url;
+}
+// Calcule un background-size en pixels garantissant du jeu de recadrage dans les deux axes,
+// quel que soit le ratio de la photo par rapport a son conteneur (contrairement a background-size:cover
+// qui ne laisse parfois aucune marge dans un des deux axes).
+function computeCoverZoomSize(elW, elH, imgW, imgH, zoom){
+  if(!elW || !elH || !imgW || !imgH) return null;
+  var coverScale = Math.max(elW/imgW, elH/imgH);
+  var zoomFactor = 1 + (Math.max(0,Math.min(100,zoom||0))/100)*1.5; // 0 -> x1 (cover), 100 -> x2.5
+  var scale = coverScale*zoomFactor;
+  return {w:Math.round(imgW*scale), h:Math.round(imgH*scale)};
+}
 function photoEditBtn(query, posStyle){
   var pos = posStyle || 'position:absolute;bottom:10px;right:10px;';
   return '<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="'+pos+'width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;z-index:5;">'
@@ -2951,20 +2974,28 @@ function photoEditBtn(query, posStyle){
 function openPhotoPicker(query){
   _photoModalTarget = query;
   _pendingPhotoData = null;
+  _photoPreviewNatural = null;
   var urlInput = document.getElementById('photoUrlInput');
   if(urlInput) urlInput.value='';
   var resetBtn = document.getElementById('photoResetBtn');
   if(resetBtn) resetBtn.style.display = (S.customPhotos && S.customPhotos[query]) ? 'flex' : 'none';
-  var pos = (S.customPhotoPos && S.customPhotoPos[query]) || {x:50,y:50};
+  var pos = (S.customPhotoPos && S.customPhotoPos[query]) || {x:50,y:50,zoom:0};
   var sliderY = document.getElementById('photoPosSliderY');
   var sliderX = document.getElementById('photoPosSliderX');
+  var sliderZ = document.getElementById('photoZoomSlider');
   if(sliderY) sliderY.value = pos.y;
   if(sliderX) sliderX.value = pos.x;
+  if(sliderZ) sliderZ.value = pos.zoom||0;
   var currentUrl = (S.customPhotos && S.customPhotos[query]) || (window._imgCache && window._imgCache[query]) || '';
   var preview = document.getElementById('photoPreviewBox');
   if(preview){
     preview.style.backgroundImage = currentUrl ? 'url(\''+currentUrl+'\')' : 'none';
-    preview.style.backgroundPosition = pos.x+'% '+pos.y+'%';
+    if(currentUrl){
+      getImgNaturalSize(currentUrl, function(sz){
+        _photoPreviewNatural = sz;
+        updatePhotoPos();
+      });
+    }
   }
   document.getElementById('photoModal').classList.add('open');
 }
@@ -2975,8 +3006,15 @@ function closePhotoPicker(){
 function updatePhotoPos(){
   var sliderY = document.getElementById('photoPosSliderY');
   var sliderX = document.getElementById('photoPosSliderX');
+  var sliderZ = document.getElementById('photoZoomSlider');
   var preview = document.getElementById('photoPreviewBox');
-  if(preview) preview.style.backgroundPosition = (sliderX?sliderX.value:50)+'% '+(sliderY?sliderY.value:50)+'%';
+  if(!preview) return;
+  var x = sliderX?sliderX.value:50, y = sliderY?sliderY.value:50, zoom = sliderZ?sliderZ.value:0;
+  preview.style.backgroundPosition = x+'% '+y+'%';
+  if(_photoPreviewNatural){
+    var size = computeCoverZoomSize(preview.clientWidth, preview.clientHeight, _photoPreviewNatural.w, _photoPreviewNatural.h, zoom);
+    if(size) preview.style.backgroundSize = size.w+'px '+size.h+'px';
+  }
 }
 function previewPhotoUrl(){
   var url = (document.getElementById('photoUrlInput').value||'').trim();
@@ -2984,6 +3022,10 @@ function previewPhotoUrl(){
   _pendingPhotoData = url;
   var preview = document.getElementById('photoPreviewBox');
   if(preview) preview.style.backgroundImage = 'url(\''+url+'\')';
+  getImgNaturalSize(url, function(sz){
+    _photoPreviewNatural = sz;
+    updatePhotoPos();
+  });
 }
 function triggerPhotoFileInput(){ document.getElementById('photoFileInput').click(); }
 function handlePhotoFileSelected(e){
@@ -3002,8 +3044,10 @@ function handlePhotoFileSelected(e){
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       var compressed = canvas.toDataURL('image/jpeg', 0.7);
       _pendingPhotoData = compressed;
+      _photoPreviewNatural = {w:canvas.width, h:canvas.height};
       var preview = document.getElementById('photoPreviewBox');
       if(preview) preview.style.backgroundImage = 'url(\''+compressed+'\')';
+      updatePhotoPos();
     };
     img.src = evt.target.result;
   };
@@ -3014,28 +3058,38 @@ async function confirmPhotoPicker(){
   if(!_photoModalTarget) return;
   var sliderY = document.getElementById('photoPosSliderY');
   var sliderX = document.getElementById('photoPosSliderX');
+  var sliderZ = document.getElementById('photoZoomSlider');
   var posY = sliderY ? parseInt(sliderY.value,10) : 50;
   var posX = sliderX ? parseInt(sliderX.value,10) : 50;
-  await savePhotoPosition(_photoModalTarget, posX, posY);
+  var zoom = sliderZ ? parseInt(sliderZ.value,10) : 0;
+  await savePhotoPosition(_photoModalTarget, posX, posY, zoom);
   if(_pendingPhotoData){
     await setCustomPhoto(_photoModalTarget, _pendingPhotoData);
   } else {
     closePhotoPicker();
-    applyPhotoPositionToDom(_photoModalTarget, posX, posY);
+    applyPhotoPositionToDom(_photoModalTarget, posX, posY, zoom);
   }
   _pendingPhotoData = null;
 }
-async function savePhotoPosition(query, posX, posY){
+async function savePhotoPosition(query, posX, posY, zoom){
   if(!S.customPhotoPos) S.customPhotoPos={};
-  S.customPhotoPos[query] = {x:posX, y:posY};
+  S.customPhotoPos[query] = {x:posX, y:posY, zoom:zoom||0};
   save();
   if(sb && CURRENT_TRIP){
-    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query+'__pos', photo_data:posX+','+posY, updated_at:new Date().toISOString()}); }catch(e){ console.error('[PlaniTrip] sync error (photo position):', e); }
+    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query+'__pos', photo_data:posX+','+posY+','+(zoom||0), updated_at:new Date().toISOString()}); }catch(e){ console.error('[PlaniTrip] sync error (photo position):', e); }
   }
 }
-function applyPhotoPositionToDom(query, posX, posY){
+function applyPhotoPositionToDom(query, posX, posY, zoom){
+  var url = (S.customPhotos && S.customPhotos[query]) || (window._imgCache && window._imgCache[query]) || '';
   document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
     el.style.backgroundPosition = posX+'% '+posY+'%';
+    if(url){
+      getImgNaturalSize(url, function(sz){
+        if(!sz) return;
+        var size = computeCoverZoomSize(el.clientWidth, el.clientHeight, sz.w, sz.h, zoom);
+        if(size) el.style.backgroundSize = size.w+'px '+size.h+'px';
+      });
+    }
   });
 }
 async function setCustomPhoto(query, url){
@@ -3095,8 +3149,15 @@ function loadPlaceImages(root){
       var img=new Image();
       img.onload=function(){
         el.style.backgroundImage='url(\''+url+'\')';
-        var pos = (S.customPhotoPos && S.customPhotoPos[q]) || {x:50,y:50};
+        var pos = (S.customPhotoPos && S.customPhotoPos[q]) || {x:50,y:50,zoom:0};
         el.style.backgroundPosition = pos.x+'% '+pos.y+'%';
+        _imgNaturalSize[url] = {w:img.naturalWidth||1, h:img.naturalHeight||1};
+        if(pos.zoom){
+          var size = computeCoverZoomSize(el.clientWidth, el.clientHeight, img.naturalWidth, img.naturalHeight, pos.zoom);
+          if(size) el.style.backgroundSize = size.w+'px '+size.h+'px';
+        } else {
+          el.style.backgroundSize = 'cover';
+        }
         el.classList.add('has-photo');
       };
       img.src=url;
@@ -10033,12 +10094,12 @@ async function loadCustomPhotos(){
   S.customPhotoPos = {};
   (data||[]).forEach(function(row){
     if(row.query && row.query.slice(-5)==='__pos'){
-      var parts = String(row.photo_data||'50,50').split(',');
-      S.customPhotoPos[row.query.slice(0,-5)] = {x:parseInt(parts[0],10)||50, y:parseInt(parts[1],10)||50};
+      var parts = String(row.photo_data||'50,50,0').split(',');
+      S.customPhotoPos[row.query.slice(0,-5)] = {x:parseInt(parts[0],10)||50, y:parseInt(parts[1],10)||50, zoom:parseInt(parts[2],10)||0};
     } else if(row.query && row.query.slice(-6)==='__posY'){
       // ancien format (position verticale uniquement), migré à la volée
       var base = row.query.slice(0,-6);
-      if(!S.customPhotoPos[base]) S.customPhotoPos[base] = {x:50, y:parseInt(row.photo_data,10)||50};
+      if(!S.customPhotoPos[base]) S.customPhotoPos[base] = {x:50, y:parseInt(row.photo_data,10)||50, zoom:0};
     } else {
       S.customPhotos[row.query] = row.photo_data;
     }
@@ -11464,6 +11525,11 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
       <span style="font-size:11px;color:var(--ink-subtle)">Gauche</span>
       <input type="range" id="photoPosSliderX" min="0" max="100" value="50" style="flex:1" oninput="updatePhotoPos()"/>
       <span style="font-size:11px;color:var(--ink-subtle)">Droite</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <span style="font-size:11px;color:var(--ink-subtle)">Zoom</span>
+      <input type="range" id="photoZoomSlider" min="0" max="100" value="0" style="flex:1" oninput="updatePhotoPos()"/>
+      <span style="font-size:11px;color:var(--ink-subtle)">+</span>
     </div>
     <button class="modal-cta" onclick="triggerPhotoFileInput()" style="margin-bottom:8px">Choisir depuis la galerie</button>
     <input class="modal-field" type="text" id="photoUrlInput" placeholder="ou colle une URL d'image…" style="margin-bottom:8px" oninput="previewPhotoUrl()"/>
