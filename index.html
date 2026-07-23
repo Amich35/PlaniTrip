@@ -10939,7 +10939,7 @@ async function runAiTripPrep(){
       +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Préparation du voyage…</div>'
       +'<div style="font-size:13px;color:var(--ink-subtle)">'+escHtml(countriesNeedingInfo[i].flag+' '+countriesNeedingInfo[i].name)+' — recherche des infos pratiques…</div>'
       +'</div>';
-    try{ await autofillCountryWithAI(countriesNeedingInfo[i].id); }catch(e){}
+    try{ await autofillCountryWithAI(countriesNeedingInfo[i].id); }catch(e){ genErrors.push(countriesNeedingInfo[i].name+' — infos pratiques : '+(e&&e.message||e)); }
   }
   for(var j=0;j<countriesNeedingProgram.length;j++){
     optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
@@ -10963,12 +10963,14 @@ async function runAiTripPrep(){
       +genErrors.map(function(e){ return '<div style="font-size:11.5px;color:var(--ink-subtle);margin-bottom:2px">• '+escHtml(e)+'</div>'; }).join('')
       +'</div>'
     : '';
+  var success = !genErrors.length;
   optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:28px 16px">'
-    +'<div style="color:var(--accent);margin-bottom:10px">'+svgIcon('check',28)+'</div>'
-    +'<div style="font-size:14px;font-weight:600;color:var(--ink)">Voyage prêt !</div>'
+    +'<div style="color:'+(success?'var(--accent)':'var(--red-muted)')+';margin-bottom:10px">'+svgIcon(success?'check':'triangle-alert',28)+'</div>'
+    +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+(success?'Voyage prêt !':'Voyage créé, génération incomplète')+'</div>'
     +errBlock
+    +(success?'':'<button class="modal-cta" style="width:100%;margin-top:14px" onclick="closePostCreateModal()">OK, j\'irai régénérer plus tard</button>')
     +'</div>';
-  if(!genErrors.length) setTimeout(closePostCreateModal, 900);
+  if(success) setTimeout(closePostCreateModal, 900);
 }
 
 document.getElementById('auth-send-link-btn').addEventListener('click', async () => {
