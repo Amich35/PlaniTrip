@@ -3989,8 +3989,8 @@ function openGuideItemModal(countryId, listField, idx){
     document.getElementById('guideItemModalBody').innerHTML=
       '<div class="ef-row" style="margin-bottom:4px"><input class="ef-input" id="guideModalCityName" type="text" placeholder="Nom de la ville" style="width:100%" autocomplete="off" oninput="showCityNameSuggestions(\''+jsStrEsc(countryId)+'\')"/></div>'
       +'<div class="suggestions-list" id="guideModalCitySuggestions" style="position:static;margin-bottom:8px"></div>'
-      +'<div class="ef-row" style="gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div>'+dateTripleHTML('guideModalCityDateStart', cityAnchor||'')+'</div>'
-      +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div>'+dateTripleHTML('guideModalCityDateEnd', '')+'</div></div>';
+      +'<div class="ef-row" style="flex-direction:column;align-items:stretch;gap:12px"><div><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div>'+dateTripleHTML('guideModalCityDateStart', cityAnchor||'')+'</div>'
+      +'<div><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div>'+dateTripleHTML('guideModalCityDateEnd', '')+'</div></div>';
     _guideModalSaveFn = saveGuideItem;
     document.getElementById('guideItemModal').classList.add('open');
     showCityNameSuggestions(countryId);
