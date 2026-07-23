@@ -1242,12 +1242,12 @@ var BUDGET_DAILY_TABLE = {
   'Turquie':80,'Liban':55,'Jordanie':95,'Israël':165,
   'Émirats arabes unis':120,'Qatar':130,'Arabie saoudite':100,'Oman':85,'Koweït':110,
   // Afrique subsaharienne
-  'Sénégal':50,'Cap Vert':65,'Mali':40,'Ghana':50,"Côte d'Ivoire":55,
+  'Sénégal':50,'Cap-Vert':65,'Mali':40,'Ghana':50,"Côte d'Ivoire":55,
   'Kenya':50,'Tanzanie':65,'Ouganda':50,'Rwanda':70,'Éthiopie':30,
   'Madagascar':35,'Maurice':90,'Réunion':110,'Afrique du Sud':55,
   'Namibie':65,'Botswana':75,'Zimbabwe':45,'Mozambique':40,'Zambie':50,
   // Asie (compléments hors liste statique)
-  'Malaisie':45,'Singapour':130,'Myanmar':30,'Inde':25,'Sri Lanka':40,
+  'Malaisie':45,'Singapour':130,'Birmanie':30,'Inde':25,'Sri Lanka':40,
   'Népal':20,'Bhoutan':200,'Chine':110,'Corée du Sud':155,'Taïwan':65,
   'Hong Kong':120,'Macao':100,'Mongolie':45,'Kazakhstan':45,'Ouzbékistan':40,
   'Géorgie':40,'Arménie':40,'Azerbaïdjan':45,
@@ -1258,7 +1258,7 @@ var BUDGET_DAILY_TABLE = {
   'Brésil':90,'Argentine':80,'Chili':70,'Uruguay':70,'Paraguay':35,
   // Pacifique & Océanie
   'Australie':230,'Nouvelle-Zélande':210,'Fidji':100,'Polynésie française':150,
-  'Nouvelle-Calédonie':130,'Vanuatu':85,'îles Cook':110,
+  'Nouvelle-Calédonie':130,'Vanuatu':85,'Îles Cook':110,
 };
 
 const COUNTRIES=[
@@ -10358,6 +10358,14 @@ function renderCtCountries() {
   });
 }
 
+function normCountryStr(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[-']/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 async function openAddCountryToTripModal() {
   await loadCountryList();
   await loadCountryFlags();
@@ -10369,9 +10377,9 @@ async function openAddCountryToTripModal() {
   const currentNames = effectiveTripCountries();
 
   function renderOptions(filter) {
-    const f = (filter || '').toLowerCase();
+    const f = normCountryStr(filter);
     const available = CT_ALL_COUNTRY_NAMES.filter(c => !currentNames.includes(c));
-    const filtered = f ? available.filter(c => c.toLowerCase().includes(f)) : available;
+    const filtered = f ? available.filter(c => normCountryStr(c).includes(f)) : available;
     optionsEl.innerHTML = '';
     filtered.forEach(c => {
       const opt = document.createElement('div');
@@ -10383,7 +10391,19 @@ async function openAddCountryToTripModal() {
       });
       optionsEl.appendChild(opt);
     });
-    if (filtered.length === 0) {
+    const typed = (filter || '').trim();
+    if (typed && !filtered.some(c => normCountryStr(c) === f)) {
+      const custom = document.createElement('div');
+      custom.className = 'ct-country-option';
+      custom.style.cssText = 'color:var(--green,#2D6A4F);font-weight:600;';
+      custom.textContent = 'Ajouter « ' + typed + ' » comme nouveau pays';
+      custom.addEventListener('click', async () => {
+        modal.style.display = 'none';
+        await addCountryToCurrentTrip(typed);
+      });
+      optionsEl.appendChild(custom);
+    }
+    if (filtered.length === 0 && !typed) {
       optionsEl.innerHTML = '<div class="ct-country-option" style="color:#6E6E73;">Aucun résultat</div>';
     }
   }
@@ -10417,9 +10437,9 @@ async function openCountryModal() {
   searchInput.value = '';
 
   function renderOptions(filter) {
-    const f = (filter || '').toLowerCase();
+    const f = normCountryStr(filter);
     const available = CT_ALL_COUNTRY_NAMES.filter(c => !CT_COUNTRIES.includes(c));
-    const filtered = f ? available.filter(c => c.toLowerCase().includes(f)) : available;
+    const filtered = f ? available.filter(c => normCountryStr(c).includes(f)) : available;
     optionsEl.innerHTML = '';
     filtered.forEach(c => {
       const opt = document.createElement('div');
@@ -10432,7 +10452,20 @@ async function openCountryModal() {
       });
       optionsEl.appendChild(opt);
     });
-    if (filtered.length === 0) {
+    const typed = (filter || '').trim();
+    if (typed && !filtered.some(c => normCountryStr(c) === f)) {
+      const custom = document.createElement('div');
+      custom.className = 'ct-country-option';
+      custom.style.cssText = 'color:var(--green,#2D6A4F);font-weight:600;';
+      custom.textContent = 'Ajouter « ' + typed + ' » comme nouveau pays';
+      custom.addEventListener('click', () => {
+        CT_COUNTRIES.push(typed);
+        renderCtCountries();
+        modal.style.display = 'none';
+      });
+      optionsEl.appendChild(custom);
+    }
+    if (filtered.length === 0 && !typed) {
       optionsEl.innerHTML = '<div class="ct-country-option" style="color:#6E6E73;">Aucun résultat</div>';
     }
   }
