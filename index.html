@@ -8282,12 +8282,13 @@ function toggleMgCtry(cid){
 }
 function renderManageCountriesScreen(){
   var hasKey = !!S.apiKey;
-  var noKeyHTML = !hasKey
-    ? '<div class="info-card">'
-      +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
-      +'<div class="status-sub">Clé API requise — <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
-      +'</div>'
-    : '';
+  var noKeyHTML = '<div class="info-card">'
+    +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
+    +(hasKey
+      ? '<div class="status-sub">Sélectionne un ou plusieurs pays ci-dessous. L\'IA va proposer des villes et des activités adaptées à ton voyage.</div>'
+      : '<div class="status-sub">Clé API requise — <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
+    )
+    +'</div>';
   var countriesHTML = COUNTRIES.map(function(c){
     var checked = _mgCtrySelected.indexOf(c.id)>-1;
     return '<div class="more-row" style="cursor:pointer" onclick="toggleMgCtry(\''+jsStrEsc(c.id)+'\')">'      +'<span style="font-size:18px;margin-right:8px">'+escHtml(c.flag)+'</span>'      +'<span class="more-row-label">'+escHtml(c.name)+'</span>'      +'<span style="width:20px;height:20px;border-radius:6px;flex-shrink:0;border:1.5px solid '+(checked?'var(--accent)':'rgba(29,29,31,0.2)')+';background:'+(checked?'var(--accent)':'transparent')+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">'+(checked?'✓':'')+'</span>'      +'</div>';
