@@ -10181,6 +10181,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     return;
   }
   CURRENT_TRIP = trip;
+  localStorage.setItem('planitrip_last_trip_id', trip.id);
   const namespacedKey = 'planitrip_trip_' + trip.id;
 
   // Migration one-shot : le tout premier trip ouvert dans ce navigateur (tous comptes confondus)
@@ -10255,7 +10256,6 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
       });
     }
   }
-  localStorage.setItem('planitrip_last_trip_id', trip.id);
   document.getElementById('create-trip-screen').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'none';
