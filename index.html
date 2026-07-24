@@ -6848,6 +6848,15 @@ function markFeedSeen(){
   try{ if(CURRENT_STORAGE_KEY) localStorage.setItem(CURRENT_STORAGE_KEY+'_feedSeenReactions', JSON.stringify(S.feedSeenReactionCounts)); }catch(e){}
   save();
   updateFeedBadge();
+  if(sb && CURRENT_TRIP && CURRENT_USER){
+    sb.from('feed_seen_state').upsert({
+      trip_id: CURRENT_TRIP.id,
+      user_id: CURRENT_USER.id,
+      last_seen_at: S.feedLastSeenAt,
+      seen_reaction_counts: S.feedSeenReactionCounts,
+      updated_at: new Date().toISOString()
+    }, {onConflict:'trip_id,user_id'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync feed_seen_state:', r.error); });
+  }
 }
 function safeDateMs(iso){
   if(!iso) return 0;
@@ -10070,6 +10079,24 @@ async function loadBudgetEntries(){
   S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); }).concat(Object.values(serverMap));
   save();
 }
+async function loadFeedSeenState(){
+  // Serveur autoritaire pour "dernière visite du Fil vue" : survit à une réinstallation
+  // de l'app (contrairement au localStorage seul). Repli sur les clés locales si hors-ligne
+  // ou si l'utilisateur n'a encore jamais synchronisé (ligne absente côté serveur).
+  if(!sb || !CURRENT_TRIP || !CURRENT_USER) return;
+  try{
+    var {data, error} = await sb.from('feed_seen_state').select('last_seen_at, seen_reaction_counts').eq('trip_id',CURRENT_TRIP.id).eq('user_id',CURRENT_USER.id).maybeSingle();
+    if(error){ console.error('[PlaniTrip] loadFeedSeenState:', error); return; }
+    if(data){
+      if(data.last_seen_at) S.feedLastSeenAt = data.last_seen_at;
+      if(data.seen_reaction_counts) S.feedSeenReactionCounts = data.seen_reaction_counts;
+      save();
+      console.log('[PlaniTrip diag] loadFeedSeenState depuis Supabase -> last_seen_at=', data.last_seen_at, '- seen_reaction_counts=', data.seen_reaction_counts);
+    } else {
+      console.log('[PlaniTrip diag] loadFeedSeenState: aucune ligne Supabase pour cet utilisateur/trip, repli sur localStorage');
+    }
+  }catch(e){ console.error('[PlaniTrip] loadFeedSeenState exception:', e); }
+}
 async function loadFavorites(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('favorites').select('key').eq('trip_id',CURRENT_TRIP.id);
@@ -10276,6 +10303,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   await loadCustomPhotos();
   await loadFlights();
   await loadFeedPosts();
+  await loadFeedSeenState();
   updateFeedBadge();
   await loadProfiles();
   rebuildCountriesFromState();
