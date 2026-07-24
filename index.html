@@ -656,6 +656,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ptr-indicator{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-6px);opacity:0;width:34px;height:34px;border-radius:50%;background:#FFFFFF;box-shadow:0 2px 8px rgba(29,29,31,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;z-index:10000;pointer-events:none;transition:opacity 0.15s ease;}
 .ptr-indicator.ptr-spin{animation:ptr-spin 0.7s linear infinite;}
 @keyframes ptr-spin{to{transform:translateX(-50%) translateY(6px) rotate(360deg);}}
+@keyframes feedReactorsIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.feed-reactors-list{animation:feedReactorsIn 180ms ease-out;}
 .auth-error{font-size:13px;color:#E76F51;text-align:center;margin-top:14px;line-height:1.5;}
 .auth-hero{display:flex;flex-direction:column;align-items:center;margin-bottom:36px;}
 .auth-logo{width:64px;height:64px;border-radius:18px;box-shadow:0 4px 16px rgba(45,106,79,0.22);margin-bottom:14px;}
@@ -6913,6 +6915,7 @@ function linkifyText(text){
   });
 }
 function renderFeed(){
+  if(!window._feedExpandedReactions) window._feedExpandedReactions={};
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
   var posts = (S.feedPosts||[]).slice().sort(function(a,b){ return (b.createdAt||'')<(a.createdAt||'') ? -1 : ((b.createdAt||'')>(a.createdAt||'') ? 1 : 0); });
@@ -6925,10 +6928,11 @@ function renderFeed(){
     var myReacted = reactions.map(canonicalPerson).indexOf(myEmail)>-1;
     var taggedHTML = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--accent);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
     var reactorAvatars = '';
-    if(reactions.length){
+    var isExpanded = !!window._feedExpandedReactions[p.id];
+    if(reactions.length && isExpanded){
       var avColors = ['#4D96FF','#F4A261','#2D6A4F','#E76F51','#95D5B2'];
       var shown = reactions.slice(0,5);
-      reactorAvatars = '<span style="display:inline-flex;margin-left:2px">'
+      reactorAvatars = '<span class="feed-reactors-list" style="display:inline-flex;margin-left:2px">'
         +shown.map(function(email,i){
           var nm = personDisplayName(email,'Toi');
           var init = stripHtml(nm).slice(0,2).toUpperCase();
@@ -6938,7 +6942,8 @@ function renderFeed(){
         +'</span>';
     }
     var reactionPill = '<div style="margin-top:8px;display:flex;align-items:center;gap:6px">'
-      +'<span onclick="toggleFeedReaction(\''+p.id+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:14px;cursor:pointer;font-size:12.5px;font-weight:600;background:'+(myReacted?'var(--red-pale)':'var(--sand-deep)')+';color:'+(myReacted?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('heart',13)+(reactions.length?(' '+reactions.length):'')+'</span>'
+      +'<span onclick="toggleFeedReaction(\''+p.id+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:14px;cursor:pointer;font-size:12.5px;font-weight:600;background:'+(myReacted?'var(--red-pale)':'var(--sand-deep)')+';color:'+(myReacted?'var(--red-muted)':'var(--ink-muted)')+'">'+svgIcon('heart',13)+'</span>'
+      +(reactions.length?('<span onclick="toggleFeedReactorsView(\''+p.id+'\')" style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-muted)">'+reactions.length+'</span>'):'')
       +reactorAvatars
       +'</div>';
     return '<div class="info-card" style="padding:14px 16px'+(p.important?';border:1.5px solid var(--red-muted)':'')+'">'
@@ -7170,6 +7175,11 @@ function toggleFeedReaction(postId){
   if(sb && CURRENT_TRIP){
     sb.from('feed_posts').update({reactions:post.reactions}).eq('id', postId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update feed_posts reactions:', r.error); } });
   }
+}
+function toggleFeedReactorsView(postId){
+  if(!window._feedExpandedReactions) window._feedExpandedReactions={};
+  window._feedExpandedReactions[postId] = !window._feedExpandedReactions[postId];
+  renderContent();
 }
 function toggleFeedImportant(postId){
   var post = (S.feedPosts||[]).find(function(p){ return p.id===postId; });
