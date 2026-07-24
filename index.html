@@ -1738,6 +1738,12 @@ function save(){
     if(window._customDetails) S.customDetails=window._customDetails;
     localStorage.setItem(CURRENT_STORAGE_KEY,JSON.stringify(S));
   }catch(e){}
+  try{
+    // Clé séparée et minuscule pour le tab actif : une écriture de quelques octets a beaucoup
+    // moins de chance d'être interrompue (mise en arrière-plan iOS, suspension mémoire) que
+    // l'écriture du gros blob d'état ci-dessus, qui peut atteindre plusieurs Mo sur un vieux voyage.
+    if(CURRENT_STORAGE_KEY && S.tab) localStorage.setItem(CURRENT_STORAGE_KEY+'_tab', S.tab);
+  }catch(e){}
 }
 
 // ── ACTIVITY DETAILS (pre-filled for Japan) ──────────────────
@@ -10229,7 +10235,10 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   // Réappliquer les valeurs par défaut : un état sauvegardé ancien ou incomplet peut manquer
   // certains champs plus récents (ex: cityTrash), ce qui ferait planter l'app à l'usage.
   ensureStateDefaults();
-  S.tab = resetTab ? 'today' : (S.tab || 'today');
+  var _savedTab = null;
+  try{ _savedTab = localStorage.getItem(namespacedKey+'_tab'); }catch(e){}
+  console.log('[PlaniTrip diag] enterTrip -> tab dans clé séparée (_tab)=', _savedTab);
+  S.tab = resetTab ? 'today' : (_savedTab || S.tab || 'today');
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
   rebuildCountriesFromState();
 
