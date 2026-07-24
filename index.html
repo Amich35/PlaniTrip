@@ -1073,6 +1073,7 @@ console.log('[PlaniTrip] Version chargée : 2026-07-16-deletecity-fix-v2');
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
 let LAST_HANDLED_USER_ID = null;
+let _userInitiatedLogin = false; // true uniquement quand l'utilisateur clique explicitement Se connecter/Créer un compte — jamais lors d'une restauration automatique de session (reload, pull-to-refresh)
 let IN_PASSWORD_RECOVERY = false;
 // ── GPS COORDINATES ────────────────────────────────────────────
 // Format: [lat, lng, "Place name for search fallback"]
@@ -9704,7 +9705,9 @@ async function initAuth() {
         if (IN_PASSWORD_RECOVERY) return; // en cours de définition de mot de passe : ne pas naviguer
         if (LAST_HANDLED_USER_ID === session.user.id) return; // vrai retour d'onglet : même session déjà en cours de chargement ou chargée, on ignore
         LAST_HANDLED_USER_ID = session.user.id;
-        onAuthenticated(session.user, true);
+        var isFresh = _userInitiatedLogin;
+        _userInitiatedLogin = false;
+        onAuthenticated(session.user, isFresh);
       } else if (event === 'SIGNED_OUT') {
         CURRENT_TRIP = null;
         LAST_HANDLED_USER_ID = null;
@@ -11300,6 +11303,7 @@ document.getElementById('auth-pw-signin-btn').addEventListener('click', async ()
   btn.disabled = true;
   btn.textContent = 'Connexion...';
 
+  _userInitiatedLogin = true;
   const { error } = await sb.auth.signInWithPassword({ email, password });
 
   btn.disabled = false;
@@ -11332,6 +11336,7 @@ document.getElementById('auth-su-submit-btn').addEventListener('click', async ()
   const btn = document.getElementById('auth-su-submit-btn');
   btn.disabled = true; btn.textContent = 'Création...';
 
+  _userInitiatedLogin = true;
   const { error } = await sb.auth.signUp({
     email, password: pw1,
     options: { emailRedirectTo: window.location.origin + window.location.pathname }
