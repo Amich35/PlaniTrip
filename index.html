@@ -6949,7 +6949,7 @@ function renderFeed(){
       reactorAvatars = '<span class="feed-reactors-list" style="display:inline-flex;margin-left:2px">'
         +shown.map(function(email,i){
           var nm = personDisplayName(email);
-          var init = stripHtml(nm).slice(0,2).toUpperCase();
+          var init = stripHtml(nm).replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g,'').slice(0,2).toUpperCase();
           return '<span title="'+escHtml(nm)+'" style="width:18px;height:18px;border-radius:50%;background:'+avColors[i%avColors.length]+';border:1.5px solid var(--parchment,#fff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;margin-left:'+(i===0?'0':'-6px')+';flex-shrink:0">'+escHtml(init)+'</span>';
         }).join('')
         +(reactions.length>5 ? '<span style="font-size:10px;color:var(--ink-subtle);margin-left:4px;align-self:center">+'+(reactions.length-5)+'</span>' : '')
