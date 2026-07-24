@@ -6843,6 +6843,7 @@ function markFeedSeen(){
       S.feedSeenReactionCounts[p.id] = (p.reactions||[]).length;
     }
   });
+  try{ if(CURRENT_STORAGE_KEY) localStorage.setItem(CURRENT_STORAGE_KEY+'_feedSeenReactions', JSON.stringify(S.feedSeenReactionCounts)); }catch(e){}
   save();
   updateFeedBadge();
 }
@@ -10244,6 +10245,11 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     var _savedFeedSeen = localStorage.getItem(namespacedKey+'_feedSeen');
     if(_savedFeedSeen) S.feedLastSeenAt = _savedFeedSeen;
     console.log('[PlaniTrip diag] enterTrip -> feedLastSeenAt dans clé séparée=', _savedFeedSeen, '- S.feedLastSeenAt final=', S.feedLastSeenAt);
+  }catch(e){}
+  try{
+    var _savedFeedSeenReactions = localStorage.getItem(namespacedKey+'_feedSeenReactions');
+    if(_savedFeedSeenReactions) S.feedSeenReactionCounts = JSON.parse(_savedFeedSeenReactions);
+    console.log('[PlaniTrip diag] enterTrip -> feedSeenReactionCounts dans clé séparée=', _savedFeedSeenReactions);
   }catch(e){}
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
   rebuildCountriesFromState();
