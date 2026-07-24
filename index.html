@@ -6844,17 +6844,28 @@ function hasFeedNotification(){
   if(!myEmail) return false;
   var lastSeenTs = S.feedLastSeenAt ? new Date(S.feedLastSeenAt).getTime() : 0;
   var seenReactions = S.feedSeenReactionCounts || {};
-  return (S.feedPosts||[]).some(function(p){
+  var result = (S.feedPosts||[]).some(function(p){
     var isMine = canonicalPerson(p.author)===myEmail;
     var createdTs = p.createdAt ? new Date(p.createdAt).getTime() : 0;
     // Nouveau post d'un autre voyageur
-    if(!isMine && createdTs>lastSeenTs) return true;
+    if(!isMine && createdTs>lastSeenTs){
+      console.log('[PlaniTrip diag] notif Fil déclenchée par nouveau post id=', p.id, 'author=', p.author, 'createdAt=', p.createdAt, 'lastSeenAt=', S.feedLastSeenAt);
+      return true;
+    }
     // Nouvelle réaction sur un de mes posts
-    if(isMine && (p.reactions||[]).length > (seenReactions[p.id]||0)) return true;
+    if(isMine && (p.reactions||[]).length > (seenReactions[p.id]||0)){
+      console.log('[PlaniTrip diag] notif Fil déclenchée par réaction id=', p.id, 'reactions.length=', (p.reactions||[]).length, 'seenReactions[id]=', seenReactions[p.id], 'idType=', typeof p.id);
+      return true;
+    }
     // Je suis tagué dans un post pas encore vu
-    if(!isMine && (p.tagged||[]).map(canonicalPerson).indexOf(myEmail)>-1 && createdTs>lastSeenTs) return true;
+    if(!isMine && (p.tagged||[]).map(canonicalPerson).indexOf(myEmail)>-1 && createdTs>lastSeenTs){
+      console.log('[PlaniTrip diag] notif Fil déclenchée par tag id=', p.id, 'createdAt=', p.createdAt);
+      return true;
+    }
     return false;
   });
+  if(result) console.log('[PlaniTrip diag] hasFeedNotification=true, S.feedLastSeenAt=', S.feedLastSeenAt, '- nb posts total=', (S.feedPosts||[]).length);
+  return result;
 }
 function updateFeedBadge(){
   var dot = document.getElementById('feed-badge-dot');
