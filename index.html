@@ -6839,14 +6839,23 @@ function markFeedSeen(){
   save();
   updateFeedBadge();
 }
+function safeDateMs(iso){
+  if(!iso) return 0;
+  // Safari (iOS) rejette silencieusement certains formats ISO valides ailleurs :
+  // microsecondes à 6 chiffres (Postgres), séparateur espace au lieu de "T".
+  var s = String(iso).trim().replace(' ', 'T');
+  s = s.replace(/(\.\d{3})\d+/, '$1'); // tronque les microsecondes à 3 décimales (millisecondes)
+  var t = new Date(s).getTime();
+  return isNaN(t) ? 0 : t;
+}
 function hasFeedNotification(){
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
   if(!myEmail) return false;
-  var lastSeenTs = S.feedLastSeenAt ? new Date(S.feedLastSeenAt).getTime() : 0;
+  var lastSeenTs = safeDateMs(S.feedLastSeenAt);
   var seenReactions = S.feedSeenReactionCounts || {};
   var result = (S.feedPosts||[]).some(function(p){
     var isMine = canonicalPerson(p.author)===myEmail;
-    var createdTs = p.createdAt ? new Date(p.createdAt).getTime() : 0;
+    var createdTs = safeDateMs(p.createdAt);
     // Nouveau post d'un autre voyageur
     if(!isMine && createdTs>lastSeenTs){
       console.log('[PlaniTrip diag] notif Fil déclenchée par nouveau post id=', p.id, 'author=', p.author, 'createdAt=', p.createdAt, 'lastSeenAt=', S.feedLastSeenAt);
