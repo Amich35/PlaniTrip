@@ -9676,6 +9676,13 @@ function showFatalAuthError(msg) {
 
 async function initAuth() {
   try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().then(function(granted){
+        console.log('[PlaniTrip diag] navigator.storage.persist() ->', granted);
+      }).catch(function(e){
+        console.warn('[PlaniTrip diag] navigator.storage.persist() a échoué:', e);
+      });
+    }
     if (!window.supabase || typeof window.supabase.createClient !== 'function') {
       showFatalAuthError("Impossible de charger le service de connexion (bloqueur de pub ou réseau ?). Réessaie de recharger la page.");
       return;
