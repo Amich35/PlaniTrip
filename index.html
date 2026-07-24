@@ -1741,10 +1741,15 @@ function save(){
     localStorage.setItem(CURRENT_STORAGE_KEY,JSON.stringify(S));
   }catch(e){}
   try{
-    // Clé séparée et minuscule pour le tab actif : une écriture de quelques octets a beaucoup
-    // moins de chance d'être interrompue (mise en arrière-plan iOS, suspension mémoire) que
-    // l'écriture du gros blob d'état ci-dessus, qui peut atteindre plusieurs Mo sur un vieux voyage.
+    // Clés séparées et minuscules pour les petits états de navigation (tab actif, pays et
+    // sous-onglet consultés) : une écriture de quelques octets a beaucoup moins de chance
+    // d'être interrompue (mise en arrière-plan iOS, suspension mémoire) que l'écriture du
+    // gros blob d'état ci-dessus, qui peut atteindre plusieurs Mo sur un vieux voyage. Si ce
+    // gros blob échoue à se charger/parser, loadState() retombe sur un pays par défaut codé
+    // en dur ('jp') — ces clés séparées évitent ce faux retour au Japon.
     if(CURRENT_STORAGE_KEY && S.tab) localStorage.setItem(CURRENT_STORAGE_KEY+'_tab', S.tab);
+    if(CURRENT_STORAGE_KEY && S.country) localStorage.setItem(CURRENT_STORAGE_KEY+'_country', S.country);
+    if(CURRENT_STORAGE_KEY && S.countryDetailTab) localStorage.setItem(CURRENT_STORAGE_KEY+'_countryDetailTab', S.countryDetailTab);
   }catch(e){}
 }
 
@@ -10287,6 +10292,13 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     var _savedFeedSeenReactions = localStorage.getItem(namespacedKey+'_feedSeenReactions');
     if(_savedFeedSeenReactions) S.feedSeenReactionCounts = JSON.parse(_savedFeedSeenReactions);
     console.log('[PlaniTrip diag] enterTrip -> feedSeenReactionCounts dans clé séparée=', _savedFeedSeenReactions);
+  }catch(e){}
+  try{
+    var _savedCountry = localStorage.getItem(namespacedKey+'_country');
+    if(_savedCountry) S.country = _savedCountry;
+    var _savedCountryDetailTab = localStorage.getItem(namespacedKey+'_countryDetailTab');
+    if(_savedCountryDetailTab) S.countryDetailTab = _savedCountryDetailTab;
+    console.log('[PlaniTrip diag] enterTrip -> country dans clé séparée=', _savedCountry, '- countryDetailTab dans clé séparée=', _savedCountryDetailTab);
   }catch(e){}
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
   rebuildCountriesFromState();
