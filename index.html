@@ -9686,6 +9686,7 @@ async function initAuth() {
       hideAllAuthSteps();
       document.getElementById('auth-step-set-password').style.display = 'block';
     } else if (session) {
+      console.log('[PlaniTrip diag] getSession() a trouvé une session directement, freshLogin=false, user=', session.user.id);
       LAST_HANDLED_USER_ID = session.user.id;
       onAuthenticated(session.user, false);
     } else {
@@ -9703,7 +9704,8 @@ async function initAuth() {
       }
       if (event === 'SIGNED_IN' && session) {
         if (IN_PASSWORD_RECOVERY) return; // en cours de définition de mot de passe : ne pas naviguer
-        if (LAST_HANDLED_USER_ID === session.user.id) return; // vrai retour d'onglet : même session déjà en cours de chargement ou chargée, on ignore
+        if (LAST_HANDLED_USER_ID === session.user.id) { console.log('[PlaniTrip diag] SIGNED_IN ignoré (déjà géré) pour', session.user.id); return; }
+        console.log('[PlaniTrip diag] SIGNED_IN traité, isFresh=', _userInitiatedLogin, 'user=', session.user.id, 'LAST_HANDLED_USER_ID avant=', LAST_HANDLED_USER_ID);
         LAST_HANDLED_USER_ID = session.user.id;
         var isFresh = _userInitiatedLogin;
         _userInitiatedLogin = false;
@@ -9819,6 +9821,7 @@ async function checkUserTrips(user, freshLogin) {
       showCreateTripScreen();
       return;
     } else if (uniqueTrips.length === 1) {
+      console.log('[PlaniTrip diag] checkUserTrips: 1 seul voyage, freshLogin=', freshLogin, '-> enterTrip resetTab=', !!freshLogin);
       await loadCountryFlags();
       try {
         enterTrip(uniqueTrips[0], !!freshLogin);
@@ -9830,6 +9833,7 @@ async function checkUserTrips(user, freshLogin) {
     } else {
       const lastTripId = localStorage.getItem('planitrip_last_trip_id');
       const lastTrip = uniqueTrips.find(t => t.id === lastTripId);
+      console.log('[PlaniTrip diag] checkUserTrips: plusieurs voyages, lastTripId=', lastTripId, '- trouvé=', !!lastTrip, '- freshLogin=', freshLogin);
       if (lastTrip) {
         await loadCountryFlags();
         try { enterTrip(lastTrip, !!freshLogin); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
@@ -10191,12 +10195,14 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
 
   CURRENT_STORAGE_KEY = namespacedKey;
   const freshState = loadState();
+  console.log('[PlaniTrip diag] enterTrip pour', trip.id, '- resetTab param=', resetTab, '- tab trouvé dans freshState=', freshState.tab, '- apiKey présente dans freshState=', !!freshState.apiKey);
   Object.keys(S).forEach(k => delete S[k]);
   Object.assign(S, freshState);
   // Réappliquer les valeurs par défaut : un état sauvegardé ancien ou incomplet peut manquer
   // certains champs plus récents (ex: cityTrash), ce qui ferait planter l'app à l'usage.
   ensureStateDefaults();
   S.tab = resetTab ? 'today' : (S.tab || 'today');
+  console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
   rebuildCountriesFromState();
 
   await loadCollaborators();
