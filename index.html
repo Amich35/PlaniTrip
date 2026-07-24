@@ -10229,6 +10229,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   await loadCustomPhotos();
   await loadFlights();
   await loadFeedPosts();
+  updateFeedBadge();
   await loadProfiles();
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
