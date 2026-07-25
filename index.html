@@ -8130,10 +8130,10 @@ function getCityOrder(countryId) {
   if(!c) return [];
   var withDates = c.cities.map(function(city, idx){
     var ck = countryId+'_'+city.city;
-    // Date canonique de la ville (réglée via la modale d'hébergement) en priorité ; à défaut,
-    // repli sur la date la plus ancienne parmi les activités de la ville (ancien comportement).
-    var cityStay = S.cityDates && S.cityDates[ck];
-    var minDate = (cityStay && cityStay.start) ? cityStay.start : null;
+    // Date de séjour de la ville : hébergement en priorité, dates de ville en repli (même
+    // logique que cityStayRange(), utilisée pour l'affichage — pour rester cohérent partout).
+    var stay = cityStayRange(ck);
+    var minDate = stay ? stay.start : null;
     if(!minDate && S.actDate){
       Object.keys(S.actDate).forEach(function(k){
         if(k.indexOf(ck+'_')===0){
