@@ -8047,7 +8047,7 @@ function deleteCity(countryId, cityName){
 
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder(); syncDeletedCities();
+  syncDeletedActs(); syncCityOrder(); syncDeletedCities(); syncCityTrash();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -8099,7 +8099,7 @@ function restoreCity(trashId){
   S.cityTrash.splice(idx,1);
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder(); syncDeletedCities();
+  syncDeletedActs(); syncCityOrder(); syncDeletedCities(); syncCityTrash();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -8122,6 +8122,7 @@ function deleteCityPermanently(trashId){
     if(idx>-1) S.cityTrash.splice(idx,1);
     save();
     renderContent();
+    syncCityTrash();
   }, 'Supprimer définitivement');
 }
 function getCityOrder(countryId) {
@@ -8183,6 +8184,14 @@ function syncDeletedActs(){
 function syncDeletedCities(){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedCities',data:S.deletedCities,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+  }
+}
+function syncCityTrash(){
+  // S.cityTrash n'était jusque-là stocké que localement (gros blob) : une suppression de ville
+  // pouvait "réussir" (ville bien cachée) tout en perdant l'entrée de corbeille correspondante
+  // si l'écriture locale était interrompue (iOS). Synchronisé comme deletedActs/deletedCities.
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityTrash',data:S.cityTrash,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function syncDeletedCountryIds(){
@@ -10273,6 +10282,8 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
     } else if(row.detail_key === '__planitrip__deletedCities'){
       if(row.data && typeof row.data === 'object'){ S.deletedCities = row.data; }
+    } else if(row.detail_key === '__planitrip__cityTrash'){
+      if(row.data && Array.isArray(row.data)){ S.cityTrash = row.data; }
     } else if(row.detail_key === '__planitrip__deletedCountryIds'){
       if(row.data && Array.isArray(row.data)){ S.deletedCountryIds = row.data; }
     } else if(row.detail_key.indexOf('__planitrip__travelerBudget_')===0){
