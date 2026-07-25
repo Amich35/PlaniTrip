@@ -1734,6 +1734,25 @@ function loadState(){
   }catch(e){}
   return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
 }
+function markDeletedTombstone(kind, id){
+  // "Tombstone" : mémorise dans une clé localStorage minuscule et séparée qu'un élément a été
+  // supprimé, indépendamment du gros blob d'état. Utilisé pour empêcher la résurrection d'un
+  // élément supprimé quand le gros blob repart sur une version antérieure (écriture interrompue
+  // sur iOS) : les fonctions loadXxx() qui fusionnent serveur+local filtrent toujours ces IDs.
+  try{
+    if(!CURRENT_STORAGE_KEY) return;
+    var k = CURRENT_STORAGE_KEY+'_deleted_'+kind;
+    var list = JSON.parse(localStorage.getItem(k)||'[]');
+    if(list.indexOf(id)===-1){ list.push(id); if(list.length>500) list=list.slice(-500); }
+    localStorage.setItem(k, JSON.stringify(list));
+  }catch(e){}
+}
+function getDeletedTombstones(kind){
+  try{
+    if(!CURRENT_STORAGE_KEY) return [];
+    return JSON.parse(localStorage.getItem(CURRENT_STORAGE_KEY+'_deleted_'+kind)||'[]');
+  }catch(e){ return []; }
+}
 function save(){
   try{
     // Persist customDetails and custom COORDS into S before saving
@@ -7269,6 +7288,7 @@ function addJournalEntry(){
 function deleteJournalEntry(id){
   showConfirm('Supprimer cette entrée du carnet ?', function(){
     S.journal=S.journal.filter(function(e){return e.id!==id;});
+    markDeletedTombstone('journal', id);
     save(); renderContent();
     if(sb && CURRENT_TRIP) sb.from('journal_entries').delete().eq('trip_id',CURRENT_TRIP.id).eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }, 'Supprimer');
@@ -7655,6 +7675,7 @@ function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return;
 function delExp(id){
   showConfirm('Supprimer cette dépense ?', function(){
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
+    markDeletedTombstone('expenses', id);
     if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     save();renderContent();
   }, 'Supprimer');
@@ -7693,6 +7714,7 @@ function editReimbursement(id){
 function restoreReimbursement(id){
   showConfirm('Annuler ce remboursement ? La dette sera restaurée.', function(){
     S.expenses = S.expenses.filter(function(e){return e.id!==id;});
+    markDeletedTombstone('expenses', id);
     save(); renderContent();
     if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }, 'Restaurer la dette');
@@ -7981,11 +8003,13 @@ function deleteCity(countryId, cityName){
   if(journalMatches.length){
     var idsToRemove = journalMatches.map(function(e){return e.id;});
     S.journal = S.journal.filter(function(e){return idsToRemove.indexOf(e.id)===-1;});
+    idsToRemove.forEach(function(jid){ markDeletedTombstone('journal', jid); });
     if(sb && CURRENT_TRIP) sb.from('journal_entries').delete().in('id', idsToRemove).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
   if(expenseMatches.length){
     var expIdsToRemove = expenseMatches.map(function(e){return e.id;});
     S.expenses = S.expenses.filter(function(e){return expIdsToRemove.indexOf(e.id)===-1;});
+    expIdsToRemove.forEach(function(eid){ markDeletedTombstone('expenses', eid); });
     if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().in('id', expIdsToRemove).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
   if(S.cityOrder) delete S.cityOrder[countryId];
@@ -10076,12 +10100,15 @@ async function loadBudgetEntries(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
   // Le serveur fait autorité : reconstruction depuis Supabase à chaque chargement.
-  // On garde uniquement les dépenses locales pas encore synchronisées (id absent côté serveur).
+  // On garde uniquement les dépenses locales pas encore synchronisées (id absent côté serveur),
+  // en excluant celles marquées comme supprimées via tombstone (voir markDeletedTombstone) —
+  // sinon une suppression non encore persistée dans le gros blob localStorage pourrait ressusciter.
   var serverMap = {};
   (data||[]).forEach(function(row){
     serverMap[row.id] = {id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date};
   });
-  S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap); }).concat(Object.values(serverMap));
+  var deletedIds = getDeletedTombstones('expenses');
+  S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap) && deletedIds.indexOf(e.id)===-1; }).concat(Object.values(serverMap));
   save();
 }
 async function loadFeedSeenState(){
@@ -10125,12 +10152,14 @@ async function loadJournalEntries(){
   var {data} = await sb.from('journal_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
   // Serveur autoritaire : reconstruction complète — une entrée supprimée par un autre
   // voyageur doit disparaître localement aussi. Les entrées locales pas encore
-  // synchronisées (id absent côté serveur) sont préservées.
+  // synchronisées (id absent côté serveur) sont préservées, sauf si marquées comme
+  // supprimées via tombstone (voir markDeletedTombstone).
   var serverMap = {};
   (data||[]).forEach(function(row){
     serverMap[row.id] = {id:row.id, date:row.entry_date, text:row.text_content||'', location:row.location||'', photo:row.photo||null};
   });
-  var localOnly = (S.journal||[]).filter(function(e){ return !(e.id in serverMap); });
+  var deletedIds = getDeletedTombstones('journal');
+  var localOnly = (S.journal||[]).filter(function(e){ return !(e.id in serverMap) && deletedIds.indexOf(e.id)===-1; });
   S.journal = localOnly.concat(Object.values(serverMap));
   save();
 }
