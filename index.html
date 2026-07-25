@@ -1753,6 +1753,17 @@ function getDeletedTombstones(kind){
     return JSON.parse(localStorage.getItem(CURRENT_STORAGE_KEY+'_deleted_'+kind)||'[]');
   }catch(e){ return []; }
 }
+function unmarkDeletedTombstone(kind, id){
+  // À appeler quand un élément précédemment supprimé est restauré (corbeille) : sinon il
+  // resterait filtré indéfiniment par loadXxx() malgré sa réinsertion côté serveur.
+  try{
+    if(!CURRENT_STORAGE_KEY) return;
+    var k = CURRENT_STORAGE_KEY+'_deleted_'+kind;
+    var list = JSON.parse(localStorage.getItem(k)||'[]');
+    var idx = list.indexOf(id);
+    if(idx>-1){ list.splice(idx,1); localStorage.setItem(k, JSON.stringify(list)); }
+  }catch(e){}
+}
 function save(){
   try{
     // Persist customDetails and custom COORDS into S before saving
@@ -4465,6 +4476,7 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
       S.customDetails = window._customDetails;
       // Suppression serveur : sinon loadCitiesActivities() (serveur autoritaire) re-synchronise
       // cette activité au prochain chargement et elle "revient" après actualisation.
+      if(act) markDeletedTombstone('activities', cityKey+'||'+act.n);
       if(sb && CURRENT_TRIP && act){
         var cpParts = cityKey.split('_');
         var cpCountryId = cpParts[0], cpCityName = cpParts.slice(1).join('_');
@@ -4494,6 +4506,7 @@ function restoreActivity(cityKey, trashIndex) {
     if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
     delete item._wasCustom;
     S.customActs[cityKey].push(item);
+    unmarkDeletedTombstone('activities', cityKey+'||'+item.n);
     if(sb && CURRENT_TRIP){
       var rpParts = cityKey.split('_');
       var rpCountryId = rpParts[0], rpCityName = rpParts.slice(1).join('_');
@@ -7987,6 +8000,8 @@ function deleteCity(countryId, cityName){
     var aIdx = S.addedCities[countryId].findIndex(function(ci){return ci.city===cityName;});
     if(aIdx>-1) S.addedCities[countryId].splice(aIdx,1);
   }
+  markDeletedTombstone('cities', countryId+'||'+cityName);
+  (S.customActs[ck]||[]).forEach(function(a){ markDeletedTombstone('activities', ck+'||'+a.n); });
   delete S.customActs[ck];
   Object.keys(doneKeys).forEach(function(k){ delete S.done[k]; });
   Object.keys(deletedActsKeys).forEach(function(k){ delete S.deletedActs[k]; });
@@ -8058,9 +8073,11 @@ function restoreCity(trashId){
   if(t.activeDay) S.activeDay[ck]=t.activeDay;
   if(t.wasOpen) S.openCities[ck]=true;
   if(t.trashActs){ if(!S.trash) S.trash={}; S.trash[ck]=t.trashActs; }
-  (t.journalEntries||[]).forEach(function(e){ S.journal.push(e); });
-  (t.expenses||[]).forEach(function(e){ S.expenses.push(e); });
+  (t.journalEntries||[]).forEach(function(e){ S.journal.push(e); unmarkDeletedTombstone('journal', e.id); });
+  (t.expenses||[]).forEach(function(e){ S.expenses.push(e); unmarkDeletedTombstone('expenses', e.id); });
   if(S.cityOrder) delete S.cityOrder[t.countryId];
+  unmarkDeletedTombstone('cities', t.countryId+'||'+t.cityName);
+  (t.customActs||[]).forEach(function(act){ unmarkDeletedTombstone('activities', ck+'||'+act.n); });
 
   S.cityTrash.splice(idx,1);
   save();
@@ -10070,28 +10087,41 @@ async function loadCitiesActivities(){
   if(!sb || !CURRENT_TRIP) return;
   var {data:citiesData} = await sb.from('cities').select('*').eq('trip_id',CURRENT_TRIP.id);
   var {data:actsData} = await sb.from('activities').select('*').eq('trip_id',CURRENT_TRIP.id);
-  // Villes : serveur autoritaire par pays, garder les villes locales non encore synchro
+  // Villes : serveur autoritaire par pays, garder les villes locales non encore synchro,
+  // en excluant celles marquées comme supprimées via tombstone (voir markDeletedTombstone) —
+  // sinon une suppression non encore persistée dans le gros blob localStorage pourrait ressusciter.
+  var deletedCityTombstones = getDeletedTombstones('cities');
   var serverCityMap = {};
   (citiesData||[]).forEach(function(row){
     if(!serverCityMap[row.country_id]) serverCityMap[row.country_id]=[];
     serverCityMap[row.country_id].push({city:row.city,sub:'',acts:[],addedBy:row.added_by_label});
   });
-  Object.keys(serverCityMap).forEach(function(cid){
-    var sNames = serverCityMap[cid].map(function(c){return c.city;});
-    var local  = (S.addedCities[cid]||[]).filter(function(c){return sNames.indexOf(c.city)===-1;});
-    S.addedCities[cid] = serverCityMap[cid].concat(local);
+  var allCityCountryIds = Object.keys(serverCityMap).concat(Object.keys(S.addedCities||{}));
+  allCityCountryIds.filter(function(v,i,a){return a.indexOf(v)===i;}).forEach(function(cid){
+    var sList = serverCityMap[cid]||[];
+    var sNames = sList.map(function(c){return c.city;});
+    var local  = (S.addedCities[cid]||[]).filter(function(c){
+      return sNames.indexOf(c.city)===-1 && deletedCityTombstones.indexOf(cid+'||'+c.city)===-1;
+    });
+    S.addedCities[cid] = sList.concat(local);
   });
-  // Activités : serveur autoritaire par clé ville, garder les activités locales non encore synchro
+  // Activités : serveur autoritaire par clé ville, garder les activités locales non encore synchro,
+  // en excluant celles marquées comme supprimées via tombstone.
+  var deletedActTombstones = getDeletedTombstones('activities');
   var serverActsMap = {};
   (actsData||[]).forEach(function(row){
     var ck=row.country_id+'_'+row.city;
     if(!serverActsMap[ck]) serverActsMap[ck]=[];
     serverActsMap[ck].push({n:row.name,m:row.tip||'',tags:[],custom:true,addedBy:row.added_by_label});
   });
-  Object.keys(serverActsMap).forEach(function(ck){
-    var sNames = serverActsMap[ck].map(function(a){return a.n;});
-    var local  = (S.customActs[ck]||[]).filter(function(a){return a.custom&&sNames.indexOf(a.n)===-1;});
-    S.customActs[ck] = serverActsMap[ck].concat(local);
+  var allActCityKeys = Object.keys(serverActsMap).concat(Object.keys(S.customActs||{}));
+  allActCityKeys.filter(function(v,i,a){return a.indexOf(v)===i;}).forEach(function(ck){
+    var sList = serverActsMap[ck]||[];
+    var sNames = sList.map(function(a){return a.n;});
+    var local  = (S.customActs[ck]||[]).filter(function(a){
+      return a.custom && sNames.indexOf(a.n)===-1 && deletedActTombstones.indexOf(ck+'||'+a.n)===-1;
+    });
+    S.customActs[ck] = sList.concat(local);
   });
   save();
 }
