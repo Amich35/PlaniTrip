@@ -4866,7 +4866,6 @@ function renderCityPanelContentBody(c, city){
           +'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
-          +'<button class="map-btn" title="Supprimer" onclick="event.stopPropagation();deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false,\''+jsStrEsc(a.n)+'\')">'+svgIcon('trash-2',14)+'</button>'
           +'</div></div></div></div></div>';
       } else {
         var ca=custs[origIdx];
@@ -4887,8 +4886,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +'<div class="act-footer" style="margin-top:4px">'+categoryPill(caCat,ck2)+'<div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
-          +'<button class="map-btn" title="Supprimer" onclick="event.stopPropagation();deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true,\''+jsStrEsc(ca.n)+'\')">'+svgIcon('trash-2',14)+'</button></div>'
+          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button></div>'
           +'</div></div></div></div>';
       }
     }).join('');
@@ -5034,7 +5032,6 @@ function renderItinerary(c, embedded){
 
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
-      +'<button onclick="event.stopPropagation();deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')" title="Supprimer la ville" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2">'+svgIcon('trash-2',13)+'</button>'
       +'<div class="city-thumb" data-img-query="'+escHtml(imgQuery)+'"></div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
