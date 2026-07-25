@@ -2088,6 +2088,7 @@ function ensureStateDefaults(){
   if(!S.actCategory) S.actCategory={};
   if(!S.customCountries) S.customCountries=[];
   if(!S.deletedCountryIds) S.deletedCountryIds=[];
+  if(!S.deletedCities) S.deletedCities={};
   if(!S.countryEdits) S.countryEdits={};
   if(!S.addedCities) S.addedCities={};
   if(!S.accom) S.accom={};
@@ -2154,6 +2155,16 @@ function rebuildCountriesFromState(){
       }
     });
   });
+  // Remove built-in cities the user deleted (analogue à S.deletedActs pour les activités
+  // intégrées, mais pour les villes intégrées — sans ça, une ville comme "Kyoto" faisant
+  // partie du programme de base revient à chaque reconstruction de COUNTRIES).
+  if(S.deletedCities){
+    COUNTRIES.forEach(function(c){
+      for(var _j=c.cities.length-1;_j>=0;_j--){
+        if(S.deletedCities[c.id+'||'+c.cities[_j].city]) c.cities.splice(_j,1);
+      }
+    });
+  }
 }
 rebuildCountriesFromState();
 
@@ -8004,6 +8015,8 @@ function deleteCity(countryId, cityName){
     if(aIdx>-1) S.addedCities[countryId].splice(aIdx,1);
   }
   markDeletedTombstone('cities', countryId+'||'+cityName);
+  if(!S.deletedCities) S.deletedCities={};
+  S.deletedCities[countryId+'||'+cityName] = true;
   (S.customActs[ck]||[]).forEach(function(a){ markDeletedTombstone('activities', ck+'||'+a.n); });
   delete S.customActs[ck];
   Object.keys(doneKeys).forEach(function(k){ delete S.done[k]; });
@@ -8034,7 +8047,7 @@ function deleteCity(countryId, cityName){
 
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder();
+  syncDeletedActs(); syncCityOrder(); syncDeletedCities();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -8080,12 +8093,13 @@ function restoreCity(trashId){
   (t.expenses||[]).forEach(function(e){ S.expenses.push(e); unmarkDeletedTombstone('expenses', e.id); });
   if(S.cityOrder) delete S.cityOrder[t.countryId];
   unmarkDeletedTombstone('cities', t.countryId+'||'+t.cityName);
+  if(S.deletedCities) delete S.deletedCities[t.countryId+'||'+t.cityName];
   (t.customActs||[]).forEach(function(act){ unmarkDeletedTombstone('activities', ck+'||'+act.n); });
 
   S.cityTrash.splice(idx,1);
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder();
+  syncDeletedActs(); syncCityOrder(); syncDeletedCities();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -8164,6 +8178,16 @@ function syncCityOrder(){
 function syncDeletedActs(){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+  }
+}
+function syncDeletedCities(){
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedCities',data:S.deletedCities,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+  }
+}
+function syncDeletedCountryIds(){
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedCountryIds',data:S.deletedCountryIds,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 function getOrder(ck,totalBase,totalCustom){
@@ -10247,6 +10271,10 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }
     } else if(row.detail_key === '__planitrip__deletedActs'){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
+    } else if(row.detail_key === '__planitrip__deletedCities'){
+      if(row.data && typeof row.data === 'object'){ S.deletedCities = row.data; }
+    } else if(row.detail_key === '__planitrip__deletedCountryIds'){
+      if(row.data && Array.isArray(row.data)){ S.deletedCountryIds = row.data; }
     } else if(row.detail_key.indexOf('__planitrip__travelerBudget_')===0){
       var cid = row.detail_key.slice('__planitrip__travelerBudget_'.length);
       if(row.data && typeof row.data === 'object'){
