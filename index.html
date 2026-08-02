@@ -3,7 +3,7 @@
 <head>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <title>PlaniTrip — Guide de voyage</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
@@ -2563,10 +2563,10 @@ function isPlaceClosedNow(hoursText){
 
   // Styles partagés inputs/textareas custom
   // Styles champs custom — fond blanc comme la carte, bordure discrète
-  // font-size réel 16px (évite le zoom auto iOS au focus) + zoom CSS 0.8125 pour un rendu visuel
-  // à 13px, identique au texte des fiches IA (16 × 0.8125 = 13)
-  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:16px;zoom:0.8125;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
-  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;zoom:0.8125;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
+  // font-size 13px identique au texte IA (le zoom auto iOS est bloqué via user-scalable=no
+  // dans le viewport meta, donc plus besoin du hack font-size 16px)
+  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
+  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
 
   // Infos pratiques (quickInfo)
   if(_isEditable){
@@ -3554,6 +3554,30 @@ async function geocodePinForActivity(actKey, actName, cityKey){
       renderContent();
     }
   }catch(e){ /* échec silencieux : le bouton carte retombe sur la recherche par nom */ }
+}
+// Rattrapage : géocode en arrière-plan toutes les activités custom d'une ville qui n'ont pas
+// encore d'épingle (créées avant l'ajout du géocodage auto). Respecte la limite Nominatim
+// (1 requête/seconde) en espaçant les appels. Ne redemande jamais deux fois la même activité
+// dans une session grâce au cache _backfillDone.
+var _backfillDone = {};
+function backfillCityActivityPins(ck){
+  if(_backfillDone[ck]) return;
+  _backfillDone[ck] = true;
+  var customs = S.customActs[ck] || [];
+  var queue = [];
+  customs.forEach(function(ca, i){
+    var key = ck+'_c'+i;
+    if(!COORDS[key]) queue.push({key:key, name:ca.n});
+  });
+  if(!queue.length) return;
+  var idx = 0;
+  function next(){
+    if(idx >= queue.length) return;
+    var item = queue[idx++];
+    geocodePinForActivity(item.key, item.name, ck);
+    setTimeout(next, 1100);
+  }
+  next();
 }
 function _createActivityCore(cityKey, val, opts){
   val = stripHtml(val.trim());
@@ -5112,6 +5136,7 @@ function openCityDetail(ck){
   save();
   renderContent();
   window.scrollTo(0,0);
+  backfillCityActivityPins(ck);
 }
 function closeCityDetail(){
   S.tab = 'country';
