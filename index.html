@@ -2422,6 +2422,75 @@ function openMapFromCard(el){
   if(!card) return;
   openMap(card.getAttribute('data-act-key'), card.getAttribute('data-act-name'));
 }
+
+// ── MENU D'ACTIONS UNIFIÉ (…) ─────────────────────────────────
+// Point d'entrée unique pour toutes les actions secondaires d'une activité (catégorie, moment,
+// horaire, jour, favori, suppression). Lit le contexte depuis la carte ancêtre.
+var _actionMenuCtx = null;
+function openActionMenu(el){
+  var card = el.closest('.act-card');
+  if(!card) return;
+  var actKey = card.getAttribute('data-act-key');
+  var actName = card.getAttribute('data-act-name');
+  var cityKey = card.getAttribute('data-city-key');
+  var origIdx = parseInt(card.getAttribute('data-orig-idx'));
+  var isCustom = card.getAttribute('data-is-custom')==='true';
+  _actionMenuCtx = {actKey:actKey, actName:actName, cityKey:cityKey, origIdx:origIdx, isCustom:isCustom};
+  var isFav = !!S.favorites[actKey];
+  var items = [
+    {icon:'pencil',   label:'Modifier',                                  action:'edit'},
+    {icon:'history',  label:'Planifier (moment et horaire)',             action:'plan'},
+    {icon:'compass',  label:'Changer la cat\u00e9gorie',                 action:'category'},
+    {icon:'calendar', label:'D\u00e9placer vers un autre jour',          action:'date'},
+    {icon:'star',     label:isFav?'Retirer des favoris':'Ajouter aux favoris', action:'fav'},
+    {icon:'trash-2',  label:'Supprimer',                                 action:'delete', danger:true}
+  ];
+  document.getElementById('actionMenuTitle').textContent = actName;
+  document.getElementById('actionMenuBody').innerHTML = items.map(function(it,i){
+    return '<div onclick="handleActionMenuTap(\''+it.action+'\')" style="display:flex;align-items:center;gap:12px;padding:13px 4px;cursor:pointer;'+(it.danger?'color:#E76F51':'color:var(--ink)')+(i>0?';border-top:1px solid rgba(29,29,31,0.07)':'')+'">'
+      +'<span style="width:22px;display:flex;justify-content:center;flex-shrink:0">'+svgIcon(it.icon,18)+'</span>'
+      +'<span style="font-size:15px;font-weight:500">'+it.label+'</span>'
+      +'</div>';
+  }).join('');
+  document.getElementById('actionMenu').classList.add('open');
+}
+function closeActionMenu(){ document.getElementById('actionMenu').classList.remove('open'); }
+function handleActionMenuTap(action){
+  var ctx = _actionMenuCtx;
+  if(!ctx) return;
+  closeActionMenu();
+  if(action==='edit'){
+    openDetail(ctx.actKey, ctx.actName, ctx.cityKey);
+  } else if(action==='plan'){
+    openPlanningModal(ctx.actKey, ctx.actName, '');
+  } else if(action==='category'){
+    openCategoryPickerModal(ctx.actKey);
+  } else if(action==='date'){
+    openDateChangeModal(ctx.actKey, ctx.cityKey);
+  } else if(action==='fav'){
+    toggleFavorite(ctx.actKey);
+  } else if(action==='delete'){
+    deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName);
+  }
+}
+// Déplacer vers un autre jour — réactive un sélecteur de date simple (existait en code mais
+// n'était affiché nulle part avant l'ajout du menu unifié).
+var _dateChangeActKey = '';
+function openDateChangeModal(actKey, cityKey){
+  _dateChangeActKey = actKey;
+  var range = (typeof cityStayRange==='function') ? cityStayRange(cityKey) : null;
+  var bounds = range && range.start && range.end ? (' min="'+range.start+'" max="'+range.end+'"') : '';
+  var curDate = (S.actDate && S.actDate[actKey]) || '';
+  document.getElementById('dateChangeModalBody').innerHTML =
+    '<input class="ef-input" id="dateChangeInput" type="date" value="'+curDate+'"'+bounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px"/>';
+  document.getElementById('dateChangeModal').classList.add('open');
+}
+function saveDateChange(){
+  var val = document.getElementById('dateChangeInput').value;
+  setActivityDate(_dateChangeActKey, val);
+  document.getElementById('dateChangeModal').classList.remove('open');
+}
+
 function openDetail(actKey, actName, cityKey) {
   const _staticDetail = ACT_DETAILS[actKey] || {};
   const _localDetail = (window._customDetails && window._customDetails[actKey]) || {};
@@ -5189,16 +5258,16 @@ function openPlanningModalFromEl(el){
 function planningPill(actKey, name, meta){
   var mk = getActMoment(actKey, name, meta);
   var timeVal = (S.actTime && S.actTime[actKey]) || '';
-  var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
   if(!mk && !timeVal){
-    return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',10)+' Planifier</span>';
+    return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',10)+' Planifier</span>';
   }
   var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
   var label = timeVal || (mo?mo.label:'');
-  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,10):svgIcon('history',10))+' '+escHtml(label)+'</span>';
+  return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,10):svgIcon('history',10))+' '+escHtml(label)+'</span>';
 }
 // Colonne horaire discrète, affichée à gauche de la photo, à l'intérieur de l'encart coloré
-// du moment (hors de la carte blanche individuelle de l'activité).
+// du moment (hors de la carte blanche individuelle de l'activité). Raccourci direct vers le
+// sélecteur horaire (contrairement aux autres pills qui passent par le menu (…) unifié).
 function timeColumnHTML(actKey, name, meta, momentColor){
   var timeVal = (S.actTime && S.actTime[actKey]) || '';
   var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
@@ -5208,13 +5277,13 @@ function timeColumnHTML(actKey, name, meta, momentColor){
 function categoryPill(catKeys, actKey){
   catKeys = catKeys || [];
   if(!catKeys.length){
-    return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('plus',10)+' Catégorie</span>';
+    return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('plus',10)+' Catégorie</span>';
   }
   return '<span style="display:inline-flex;gap:3px;flex-wrap:wrap;vertical-align:middle">'
     +catKeys.map(function(catKey){
       var cat = ACTIVITY_CATEGORIES[catKey];
       if(!cat) return '';
-      return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;cursor:pointer;flex-shrink:0">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+      return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;cursor:pointer;flex-shrink:0">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
     }).join('')
     +'</span>';
 }
@@ -5289,7 +5358,7 @@ function renderCityPanelContentBody(c, city){
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
         var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(a.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+' Supprimer</div>'
-          +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+          +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' >'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
@@ -5300,6 +5369,7 @@ function renderCityPanelContentBody(c, city){
           +'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMapFromCard(this)">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
+          +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',15)+'</button>'
           +'</div></div></div></div></div>';
         return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m};
       } else {
@@ -5317,12 +5387,13 @@ function renderCityPanelContentBody(c, city){
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
         var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+' Supprimer</div>'
-          +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+          +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +'<div class="act-footer" style="margin-top:4px">'+categoryPill(caCat,ck2)+(caMoment?'':planningPill(ck2,ca.n,ca.m))+'<div style="display:flex;gap:2px">'
-          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button></div>'
+          +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
+          +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',15)+'</button></div>'
           +'</div></div></div></div>';
         return {html:chtml, moment:caMoment, actKey:ck2, name:ca.n, meta:ca.m};
       }
@@ -12156,6 +12227,27 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div id="planningModalBody"></div>
     <button onclick="savePlanningModal()" style="width:100%;margin-top:14px;padding:12px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
     <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('planningModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
+<!-- Menu d'actions unifié (…) sur une activité -->
+<div class="share-modal" id="actionMenu">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="actionMenuTitle" style="font-size:14px;color:var(--ink-subtle);font-weight:600"></div>
+    <div id="actionMenuBody"></div>
+    <div style="text-align:center;margin-top:10px"><span onclick="closeActionMenu()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
+<!-- Déplacer vers un autre jour -->
+<div class="share-modal" id="dateChangeModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Déplacer vers un autre jour</div>
+    <div id="dateChangeModalBody"></div>
+    <button onclick="saveDateChange()" style="width:100%;margin-top:14px;padding:12px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
+    <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('dateChangeModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
   </div>
 </div>
 
