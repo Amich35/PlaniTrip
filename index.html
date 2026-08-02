@@ -2475,32 +2475,8 @@ function isPlaceClosedNow(hoursText){
   }
 }
 // Infos rapides — grille de scan ultra-rapide (icône / label / valeur), à la Flighty
-  var quickItems = [];
-  if(d.hours) quickItems.push({icon:'sun', label:'Ouvert', value:d.hours});
-  if(d.duration) quickItems.push({icon:'history', label:'Durée', value:d.duration});
-  if(d.bookingRequired) quickItems.push({icon:'check-square', label:'Réservation', value:d.bookingRequired});
-  if(d.bestTime) quickItems.push({icon:'sparkles', label:'Idéal', value:d.bestTime});
-  var isClosedNow = isPlaceClosedNow(d.hours);
-  var quickCardBg = isClosedNow ? '#FBF1E8' : '#F2F7F4';
-  var quickCardBorder = isClosedNow ? 'rgba(244,162,97,0.28)' : 'rgba(45,106,79,0.10)';
-  var quickCardAccent = isClosedNow ? 'var(--orange,#F4A261)' : 'var(--accent)';
-  var quickCardIconBorder = isClosedNow ? 'rgba(244,162,97,0.35)' : 'rgba(45,106,79,0.18)';
-  var quickHTML = '';
-  if(quickItems.length){
-    quickHTML = '<div style="display:flex;border:1px solid '+quickCardBorder+';border-radius:16px;padding:16px 8px;background:'+quickCardBg+'">'
-      + quickItems.map(function(item){
-          var isHoursItem = item.label==='Ouvert';
-          var iconColor = (isHoursItem && isClosedNow) ? quickCardAccent : (isHoursItem ? 'var(--accent)' : 'var(--accent)');
-          var iconBorder = (isHoursItem && isClosedNow) ? quickCardIconBorder : 'rgba(45,106,79,0.18)';
-          return '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px">'
-            +'<span style="width:38px;height:38px;border-radius:50%;border:1px solid '+iconBorder+';display:flex;align-items:center;justify-content:center;color:'+iconColor+'">'+svgIcon(item.icon,17)+'</span>'
-            +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Fermé':'Ouvert'):item.label)+'</span>'
-            +'<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(item.value)+'</span>'
-            +'</div>';
-        }).join('')
-      +'</div>';
-  }
-  document.getElementById('detailQuickInfo').innerHTML = quickHTML;
+  document.getElementById('detailQuickInfo').innerHTML = buildQuickInfoHTML(d);
+
 
   // Actions — toujours visibles, en haut, style grille icône/label
   document.getElementById('detailMapBtn').innerHTML = '<span class="dab-circle">'+svgIcon('map-pin',17)+'</span><span>Carte</span>';
@@ -2586,17 +2562,30 @@ function isPlaceClosedNow(hoursText){
       {key:'hours',           icon:'sun',          label:'Horaires',          placeholder:'ex\u00a0: 9h\u201318h'},
       {key:'duration',        icon:'history',      label:'Dur\u00e9e',              placeholder:'ex\u00a0: 1h30'},
       {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: t\u00f4t le matin'},
-      {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'}
+      {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'},
+      {key:'address',         icon:'map-pin',      label:'Adresse',           placeholder:'Adresse pr\u00e9cise', full:true},
+      {key:'tag',             icon:'landmark',     label:'Type de lieu',      placeholder:'ex\u00a0: Temple, Restaurant\u2026', full:true}
     ];
     var _qBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">';
     _qFields.forEach(function(f){
       var _fval = escHtml(_dSaved[f.key]||'');
-      _qBody += '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon(f.icon,11)+' '+f.label+'</div>'
+      _qBody += '<div'+(f.full?' style="grid-column:1/-1"':'')+'><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon(f.icon,11)+' '+f.label+'</div>'
         +'<input type="text" placeholder="'+f.placeholder+'" value="'+_fval+'" style="'+_inStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\''+f.key+'\',this.value)"/>'
         +'</div>';
     });
     _qBody += '</div>';
     html += _detailAccordion('Infos pratiques', _qBody, false);
+  }
+
+  // Tarifs — affiché en lecture seule pour l'IA, éditable pour custom (jusqu'ici collecté par
+  // l'IA mais jamais affiché nulle part : on l'expose maintenant pour tout le monde)
+  if(_isEditable){
+    var _costsVal = (_dSaved.costs||[]).join('\n');
+    var _cBody = '<textarea rows="2" placeholder="Un tarif par ligne\u2026 ex\u00a0: Adulte 15€" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'costs\',this.value)">'+escHtml(_costsVal)+'</textarea>';
+    html += _detailAccordion('Tarifs', _cBody, false);
+  } else if(d.costs && d.costs.length) {
+    var _costsHtml = '<div class="detail-text">'+d.costs.map(function(c){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+escHtml(c)+'</div>';}).join('')+'</div>';
+    html += _detailAccordion('Tarifs', _costsHtml, false);
   }
 
   // À savoir
@@ -2742,6 +2731,43 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
   }
 }
+function buildQuickInfoHTML(d){
+  var quickItems = [];
+  if(d.hours) quickItems.push({icon:'sun', label:'Ouvert', value:d.hours});
+  if(d.duration) quickItems.push({icon:'history', label:'Durée', value:d.duration});
+  if(d.bookingRequired) quickItems.push({icon:'check-square', label:'Réservation', value:d.bookingRequired});
+  if(d.bestTime) quickItems.push({icon:'sparkles', label:'Idéal', value:d.bestTime});
+  var isClosedNow = isPlaceClosedNow(d.hours);
+  var quickCardBg = isClosedNow ? '#FBF1E8' : '#F2F7F4';
+  var quickCardBorder = isClosedNow ? 'rgba(244,162,97,0.28)' : 'rgba(45,106,79,0.10)';
+  var quickCardAccent = isClosedNow ? 'var(--orange,#F4A261)' : 'var(--accent)';
+  var quickCardIconBorder = isClosedNow ? 'rgba(244,162,97,0.35)' : 'rgba(45,106,79,0.18)';
+  if(!quickItems.length) return '';
+  return '<div style="display:flex;border:1px solid '+quickCardBorder+';border-radius:16px;padding:16px 8px;background:'+quickCardBg+'">'
+    + quickItems.map(function(item){
+        var isHoursItem = item.label==='Ouvert';
+        var iconColor = (isHoursItem && isClosedNow) ? quickCardAccent : (isHoursItem ? 'var(--accent)' : 'var(--accent)');
+        var iconBorder = (isHoursItem && isClosedNow) ? quickCardIconBorder : 'rgba(45,106,79,0.18)';
+        return '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px">'
+          +'<span style="width:38px;height:38px;border-radius:50%;border:1px solid '+iconBorder+';display:flex;align-items:center;justify-content:center;color:'+iconColor+'">'+svgIcon(item.icon,17)+'</span>'
+          +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Fermé':'Ouvert'):item.label)+'</span>'
+          +'<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(item.value)+'</span>'
+          +'</div>';
+      }).join('')
+    +'</div>';
+}
+// Rafraîchit le header (tag, adresse, bloc infos rapides) sans reconstruire toute la fiche —
+// évite de perdre le focus/scroll de l'utilisateur en train de remplir un autre champ.
+function refreshDetailHeaderLive(actKey){
+  if(!document.getElementById('detailModal').classList.contains('open')) return;
+  var d = (window._customDetails && window._customDetails[actKey]) || {};
+  var tagEl = document.getElementById('detailTag');
+  if(tagEl){ tagEl.textContent = d.tag || ''; tagEl.style.display = d.tag ? '' : 'none'; }
+  var subEl = document.getElementById('detailSub');
+  if(subEl){ subEl.textContent = d.address || ''; subEl.style.display = d.address ? '' : 'none'; }
+  var quickEl = document.getElementById('detailQuickInfo');
+  if(quickEl) quickEl.innerHTML = buildQuickInfoHTML(d);
+}
 function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(!window._customDetails) window._customDetails = {};
   if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
@@ -2776,6 +2802,12 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
     d.bookingRequired = val;
   } else if(field === 'website'){
     d.website = val;
+  } else if(field === 'address'){
+    d.address = val;
+  } else if(field === 'tag'){
+    d.tag = val;
+  } else if(field === 'costs'){
+    d.costs = val.split('\n').map(function(l){return l.trim();}).filter(Boolean);
   } else if(field === 'mapsUrl'){
     d.mapsUrl = val;
     // Si l'utilisateur colle un lien Google Maps, essayer d'en extraire les coords
@@ -2789,6 +2821,7 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
   }
+  refreshDetailHeaderLive(actKey);
   renderContent();
 }
 function unlockCustomActDetail(actKey, cityKey, actName){
