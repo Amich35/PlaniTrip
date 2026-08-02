@@ -488,6 +488,9 @@ a{color:var(--ink);}
 .planning-group-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-subtle);display:flex;align-items:center;gap:6px;margin:16px 2px 8px;}
 .planning-group-header:first-child{margin-top:2px;}
 .planning-group-header--muted{opacity:0.55;}
+.planning-group{border-radius:18px;padding:10px 10px 6px;margin:0 0 14px;}
+.planning-group .planning-group-header{margin:0 2px 8px;}
+.planning-group .swipe-wrap{margin-bottom:8px;}
 .day-tabs::-webkit-scrollbar{display:none;}
 .day-tab{flex-shrink:0;padding:5px 12px;min-height:26px;border-radius:16px;font-size:11px;font-weight:500;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;transition:all 0.15s;}
 .day-tab.active{background:var(--sand-deep);color:var(--ink);font-weight:600;}
@@ -5150,15 +5153,27 @@ function getActCategory(actKey, name, meta){
   var guessed = guessActivityCategory(name, meta);
   return guessed ? [guessed] : [];
 }
+function openPlanningModalFromEl(el){
+  openPlanningModal(el.getAttribute('data-act-key'), el.getAttribute('data-act-name'), el.getAttribute('data-act-meta'));
+}
 function planningPill(actKey, name, meta){
   var mk = getActMoment(actKey, name, meta);
   var timeVal = (S.actTime && S.actTime[actKey]) || '';
+  var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
   if(!mk && !timeVal){
-    return '<span onclick="event.stopPropagation();openPlanningModal(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(name)+'\',\''+jsStrEsc(meta||'')+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',10)+' Planifier</span>';
+    return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',10)+' Planifier</span>';
   }
   var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
   var label = timeVal || (mo?mo.label:'');
-  return '<span onclick="event.stopPropagation();openPlanningModal(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(name)+'\',\''+jsStrEsc(meta||'')+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,10):svgIcon('history',10))+' '+escHtml(label)+'</span>';
+  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,10):svgIcon('history',10))+' '+escHtml(label)+'</span>';
+}
+// Colonne horaire discrète, affichée à gauche de la photo, à l'intérieur de l'encart coloré
+// du moment (hors de la carte blanche individuelle de l'activité).
+function timeColumnHTML(actKey, name, meta, momentColor){
+  var timeVal = (S.actTime && S.actTime[actKey]) || '';
+  var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
+  var content = timeVal ? escHtml(timeVal) : svgIcon('history',13);
+  return '<div '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="flex-shrink:0;width:40px;padding-top:16px;text-align:right;font-size:11px;font-weight:700;color:'+momentColor+';line-height:1.2;cursor:pointer;opacity:'+(timeVal?'1':'0.45')+'">'+content+'</div>';
 }
 function categoryPill(catKeys, actKey){
   catKeys = catKeys || [];
@@ -5251,12 +5266,12 @@ function renderCityPanelContentBody(c, city){
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +'<div class="act-footer" style="margin-top:4px">'
           +categoryPill(actCat,k)
-          +planningPill(k,a.n,a.m)
+          +(actMoment?'':planningPill(k,a.n,a.m))
           +'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
           +'</div></div></div></div></div>';
-        return {html:html, moment:actMoment};
+        return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m};
       } else {
         var ca=custs[origIdx];
         if(!ca) return null;
@@ -5276,28 +5291,33 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
-          +'<div class="act-footer" style="margin-top:4px">'+categoryPill(caCat,ck2)+planningPill(ck2,ca.n,ca.m)+'<div style="display:flex;gap:2px">'
+          +'<div class="act-footer" style="margin-top:4px">'+categoryPill(caCat,ck2)+(caMoment?'':planningPill(ck2,ca.n,ca.m))+'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button></div>'
           +'</div></div></div></div>';
-        return {html:chtml, moment:caMoment};
+        return {html:chtml, moment:caMoment, actKey:ck2, name:ca.n, meta:ca.m};
       }
     }).filter(Boolean);
 
     // Regroupement visuel façon "planning" : Matin / Midi / Après-midi / Soir, puis Non planifié
     var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
-    baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item.html); });
+    baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
     var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
     var momentOrder = ['morning','noon','afternoon','evening',''];
+    var momentAccent = {morning:'#F4A261', noon:'var(--accent)', afternoon:'#4D96FF', evening:'var(--ink-muted)'};
+    var momentBg = {morning:'#FBF1E8', noon:'#F2F7F4', afternoon:'#EDF3FC', evening:'#F1EFEA'};
     const baseActsHTML = momentOrder.map(function(mk){
       var items = momentGroups[mk];
       if(!items.length) return '';
-      var header = '';
       if(mk && ACTIVITY_MOMENTS[mk]){
-        header = '<div class="planning-group-header">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,13)+' '+ACTIVITY_MOMENTS[mk].label+'</div>';
-      } else if(!mk && hasAnyPlanned){
-        header = '<div class="planning-group-header planning-group-header--muted">Non planifié</div>';
+        var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,13)+' '+ACTIVITY_MOMENTS[mk].label+'</div>';
+        var rows = items.map(function(it){
+          return '<div style="display:flex;align-items:flex-start;gap:2px">'+timeColumnHTML(it.actKey,it.name,it.meta,momentAccent[mk])+'<div style="flex:1;min-width:0">'+it.html+'</div></div>';
+        }).join('');
+        return '<div class="planning-group" style="background:'+momentBg[mk]+'">'+header+rows+'</div>';
+      } else {
+        var header2 = hasAnyPlanned ? '<div class="planning-group-header planning-group-header--muted">Non planifié</div>' : '';
+        return header2+items.map(function(it){return it.html;}).join('');
       }
-      return header+items.join('');
     }).join('');
 
     const activityTrashBtn = activityTrashButtonHTML(ck);
