@@ -2530,7 +2530,16 @@ function isPlaceClosedNow(hoursText){
     }
   }
   if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
-  if(d.m || actMeta) {
+  // Détection activité custom → note éditable si pas de fiche IA
+  var _idxPart = cityKey ? actKey.slice(cityKey.length+1) : '';
+  var _isCustom = _idxPart.indexOf('c')===0;
+  var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
+  var _isEditableNote = _isCustom && !d._aiGenerated;
+  if(_isEditableNote){
+    html += '<div class="detail-section"><div class="detail-section-title">Note</div>'
+      +'<textarea id="detailCustomNote" class="ef-input" rows="3" placeholder="Ajoute une note, conseil, horaire\u2026" style="width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px" onblur="saveCustomActNote(\''+jsStrEsc(cityKey)+'\','+_custIdx+',this.value)">'+escHtml(actMeta)+'</textarea>'
+      +'</div>';
+  } else if(d.m || actMeta) {
     html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">À savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
   }
   if(d.tips && d.tips.length) {
@@ -2635,6 +2644,12 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     var statusEl = document.getElementById('detailAiStatus');
     if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
   }
+}
+function saveCustomActNote(cityKey, custIdx, val){
+  if(!S.customActs[cityKey] || !S.customActs[cityKey][custIdx]) return;
+  S.customActs[cityKey][custIdx].m = val.trim();
+  save();
+  renderContent();
 }
 function closeDetail(){ document.getElementById('detailModal').classList.remove('open'); }
 
