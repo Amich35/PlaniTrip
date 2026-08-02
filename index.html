@@ -485,6 +485,9 @@ a{color:var(--ink);}
 .cf-cat-chip.active{background:var(--accent-pale);color:var(--accent);}
 @keyframes cfListFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 .cf-act-list{animation:cfListFade 220ms cubic-bezier(0.34,1.56,0.64,1);}
+.planning-group-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-subtle);display:flex;align-items:center;gap:6px;margin:16px 2px 8px;}
+.planning-group-header:first-child{margin-top:2px;}
+.planning-group-header--muted{opacity:0.55;}
 .day-tabs::-webkit-scrollbar{display:none;}
 .day-tab{flex-shrink:0;padding:5px 12px;min-height:26px;border-radius:16px;font-size:11px;font-weight:500;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;transition:all 0.15s;}
 .day-tab.active{background:var(--sand-deep);color:var(--ink);font-weight:600;}
@@ -2097,6 +2100,8 @@ function ensureStateDefaults(){
   if(!S.journal) S.journal=[];
   if(!S.activeCategory) S.activeCategory={};
   if(!S.actCategory) S.actCategory={};
+  if(!S.actMoment) S.actMoment={};
+  if(!S.actTime) S.actTime={};
   if(!S.customCountries) S.customCountries=[];
   if(!S.deletedCountryIds) S.deletedCountryIds=[];
   if(!S.deletedCities) S.deletedCities={};
@@ -5045,6 +5050,18 @@ const ACTIVITY_CATEGORIES = {
   photo:{label:'Photo',icon:'camera',emoji:'📷'},
   walk:{label:'Balade',icon:'map-pin',emoji:'🚶'}
 };
+const ACTIVITY_MOMENTS = {
+  morning:{label:'Matin',icon:'sun',emoji:'🌅'},
+  noon:{label:'Midi',icon:'utensils',emoji:'🍜'},
+  afternoon:{label:'Après-midi',icon:'compass',emoji:'🌤'},
+  evening:{label:'Soir',icon:'moon',emoji:'🌙'}
+};
+const MOMENT_KEYWORDS = {
+  morning:['petit-déjeuner','petit déjeuner','matin','breakfast','lever du soleil','sunrise','tôt le matin'],
+  noon:['déjeuner','dejeuner','midi','lunch'],
+  afternoon:['après-midi','apres-midi','afternoon'],
+  evening:['dîner','diner','soir','nuit','dinner','night','coucher de soleil','sunset','soirée','soiree']
+};
 const CATEGORY_KEYWORDS = {
   monument:['temple','château','chateau','castle','palais','palace','pagode','pagoda','sanctuaire','shrine','monument','tour','fort','cathédrale','cathedrale','église','eglise','ruines','angkor','wat ','musée','musee','museum'],
   food:['restaurant','street food','food court','marché alimentaire','ramen','sushi','déjeuner','dejeuner','dîner','diner','cuisine','café','cafe','brunch','food','cooking class','dégustation','degustation'],
@@ -5061,6 +5078,70 @@ function guessActivityCategory(name, meta){
   }
   return null;
 }
+function guessActivityMoment(name, meta){
+  var text = ((name||'')+' '+(meta||'')).toLowerCase();
+  for(var mk in MOMENT_KEYWORDS){
+    var kws = MOMENT_KEYWORDS[mk];
+    for(var i=0;i<kws.length;i++){ if(text.indexOf(kws[i])>-1) return mk; }
+  }
+  return null;
+}
+// Retourne la clé du moment ('morning'/'noon'/'afternoon'/'evening') ou '' si non assigné.
+// '' explicite (choix utilisateur) est distinct de undefined (jamais décidé → devine).
+function getActMoment(actKey, name, meta){
+  if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
+  return guessActivityMoment(name, meta) || '';
+}
+function setActMoment(actKey, momentKey){
+  if(!S.actMoment) S.actMoment={};
+  S.actMoment[actKey] = momentKey;
+  save();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+  }
+  renderContent();
+}
+function setActSuggestedTime(actKey, val){
+  if(!S.actTime) S.actTime={};
+  S.actTime[actKey] = (val||'').trim();
+  save();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+  }
+  renderContent();
+}
+var _planningModalActKey = '';
+var _planningModalMoment = '';
+function openPlanningModal(actKey, name, meta){
+  _planningModalActKey = actKey;
+  _planningModalMoment = getActMoment(actKey, name||'', meta||'');
+  var currentTime = (S.actTime && S.actTime[actKey]) || '';
+  var pills = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
+    var mo = ACTIVITY_MOMENTS[mk];
+    var isActive = _planningModalMoment===mk;
+    return '<span onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'" style="display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;margin:3px;background:'+(isActive?'var(--accent)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(mo.icon,14)+' '+mo.label+'</span>';
+  }).join('');
+  document.getElementById('planningModalBody').innerHTML =
+    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
+    +'<div style="display:flex;flex-wrap:wrap;margin-bottom:14px">'+pills+'</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Horaire indicatif (optionnel)</div>'
+    +'<input class="ef-input" id="planningModalTime" type="text" placeholder="ex\u00a0: 10h30, Avant 7h, 17h\u201319h" value="'+escHtml(currentTime)+'" style="width:100%;box-sizing:border-box"/>';
+  document.getElementById('planningModal').classList.add('open');
+}
+function selectPlanningMoment(mk){
+  _planningModalMoment = (_planningModalMoment===mk) ? '' : mk;
+  document.querySelectorAll('[data-moment-pill]').forEach(function(el){
+    var active = el.getAttribute('data-moment-pill')===_planningModalMoment;
+    el.style.background = active ? 'var(--accent)' : 'var(--sand-deep)';
+    el.style.color = active ? '#fff' : 'var(--ink-muted)';
+  });
+}
+function savePlanningModal(){
+  var timeVal = document.getElementById('planningModalTime').value;
+  setActMoment(_planningModalActKey, _planningModalMoment);
+  setActSuggestedTime(_planningModalActKey, timeVal);
+  document.getElementById('planningModal').classList.remove('open');
+}
 function getActCategory(actKey, name, meta){
   if(S.actCategory && S.actCategory[actKey]!==undefined){
     var v = S.actCategory[actKey];
@@ -5068,6 +5149,16 @@ function getActCategory(actKey, name, meta){
   }
   var guessed = guessActivityCategory(name, meta);
   return guessed ? [guessed] : [];
+}
+function planningPill(actKey, name, meta){
+  var mk = getActMoment(actKey, name, meta);
+  var timeVal = (S.actTime && S.actTime[actKey]) || '';
+  if(!mk && !timeVal){
+    return '<span onclick="event.stopPropagation();openPlanningModal(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(name)+'\',\''+jsStrEsc(meta||'')+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',10)+' Planifier</span>';
+  }
+  var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
+  var label = timeVal || (mo?mo.label:'');
+  return '<span onclick="event.stopPropagation();openPlanningModal(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(name)+'\',\''+jsStrEsc(meta||'')+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,10):svgIcon('history',10))+' '+escHtml(label)+'</span>';
 }
 function categoryPill(catKeys, actKey){
   catKeys = catKeys || [];
@@ -5132,26 +5223,27 @@ function renderCityPanelContentBody(c, city){
     const totalCustomAll=(S.customActs[ck]||[]).length;
     const order=getOrder(ck,totalBase,totalCustomAll);
     const custs=S.customActs[ck]||[];
-    const baseActsHTML=order.map(function(slot,slotIdx){
+    const baseActsItems=order.map(function(slot,slotIdx){
       var isBase=slot[0]==='b';
       var origIdx=parseInt(slot.slice(1));
       if(isBase){
-        if(S.deletedActs[ck+'_'+origIdx]) return '';
+        if(S.deletedActs[ck+'_'+origIdx]) return null;
         var a=city.acts[origIdx];
-        if(!a) return '';
+        if(!a) return null;
         var k=ck+'_'+origIdx;
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
-        if(activeDay!=='Tous' && actDateVal!==activeDay) return '';
-        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m).indexOf(activeCat)===-1) return '';
+        if(activeDay!=='Tous' && actDateVal!==activeDay) return null;
+        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m).indexOf(activeCat)===-1) return null;
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
         var actCat = getActCategory(k, a.n, a.m);
+        var actMoment = getActMoment(k, a.n, a.m);
         var actCityStay = cityStayRange(ck);
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false,\''+jsStrEsc(a.n)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',false,\''+jsStrEsc(a.n)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetail(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"':'')+' >'
@@ -5159,32 +5251,53 @@ function renderCityPanelContentBody(c, city){
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +'<div class="act-footer" style="margin-top:4px">'
           +categoryPill(actCat,k)
+          +planningPill(k,a.n,a.m)
           +'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMap(\''+jsStrEsc(k)+'\',\''+a.n.replace(/'/g,"\\'")+'\')">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
           +'</div></div></div></div></div>';
+        return {html:html, moment:actMoment};
       } else {
         var ca=custs[origIdx];
-        if(!ca) return '';
+        if(!ca) return null;
         var ck2=ck+'_c'+origIdx;
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
-        if(activeDay!=='Tous' && cDateVal!==activeDay) return '';
+        if(activeDay!=='Tous' && cDateVal!==activeDay) return null;
         var caCat = getActCategory(ck2, ca.n, ca.m);
-        if(activeCat!=='Tous' && caCat.indexOf(activeCat)===-1) return '';
+        if(activeCat!=='Tous' && caCat.indexOf(activeCat)===-1) return null;
+        var caMoment = getActMoment(ck2, ca.n, ca.m);
         var cdone=!!S.done[ck2];
         var cCityStay = cityStayRange(ck);
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        return '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true,\''+jsStrEsc(ca.n)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" onclick="deleteActivity(\''+jsStrEsc(ck)+'\','+origIdx+',true,\''+jsStrEsc(ca.n)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetail(\''+jsStrEsc(ck2)+'\',\''+ca.n.replace(/'/g,"\\'")+'\''+',\''+jsStrEsc(ck)+'\')" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
-          +'<div class="act-footer" style="margin-top:4px">'+categoryPill(caCat,ck2)+'<div style="display:flex;gap:2px">'
+          +'<div class="act-footer" style="margin-top:4px">'+categoryPill(caCat,ck2)+planningPill(ck2,ca.n,ca.m)+'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button></div>'
           +'</div></div></div></div>';
+        return {html:chtml, moment:caMoment};
       }
+    }).filter(Boolean);
+
+    // Regroupement visuel façon "planning" : Matin / Midi / Après-midi / Soir, puis Non planifié
+    var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
+    baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item.html); });
+    var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
+    var momentOrder = ['morning','noon','afternoon','evening',''];
+    const baseActsHTML = momentOrder.map(function(mk){
+      var items = momentGroups[mk];
+      if(!items.length) return '';
+      var header = '';
+      if(mk && ACTIVITY_MOMENTS[mk]){
+        header = '<div class="planning-group-header">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,13)+' '+ACTIVITY_MOMENTS[mk].label+'</div>';
+      } else if(!mk && hasAnyPlanned){
+        header = '<div class="planning-group-header planning-group-header--muted">Non planifié</div>';
+      }
+      return header+items.join('');
     }).join('');
 
     const activityTrashBtn = activityTrashButtonHTML(ck);
@@ -10573,6 +10686,10 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
     } else if(row.detail_key === '__planitrip__actCategory'){
       if(row.data && typeof row.data === 'object'){ S.actCategory = row.data; }
+    } else if(row.detail_key === '__planitrip__actMoment'){
+      if(row.data && typeof row.data === 'object'){ S.actMoment = row.data; }
+    } else if(row.detail_key === '__planitrip__actTime'){
+      if(row.data && typeof row.data === 'object'){ S.actTime = row.data; }
     } else if(row.detail_key === '__planitrip__cityDates'){
       if(row.data && typeof row.data === 'object'){ S.cityDates = row.data; }
     } else if(row.detail_key === '__planitrip__actDay'){
@@ -11978,6 +12095,17 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-title">Choisir une catégorie</div>
     <div id="categoryModalBody"></div>
     <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('categoryModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Fermer</span></div>
+  </div>
+</div>
+
+<!-- Planning (moment + horaire) picker modal -->
+<div class="share-modal" id="planningModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Planifier</div>
+    <div id="planningModalBody"></div>
+    <button onclick="savePlanningModal()" style="width:100%;margin-top:14px;padding:12px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
+    <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('planningModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
   </div>
 </div>
 
