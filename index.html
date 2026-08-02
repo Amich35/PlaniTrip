@@ -2563,10 +2563,11 @@ function isPlaceClosedNow(hoursText){
 
   // Styles partagés inputs/textareas custom
   // Styles champs custom — fond blanc comme la carte, bordure discrète
-  // font-size 13px identique au texte IA (le zoom auto iOS est bloqué via user-scalable=no
-  // dans le viewport meta, donc plus besoin du hack font-size 16px)
-  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
-  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
+  // font-size 16px : requis pour empêcher le zoom auto au focus sur iOS — le viewport meta
+  // (user-scalable=no) ne suffit pas de façon fiable en PWA installée (limitation connue WebKit).
+  // Léger écart visuel pendant l'édition, mais identique au texte IA (13px) une fois validé.
+  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:16px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
+  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
 
   // Infos pratiques (quickInfo)
   if(_isEditable){
@@ -3557,23 +3558,23 @@ async function geocodePinForActivity(actKey, actName, cityKey){
 }
 // Rattrapage : géocode en arrière-plan toutes les activités custom d'une ville qui n'ont pas
 // encore d'épingle (créées avant l'ajout du géocodage auto). Respecte la limite Nominatim
-// (1 requête/seconde) en espaçant les appels. Ne redemande jamais deux fois la même activité
-// dans une session grâce au cache _backfillDone.
-var _backfillDone = {};
+// (1 requête/seconde) en espaçant les appels. Suivi par activité (pas par ville) : si la
+// synchro Supabase n'a pas encore chargé les activités au premier passage, on retentera au
+// prochain openCityDetail() plutôt que d'abandonner définitivement.
+var _pinAttempted = {};
 function backfillCityActivityPins(ck){
-  if(_backfillDone[ck]) return;
-  _backfillDone[ck] = true;
   var customs = S.customActs[ck] || [];
   var queue = [];
   customs.forEach(function(ca, i){
     var key = ck+'_c'+i;
-    if(!COORDS[key]) queue.push({key:key, name:ca.n});
+    if(!COORDS[key] && !_pinAttempted[key]) queue.push({key:key, name:ca.n});
   });
   if(!queue.length) return;
   var idx = 0;
   function next(){
     if(idx >= queue.length) return;
     var item = queue[idx++];
+    _pinAttempted[item.key] = true;
     geocodePinForActivity(item.key, item.name, ck);
     setTimeout(next, 1100);
   }
