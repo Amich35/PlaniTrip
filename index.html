@@ -3550,10 +3550,23 @@ async function geocodePinForActivity(actKey, actName, cityKey){
   var countryNameEn = country ? getEnglishCountryName(country.name) : '';
   var query = actName+', '+cityName+(countryNameEn?', '+countryNameEn:'');
   try{
-    const res = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(query)+'&format=json&limit=1');
-    const json = await res.json();
-    if(json && json.length){
-      var lat = parseFloat(json[0].lat), lng = parseFloat(json[0].lon);
+    // Biais géographique optionnel : centre les résultats autour de la ville pour désambiguïser
+    // les noms courants (ex: plusieurs "Marché Central" dans des pays différents).
+    var bias = '';
+    try{
+      var cityCoord = await geocodeCity(cityName, country?country.name:'');
+      if(cityCoord && cityCoord.lat && cityCoord.lng){ bias = '&lat='+cityCoord.lat+'&lon='+cityCoord.lng; }
+    }catch(biasErr){}
+    // Photon (komoot.io, basé sur OpenStreetMap) : CORS explicitement supporté pour les appels
+    // client-side, contrairement à Nominatim dont le support CORS n'est pas garanti pour tous
+    // les navigateurs/contextes (échecs silencieux observés en PWA).
+    const res = await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(query)+'&limit=1&lang=fr'+bias);
+    if(!res.ok){ console.error('[PlaniTrip] geocodePinForActivity: HTTP '+res.status, actName); return; }
+    const geo = await res.json();
+    if(geo && geo.features && geo.features.length){
+      var coords = geo.features[0].geometry && geo.features[0].geometry.coordinates;
+      if(!coords || coords.length<2){ console.error('[PlaniTrip] geocodePinForActivity: pas de coordonnées', actName); return; }
+      var lng = parseFloat(coords[0]), lat = parseFloat(coords[1]); // GeoJSON = [lon, lat]
       if(isNaN(lat) || isNaN(lng)) return;
       COORDS[actKey] = [lat, lng, actName];
       if(!window._customDetails) window._customDetails={};
@@ -3566,8 +3579,10 @@ async function geocodePinForActivity(actKey, actName, cityKey){
         sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
       }
       renderContent();
+    } else {
+      console.error('[PlaniTrip] geocodePinForActivity: aucun résultat pour', query);
     }
-  }catch(e){ /* échec silencieux : le bouton carte retombe sur la recherche par nom */ }
+  }catch(e){ console.error('[PlaniTrip] geocodePinForActivity: échec réseau', actName, e); }
 }
 // Rattrapage : géocode en arrière-plan toutes les activités custom d'une ville qui n'ont pas
 // encore d'épingle (créées avant l'ajout du géocodage auto). Respecte la limite Nominatim
