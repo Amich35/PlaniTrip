@@ -2595,19 +2595,19 @@ function isPlaceClosedNow(hoursText){
   if(_isEditable){
     var _tipsVal = (_dSaved.tips||[]).join('\n');
     var _tBody = '<textarea rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>';
-    html += _detailAccordion('Conseils &amp; astuces', _tBody, !!_tipsVal);
+    html += _detailAccordion('Conseils & astuces', _tBody, !!_tipsVal);
   } else if(d.tips && d.tips.length) {
     var _tipsHtml = '<div class="detail-text">'+d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')+'</div>';
-    html += _detailAccordion('Conseils &amp; astuces', _tipsHtml, true);
+    html += _detailAccordion('Conseils & astuces', _tipsHtml, true);
   }
 
   // Histoire & contexte
   if(_isEditable){
     var _histVal = _dSaved.history || '';
     var _hBody = '<textarea rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>';
-    html += _detailAccordion('Histoire &amp; contexte', _hBody, false);
+    html += _detailAccordion('Histoire & contexte', _hBody, false);
   } else if(d.history) {
-    html += _detailAccordion('Histoire &amp; contexte', '<div class="detail-text">'+d.history+'</div>', false);
+    html += _detailAccordion('Histoire & contexte', '<div class="detail-text">'+d.history+'</div>', false);
   }
 
   // Liens
