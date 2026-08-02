@@ -3618,7 +3618,7 @@ function _createActivityCore(cityKey, val, opts){
   if(opts.meta) actObj._userMeta = true;
   S.customActs[cityKey].push(actObj);
   var actKey = cityKey+'_c'+newIdx;
-  if(opts.category){ if(!S.actCategory) S.actCategory={}; S.actCategory[actKey]=opts.category; }
+  if(opts.categories && opts.categories.length){ if(!S.actCategory) S.actCategory={}; S.actCategory[actKey]=opts.categories.slice(); }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
   save();
   renderContent();
@@ -3644,10 +3644,10 @@ function addActivity(cityKey) {
   _createActivityCore(cityKey, val);
 }
 var _addActivityModalCk = '';
-var _addActivityModalCat = '';
+var _addActivityModalCats = [];
 function openAddActivityModal(ck){
   _addActivityModalCk = ck;
-  _addActivityModalCat = '';
+  _addActivityModalCats = [];
   var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
   var dateBounds = range ? (' min="'+range.start+'" max="'+range.end+'"') : '';
   var catPills = Object.keys(ACTIVITY_CATEGORIES).map(function(key){
@@ -3659,7 +3659,7 @@ function openAddActivityModal(ck){
     '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
     +'<div class="suggestions-list" id="guideModalActSuggestions" style="position:static;margin-bottom:8px"></div>'
     +'<div class="ef-row" style="margin-bottom:10px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Description courte (optionnel)" style="width:100%"/></div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Catégorie (optionnel)</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Cat\u00e9gories (optionnel, plusieurs possibles)</div>'
     +'<div style="margin-bottom:10px">'+catPills+'</div>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date (optionnel)</div>'
     +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/>';
@@ -3667,9 +3667,10 @@ function openAddActivityModal(ck){
   document.getElementById('guideItemModal').classList.add('open');
 }
 function selectAddActivityCat(key){
-  _addActivityModalCat = (_addActivityModalCat===key) ? '' : key;
+  var idx = _addActivityModalCats.indexOf(key);
+  if(idx>-1) _addActivityModalCats.splice(idx,1); else _addActivityModalCats.push(key);
   document.querySelectorAll('[data-cat-pill]').forEach(function(el){
-    var active = el.getAttribute('data-cat-pill')===_addActivityModalCat;
+    var active = _addActivityModalCats.indexOf(el.getAttribute('data-cat-pill'))>-1;
     el.style.background = active ? 'var(--accent-pale)' : 'var(--sand-deep)';
     el.style.color = active ? 'var(--accent)' : 'var(--ink-subtle)';
   });
@@ -3706,7 +3707,7 @@ function saveAddActivityModal(){
   var meta = ((document.getElementById('guideModalActMeta')||{}).value||'').trim();
   var date = ((document.getElementById('guideModalActDate')||{}).value||'').trim();
   closeGuideItemModal();
-  _createActivityCore(_addActivityModalCk, val, {meta:meta, category:_addActivityModalCat, date:date});
+  _createActivityCore(_addActivityModalCk, val, {meta:meta, categories:_addActivityModalCats, date:date});
 }
 
 function saveApiKeyFromSettingsModal(){
@@ -5028,15 +5029,25 @@ function guessActivityCategory(name, meta){
   return null;
 }
 function getActCategory(actKey, name, meta){
-  if(S.actCategory && S.actCategory[actKey]) return S.actCategory[actKey];
-  return guessActivityCategory(name, meta);
-}
-function categoryPill(catKey, actKey){
-  if(catKey){
-    var cat = ACTIVITY_CATEGORIES[catKey];
-    return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+  if(S.actCategory && S.actCategory[actKey]!==undefined){
+    var v = S.actCategory[actKey];
+    return Array.isArray(v) ? v : (v ? [v] : []);
   }
-  return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('plus',10)+' Catégorie</span>';
+  var guessed = guessActivityCategory(name, meta);
+  return guessed ? [guessed] : [];
+}
+function categoryPill(catKeys, actKey){
+  catKeys = catKeys || [];
+  if(!catKeys.length){
+    return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:2px 8px;border-radius:10px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('plus',10)+' Catégorie</span>';
+  }
+  return '<span style="display:inline-flex;gap:3px;flex-wrap:wrap;vertical-align:middle">'
+    +catKeys.map(function(catKey){
+      var cat = ACTIVITY_CATEGORIES[catKey];
+      if(!cat) return '';
+      return '<span onclick="event.stopPropagation();openCategoryPickerModal(\''+jsStrEsc(actKey)+'\')" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-pale);padding:2px 8px;border-radius:10px;cursor:pointer;flex-shrink:0">'+svgIcon(cat.icon,10)+' '+cat.label+'</span>';
+    }).join('')
+    +'</span>';
 }
 var _categoryModalActKey = '';
 function openCategoryPickerModal(actKey){
@@ -5044,24 +5055,38 @@ function openCategoryPickerModal(actKey){
   var current = getActCategory(actKey, '', '');
   var body = Object.keys(ACTIVITY_CATEGORIES).map(function(catKey){
     var cat = ACTIVITY_CATEGORIES[catKey];
-    var isActive = current===catKey;
-    return '<span onclick="selectCategoryForAct(\''+catKey+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;margin:3px;background:'+(isActive?'var(--accent)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(cat.icon,14)+' '+cat.label+'</span>';
+    var isActive = current.indexOf(catKey)>-1;
+    return '<span onclick="toggleCategoryForAct(\''+catKey+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;margin:3px;background:'+(isActive?'var(--accent)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(cat.icon,14)+' '+cat.label+'</span>';
   }).join('');
   document.getElementById('categoryModalBody').innerHTML = '<div style="display:flex;flex-wrap:wrap">'+body+'</div>'
-    +'<div style="text-align:center;margin-top:10px"><span onclick="selectCategoryForAct(\'\')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Aucune catégorie</span></div>';
+    +(current.length?'<div style="text-align:center;margin-top:10px"><span onclick="clearCategoriesForAct()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Tout retirer</span></div>':'');
   document.getElementById('categoryModal').classList.add('open');
 }
-function selectCategoryForAct(catKey){
-  if(!S.actCategory) S.actCategory={};
-  if(catKey) S.actCategory[_categoryModalActKey] = catKey; else delete S.actCategory[_categoryModalActKey];
-  save();
-  document.getElementById('categoryModal').classList.remove('open');
-  renderContent();
+function syncActCategory(){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){
       if(r&&r.error) console.error('[PlaniTrip] sync actCategory:', r.error);
     });
   }
+}
+function toggleCategoryForAct(catKey){
+  if(!S.actCategory) S.actCategory={};
+  var current = getActCategory(_categoryModalActKey, '', '').slice();
+  var idx = current.indexOf(catKey);
+  if(idx>-1) current.splice(idx,1); else current.push(catKey);
+  S.actCategory[_categoryModalActKey] = current;
+  save();
+  openCategoryPickerModal(_categoryModalActKey);
+  renderContent();
+  syncActCategory();
+}
+function clearCategoriesForAct(){
+  if(!S.actCategory) S.actCategory={};
+  S.actCategory[_categoryModalActKey] = [];
+  save();
+  openCategoryPickerModal(_categoryModalActKey);
+  renderContent();
+  syncActCategory();
 }
 
 function renderCityPanelContentBody(c, city){
@@ -5084,7 +5109,7 @@ function renderCityPanelContentBody(c, city){
         var k=ck+'_'+origIdx;
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         if(activeDay!=='Tous' && actDateVal!==activeDay) return '';
-        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m)!==activeCat) return '';
+        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m).indexOf(activeCat)===-1) return '';
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
@@ -5112,7 +5137,7 @@ function renderCityPanelContentBody(c, city){
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         if(activeDay!=='Tous' && cDateVal!==activeDay) return '';
         var caCat = getActCategory(ck2, ca.n, ca.m);
-        if(activeCat!=='Tous' && caCat!==activeCat) return '';
+        if(activeCat!=='Tous' && caCat.indexOf(activeCat)===-1) return '';
         var cdone=!!S.done[ck2];
         var cCityStay = cityStayRange(ck);
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
@@ -5135,8 +5160,8 @@ function renderCityPanelContentBody(c, city){
 
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
-    city.acts.forEach(function(a,i){ if(!S.deletedActs[ck+'_'+i]){ var cat=getActCategory(ck+'_'+i,a.n,a.m); if(cat) presentCats[cat]=true; } });
-    (S.customActs[ck]||[]).forEach(function(ca,i){ var cat=getActCategory(ck+'_c'+i,ca.n,ca.m); if(cat) presentCats[cat]=true; });
+    city.acts.forEach(function(a,i){ if(!S.deletedActs[ck+'_'+i]){ getActCategory(ck+'_'+i,a.n,a.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); } });
+    (S.customActs[ck]||[]).forEach(function(ca,i){ getActCategory(ck+'_c'+i,ca.n,ca.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); });
     var catKeys = Object.keys(presentCats);
     var categoryFilterHTML = '';
     if(catKeys.length){
