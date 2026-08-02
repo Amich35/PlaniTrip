@@ -2520,55 +2520,97 @@ function isPlaceClosedNow(hoursText){
   refreshActionButtons();
 
   // Sections
-  let html = '';
-  if(!hasAnyDetail){
-    if(S.apiKey){
-      html = '<div class="detail-section" id="detailAiStatus"><div class="detail-text">Génération des détails avec l\'IA…</div></div>';
-      fetchActivityDetailAI(cityKey, actName, actKey);
-    } else {
-      html = '<div class="detail-section"><div class="detail-text">Pas encore de fiche détaillée. <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">Configure ta clé API dans Mon compte</span> pour la générer avec l\'IA.</div></div>';
-    }
-  }
-  if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
-  // Détection activité custom sans fiche IA → champs manuels éditables
   var _idxPart = cityKey ? actKey.slice(cityKey.length+1) : '';
   var _isCustom = _idxPart.indexOf('c')===0;
   var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
-  var _isEditableDetail = _isCustom && !d._aiGenerated;
-  var _taStyle = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px';
-  if(_isEditableDetail){
-    var _dSaved = (window._customDetails && window._customDetails[actKey]) || {};
+  var _isEditable = _isCustom && !d._aiGenerated;
+  var _dSaved = _isEditable ? ((window._customDetails && window._customDetails[actKey]) || {}) : {};
+  var _taStyle = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px;margin-top:6px';
+  var _inStyle = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-top:4px';
+  var _esc = jsStrEsc;
+
+  let html = '';
+
+  // Badge IA si applicable
+  if(d._aiGenerated) html += '<div class="ai-badge">G\u00e9n\u00e9r\u00e9 par IA (avec recherche web) \u2014 v\u00e9rifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' \u00b7 '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
+
+  // Si IA en cours de génération
+  if(!hasAnyDetail && !_isEditable){
+    if(S.apiKey){
+      html += '<div class="detail-section" id="detailAiStatus"><div class="detail-text">G\u00e9n\u00e9ration des d\u00e9tails avec l\'IA\u2026</div></div>';
+      fetchActivityDetailAI(cityKey, actName, actKey);
+    } else {
+      html += '<div class="detail-section"><div class="detail-text">Pas encore de fiche d\u00e9taill\u00e9e. <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">Configure ta cl\u00e9 API dans Mon compte</span> pour la g\u00e9n\u00e9rer avec l\'IA.</div></div>';
+    }
+  }
+
+  // Grille quickInfo — éditable si custom
+  if(_isEditable){
+    var _qFields = [
+      {key:'hours',    icon:'sun',          label:'Horaires',         placeholder:'ex\u00a0: 9h\u201318h, ferm\u00e9 lundi'},
+      {key:'duration', icon:'history',       label:'Dur\u00e9e',           placeholder:'ex\u00a0: 1h30'},
+      {key:'bestTime', icon:'sparkles',      label:'Meilleur moment', placeholder:'ex\u00a0: t\u00f4t le matin'},
+      {key:'bookingRequired',icon:'check-square',label:'R\u00e9servation',   placeholder:'Oui / Non / Recommand\u00e9'}
+    ];
+    html += '<div class="detail-section"><div class="detail-section-title">Infos pratiques</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">';
+    _qFields.forEach(function(f){
+      var _fval = escHtml(_dSaved[f.key]||'');
+      html += '<div style="display:flex;flex-direction:column;gap:2px">'
+        +'<span style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px">'+svgIcon(f.icon,11)+' '+f.label+'</span>'
+        +'<input class="ef-input" type="text" placeholder="'+f.placeholder+'" value="'+_fval+'" style="'+_inStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\''+f.key+'\',this.value)"/>'
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // À savoir
+  if(_isEditable){
     var _mVal = _dSaved.m || actMeta || '';
-    var _tipsVal = (_dSaved.tips || []).join('\n');
-    var _histVal = _dSaved.history || '';
     html += '<div class="detail-section"><div class="detail-section-title">\u00c0 savoir</div>'
-      +'<textarea class="ef-input" rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>'
+      +'<textarea class="ef-input" rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>'
       +'</div>';
+  } else if(d.m || actMeta) {
+    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">\u00c0 savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
+  }
+
+  // Conseils & astuces
+  if(_isEditable){
+    var _tipsVal = (_dSaved.tips||[]).join('\n');
     html += '<div class="detail-section"><div class="detail-section-title">Conseils &amp; astuces</div>'
-      +'<textarea class="ef-input" rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>'
+      +'<textarea class="ef-input" rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>'
       +'</div>';
+  } else if(d.tips && d.tips.length) {
+    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Conseils &amp; astuces<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'
+      + d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')
+      +'</div></div>';
+  }
+
+  // Histoire & contexte
+  if(_isEditable){
+    var _histVal = _dSaved.history || '';
     html += '<div class="detail-section"><div class="detail-section-title">Histoire &amp; contexte</div>'
-      +'<textarea class="ef-input" rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>'
+      +'<textarea class="ef-input" rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>'
       +'</div>';
-  } else {
-    if(d.m || actMeta) {
-      html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">\u00c0 savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
-    }
-    if(d.tips && d.tips.length) {
-      html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Conseils &amp; astuces<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'
-        + d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')
-        +'</div></div>';
-    }
+  } else if(d.history) {
+    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.hist-chevron\').style.transform=b.style.display===\'none\'?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Histoire &amp; contexte<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text" style="display:none">'+d.history+'</div></div>';
   }
-  if(d.website || d.mapsUrl) {
+
+  // Liens
+  if(_isEditable){
+    var _websiteVal = escHtml(_dSaved.website||'');
+    var _mapsVal = escHtml(_dSaved.mapsUrl||'');
     html += '<div class="detail-section"><div class="detail-section-title">Liens</div>'
-      + (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel ↗</a>':'')
-      + (d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps ↗</a>':'')
+      +'<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">'
+      +'<input class="ef-input" type="url" placeholder="Site officiel (https://\u2026)" value="'+_websiteVal+'" style="'+_inStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'website\',this.value)"/>'
+      +'<input class="ef-input" type="url" placeholder="Lien Google Maps" value="'+_mapsVal+'" style="'+_inStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'mapsUrl\',this.value)"/>'
+      +'</div></div>';
+  } else if(d.website || d.mapsUrl) {
+    html += '<div class="detail-section"><div class="detail-section-title">Liens</div>'
+      + (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel \u2197</a>':'')
+      + (d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps \u2197</a>':'')
       +'</div>';
   }
-  if(d.history) {
-    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.hist-chevron\').style.transform=b.style.display===\'none\'?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Histoire & contexte<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text" style="display:none">'+d.history+'</div></div>';
-  }
+
   document.getElementById('detailSections').innerHTML = html;
 
   modal.classList.add('open');
@@ -2662,16 +2704,34 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(!window._customDetails) window._customDetails = {};
   if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
   var d = window._customDetails[actKey];
+  val = (val||'').trim();
   if(field === 'm'){
-    d.m = val.trim();
-    // Sync aussi dans S.customActs pour l'affichage dans la carte
+    d.m = val;
+    // Sync dans S.customActs pour l'affichage dans la carte activité
     if(S.customActs[cityKey] && S.customActs[cityKey][custIdx] && !S.customActs[cityKey][custIdx]._userMeta){
-      S.customActs[cityKey][custIdx].m = val.trim();
+      S.customActs[cityKey][custIdx].m = val;
     }
   } else if(field === 'tips'){
     d.tips = val.split('\n').map(function(l){return l.trim();}).filter(Boolean);
   } else if(field === 'history'){
-    d.history = val.trim();
+    d.history = val;
+  } else if(field === 'hours'){
+    d.hours = val;
+  } else if(field === 'duration'){
+    d.duration = val;
+  } else if(field === 'bestTime'){
+    d.bestTime = val;
+  } else if(field === 'bookingRequired'){
+    d.bookingRequired = val;
+  } else if(field === 'website'){
+    d.website = val;
+  } else if(field === 'mapsUrl'){
+    d.mapsUrl = val;
+    // Si l'utilisateur colle un lien Google Maps, essayer d'en extraire les coords
+    if(val && val.indexOf('google.com/maps') > -1){
+      var _llMatch = val.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if(_llMatch){ COORDS[actKey] = [parseFloat(_llMatch[1]), parseFloat(_llMatch[2]), actKey]; }
+    }
   }
   S.customDetails = window._customDetails;
   save();
