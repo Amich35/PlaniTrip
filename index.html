@@ -2507,7 +2507,7 @@ function openDetail(actKey, actName, cityKey) {
   var _idxPart = cityKey ? actKey.slice(cityKey.length+1) : '';
   var _isCustom = _idxPart.indexOf('c')===0;
   var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
-  var _isEditable = _isCustom && !d._aiGenerated && !d._userValidated;
+  var _isEditable = _isCustom && ((!d._aiGenerated && !d._userValidated) || d._editUnlocked);
   var _dSaved = _isEditable ? ((window._customDetails && window._customDetails[actKey]) || {}) : {};
   var _esc = jsStrEsc;
 
@@ -2627,7 +2627,7 @@ function openDetail(actKey, actName, cityKey) {
     html += '<div style="text-align:center;margin-top:4px">'
       +'<button data-act-key="'+escHtml(actKey)+'" data-city-key="'+escHtml(cityKey)+'" data-act-name="'+escHtml(actName)+'" data-cust-idx="'+_custIdx+'" onclick="validatePlanningDetailFromEl(this)" style="padding:10px 28px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Valider</button>'
       +'</div>';
-  } else if(_isCustom && !d._aiGenerated && d._userValidated){
+  } else if(_isCustom){
     html += '<div style="text-align:center;margin-top:4px">'
       +'<button data-act-key="'+escHtml(actKey)+'" data-city-key="'+escHtml(cityKey)+'" data-act-name="'+escHtml(actName)+'" onclick="unlockCustomActDetailFromEl(this)" style="padding:9px 22px;border-radius:20px;border:1px solid rgba(29,29,31,0.14);background:transparent;color:var(--ink-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:inline-flex;align-items:center;gap:6px">'+svgIcon('pencil',14)+' Modifier</button>'
       +'</div>';
@@ -2792,8 +2792,9 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   var d = window._customDetails[actKey];
   val = (val||'').trim();
   if(field === '_reload'){
-    // Marque la fiche comme validée → basculera en lecture seule au prochain openDetail()
+    // Marque la fiche comme validée → repasse en lecture seule (IA ou manuel) au prochain openDetail()
     d._userValidated = true;
+    d._editUnlocked = false;
     S.customDetails = window._customDetails;
     save();
     if(sb && CURRENT_TRIP){
@@ -2844,7 +2845,7 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
 }
 function unlockCustomActDetail(actKey, cityKey, actName){
   if(!window._customDetails || !window._customDetails[actKey]) return;
-  window._customDetails[actKey]._userValidated = false;
+  window._customDetails[actKey]._editUnlocked = true;
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
