@@ -474,18 +474,17 @@ a{color:var(--ink);}
 
 /* ── DAY PLANNING ── */
 .day-tabs{display:flex;gap:4px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none;margin-bottom:6px;}
-.city-filters-sticky{position:sticky;top:0;z-index:15;background:var(--sand);padding-top:6px;margin:0 -16px;padding-left:16px;padding-right:16px;border-bottom:1px solid rgba(29,29,31,0.06);}
-.cf-row-label{font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:4px;margin:6px 0 5px;}
-.cf-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:9px;-webkit-overflow-scrolling:touch;}
+.city-filters-sticky{position:sticky;top:0;z-index:15;background:rgba(248,246,242,0.95);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding-top:8px;margin:0 -16px;padding-left:16px;padding-right:16px;box-shadow:0 2px 6px rgba(29,29,31,0.05);}
+.cf-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px;-webkit-overflow-scrolling:touch;}
 .cf-chips::-webkit-scrollbar{display:none;}
-.cf-day-chip{flex-shrink:0;min-width:38px;height:38px;padding:4px 10px;border-radius:14px;border:none;background:#F6F3EC;color:var(--ink-muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
-.cf-day-chip .cf-day-num{font-size:13px;font-weight:700;line-height:1.1;}
+.cf-day-chip{flex-shrink:0;min-width:40px;height:40px;padding:4px 12px;border-radius:12px;border:none;background:#F6F3EC;color:var(--ink-muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
+.cf-day-chip .cf-day-num{font-size:14px;font-weight:700;line-height:1.1;}
 .cf-day-chip .cf-day-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:0.3px;opacity:0.75;line-height:1.2;}
 .cf-day-chip.active{background:var(--accent-pale);color:var(--accent);}
-.cf-cat-chip{flex-shrink:0;height:38px;min-width:38px;padding:0 12px;border-radius:19px;border:none;background:#F6F3EC;color:var(--ink-subtle);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12.5px;font-weight:600;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}
+.cf-cat-chip{flex-shrink:0;height:34px;min-width:34px;padding:0 11px;border-radius:17px;border:none;background:#F6F3EC;color:var(--ink-subtle);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:600;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}
 .cf-cat-chip.active{background:var(--accent-pale);color:var(--accent);}
-@keyframes cfListFade{from{opacity:0;transform:translateY(2px);}to{opacity:1;transform:translateY(0);}}
-.cf-act-list{animation:cfListFade 180ms ease;}
+@keyframes cfListFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.cf-act-list{animation:cfListFade 220ms cubic-bezier(0.34,1.56,0.64,1);}
 .day-tabs::-webkit-scrollbar{display:none;}
 .day-tab{flex-shrink:0;padding:5px 12px;min-height:26px;border-radius:16px;font-size:11px;font-weight:500;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;transition:all 0.15s;}
 .day-tab.active{background:var(--sand-deep);color:var(--ink);font-weight:600;}
@@ -5127,11 +5126,11 @@ function renderCityPanelContentBody(c, city){
     var categoryFilterHTML = '';
     if(catKeys.length){
       categoryFilterHTML = '<div class="cf-chips">'
-        +'<button class="cf-cat-chip'+(activeCat==='Tous'?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\'Tous\')">'+(activeCat==='Tous'?svgIcon('check',12)+' ':'')+'Toutes</button>'
+        +'<button class="cf-cat-chip'+(activeCat==='Tous'?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\'Tous\')">Toutes</button>'
         +catKeys.map(function(catKey){
           var cat = ACTIVITY_CATEGORIES[catKey];
           var isActive = activeCat===catKey;
-          return '<button class="cf-cat-chip'+(isActive?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\''+catKey+'\')" title="'+cat.label+'">'+svgIcon(cat.icon,15)+(isActive?svgIcon('check',11):'')+'</button>';
+          return '<button class="cf-cat-chip'+(isActive?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\''+catKey+'\')" title="'+cat.label+'">'+svgIcon(cat.icon,15)+'</button>';
         }).join('')
         +'</div>';
     }
@@ -5139,10 +5138,7 @@ function renderCityPanelContentBody(c, city){
     var dayTabsHTML = renderDayTabs(ck);
     var filterBarHTML = '';
     if(dayTabsHTML || categoryFilterHTML){
-      filterBarHTML = '<div class="city-filters-sticky">'
-        +(dayTabsHTML ? '<div class="cf-row-label">'+svgIcon('calendar',11)+' Jour</div>'+dayTabsHTML : '')
-        +(categoryFilterHTML ? '<div class="cf-row-label">'+svgIcon('compass',11)+' Cat\u00e9gorie</div>'+categoryFilterHTML : '')
-        +'</div>';
+      filterBarHTML = '<div class="city-filters-sticky">'+dayTabsHTML+categoryFilterHTML+'</div>';
     }
 
     return filterBarHTML+'<div class="cf-act-list">'+baseActsHTML+'</div>'+addForm;
