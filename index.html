@@ -2544,71 +2544,83 @@ function isPlaceClosedNow(hoursText){
     }
   }
 
-  // Grille quickInfo — éditable si custom
+  // Helper : section accordéon identique à la version IA, corps = contenu HTML
+  function _detailAccordion(title, bodyHtml, startOpen){
+    var _disp = startOpen ? 'block' : 'none';
+    var _rot  = startOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+    return '<div class="detail-section">'
+      +'<div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">'
+      +escHtml(title)
+      +'<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:'+_rot+'">'+svgIcon('chevron-right',16)+'</span>'
+      +'</div>'
+      +'<div style="display:'+_disp+'">'+bodyHtml+'</div>'
+      +'</div>';
+  }
+
+  // Styles partagés inputs/textareas custom
+  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:var(--sand);color:var(--ink);margin-top:2px';
+  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:var(--sand);color:var(--ink)';
+
+  // Infos pratiques (quickInfo)
   if(_isEditable){
     var _qFields = [
-      {key:'hours',    icon:'sun',          label:'Horaires',         placeholder:'ex\u00a0: 9h\u201318h, ferm\u00e9 lundi'},
-      {key:'duration', icon:'history',       label:'Dur\u00e9e',           placeholder:'ex\u00a0: 1h30'},
-      {key:'bestTime', icon:'sparkles',      label:'Meilleur moment', placeholder:'ex\u00a0: t\u00f4t le matin'},
-      {key:'bookingRequired',icon:'check-square',label:'R\u00e9servation',   placeholder:'Oui / Non / Recommand\u00e9'}
+      {key:'hours',           icon:'sun',          label:'Horaires',          placeholder:'ex\u00a0: 9h\u201318h'},
+      {key:'duration',        icon:'history',      label:'Dur\u00e9e',              placeholder:'ex\u00a0: 1h30'},
+      {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: t\u00f4t le matin'},
+      {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'}
     ];
-    html += '<div class="detail-section"><div class="detail-section-title">Infos pratiques</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">';
+    var _qBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">';
     _qFields.forEach(function(f){
       var _fval = escHtml(_dSaved[f.key]||'');
-      html += '<div style="display:flex;flex-direction:column;gap:2px">'
-        +'<span style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px">'+svgIcon(f.icon,11)+' '+f.label+'</span>'
-        +'<input class="ef-input" type="text" placeholder="'+f.placeholder+'" value="'+_fval+'" style="'+_inStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\''+f.key+'\',this.value)"/>'
+      _qBody += '<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon(f.icon,11)+' '+f.label+'</div>'
+        +'<input type="text" placeholder="'+f.placeholder+'" value="'+_fval+'" style="'+_inStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\''+f.key+'\',this.value)"/>'
         +'</div>';
     });
-    html += '</div></div>';
+    _qBody += '</div>';
+    html += _detailAccordion('Infos pratiques', _qBody, false);
   }
 
   // À savoir
   if(_isEditable){
     var _mVal = _dSaved.m || actMeta || '';
-    html += '<div class="detail-section"><div class="detail-section-title">\u00c0 savoir</div>'
-      +'<textarea class="ef-input" rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>'
-      +'</div>';
+    var _mBody = '<textarea rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>';
+    html += _detailAccordion('\u00c0 savoir', _mBody, !!_mVal);
   } else if(d.m || actMeta) {
-    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">\u00c0 savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
+    html += _detailAccordion('\u00c0 savoir', '<div class="detail-text">'+escHtml(d.m || actMeta)+'</div>', true);
   }
 
   // Conseils & astuces
   if(_isEditable){
     var _tipsVal = (_dSaved.tips||[]).join('\n');
-    html += '<div class="detail-section"><div class="detail-section-title">Conseils &amp; astuces</div>'
-      +'<textarea class="ef-input" rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>'
-      +'</div>';
+    var _tBody = '<textarea rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>';
+    html += _detailAccordion('Conseils &amp; astuces', _tBody, !!_tipsVal);
   } else if(d.tips && d.tips.length) {
-    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Conseils &amp; astuces<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'
-      + d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')
-      +'</div></div>';
+    var _tipsHtml = '<div class="detail-text">'+d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')+'</div>';
+    html += _detailAccordion('Conseils &amp; astuces', _tipsHtml, true);
   }
 
   // Histoire & contexte
   if(_isEditable){
     var _histVal = _dSaved.history || '';
-    html += '<div class="detail-section"><div class="detail-section-title">Histoire &amp; contexte</div>'
-      +'<textarea class="ef-input" rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>'
-      +'</div>';
+    var _hBody = '<textarea rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>';
+    html += _detailAccordion('Histoire &amp; contexte', _hBody, false);
   } else if(d.history) {
-    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.hist-chevron\').style.transform=b.style.display===\'none\'?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Histoire &amp; contexte<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text" style="display:none">'+d.history+'</div></div>';
+    html += _detailAccordion('Histoire &amp; contexte', '<div class="detail-text">'+d.history+'</div>', false);
   }
 
   // Liens
   if(_isEditable){
     var _websiteVal = escHtml(_dSaved.website||'');
     var _mapsVal = escHtml(_dSaved.mapsUrl||'');
-    html += '<div class="detail-section"><div class="detail-section-title">Liens</div>'
-      +'<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">'
-      +'<input class="ef-input" type="url" placeholder="Site officiel (https://\u2026)" value="'+_websiteVal+'" style="'+_inStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'website\',this.value)"/>'
-      +'<input class="ef-input" type="url" placeholder="Lien Google Maps" value="'+_mapsVal+'" style="'+_inStyle+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'mapsUrl\',this.value)"/>'
-      +'</div></div>';
-  } else if(d.website || d.mapsUrl) {
-    html += '<div class="detail-section"><div class="detail-section-title">Liens</div>'
-      + (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel \u2197</a>':'')
-      + (d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps \u2197</a>':'')
+    var _lBody = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">'
+      +'<input type="url" placeholder="Site officiel (https://\u2026)" value="'+_websiteVal+'" style="'+_inStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'website\',this.value)"/>'
+      +'<input type="url" placeholder="Lien Google Maps" value="'+_mapsVal+'" style="'+_inStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'mapsUrl\',this.value)"/>'
       +'</div>';
+    html += _detailAccordion('Liens', _lBody, !!(_websiteVal||_mapsVal));
+  } else if(d.website || d.mapsUrl) {
+    var _lHtml = (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel \u2197</a>':'')
+      +(d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps \u2197</a>':'');
+    html += _detailAccordion('Liens', _lHtml, true);
   }
 
   document.getElementById('detailSections').innerHTML = html;
