@@ -2523,7 +2523,7 @@ function isPlaceClosedNow(hoursText){
   var _idxPart = cityKey ? actKey.slice(cityKey.length+1) : '';
   var _isCustom = _idxPart.indexOf('c')===0;
   var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
-  var _isEditable = _isCustom && !d._aiGenerated;
+  var _isEditable = _isCustom && !d._aiGenerated && !d._userValidated;
   var _dSaved = _isEditable ? ((window._customDetails && window._customDetails[actKey]) || {}) : {};
   var _taStyle = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px;margin-top:6px';
   var _inStyle = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;margin-top:4px';
@@ -2558,8 +2558,10 @@ function isPlaceClosedNow(hoursText){
   }
 
   // Styles partagés inputs/textareas custom
-  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:var(--sand);color:var(--ink);margin-top:2px';
-  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:var(--sand);color:var(--ink)';
+  // Styles champs custom — fond blanc comme la carte, bordure discrète
+  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
+  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
+  var _btnValider = '<button onclick="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'_reload\',\'\');openDetail(\''+_esc(actKey)+'\','+JSON.stringify(actName)+',\''+_esc(cityKey)+'\')" style="margin-top:8px;padding:7px 16px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Valider</button>';
 
   // Infos pratiques (quickInfo)
   if(_isEditable){
@@ -2583,7 +2585,8 @@ function isPlaceClosedNow(hoursText){
   // À savoir
   if(_isEditable){
     var _mVal = _dSaved.m || actMeta || '';
-    var _mBody = '<textarea rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>';
+    var _mBody = '<textarea rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>'
+      +'<div style="text-align:right">'+_btnValider+'</div>';
     html += _detailAccordion('\u00c0 savoir', _mBody, !!_mVal);
   } else if(d.m || actMeta) {
     html += _detailAccordion('\u00c0 savoir', '<div class="detail-text">'+escHtml(d.m || actMeta)+'</div>', true);
@@ -2717,7 +2720,16 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
   var d = window._customDetails[actKey];
   val = (val||'').trim();
-  if(field === 'm'){
+  if(field === '_reload'){
+    // Marque la fiche comme validée → basculera en lecture seule au prochain openDetail()
+    d._userValidated = true;
+    S.customDetails = window._customDetails;
+    save();
+    if(sb && CURRENT_TRIP){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
+    return;
+  } else if(field === 'm'){
     d.m = val;
     // Sync dans S.customActs pour l'affichage dans la carte activité
     if(S.customActs[cityKey] && S.customActs[cityKey][custIdx] && !S.customActs[cityKey][custIdx]._userMeta){
