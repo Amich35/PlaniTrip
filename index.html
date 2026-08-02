@@ -2423,7 +2423,9 @@ function openMapFromCard(el){
   openMap(card.getAttribute('data-act-key'), card.getAttribute('data-act-name'));
 }
 function openDetail(actKey, actName, cityKey) {
-  const d = ACT_DETAILS[actKey] || (window._customDetails&&window._customDetails[actKey]) || {};
+  const _staticDetail = ACT_DETAILS[actKey] || {};
+  const _localDetail = (window._customDetails && window._customDetails[actKey]) || {};
+  const d = Object.assign({}, _staticDetail, _localDetail);
   const modal = document.getElementById('detailModal');
   const hasAnyDetail = !!(ACT_DETAILS[actKey] || (window._customDetails&&window._customDetails[actKey]));
 
@@ -2507,8 +2509,10 @@ function openDetail(actKey, actName, cityKey) {
   var _idxPart = cityKey ? actKey.slice(cityKey.length+1) : '';
   var _isCustom = _idxPart.indexOf('c')===0;
   var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
-  var _isEditable = _isCustom && ((!d._aiGenerated && !d._userValidated) || d._editUnlocked);
-  var _dSaved = _isEditable ? ((window._customDetails && window._customDetails[actKey]) || {}) : {};
+  var _hasStaticContent = Object.keys(_staticDetail).length > 0;
+  var _aiFetchInFlight = !hasAnyDetail && !!S.apiKey;
+  var _isEditable = !_aiFetchInFlight && ((!_hasStaticContent && !d._aiGenerated && !d._userValidated) || d._editUnlocked);
+  var _dSaved = _isEditable ? d : {};
   var _esc = jsStrEsc;
 
   let html = '';
@@ -2516,14 +2520,11 @@ function openDetail(actKey, actName, cityKey) {
   // Badge IA si applicable
   if(d._aiGenerated) html += '<div class="ai-badge">G\u00e9n\u00e9r\u00e9 par IA (avec recherche web) \u2014 v\u00e9rifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' \u00b7 '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
 
-  // Si IA en cours de génération
-  if(!hasAnyDetail && !_isEditable){
-    if(S.apiKey){
-      html += '<div class="detail-section" id="detailAiStatus"><div class="detail-text">G\u00e9n\u00e9ration des d\u00e9tails avec l\'IA\u2026</div></div>';
-      fetchActivityDetailAI(cityKey, actName, actKey);
-    } else {
-      html += '<div class="detail-section"><div class="detail-text">Pas encore de fiche d\u00e9taill\u00e9e. <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">Configure ta cl\u00e9 API dans Mon compte</span> pour la g\u00e9n\u00e9rer avec l\'IA.</div></div>';
-    }
+  // Si aucune fiche n'existe encore : lance l'IA si une clé est configurée, sinon les sections
+  // ci-dessous s'affichent directement en mode édition (fallback manuel sans IA).
+  if(!hasAnyDetail && S.apiKey){
+    html += '<div class="detail-section" id="detailAiStatus"><div class="detail-text">G\u00e9n\u00e9ration des d\u00e9tails avec l\'IA\u2026</div></div>';
+    fetchActivityDetailAI(cityKey, actName, actKey);
   }
 
   // Helper : section accordéon identique à la version IA, corps = contenu HTML
@@ -2627,7 +2628,7 @@ function openDetail(actKey, actName, cityKey) {
     html += '<div style="text-align:center;margin-top:4px">'
       +'<button data-act-key="'+escHtml(actKey)+'" data-city-key="'+escHtml(cityKey)+'" data-act-name="'+escHtml(actName)+'" data-cust-idx="'+_custIdx+'" onclick="validatePlanningDetailFromEl(this)" style="padding:10px 28px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Valider</button>'
       +'</div>';
-  } else if(_isCustom){
+  } else {
     html += '<div style="text-align:center;margin-top:4px">'
       +'<button data-act-key="'+escHtml(actKey)+'" data-city-key="'+escHtml(cityKey)+'" data-act-name="'+escHtml(actName)+'" onclick="unlockCustomActDetailFromEl(this)" style="padding:9px 22px;border-radius:20px;border:1px solid rgba(29,29,31,0.14);background:transparent;color:var(--ink-muted);font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:inline-flex;align-items:center;gap:6px">'+svgIcon('pencil',14)+' Modifier</button>'
       +'</div>';
