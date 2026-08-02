@@ -2530,22 +2530,35 @@ function isPlaceClosedNow(hoursText){
     }
   }
   if(d._aiGenerated) html += '<div class="ai-badge">Généré par IA (avec recherche web) — vérifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' · '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
-  // Détection activité custom → note éditable si pas de fiche IA
+  // Détection activité custom sans fiche IA → champs manuels éditables
   var _idxPart = cityKey ? actKey.slice(cityKey.length+1) : '';
   var _isCustom = _idxPart.indexOf('c')===0;
   var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
-  var _isEditableNote = _isCustom && !d._aiGenerated;
-  if(_isEditableNote){
-    html += '<div class="detail-section"><div class="detail-section-title">Note</div>'
-      +'<textarea id="detailCustomNote" class="ef-input" rows="3" placeholder="Ajoute une note, conseil, horaire\u2026" style="width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px" onblur="saveCustomActNote(\''+jsStrEsc(cityKey)+'\','+_custIdx+',this.value)">'+escHtml(actMeta)+'</textarea>'
+  var _isEditableDetail = _isCustom && !d._aiGenerated;
+  var _taStyle = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:13px';
+  if(_isEditableDetail){
+    var _dSaved = (window._customDetails && window._customDetails[actKey]) || {};
+    var _mVal = _dSaved.m || actMeta || '';
+    var _tipsVal = (_dSaved.tips || []).join('\n');
+    var _histVal = _dSaved.history || '';
+    html += '<div class="detail-section"><div class="detail-section-title">\u00c0 savoir</div>'
+      +'<textarea class="ef-input" rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>'
       +'</div>';
-  } else if(d.m || actMeta) {
-    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">À savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
-  }
-  if(d.tips && d.tips.length) {
-    html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Conseils & astuces<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'
-      + d.tips.map(t=>'<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>').join('')
-      +'</div></div>';
+    html += '<div class="detail-section"><div class="detail-section-title">Conseils &amp; astuces</div>'
+      +'<textarea class="ef-input" rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>'
+      +'</div>';
+    html += '<div class="detail-section"><div class="detail-section-title">Histoire &amp; contexte</div>'
+      +'<textarea class="ef-input" rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle+'" onblur="saveCustomActDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>'
+      +'</div>';
+  } else {
+    if(d.m || actMeta) {
+      html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">\u00c0 savoir<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'+escHtml(d.m || actMeta)+'</div></div>';
+    }
+    if(d.tips && d.tips.length) {
+      html += '<div class="detail-section"><div class="detail-section-title" onclick="var b=this.nextElementSibling;var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';this.querySelector(\'.hist-chevron\').style.transform=open?\'rotate(0deg)\':\'rotate(90deg)\';" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">Conseils &amp; astuces<span class="hist-chevron" style="transition:transform 0.2s;color:var(--ink-subtle);transform:rotate(90deg)">'+svgIcon('chevron-right',16)+'</span></div><div class="detail-text">'
+        + d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')
+        +'</div></div>';
+    }
   }
   if(d.website || d.mapsUrl) {
     html += '<div class="detail-section"><div class="detail-section-title">Liens</div>'
@@ -2645,10 +2658,26 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
   }
 }
-function saveCustomActNote(cityKey, custIdx, val){
-  if(!S.customActs[cityKey] || !S.customActs[cityKey][custIdx]) return;
-  S.customActs[cityKey][custIdx].m = val.trim();
+function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
+  if(!window._customDetails) window._customDetails = {};
+  if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
+  var d = window._customDetails[actKey];
+  if(field === 'm'){
+    d.m = val.trim();
+    // Sync aussi dans S.customActs pour l'affichage dans la carte
+    if(S.customActs[cityKey] && S.customActs[cityKey][custIdx] && !S.customActs[cityKey][custIdx]._userMeta){
+      S.customActs[cityKey][custIdx].m = val.trim();
+    }
+  } else if(field === 'tips'){
+    d.tips = val.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+  } else if(field === 'history'){
+    d.history = val.trim();
+  }
+  S.customDetails = window._customDetails;
   save();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+  }
   renderContent();
 }
 function closeDetail(){ document.getElementById('detailModal').classList.remove('open'); }
