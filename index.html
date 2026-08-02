@@ -2447,33 +2447,6 @@ function openDetail(actKey, actName, cityKey) {
     }
   }
 
-// Détection native (sans IA) d'un lieu fermé maintenant, à partir du texte horaires libre.
-// Retourne true seulement si on est CONFIANT que c'est fermé ; sinon false (par défaut "ouvert").
-function isPlaceClosedNow(hoursText){
-  if(!hoursText) return false;
-  var t = hoursText.toLowerCase();
-  if(t.indexOf('24h/24')>-1 || t.indexOf('24/24')>-1) return false;
-  if(t.indexOf('inconnu')>-1) return false;
-  var matches = t.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/g);
-  if(!matches || matches.length<2) return false;
-  function toMinutes(m){
-    var parts = m.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/);
-    var h = parseInt(parts[1],10);
-    var mm = parts[2] ? parseInt(parts[2],10) : 0;
-    return h*60+mm;
-  }
-  var openMin = toMinutes(matches[0]);
-  var closeMin = toMinutes(matches[1]);
-  var now = new Date();
-  var nowMin = now.getHours()*60+now.getMinutes();
-  if(closeMin===openMin) return false;
-  if(closeMin>openMin){
-    return !(nowMin>=openMin && nowMin<closeMin);
-  } else {
-    // Plage nocturne (ex: 22h - 4h)
-    return !(nowMin>=openMin || nowMin<closeMin);
-  }
-}
 // Infos rapides — grille de scan ultra-rapide (icône / label / valeur), à la Flighty
   document.getElementById('detailQuickInfo').innerHTML = buildQuickInfoHTML(d);
 
@@ -2729,6 +2702,33 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     }
     var statusEl = document.getElementById('detailAiStatus');
     if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
+  }
+}
+// Détection native (sans IA) d'un lieu fermé maintenant, à partir du texte horaires libre.
+// Retourne true seulement si on est CONFIANT que c'est fermé ; sinon false (par défaut "ouvert").
+function isPlaceClosedNow(hoursText){
+  if(!hoursText) return false;
+  var t = hoursText.toLowerCase();
+  if(t.indexOf('24h/24')>-1 || t.indexOf('24/24')>-1) return false;
+  if(t.indexOf('inconnu')>-1) return false;
+  var matches = t.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/g);
+  if(!matches || matches.length<2) return false;
+  function toMinutes(m){
+    var parts = m.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/);
+    var h = parseInt(parts[1],10);
+    var mm = parts[2] ? parseInt(parts[2],10) : 0;
+    return h*60+mm;
+  }
+  var openMin = toMinutes(matches[0]);
+  var closeMin = toMinutes(matches[1]);
+  var now = new Date();
+  var nowMin = now.getHours()*60+now.getMinutes();
+  if(closeMin===openMin) return false;
+  if(closeMin>openMin){
+    return !(nowMin>=openMin && nowMin<closeMin);
+  } else {
+    // Plage nocturne (ex: 22h - 4h)
+    return !(nowMin>=openMin || nowMin<closeMin);
   }
 }
 function buildQuickInfoHTML(d){
