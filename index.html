@@ -2559,9 +2559,9 @@ function isPlaceClosedNow(hoursText){
 
   // Styles partagés inputs/textareas custom
   // Styles champs custom — fond blanc comme la carte, bordure discrète
-  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
-  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
-  var _btnValider = '<button onclick="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'_reload\',\'\');openDetail(\''+_esc(actKey)+'\','+JSON.stringify(actName)+',\''+_esc(cityKey)+'\')" style="margin-top:8px;padding:7px 16px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Valider</button>';
+  // font-size 16px : évite le zoom automatique d'iOS Safari au focus sur les champs de saisie
+  var _taStyle2 = 'width:100%;box-sizing:border-box;resize:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;font-size:16px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);margin-top:2px';
+  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
 
   // Infos pratiques (quickInfo)
   if(_isEditable){
@@ -2585,8 +2585,7 @@ function isPlaceClosedNow(hoursText){
   // À savoir
   if(_isEditable){
     var _mVal = _dSaved.m || actMeta || '';
-    var _mBody = '<textarea rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>'
-      +'<div style="text-align:right">'+_btnValider+'</div>';
+    var _mBody = '<textarea rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>';
     html += _detailAccordion('\u00c0 savoir', _mBody, !!_mVal);
   } else if(d.m || actMeta) {
     html += _detailAccordion('\u00c0 savoir', '<div class="detail-text">'+escHtml(d.m || actMeta)+'</div>', true);
@@ -2624,6 +2623,13 @@ function isPlaceClosedNow(hoursText){
     var _lHtml = (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel \u2197</a>':'')
       +(d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps \u2197</a>':'');
     html += _detailAccordion('Liens', _lHtml, true);
+  }
+
+  // Bouton Valider unique — bascule toute la fiche en lecture seule (style IA)
+  if(_isEditable){
+    html += '<div style="text-align:center;margin-top:4px">'
+      +'<button onclick="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'_reload\',\'\');openDetail(\''+_esc(actKey)+'\',\''+_esc(actName)+'\',\''+_esc(cityKey)+'\')" style="padding:10px 28px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Valider</button>'
+      +'</div>';
   }
 
   document.getElementById('detailSections').innerHTML = html;
