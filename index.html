@@ -2286,6 +2286,10 @@ function openMap(coordKey, placeName) {
     const q = encodeURIComponent(placeName);
     document.getElementById('mapApple').onclick = function(){window.location.href='maps://maps.apple.com/?q='+q;closeMap();return false;};
     document.getElementById('mapGoogle').onclick = function(){window.open('https://www.google.com/maps/search/?api=1&query='+q,'_blank');closeMap();return false;};
+    // Rattrapage : activité créée avant l'ajout du géocodage auto — tente un géocodage en
+    // arrière-plan pour que l'épingle apparaisse au prochain affichage de la carte.
+    var _bfMatch = coordKey.match(/^(.+)_c?\d+$/);
+    if(_bfMatch) geocodePinForActivity(coordKey, placeName, _bfMatch[1]);
   }
   modal.classList.add('open');
 }
@@ -3505,6 +3509,37 @@ function showSuggestions(ck) {
   });
 }
 
+// Géocode une activité custom via Nominatim (OpenStreetMap, gratuit, sans clé) pour lui donner
+// une épingle sur la carte. Contrairement à geocodeCity(), fonctionne sur des lieux précis
+// (restaurants, monuments…) et pas seulement des villes. Ne fait rien si des coords existent déjà.
+async function geocodePinForActivity(actKey, actName, cityKey){
+  if(COORDS[actKey]) return;
+  var parts = cityKey.split('_');
+  var countryId = parts[0];
+  var cityName = parts.slice(1).join('_');
+  var country = COUNTRIES.find(function(c){ return c.id===countryId; });
+  var countryNameEn = country ? getEnglishCountryName(country.name) : '';
+  var query = actName+', '+cityName+(countryNameEn?', '+countryNameEn:'');
+  try{
+    const res = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(query)+'&format=json&limit=1');
+    const json = await res.json();
+    if(json && json.length){
+      var lat = parseFloat(json[0].lat), lng = parseFloat(json[0].lon);
+      if(isNaN(lat) || isNaN(lng)) return;
+      COORDS[actKey] = [lat, lng, actName];
+      if(!window._customDetails) window._customDetails={};
+      if(!window._customDetails[actKey]) window._customDetails[actKey]={};
+      window._customDetails[actKey].lat = lat;
+      window._customDetails[actKey].lng = lng;
+      S.customDetails = window._customDetails;
+      save();
+      if(sb && CURRENT_TRIP){
+        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+      }
+      renderContent();
+    }
+  }catch(e){ /* échec silencieux : le bouton carte retombe sur la recherche par nom */ }
+}
 function _createActivityCore(cityKey, val, opts){
   val = stripHtml(val.trim());
   if(!val) return;
@@ -3520,6 +3555,7 @@ function _createActivityCore(cityKey, val, opts){
   save();
   renderContent();
   fetchActivityDetailAI(cityKey, val, actKey, newIdx);
+  if(!S.apiKey) geocodePinForActivity(actKey, val, cityKey);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
