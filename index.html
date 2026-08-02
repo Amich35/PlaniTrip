@@ -132,7 +132,10 @@ a{color:var(--ink);}
 
 .act-del{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:rgba(29,29,31,0.070);color:var(--ink-subtle);border-radius:50%;line-height:1;opacity:0.5;transition:opacity 0.15s,background 0.15s;padding:0;} .act-card:hover .act-del,.act-card:active .act-del{opacity:1;}
 .swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r16);margin-top:6px;background:#F8F6F2;-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
-.swipe-delete-bg{position:absolute;top:0;bottom:0;right:0;width:100px;background:var(--red-muted);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:0 var(--r16) var(--r16) 0;opacity:0;transform:translateX(6px);}
+.swipe-delete-bg{position:absolute;top:0;bottom:0;right:0;width:160px;display:flex;opacity:0;transform:translateX(6px);border-radius:0 var(--r16) var(--r16) 0;overflow:hidden;}
+.swipe-edit-btn,.swipe-del-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:600;gap:3px;color:#fff;}
+.swipe-edit-btn{background:var(--accent);}
+.swipe-del-btn{background:var(--red-muted);}
 .swipe-done-bg{position:absolute;top:0;bottom:0;left:0;width:90px;background:#8A8A8E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;gap:5px;border-radius:var(--r16) 0 0 var(--r16);opacity:0;transform:translateX(-6px);}
 .swipe-fg{margin-top:0 !important;touch-action:pan-y;will-change:transform;-webkit-backface-visibility:hidden;backface-visibility:hidden;-webkit-transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent;outline:none;}
 .swipe-fg *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
@@ -491,6 +494,9 @@ a{color:var(--ink);}
 .planning-group{border-radius:18px;padding:10px 10px 6px;margin:0 0 14px;}
 .planning-group .planning-group-header{margin:0 2px 8px;}
 .planning-group .swipe-wrap{margin-bottom:8px;}
+.moment-segctrl{display:flex;background:var(--sand-deep);border-radius:10px;padding:2px;gap:2px;}
+.moment-seg{flex:1;text-align:center;padding:9px 4px;border-radius:8px;font-size:11px;font-weight:600;color:var(--ink-muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:background-color 0.15s ease,color 0.15s ease,box-shadow 0.15s ease;}
+.moment-seg.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(29,29,31,0.14);}
 .day-tabs::-webkit-scrollbar{display:none;}
 .day-tab{flex-shrink:0;padding:5px 12px;min-height:26px;border-radius:16px;font-size:11px;font-weight:500;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;transition:all 0.15s;}
 .day-tab.active{background:var(--sand-deep);color:var(--ink);font-weight:600;}
@@ -4835,6 +4841,9 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
   }catch(e){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec appel API', e); _lastAiError='Échec réseau: '+(e&&e.message||e); return false; }
 }
 
+function editActivityFromSwipe(el){
+  openDetail(el.getAttribute('data-act-key'), el.getAttribute('data-act-name'), el.getAttribute('data-city-key'));
+}
 function deleteActivityFromEl(el){
   var cityKey = el.getAttribute('data-city-key');
   var idx = parseInt(el.getAttribute('data-orig-idx'));
@@ -5075,8 +5084,8 @@ function swipeMove(e, el){
     if(dx>=0){
       dxRaw = allowRight ? Math.min(90, dx) : 0;
     } else {
-      var base = _swipeState.wasOpen ? -108 : 0;
-      dxRaw = Math.min(0, Math.max(-108, base + dx));
+      var base = _swipeState.wasOpen ? -160 : 0;
+      dxRaw = Math.min(0, Math.max(-160, base + dx));
     }
     _swipeState.dx = dxRaw;
     el.style.transition = 'none';
@@ -5122,7 +5131,7 @@ function swipeEnd(e, el){
   }
   if(_swipeState.dragging){
     if(_swipeState.dx < -50){
-      el.style.transform = 'translateX(-108px)';
+      el.style.transform = 'translateX(-160px)';
       el.dataset.swipeOpen = '1';
       snapBg(true);
     } else if(_swipeState.dx > 50 && el.dataset.actKey){
@@ -5218,28 +5227,36 @@ function openPlanningModal(actKey, name, meta){
   _planningModalActKey = actKey;
   _planningModalMoment = getActMoment(actKey, name||'', meta||'');
   var currentTime = (S.actTime && S.actTime[actKey]) || '';
-  var pills = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
+  var isExactTime = /^\d{2}:\d{2}$/.test(currentTime);
+  var segments = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
     var mo = ACTIVITY_MOMENTS[mk];
     var isActive = _planningModalMoment===mk;
-    return '<span onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'" style="display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;margin:3px;background:'+(isActive?'var(--accent)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(mo.icon,14)+' '+mo.label+'</span>';
+    return '<div class="moment-seg'+(isActive?' active':'')+'" onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'">'+svgIcon(mo.icon,16)+'<span>'+mo.label+'</span></div>';
   }).join('');
   document.getElementById('planningModalBody').innerHTML =
     '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
-    +'<div style="display:flex;flex-wrap:wrap;margin-bottom:14px">'+pills+'</div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Horaire indicatif (optionnel)</div>'
-    +'<input class="ef-input" id="planningModalTime" type="text" placeholder="ex\u00a0: 10h30, Avant 7h, 17h\u201319h" value="'+escHtml(currentTime)+'" style="width:100%;box-sizing:border-box"/>';
+    +'<div class="moment-segctrl" style="margin-bottom:16px">'+segments+'</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Horaire</div>'
+    +'<input class="ef-input" id="planningModalTimeExact" type="time" value="'+(isExactTime?currentTime:'')+'" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:8px"/>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">ou horaire approximatif (optionnel)</div>'
+    +'<input class="ef-input" id="planningModalTime" type="text" placeholder="ex\u00a0: Avant 7h, 17h\u201319h" value="'+(isExactTime?'':escHtml(currentTime))+'" style="width:100%;box-sizing:border-box;margin-bottom:10px"/>'
+    +(currentTime?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
   document.getElementById('planningModal').classList.add('open');
+}
+function clearPlanningTime(){
+  document.getElementById('planningModalTimeExact').value = '';
+  document.getElementById('planningModalTime').value = '';
 }
 function selectPlanningMoment(mk){
   _planningModalMoment = (_planningModalMoment===mk) ? '' : mk;
   document.querySelectorAll('[data-moment-pill]').forEach(function(el){
-    var active = el.getAttribute('data-moment-pill')===_planningModalMoment;
-    el.style.background = active ? 'var(--accent)' : 'var(--sand-deep)';
-    el.style.color = active ? '#fff' : 'var(--ink-muted)';
+    el.classList.toggle('active', el.getAttribute('data-moment-pill')===_planningModalMoment);
   });
 }
 function savePlanningModal(){
-  var timeVal = document.getElementById('planningModalTime').value;
+  var exactVal = document.getElementById('planningModalTimeExact').value;
+  var freeVal = document.getElementById('planningModalTime').value;
+  var timeVal = exactVal || freeVal;
   setActMoment(_planningModalActKey, _planningModalMoment);
   setActSuggestedTime(_planningModalActKey, timeVal);
   document.getElementById('planningModal').classList.remove('open');
@@ -5357,7 +5374,7 @@ function renderCityPanelContentBody(c, city){
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(a.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+' Supprimer</div>'
+        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(a.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(a.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' >'
@@ -5386,7 +5403,7 @@ function renderCityPanelContentBody(c, city){
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+' Supprimer</div>'
+        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(ca.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" style="border-style:dashed" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
