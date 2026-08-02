@@ -474,6 +474,18 @@ a{color:var(--ink);}
 
 /* ── DAY PLANNING ── */
 .day-tabs{display:flex;gap:4px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none;margin-bottom:6px;}
+.city-filters-sticky{position:sticky;top:0;z-index:15;background:var(--sand);padding-top:6px;margin:0 -16px;padding-left:16px;padding-right:16px;border-bottom:1px solid rgba(29,29,31,0.06);}
+.cf-row-label{font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:4px;margin:6px 0 5px;}
+.cf-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:9px;-webkit-overflow-scrolling:touch;}
+.cf-chips::-webkit-scrollbar{display:none;}
+.cf-day-chip{flex-shrink:0;min-width:38px;height:38px;padding:4px 10px;border-radius:14px;border:none;background:#F6F3EC;color:var(--ink-muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
+.cf-day-chip .cf-day-num{font-size:13px;font-weight:700;line-height:1.1;}
+.cf-day-chip .cf-day-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:0.3px;opacity:0.75;line-height:1.2;}
+.cf-day-chip.active{background:var(--accent-pale);color:var(--accent);}
+.cf-cat-chip{flex-shrink:0;height:38px;min-width:38px;padding:0 12px;border-radius:19px;border:none;background:#F6F3EC;color:var(--ink-subtle);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12.5px;font-weight:600;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}
+.cf-cat-chip.active{background:var(--accent-pale);color:var(--accent);}
+@keyframes cfListFade{from{opacity:0;transform:translateY(2px);}to{opacity:1;transform:translateY(0);}}
+.cf-act-list{animation:cfListFade 180ms ease;}
 .day-tabs::-webkit-scrollbar{display:none;}
 .day-tab{flex-shrink:0;padding:5px 12px;min-height:26px;border-radius:16px;font-size:11px;font-weight:500;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;transition:all 0.15s;}
 .day-tab.active{background:var(--sand-deep);color:var(--ink);font-weight:600;}
@@ -3453,11 +3465,13 @@ function renderDayTabs(ck) {
   const nonEmptyDates = dates.filter(function(iso){ return (counts[iso]||0)>0; });
   if(!nonEmptyDates.length) return '';
   const active = S.activeDay[ck]||'Tous';
-  let html = '<div class="day-tabs">';
-  html += '<button class="'+(active==='Tous'?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')">Tous</button>';
+  let html = '<div class="cf-chips">';
+  html += '<button class="cf-day-chip'+(active==='Tous'?' active':'')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')"><span class="cf-day-num">Tout</span></button>';
   nonEmptyDates.forEach(function(iso){
-    var label = new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-    html += '<button class="'+(iso===active?'day-tab active':'day-tab')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')">'+label+'</button>';
+    var d = new Date(iso+'T00:00:00');
+    var dayNum = d.toLocaleDateString('fr-FR',{day:'numeric'});
+    var weekday = d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','');
+    html += '<button class="cf-day-chip'+(iso===active?' active':'')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\''+iso+'\')"><span class="cf-day-num">'+dayNum+'</span><span class="cf-day-lbl">'+weekday+'</span></button>';
   });
   html += '</div>';
   return html;
@@ -5112,17 +5126,26 @@ function renderCityPanelContentBody(c, city){
     var catKeys = Object.keys(presentCats);
     var categoryFilterHTML = '';
     if(catKeys.length){
-      categoryFilterHTML = '<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch">'
-        +'<span onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\'Tous\')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;background:'+(activeCat==='Tous'?'var(--ink)':'var(--sand-deep)')+';color:'+(activeCat==='Tous'?'#fff':'var(--ink-muted)')+'">Tous</span>'
+      categoryFilterHTML = '<div class="cf-chips">'
+        +'<button class="cf-cat-chip'+(activeCat==='Tous'?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\'Tous\')">'+(activeCat==='Tous'?svgIcon('check',12)+' ':'')+'Toutes</button>'
         +catKeys.map(function(catKey){
           var cat = ACTIVITY_CATEGORIES[catKey];
           var isActive = activeCat===catKey;
-          return '<span onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\''+catKey+'\')" style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;background:'+(isActive?'var(--ink)':'var(--sand-deep)')+';color:'+(isActive?'#fff':'var(--ink-muted)')+'">'+svgIcon(cat.icon,13)+' '+cat.label+'</span>';
+          return '<button class="cf-cat-chip'+(isActive?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\''+catKey+'\')" title="'+cat.label+'">'+svgIcon(cat.icon,15)+(isActive?svgIcon('check',11):'')+'</button>';
         }).join('')
         +'</div>';
     }
 
-    return renderDayTabs(ck)+categoryFilterHTML+baseActsHTML+addForm;
+    var dayTabsHTML = renderDayTabs(ck);
+    var filterBarHTML = '';
+    if(dayTabsHTML || categoryFilterHTML){
+      filterBarHTML = '<div class="city-filters-sticky">'
+        +(dayTabsHTML ? '<div class="cf-row-label">'+svgIcon('calendar',11)+' Jour</div>'+dayTabsHTML : '')
+        +(categoryFilterHTML ? '<div class="cf-row-label">'+svgIcon('compass',11)+' Cat\u00e9gorie</div>'+categoryFilterHTML : '')
+        +'</div>';
+    }
+
+    return filterBarHTML+'<div class="cf-act-list">'+baseActsHTML+'</div>'+addForm;
 }
 
 function setCityCategory(ck, cat){
