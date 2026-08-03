@@ -5313,7 +5313,6 @@ function setActMoment(actKey, momentKey){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
   }
-  renderContent();
 }
 function setActSuggestedTime(actKey, val){
   if(!S.actTime) S.actTime={};
@@ -5322,7 +5321,6 @@ function setActSuggestedTime(actKey, val){
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
   }
-  renderContent();
 }
 var _planningModalActKey = '';
 var _planningModalMoment = '';
@@ -12378,7 +12376,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-handle"></div>
     <div class="modal-title">Planifier</div>
     <div id="planningModalBody"></div>
-    <button onclick="savePlanningModal()" style="width:100%;margin-top:14px;padding:12px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
+    <button onclick="savePlanningModal()" style="display:block;margin:14px auto 0;padding:12px 32px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
     <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('planningModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
   </div>
 </div>
