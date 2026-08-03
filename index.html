@@ -2449,6 +2449,8 @@ function openActionMenu(el){
     {icon:'compass',  label:'Changer la cat\u00e9gorie',                 action:'category'},
     {icon:'calendar', label:'D\u00e9placer vers un autre jour',          action:'date'},
     {icon:'star',     label:isFav?'Retirer des favoris':'Ajouter aux favoris', action:'fav'},
+    {icon:'repeat',   label:'Dupliquer',                                 action:'duplicate'},
+    {icon:'map',      label:'D\u00e9placer vers une autre ville',        action:'moveCity'},
     {icon:'trash-2',  label:'Supprimer',                                 action:'delete', danger:true}
   ];
   document.getElementById('actionMenuTitle').textContent = actName;
@@ -2475,6 +2477,10 @@ function handleActionMenuTap(action){
     openDateChangeModal(ctx.actKey, ctx.cityKey);
   } else if(action==='fav'){
     toggleFavorite(ctx.actKey);
+  } else if(action==='duplicate'){
+    duplicateActivity(ctx.cityKey, ctx.actKey, ctx.actName, ctx.isCustom, ctx.origIdx);
+  } else if(action==='moveCity'){
+    openMoveToCityModal(ctx.actKey, ctx.actName, ctx.cityKey, ctx.isCustom, ctx.origIdx);
   } else if(action==='delete'){
     deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName);
   }
@@ -3747,6 +3753,95 @@ function backfillCityActivityPins(ck){
   }
   next();
 }
+// Duplique une activité (intégrée ou custom) — par défaut dans la même ville, ou dans
+// targetCityKey si fourni (utilisé par "Déplacer vers une autre ville"). Copie catégories,
+// moment, horaire, fiche détaillée et coordonnées. Ne déclenche PAS l'IA (données déjà connues).
+function duplicateActivity(cityKey, actKey, actName, isCustom, origIdx, targetCityKey){
+  var destCityKey = targetCityKey || cityKey;
+  var meta = '';
+  if(isCustom){
+    var srcAct = (S.customActs[cityKey]||[])[origIdx];
+    meta = srcAct ? (srcAct.m||'') : '';
+  } else {
+    var parts0 = cityKey.split('_');
+    var country0 = COUNTRIES.find(function(c){ return c.id===parts0[0]; });
+    var city0 = country0 ? country0.cities.find(function(ci){ return parts0[0]+'_'+ci.city===cityKey; }) : null;
+    var srcBase = city0 ? city0.acts[origIdx] : null;
+    meta = srcBase ? (srcBase.m||'') : '';
+  }
+  var newName = destCityKey===cityKey ? (actName+' (copie)') : actName;
+  if(!S.customActs[destCityKey]) S.customActs[destCityKey] = [];
+  var newIdx = S.customActs[destCityKey].length;
+  var newActKey = destCityKey+'_c'+newIdx;
+  S.customActs[destCityKey].push({n:newName, m:meta, tags:[], custom:true});
+
+  if(S.actCategory && S.actCategory[actKey]!==undefined){
+    if(!S.actCategory) S.actCategory={};
+    var srcCat = S.actCategory[actKey];
+    S.actCategory[newActKey] = Array.isArray(srcCat) ? srcCat.slice() : srcCat;
+  }
+  if(S.actMoment && S.actMoment[actKey]!==undefined){
+    if(!S.actMoment) S.actMoment={};
+    S.actMoment[newActKey] = S.actMoment[actKey];
+  }
+  if(S.actTime && S.actTime[actKey]){
+    if(!S.actTime) S.actTime={};
+    S.actTime[newActKey] = S.actTime[actKey];
+  }
+  // Copie la fiche détail complète (fusion statique + locale de la source)
+  var staticSrc = ACT_DETAILS[actKey] || {};
+  var localSrc = (window._customDetails && window._customDetails[actKey]) || {};
+  var mergedSrc = Object.assign({}, staticSrc, localSrc);
+  if(Object.keys(mergedSrc).length){
+    if(!window._customDetails) window._customDetails = {};
+    window._customDetails[newActKey] = Object.assign({}, mergedSrc);
+    S.customDetails = window._customDetails;
+  }
+  if(COORDS[actKey]) COORDS[newActKey] = COORDS[actKey].slice();
+
+  save();
+  renderContent();
+
+  if(sb && CURRENT_TRIP){
+    var parts = destCityKey.split('_');
+    var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+    sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:newName,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    if(window._customDetails[newActKey]){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:newActKey, data:window._customDetails[newActKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
+    if(S.actCategory){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
+    if(S.actMoment){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
+    if(S.actTime){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
+  }
+}
+
+// Déplace une activité vers une autre ville : duplique dans la ville cible (fonction déjà
+// testée), puis supprime l'originale (réutilise deleteActivity — logique de réindexation et
+// de tombstone déjà éprouvée, on évite de la réécrire pour ne pas fragiliser la corbeille).
+var _moveActivityCtx = null;
+function openMoveToCityModal(actKey, actName, cityKey, isCustom, origIdx){
+  _moveActivityCtx = {actKey:actKey, actName:actName, cityKey:cityKey, isCustom:isCustom, origIdx:origIdx};
+  var body = '';
+  COUNTRIES.forEach(function(country){
+    var cities = (country.cities||[]).filter(function(ci){ return country.id+'_'+ci.city !== cityKey; });
+    if(!cities.length) return;
+    body += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-subtle);font-weight:600;margin:14px 4px 6px">'+escHtml(country.name)+'</div>';
+    body += cities.map(function(ci){
+      var targetKey = country.id+'_'+ci.city;
+      return '<div onclick="confirmMoveToCity(\''+jsStrEsc(targetKey)+'\')" style="display:flex;align-items:center;gap:10px;padding:12px 4px;cursor:pointer;border-top:1px solid rgba(29,29,31,0.07)"><span style="width:20px;display:flex;justify-content:center;color:var(--ink-subtle)">'+svgIcon('map-pin',16)+'</span><span style="font-size:14px;font-weight:500">'+escHtml(ci.city)+'</span></div>';
+    }).join('');
+  });
+  document.getElementById('moveToCityModalBody').innerHTML = body || '<div style="padding:20px;text-align:center;color:var(--ink-subtle);font-size:13px">Aucune autre ville disponible</div>';
+  document.getElementById('moveToCityModal').classList.add('open');
+}
+function confirmMoveToCity(targetCityKey){
+  var ctx = _moveActivityCtx;
+  if(!ctx) return;
+  document.getElementById('moveToCityModal').classList.remove('open');
+  duplicateActivity(ctx.cityKey, ctx.actKey, ctx.actName, ctx.isCustom, ctx.origIdx, targetCityKey);
+  deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName);
+}
+
 function _createActivityCore(cityKey, val, opts){
   val = stripHtml(val.trim());
   if(!val) return;
@@ -12268,7 +12363,18 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   </div>
 </div>
 
+<!-- Déplacer vers une autre ville -->
+<div class="share-modal" id="moveToCityModal">
+  <div class="share-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Déplacer vers une autre ville</div>
+    <div id="moveToCityModalBody" style="max-height:50vh;overflow-y:auto"></div>
+    <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('moveToCityModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
 <div class="share-modal" id="accomModal">
+
   <div class="share-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title" id="accomModalTitle">Logement</div>
