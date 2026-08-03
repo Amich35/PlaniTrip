@@ -99,7 +99,7 @@ a{color:var(--ink);}
 .city-accordion.open .city-panel{display:block;}
 
 /* Activity card with map button */
-.act-card{display:flex;align-items:stretch;gap:12px;padding:14px;border-radius:20px;margin-top:0;background:#fff;border:none;box-shadow:0 3px 14px rgba(29,29,31,0.06);position:relative;overflow:visible;transition:box-shadow 0.18s,transform 0.18s;min-height:112px;box-sizing:border-box;}
+.act-card{display:flex;align-items:stretch;gap:12px;padding:14px;border-radius:20px;margin-top:0;background:#fff;border:none;box-shadow:0 3px 14px rgba(29,29,31,0.06);position:relative;overflow:visible;transition:box-shadow 0.18s,transform 0.18s;min-height:112px;box-sizing:border-box;width:100%;}
 .act-card.done{background:#fff;} .act-card.done>*{opacity:0.4;} .act-card.done .act-thumb{opacity:1;} .act-card:not(.done):active{transform:scale(0.985);box-shadow:0 1px 5px rgba(29,29,31,0.05);}
 .act-card.done .act-name{text-decoration:line-through;}
 .act-check{width:24px;height:24px;border-radius:50%;flex-shrink:0;margin-top:0;border:1.5px solid rgba(29,29,31,0.175);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);background:transparent;}
@@ -132,7 +132,7 @@ a{color:var(--ink);}
 .fav-btn:active{transform:scale(0.92);}
 
 .act-del{position:absolute;top:8px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:rgba(29,29,31,0.070);color:var(--ink-subtle);border-radius:50%;line-height:1;opacity:0.5;transition:opacity 0.15s,background 0.15s;padding:0;} .act-card:hover .act-del,.act-card:active .act-del{opacity:1;}
-.swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r16);margin-top:6px;background:#F8F6F2;-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
+.swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r16);margin-top:6px;background:#F8F6F2;-webkit-transform:translateZ(0);transform:translateZ(0);-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;width:100%;box-sizing:border-box;}
 .swipe-delete-bg{position:absolute;top:0;bottom:0;right:0;width:160px;display:flex;opacity:0;transform:translateX(6px);border-radius:0 var(--r16) var(--r16) 0;overflow:hidden;}
 .swipe-edit-btn,.swipe-del-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:600;gap:3px;color:#fff;}
 .swipe-edit-btn{background:var(--accent);}
