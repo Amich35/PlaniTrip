@@ -99,7 +99,7 @@ a{color:var(--ink);}
 .city-accordion.open .city-panel{display:block;}
 
 /* Activity card with map button */
-.act-card{display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:20px;margin-top:0;background:#fff;border:none;box-shadow:0 3px 14px rgba(29,29,31,0.06);position:relative;overflow:visible;transition:box-shadow 0.18s,transform 0.18s;}
+.act-card{display:flex;align-items:stretch;gap:12px;padding:14px;border-radius:20px;margin-top:0;background:#fff;border:none;box-shadow:0 3px 14px rgba(29,29,31,0.06);position:relative;overflow:visible;transition:box-shadow 0.18s,transform 0.18s;}
 .act-card.done{background:#fff;} .act-card.done>*{opacity:0.4;} .act-card.done .act-thumb{opacity:1;} .act-card:not(.done):active{transform:scale(0.985);box-shadow:0 1px 5px rgba(29,29,31,0.05);}
 .act-card.done .act-name{text-decoration:line-through;}
 .act-check{width:24px;height:24px;border-radius:50%;flex-shrink:0;margin-top:0;border:1.5px solid rgba(29,29,31,0.175);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);background:transparent;}
@@ -5543,13 +5543,12 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
-          +'<div class="act-footer" style="margin-top:0;margin-bottom:4px">'
-          +timeCapsuleHTML(k,a.n,a.m,actMoment?momentAccent[actMoment]:null)
-          +categoryPill(actCat,k)
-          +'</div>'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
-          +'</div>'
+          +'<div class="act-footer">'
+          +timeCapsuleHTML(k,a.n,a.m,actMoment?momentAccent[actMoment]:null)
+          +categoryPill(actCat,k)
+          +'</div></div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMapFromCard(this)">'+(hasCoord?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
@@ -5574,13 +5573,12 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
-          +'<div class="act-footer" style="margin-top:0;margin-bottom:4px">'
-          +timeCapsuleHTML(ck2,ca.n,ca.m,caMoment?momentAccent[caMoment]:null)
-          +categoryPill(caCat,ck2)
-          +'</div>'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
-          +'</div>'
+          +'<div class="act-footer">'
+          +timeCapsuleHTML(ck2,ca.n,ca.m,caMoment?momentAccent[caMoment]:null)
+          +categoryPill(caCat,ck2)
+          +'</div></div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
