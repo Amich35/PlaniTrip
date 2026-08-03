@@ -2119,6 +2119,8 @@ function ensureStateDefaults(){
   if(!S.actCategory) S.actCategory={};
   if(!S.actMoment) S.actMoment={};
   if(!S.actTime) S.actTime={};
+  if(!S.actTimeStart) S.actTimeStart={};
+  if(!S.actTimeEnd) S.actTimeEnd={};
   if(!S.customCountries) S.customCountries=[];
   if(!S.deletedCountryIds) S.deletedCountryIds=[];
   if(!S.deletedCities) S.deletedCities={};
@@ -3618,7 +3620,7 @@ function renderDayTabs(ck) {
   if(!nonEmptyDates.length) return '';
   const active = S.activeDay[ck]||'Tous';
   let html = '<div class="cf-chips">';
-  html += '<button class="cf-day-chip'+(active==='Tous'?' active':'')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')"><span class="cf-day-num">Tout</span></button>';
+  html += '<button class="cf-day-chip'+(active==='Tous'?' active':'')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')"><span class="cf-day-num" style="font-size:12px;font-weight:600">Tout</span></button>';
   nonEmptyDates.forEach(function(iso){
     var d = new Date(iso+'T00:00:00');
     var dayNum = d.toLocaleDateString('fr-FR',{day:'numeric'});
@@ -5328,13 +5330,33 @@ function setActSuggestedTime(actKey, val){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
   }
 }
+// Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
+// pour les horaires approximatifs type "Avant 7h" que la plage ne peut pas exprimer.
+function setActTimeRange(actKey, start, end, freeText){
+  if(!S.actTimeStart) S.actTimeStart={};
+  if(!S.actTimeEnd) S.actTimeEnd={};
+  if(!S.actTime) S.actTime={};
+  start = (start||'').trim(); end = (end||'').trim(); freeText = (freeText||'').trim();
+  S.actTimeStart[actKey] = start;
+  S.actTimeEnd[actKey] = end;
+  // Le texte libre n'est utilisé que si aucune plage structurée n'est renseignée
+  S.actTime[actKey] = (start||end) ? '' : freeText;
+  save();
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+  }
+}
 var _planningModalActKey = '';
 var _planningModalMoment = '';
 function openPlanningModal(actKey, name, meta){
   _planningModalActKey = actKey;
   _planningModalMoment = getActMoment(actKey, name||'', meta||'');
+  var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+  var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
   var currentTime = (S.actTime && S.actTime[actKey]) || '';
-  var isExactTime = /^\d{2}:\d{2}$/.test(currentTime);
+  var hasStructured = !!(startVal || endVal);
   var segments = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
     var mo = ACTIVITY_MOMENTS[mk];
     var isActive = _planningModalMoment===mk;
@@ -5343,15 +5365,19 @@ function openPlanningModal(actKey, name, meta){
   document.getElementById('planningModalBody').innerHTML =
     '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
     +'<div class="moment-segctrl" style="margin-bottom:16px">'+segments+'</div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Horaire</div>'
-    +'<input class="ef-input" id="planningModalTimeExact" type="time" value="'+(isExactTime?currentTime:'')+'" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:8px"/>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Plage horaire</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:8px">'
+    +'<input class="ef-input" id="planningModalTimeStart" type="time" value="'+escHtml(startVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
+    +'<input class="ef-input" id="planningModalTimeEnd" type="time" value="'+escHtml(endVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
+    +'</div>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">ou horaire approximatif (optionnel)</div>'
-    +'<input class="ef-input" id="planningModalTime" type="text" placeholder="ex\u00a0: Avant 7h, 17h\u201319h" value="'+(isExactTime?'':escHtml(currentTime))+'" style="width:100%;box-sizing:border-box;margin-bottom:10px"/>'
-    +(currentTime?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
+    +'<input class="ef-input" id="planningModalTime" type="text" placeholder="ex\u00a0: Avant 7h, journée" value="'+(hasStructured?'':escHtml(currentTime))+'" style="width:100%;box-sizing:border-box;margin-bottom:10px"/>'
+    +((startVal||endVal||currentTime)?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
   document.getElementById('planningModal').classList.add('open');
 }
 function clearPlanningTime(){
-  document.getElementById('planningModalTimeExact').value = '';
+  document.getElementById('planningModalTimeStart').value = '';
+  document.getElementById('planningModalTimeEnd').value = '';
   document.getElementById('planningModalTime').value = '';
 }
 function selectPlanningMoment(mk){
@@ -5361,15 +5387,14 @@ function selectPlanningMoment(mk){
   });
 }
 function savePlanningModal(){
-  var exactVal = document.getElementById('planningModalTimeExact').value;
+  var startVal = document.getElementById('planningModalTimeStart').value;
+  var endVal = document.getElementById('planningModalTimeEnd').value;
   var freeVal = document.getElementById('planningModalTime').value;
-  var timeVal = exactVal || freeVal;
-  // Dérivation automatique : si heure exacte et pas de moment choisi manuellement → déduit le moment
+  // Dérivation automatique : si heure de début renseignée et pas de moment choisi manuellement → déduit le moment
   var finalMoment = _planningModalMoment;
-  if(!finalMoment && exactVal) finalMoment = momentFromTime(exactVal);
-  // Dérivation inverse : si moment choisi mais pas d'heure → on garde juste le moment
+  if(!finalMoment && startVal) finalMoment = momentFromTime(startVal);
   setActMoment(_planningModalActKey, finalMoment);
-  setActSuggestedTime(_planningModalActKey, timeVal);
+  setActTimeRange(_planningModalActKey, startVal, endVal, freeVal);
   document.getElementById('planningModal').classList.remove('open');
   renderContent();
 }
@@ -5397,16 +5422,25 @@ function planningPill(actKey, name, meta){
 // Capsule horaire affichée en haut de chaque carte activité (sous le titre).
 // Toujours visible — affiche l'heure si définie, sinon le moment, sinon "+ Planifier".
 // Point d'entrée unique vers openPlanningModal.
+// S.actTimeStart / S.actTimeEnd : bornes de la plage horaire (HH:MM), toutes deux optionnelles.
+// Le moment de la journée est dérivé automatiquement de l'heure de début (voir momentFromTime).
+// La capsule n'affiche que l'heure (plage ou heure simple) — jamais le nom du moment en texte,
+// pour éviter la redondance avec le header de section (MATIN/MIDI/...).
+function formatTimeRange(actKey){
+  var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+  var end = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+  var legacy = (S.actTime && S.actTime[actKey]) || '';
+  if(start && end) return start.replace(':','h')+'-'+end.replace(':','h');
+  if(start) return start.replace(':','h');
+  if(legacy) return legacy;
+  return '';
+}
 function timeCapsuleHTML(actKey, name, meta, momentColor){
-  var timeVal = (S.actTime && S.actTime[actKey]) || '';
+  var timeVal = formatTimeRange(actKey);
   var mk = (S.actMoment && S.actMoment[actKey] !== undefined) ? S.actMoment[actKey] : null;
-  var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
   var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
-  var hasInfo = timeVal || mk;
-  var label;
-  if(timeVal){ label = escHtml(timeVal); }
-  else if(mo){ label = mo.label; }
-  else { label = 'Planifier'; }
+  var hasInfo = !!timeVal;
+  var label = hasInfo ? escHtml(timeVal) : 'Planifier';
   var color = hasInfo ? 'var(--accent)' : 'var(--ink-subtle)';
   return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:'+color+';background:rgba(29,29,31,0.045);padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.65')+'">'+label+'</span>';
 }
@@ -5509,12 +5543,13 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
-          +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
-          +'<div class="act-footer">'
+          +'<div class="act-footer" style="margin-top:0;margin-bottom:4px">'
           +timeCapsuleHTML(k,a.n,a.m,actMoment?momentAccent[actMoment]:null)
           +categoryPill(actCat,k)
-          +'</div></div>'
+          +'</div>'
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
+          +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
+          +'</div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMapFromCard(this)">'+(hasCoord?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
@@ -5539,12 +5574,13 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
-          +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
-          +'<div class="act-footer">'
+          +'<div class="act-footer" style="margin-top:0;margin-bottom:4px">'
           +timeCapsuleHTML(ck2,ca.n,ca.m,caMoment?momentAccent[caMoment]:null)
           +categoryPill(caCat,ck2)
-          +'</div></div>'
+          +'</div>'
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
+          +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
+          +'</div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
@@ -5562,8 +5598,9 @@ function renderCityPanelContentBody(c, city){
       var items = momentGroups[mk];
       if(!items.length) return '';
       if(mk && ACTIVITY_MOMENTS[mk]){
-        var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)+'<span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span></div>'
-          +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin:0 0 12px;width:32px"></div>';
+        var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)
+          +'<span style="display:inline-block"><span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span>'
+          +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin-top:4px"></div></span></div>';
         var rows = items.map(function(it){
           return it.html;
         }).join('');
@@ -10970,6 +11007,10 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.actMoment = row.data; }
     } else if(row.detail_key === '__planitrip__actTime'){
       if(row.data && typeof row.data === 'object'){ S.actTime = row.data; }
+    } else if(row.detail_key === '__planitrip__actTimeStart'){
+      if(row.data && typeof row.data === 'object'){ S.actTimeStart = row.data; }
+    } else if(row.detail_key === '__planitrip__actTimeEnd'){
+      if(row.data && typeof row.data === 'object'){ S.actTimeEnd = row.data; }
     } else if(row.detail_key === '__planitrip__cityDates'){
       if(row.data && typeof row.data === 'object'){ S.cityDates = row.data; }
     } else if(row.detail_key === '__planitrip__actDay'){
