@@ -5479,6 +5479,8 @@ function clearCategoriesForAct(){
 }
 
 function renderCityPanelContentBody(c, city){
+    var momentAccent = {morning:'#F4A261', noon:'var(--accent)', afternoon:'#4D96FF', evening:'var(--ink-muted)'};
+    var momentBg = {morning:'#FBF1E8', noon:'#F2F7F4', afternoon:'#EDF3FC', evening:'#F1EFEA'};
     const ck=c.id+'_'+city.city;
     const customs=S.customActs[ck]||[];
     const activeDay = S.activeDay[ck]||'Tous';
@@ -5553,8 +5555,6 @@ function renderCityPanelContentBody(c, city){
     }).filter(Boolean);
 
     // Regroupement visuel façon "planning" : Matin / Midi / Après-midi / Soir, puis Non planifié
-    var momentAccent = {morning:'#F4A261', noon:'var(--accent)', afternoon:'#4D96FF', evening:'var(--ink-muted)'};
-    var momentBg = {morning:'#FBF1E8', noon:'#F2F7F4', afternoon:'#EDF3FC', evening:'#F1EFEA'};
     var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
     baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
     var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
