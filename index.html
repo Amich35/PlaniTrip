@@ -3856,6 +3856,7 @@ function _createActivityCore(cityKey, val, opts){
   var actKey = cityKey+'_c'+newIdx;
   if(opts.categories && opts.categories.length){ if(!S.actCategory) S.actCategory={}; S.actCategory[actKey]=opts.categories.slice(); }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
+  if(opts.time){ if(!S.actTime) S.actTime={}; S.actTime[actKey]=opts.time; var derivedMoment=momentFromTime(opts.time); if(derivedMoment){ if(!S.actMoment) S.actMoment={}; S.actMoment[actKey]=derivedMoment; } }
   save();
   renderContent();
   fetchActivityDetailAI(cityKey, val, actKey, newIdx);
@@ -3897,8 +3898,12 @@ function openAddActivityModal(ck){
     +'<div class="ef-row" style="margin-bottom:10px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Description courte (optionnel)" style="width:100%"/></div>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Cat\u00e9gories (optionnel, plusieurs possibles)</div>'
     +'<div style="margin-bottom:10px">'+catPills+'</div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date (optionnel)</div>'
-    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/>';
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date (optionnel)</div>'
+    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Horaire (optionnel)</div>'
+    +'<input class="ef-input" id="guideModalActTime" type="time" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div>'
+    +'</div>';
   _guideModalSaveFn = saveAddActivityModal;
   document.getElementById('guideItemModal').classList.add('open');
 }
@@ -3942,8 +3947,9 @@ function saveAddActivityModal(){
   if(!val) return;
   var meta = ((document.getElementById('guideModalActMeta')||{}).value||'').trim();
   var date = ((document.getElementById('guideModalActDate')||{}).value||'').trim();
+  var timeVal = ((document.getElementById('guideModalActTime')||{}).value||'').trim();
   closeGuideItemModal();
-  _createActivityCore(_addActivityModalCk, val, {meta:meta, categories:_addActivityModalCats, date:date});
+  _createActivityCore(_addActivityModalCk, val, {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal});
 }
 
 function saveApiKeyFromSettingsModal(){
@@ -5354,9 +5360,14 @@ function savePlanningModal(){
   var exactVal = document.getElementById('planningModalTimeExact').value;
   var freeVal = document.getElementById('planningModalTime').value;
   var timeVal = exactVal || freeVal;
-  setActMoment(_planningModalActKey, _planningModalMoment);
+  // Dérivation automatique : si heure exacte et pas de moment choisi manuellement → déduit le moment
+  var finalMoment = _planningModalMoment;
+  if(!finalMoment && exactVal) finalMoment = momentFromTime(exactVal);
+  // Dérivation inverse : si moment choisi mais pas d'heure → on garde juste le moment
+  setActMoment(_planningModalActKey, finalMoment);
   setActSuggestedTime(_planningModalActKey, timeVal);
   document.getElementById('planningModal').classList.remove('open');
+  renderContent();
 }
 function getActCategory(actKey, name, meta){
   if(S.actCategory && S.actCategory[actKey]!==undefined){
@@ -5379,14 +5390,40 @@ function planningPill(actKey, name, meta){
   var label = timeVal || (mo?mo.label:'');
   return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.10);padding:2px 9px;border-radius:20px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,9):svgIcon('history',9))+' '+escHtml(label)+'</span>';
 }
-// Colonne horaire discrète, affichée à gauche de la photo, à l'intérieur de l'encart coloré
-// du moment (hors de la carte blanche individuelle de l'activité). Raccourci direct vers le
-// sélecteur horaire (contrairement aux autres pills qui passent par le menu (…) unifié).
-function timeColumnHTML(actKey, name, meta, momentColor){
+// Capsule horaire affichée en haut de chaque carte activité (sous le titre).
+// Toujours visible — affiche l'heure si définie, sinon le moment, sinon "+ Planifier".
+// Point d'entrée unique vers openPlanningModal.
+function timeCapsuleHTML(actKey, name, meta, momentColor){
   var timeVal = (S.actTime && S.actTime[actKey]) || '';
+  var mk = (S.actMoment && S.actMoment[actKey] !== undefined) ? S.actMoment[actKey] : null;
+  var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
   var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
-  var content = timeVal ? escHtml(timeVal) : svgIcon('history',13);
-  return '<div '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="flex-shrink:0;width:40px;padding-top:16px;text-align:right;font-size:11px;font-weight:700;color:'+momentColor+';line-height:1.2;cursor:pointer;opacity:'+(timeVal?'1':'0.45')+'">'+content+'</div>';
+  var hasInfo = timeVal || mk;
+  var label, color, bg;
+  if(timeVal){
+    label = escHtml(timeVal);
+    color = momentColor || 'var(--accent)';
+    bg = 'rgba(29,29,31,0.06)';
+  } else if(mo){
+    label = svgIcon(mo.icon,10)+' '+mo.label;
+    color = momentColor || 'var(--accent)';
+    bg = 'rgba(29,29,31,0.06)';
+  } else {
+    label = svgIcon('clock',10)+' Planifier';
+    color = 'var(--ink-subtle)';
+    bg = 'rgba(29,29,31,0.05)';
+  }
+  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:'+(hasInfo?'700':'500')+';color:'+color+';background:'+bg+';padding:2px 9px;border-radius:20px;cursor:pointer;margin-top:3px;margin-bottom:1px;opacity:'+(hasInfo?'1':'0.6')+'">'+label+'</span>';
+}
+// Dérivation automatique : convertit une heure HH:MM en clé de moment
+function momentFromTime(timeStr){
+  var m = /^(\d{2}):(\d{2})$/.exec(timeStr);
+  if(!m) return '';
+  var h = parseInt(m[1],10);
+  if(h>=5 && h<12) return 'morning';
+  if(h>=12 && h<14) return 'noon';
+  if(h>=14 && h<19) return 'afternoon';
+  return 'evening';
 }
 function categoryPill(catKeys, actKey){
   catKeys = catKeys || [];
@@ -5476,10 +5513,10 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' >'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
+          +timeCapsuleHTML(k,a.n,a.m,actMoment?momentAccent[actMoment]:null)
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +'<div class="act-footer">'
           +categoryPill(actCat,k)
-          +(actMoment?'':planningPill(k,a.n,a.m))
           +'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openMapFromCard(this)">'+(hasCoord?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
@@ -5504,8 +5541,9 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
+          +timeCapsuleHTML(ck2,ca.n,ca.m,caMoment?momentAccent[caMoment]:null)
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
-          +'<div class="act-footer">'+categoryPill(caCat,ck2)+(caMoment?'':planningPill(ck2,ca.n,ca.m))+'<div style="display:flex;gap:2px">'
+          +'<div class="act-footer">'+categoryPill(caCat,ck2)+'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',15)+'</button></div>'
           +'</div></div></div></div>';
@@ -5526,7 +5564,7 @@ function renderCityPanelContentBody(c, city){
       if(mk && ACTIVITY_MOMENTS[mk]){
         var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,13)+' '+ACTIVITY_MOMENTS[mk].label+'</div>';
         var rows = items.map(function(it){
-          return '<div style="display:flex;align-items:flex-start;gap:2px">'+timeColumnHTML(it.actKey,it.name,it.meta,momentAccent[mk])+'<div style="flex:1;min-width:0">'+it.html+'</div></div>';
+          return it.html;
         }).join('');
         return '<div class="planning-group" style="background:'+momentBg[mk]+'">'+header+rows+'</div>';
       } else {
