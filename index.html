@@ -494,7 +494,7 @@ a{color:var(--ink);}
 .planning-group-header{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-subtle);display:flex;align-items:center;gap:6px;margin:16px 0 8px 12px;}
 .planning-group-header:first-child{margin-top:0;}
 .planning-group-header--muted{opacity:0.5;}
-.planning-group{border-radius:4px;padding:2px 0 2px 12px;margin:0 0 18px;background:transparent;}
+.planning-group{border-radius:4px;padding:2px 0;margin:0 0 18px;background:transparent;}
 .planning-group .planning-group-header{margin:2px 0 8px 0;}
 .planning-group .swipe-wrap{margin-bottom:10px;}
 .moment-segctrl{display:flex;background:var(--sand-deep);border-radius:10px;padding:2px;gap:2px;}
@@ -5557,11 +5557,12 @@ function renderCityPanelContentBody(c, city){
       var items = momentGroups[mk];
       if(!items.length) return '';
       if(mk && ACTIVITY_MOMENTS[mk]){
-        var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)+'<span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span></div>';
+        var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)+'<span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span></div>'
+          +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin:0 0 12px;width:32px"></div>';
         var rows = items.map(function(it){
           return it.html;
         }).join('');
-        return '<div class="planning-group" style="border-left:4px solid '+momentAccent[mk]+'">'+header+rows+'</div>';
+        return '<div class="planning-group">'+header+rows+'</div>';
       } else {
         var header2 = hasAnyPlanned ? '<div class="planning-group-header planning-group-header--muted">Non planifié</div>' : '';
         return header2+items.map(function(it){return it.html;}).join('');
