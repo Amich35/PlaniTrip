@@ -10486,9 +10486,22 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(function(){});
   // When a newer version has been fetched, activated, and taken control,
   // reload once automatically so the update applies without manual action.
+  // On attend que l'app ait fini son chargement initial (enterTrip terminé, main-app affiché)
+  // avant d'autoriser ce reload : sinon un changement de service worker survenant en plein
+  // milieu du chargement des données (enterTrip async) interrompt le rendu et laisse un
+  // écran vide tant qu'aucune interaction ne force un nouveau renderContent().
   var _swReloaded = false;
+  var _pendingSwReload = false;
   function _doAutoReload(){
     if(_swReloaded) return;
+    var mainApp = document.getElementById('main-app');
+    var appReady = mainApp && mainApp.style.display !== 'none';
+    if(!appReady){
+      // L'app n'a pas fini de charger : on mémorise la demande et on réessaiera
+      // une fois le chargement terminé (voir appel dans enterTrip()).
+      _pendingSwReload = true;
+      return;
+    }
     var active = document.activeElement;
     var isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA');
     if(isTyping){
@@ -10499,6 +10512,9 @@ if ('serviceWorker' in navigator) {
     location.reload();
   }
   navigator.serviceWorker.addEventListener('controllerchange', _doAutoReload);
+  window._retrySwReloadIfPending = function(){
+    if(_pendingSwReload) _doAutoReload();
+  };
 }
 
 // ---- Auth (Supabase) ----
@@ -11200,6 +11216,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   renderContent();
+  if(window._retrySwReloadIfPending) window._retrySwReloadIfPending();
   } finally {
     _enterTripLock = null;
   }
