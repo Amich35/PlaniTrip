@@ -482,6 +482,11 @@ a{color:var(--ink);}
 .day-tabs{display:flex;gap:4px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none;margin-bottom:6px;}
 .city-filters-sticky{position:sticky;top:0;z-index:15;background:rgba(248,246,242,0.95);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding-top:8px;margin:0 -16px;padding-left:16px;padding-right:16px;box-shadow:0 2px 6px rgba(29,29,31,0.05);}
 .cf-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px;-webkit-overflow-scrolling:touch;}
+.cf-filter-card{background:#fff;border-radius:18px;padding:12px 12px 10px;margin-bottom:10px;box-shadow:0 2px 10px rgba(29,29,31,0.05);}
+.cf-filter-row{display:flex;align-items:center;gap:8px;}
+.cf-filter-row .cf-filter-icon{flex-shrink:0;width:20px;display:flex;align-items:center;justify-content:center;color:var(--ink-subtle);opacity:0.6;}
+.cf-filter-row .cf-chips{flex:1;padding-bottom:0;margin-bottom:0;min-width:0;}
+.cf-filter-sep{height:1px;background:rgba(29,29,31,0.07);margin:10px 0;}
 .cf-chips::-webkit-scrollbar{display:none;}
 .cf-day-chip{flex-shrink:0;min-width:40px;height:40px;padding:4px 12px;border-radius:12px;border:none;background:#F6F3EC;color:var(--ink-muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:background-color 0.18s ease,color 0.18s ease;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
 .cf-day-chip .cf-day-num{font-size:14px;font-weight:700;line-height:1.1;}
@@ -5593,7 +5598,13 @@ function renderCityPanelContentBody(c, city){
     var dayTabsHTML = renderDayTabs(ck);
     var filterBarHTML = '';
     if(dayTabsHTML || categoryFilterHTML){
-      filterBarHTML = '<div class="city-filters-sticky">'+dayTabsHTML+categoryFilterHTML+'</div>';
+      var calIcon = '<span class="cf-filter-icon">'+svgIcon('calendar',15)+'</span>';
+      var compassIcon = '<span class="cf-filter-icon">'+svgIcon('compass',15)+'</span>';
+      var rowsHTML = '';
+      if(dayTabsHTML) rowsHTML += '<div class="cf-filter-row">'+calIcon+dayTabsHTML+'</div>';
+      if(dayTabsHTML && categoryFilterHTML) rowsHTML += '<div class="cf-filter-sep"></div>';
+      if(categoryFilterHTML) rowsHTML += '<div class="cf-filter-row">'+compassIcon+categoryFilterHTML+'</div>';
+      filterBarHTML = '<div class="city-filters-sticky"><div class="cf-filter-card">'+rowsHTML+'</div></div>';
     }
 
     return filterBarHTML+'<div class="cf-act-list">'+baseActsHTML+'</div>'+addForm;
