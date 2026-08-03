@@ -5512,8 +5512,8 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' >'
-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
           +timeCapsuleHTML(k,a.n,a.m,actMoment?momentAccent[actMoment]:null)
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +'<div class="act-footer">'
           +categoryPill(actCat,k)
@@ -5540,8 +5540,9 @@ function renderCityPanelContentBody(c, city){
         var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(ca.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
-          +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer"><div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
+          +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer">'
           +timeCapsuleHTML(ck2,ca.n,ca.m,caMoment?momentAccent[caMoment]:null)
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +'<div class="act-footer">'+categoryPill(caCat,ck2)+'<div style="display:flex;gap:2px">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="16"></span></button>'
