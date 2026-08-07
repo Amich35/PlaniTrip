@@ -11169,7 +11169,14 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   S.tab = resetTab ? 'today' : (_savedTab || S.tab || 'today');
   try{
     var _savedCityKey = localStorage.getItem(namespacedKey+'_currentCityKey');
-    if(_savedCityKey && !S.currentCityKey) S.currentCityKey = _savedCityKey;
+    // La clé séparée prime toujours sur le blob quand elle existe : le blob (gros JSON, parfois
+    // volumineux) peut avoir échoué silencieusement à se réécrire lors d'un save() récent alors
+    // que les clés séparées, plus légères, ont bien été mises à jour — dans ce cas le blob
+    // contient une VALEUR PÉRIMÉE non vide (ex: une ville visitée lors d'une session précédente),
+    // pas une valeur vide, donc un simple "si vide alors fallback" ne suffit pas : ça laissait
+    // l'app retomber systématiquement sur la dernière ville dont le blob avait gardé une trace
+    // (ex: toujours Osaka) au lieu de la ville réellement consultée juste avant le refresh.
+    if(_savedCityKey !== null) S.currentCityKey = _savedCityKey || undefined;
     console.log('[PlaniTrip diag] enterTrip -> currentCityKey dans clé séparée=', _savedCityKey, '- S.currentCityKey final=', S.currentCityKey);
   }catch(e){}
   try{
@@ -11191,9 +11198,9 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   }catch(e){}
   try{
     var _savedArchCitiesCountry = localStorage.getItem(namespacedKey+'_archivedCitiesCountry');
-    if(_savedArchCitiesCountry && !S.archivedCitiesCountry) S.archivedCitiesCountry = _savedArchCitiesCountry;
+    if(_savedArchCitiesCountry !== null) S.archivedCitiesCountry = _savedArchCitiesCountry || undefined;
     var _savedArchActivitiesCity = localStorage.getItem(namespacedKey+'_archivedActivitiesCity');
-    if(_savedArchActivitiesCity && !S.archivedActivitiesCity) S.archivedActivitiesCity = _savedArchActivitiesCity;
+    if(_savedArchActivitiesCity !== null) S.archivedActivitiesCity = _savedArchActivitiesCity || undefined;
   }catch(e){}
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
   rebuildCountriesFromState();
