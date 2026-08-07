@@ -6123,6 +6123,24 @@ function renderToday(){
       todayActs = todayActs.concat(getCityActivitiesForToday(c, city, todayStr));
     });
   }
+  // Tri chronologique : horaire de début précis en priorité (ex: 09:30), sinon le moment de la
+  // journée comme repli (Matin/Midi/Après-midi/Soir dans cet ordre), sinon la position d'origine
+  // (ordre de la fiche ville, incluant un éventuel réordonnancement manuel par glisser-déposer) —
+  // sans ce tri, la carte "Prochainement" affichait juste les activités concaténées ville par
+  // ville sans respecter l'ordre chronologique réel de la journée.
+  var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
+  todayActs.forEach(function(a, idx){ a._origIdx = idx; });
+  todayActs.sort(function(a, b){
+    var aStart = (S.actTimeStart && S.actTimeStart[a.key]) || '';
+    var bStart = (S.actTimeStart && S.actTimeStart[b.key]) || '';
+    if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+    if(aStart && !bStart) return -1;
+    if(!aStart && bStart) return 1;
+    var aMoment = _momentSortRank[getActMoment(a.key, a.name, a.meta)] ?? 4;
+    var bMoment = _momentSortRank[getActMoment(b.key, b.name, b.meta)] ?? 4;
+    if(aMoment !== bMoment) return aMoment - bMoment;
+    return a._origIdx - b._origIdx;
+  });
   var myEmailToday = (CURRENT_USER && CURRENT_USER.email) || '';
   var todaySpent = S.expenses.filter(function(e){return e.date===todayStr && canonicalPerson(e.personLabel||e.person)===myEmailToday && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
   var budgetDaily = c ? getMyCountryDailyBudget(c) : 0;
