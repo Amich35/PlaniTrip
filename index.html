@@ -1811,6 +1811,10 @@ function save(){
     if(CURRENT_STORAGE_KEY && S.tab) localStorage.setItem(CURRENT_STORAGE_KEY+'_tab', S.tab);
     if(CURRENT_STORAGE_KEY && S.country) localStorage.setItem(CURRENT_STORAGE_KEY+'_country', S.country);
     if(CURRENT_STORAGE_KEY && S.countryDetailTab) localStorage.setItem(CURRENT_STORAGE_KEY+'_countryDetailTab', S.countryDetailTab);
+    if(CURRENT_STORAGE_KEY){
+      if(S.currentCityKey) localStorage.setItem(CURRENT_STORAGE_KEY+'_currentCityKey', S.currentCityKey);
+      else localStorage.removeItem(CURRENT_STORAGE_KEY+'_currentCityKey');
+    }
   }catch(e){}
 }
 
@@ -11153,6 +11157,11 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   try{ _savedTab = localStorage.getItem(namespacedKey+'_tab'); }catch(e){}
   console.log('[PlaniTrip diag] enterTrip -> tab dans clé séparée (_tab)=', _savedTab);
   S.tab = resetTab ? 'today' : (_savedTab || S.tab || 'today');
+  try{
+    var _savedCityKey = localStorage.getItem(namespacedKey+'_currentCityKey');
+    if(_savedCityKey && !S.currentCityKey) S.currentCityKey = _savedCityKey;
+    console.log('[PlaniTrip diag] enterTrip -> currentCityKey dans clé séparée=', _savedCityKey, '- S.currentCityKey final=', S.currentCityKey);
+  }catch(e){}
   try{
     var _savedFeedSeen = localStorage.getItem(namespacedKey+'_feedSeen');
     if(_savedFeedSeen) S.feedLastSeenAt = _savedFeedSeen;
