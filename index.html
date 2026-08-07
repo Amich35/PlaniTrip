@@ -1746,6 +1746,12 @@ const _PLACE_QUERY_OVERRIDES = {
 };
 
 let CURRENT_STORAGE_KEY = 'asie2026';
+// Champs S.xxx dont dépend le rendu de l'écran courant (voir renderContent()), sauvegardés
+// individuellement dans des clés localStorage légères pour survivre même si le gros blob
+// d'état échoue à se recharger après un refresh (voir commentaire détaillé dans save()).
+// Toute nouvelle sélection contextuelle utilisée pour choisir quoi afficher (S.tab==='xxx'
+// qui dépend d'un autre champ) doit être ajoutée ici pour éviter un écran cassé/orphelin.
+const NAV_STATE_KEYS = ['tab','country','countryDetailTab','currentCityKey','archivedCitiesCountry','archivedActivitiesCity'];
 function loadState(){
   try{
     const s=localStorage.getItem(CURRENT_STORAGE_KEY);
@@ -1802,18 +1808,22 @@ function save(){
     localStorage.setItem(CURRENT_STORAGE_KEY,JSON.stringify(S));
   }catch(e){}
   try{
-    // Clés séparées et minuscules pour les petits états de navigation (tab actif, pays et
-    // sous-onglet consultés) : une écriture de quelques octets a beaucoup moins de chance
-    // d'être interrompue (mise en arrière-plan iOS, suspension mémoire) que l'écriture du
+    // Clés séparées et minuscules pour les petits états de navigation (tab actif, et tout champ
+    // de sélection contextuelle nécessaire pour reconstruire l'écran courant — pays consulté,
+    // ville ouverte, sous-onglet, etc.) : une écriture de quelques octets a beaucoup moins de
+    // chance d'être interrompue (mise en arrière-plan iOS, suspension mémoire) que l'écriture du
     // gros blob d'état ci-dessus, qui peut atteindre plusieurs Mo sur un vieux voyage. Si ce
-    // gros blob échoue à se charger/parser, loadState() retombe sur un pays par défaut codé
-    // en dur ('jp') — ces clés séparées évitent ce faux retour au Japon.
-    if(CURRENT_STORAGE_KEY && S.tab) localStorage.setItem(CURRENT_STORAGE_KEY+'_tab', S.tab);
-    if(CURRENT_STORAGE_KEY && S.country) localStorage.setItem(CURRENT_STORAGE_KEY+'_country', S.country);
-    if(CURRENT_STORAGE_KEY && S.countryDetailTab) localStorage.setItem(CURRENT_STORAGE_KEY+'_countryDetailTab', S.countryDetailTab);
+    // gros blob échoue à se charger/parser, loadState() retombe sur des valeurs par défaut —
+    // ces clés séparées évitent qu'un tab restauré (ex: 'cityDetail') se retrouve orphelin
+    // d'un champ de sélection non restauré (ex: currentCityKey), ce qui casse l'écran ou le
+    // fait retomber sur un onglet différent de celui affiché avant le refresh.
+    // NAV_STATE_KEYS doit lister tout champ S.xxx dont dépend le rendu d'un S.tab donné.
     if(CURRENT_STORAGE_KEY){
-      if(S.currentCityKey) localStorage.setItem(CURRENT_STORAGE_KEY+'_currentCityKey', S.currentCityKey);
-      else localStorage.removeItem(CURRENT_STORAGE_KEY+'_currentCityKey');
+      NAV_STATE_KEYS.forEach(function(field){
+        var k = CURRENT_STORAGE_KEY+'_'+field;
+        if(S[field]) localStorage.setItem(k, S[field]);
+        else localStorage.removeItem(k);
+      });
     }
   }catch(e){}
 }
@@ -11178,6 +11188,12 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     var _savedCountryDetailTab = localStorage.getItem(namespacedKey+'_countryDetailTab');
     if(_savedCountryDetailTab) S.countryDetailTab = _savedCountryDetailTab;
     console.log('[PlaniTrip diag] enterTrip -> country dans clé séparée=', _savedCountry, '- countryDetailTab dans clé séparée=', _savedCountryDetailTab);
+  }catch(e){}
+  try{
+    var _savedArchCitiesCountry = localStorage.getItem(namespacedKey+'_archivedCitiesCountry');
+    if(_savedArchCitiesCountry && !S.archivedCitiesCountry) S.archivedCitiesCountry = _savedArchCitiesCountry;
+    var _savedArchActivitiesCity = localStorage.getItem(namespacedKey+'_archivedActivitiesCity');
+    if(_savedArchActivitiesCity && !S.archivedActivitiesCity) S.archivedActivitiesCity = _savedArchActivitiesCity;
   }catch(e){}
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
   rebuildCountriesFromState();
