@@ -5371,33 +5371,27 @@ function openPlanningModal(actKey, name, meta){
   _planningModalActKey = actKey;
   var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
   var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
-  var currentTime = (S.actTime && S.actTime[actKey]) || '';
-  var hasStructured = !!(startVal || endVal);
   document.getElementById('planningModalBody').innerHTML =
     '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Plage horaire</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:8px">'
     +'<input class="ef-input" id="planningModalTimeStart" type="time" value="'+escHtml(startVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
     +'<input class="ef-input" id="planningModalTimeEnd" type="time" value="'+escHtml(endVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
     +'</div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Le moment de la journée (Matin / Midi / Après-midi / Soir) est déduit automatiquement de l\'heure de début.</div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin:10px 0 6px">ou horaire approximatif (optionnel)</div>'
-    +'<input class="ef-input" id="planningModalTime" type="text" placeholder="ex\u00a0: Avant 7h, journée" value="'+(hasStructured?'':escHtml(currentTime))+'" style="width:100%;box-sizing:border-box;margin-bottom:10px"/>'
-    +((startVal||endVal||currentTime)?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:10px">Le moment de la journée (Matin / Midi / Après-midi / Soir) est déduit automatiquement de l\'heure de début.</div>'
+    +((startVal||endVal)?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
   document.getElementById('planningModal').classList.add('open');
 }
 function clearPlanningTime(){
   document.getElementById('planningModalTimeStart').value = '';
   document.getElementById('planningModalTimeEnd').value = '';
-  document.getElementById('planningModalTime').value = '';
 }
 function savePlanningModal(){
   var startVal = document.getElementById('planningModalTimeStart').value;
   var endVal = document.getElementById('planningModalTimeEnd').value;
-  var freeVal = document.getElementById('planningModalTime').value;
   // Le moment de la journée est désormais uniquement dérivé de l'heure de début — pas de choix
   // manuel possible. Sans heure, l'activité reste dans "Non planifié" (moment vide).
   setActMoment(_planningModalActKey, startVal ? momentFromTime(startVal) : '');
-  setActTimeRange(_planningModalActKey, startVal, endVal, freeVal);
+  setActTimeRange(_planningModalActKey, startVal, endVal, '');
   document.getElementById('planningModal').classList.remove('open');
   renderContent();
 }
