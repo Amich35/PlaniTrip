@@ -100,6 +100,7 @@ a{color:var(--ink);}
 
 /* Activity card with map button */
 .act-card{display:flex;align-items:stretch;gap:12px;padding:14px;border-radius:20px;margin-top:0;background:#fff;border:none;box-shadow:0 3px 14px rgba(29,29,31,0.06);position:relative;overflow:visible;transition:box-shadow 0.18s,transform 0.18s;min-height:112px;box-sizing:border-box;width:100%;}
+.act-card-highlight{box-shadow:0 0 0 2px var(--accent),0 3px 14px rgba(29,29,31,0.06)!important;transition:box-shadow 0.3s ease!important;}
 .act-card.done{background:#fff;} .act-card.done>*{opacity:0.4;} .act-card.done .act-thumb{opacity:1;} .act-card:not(.done):active{transform:scale(0.985);box-shadow:0 1px 5px rgba(29,29,31,0.05);}
 .act-card.done .act-name{text-decoration:line-through;}
 .act-check{width:24px;height:24px;border-radius:50%;flex-shrink:0;margin-top:0;border:1.5px solid rgba(29,29,31,0.175);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);background:transparent;}
@@ -5665,12 +5666,27 @@ function setCityCategory(ck, cat){
   save();
   renderContent();
 }
-function openCityDetail(ck){
+function openCityDetail(ck, scrollToActKey){
   S.currentCityKey = ck;
   S.tab = 'cityDetail';
   save();
   renderContent();
-  window.scrollTo(0,0);
+  if(scrollToActKey){
+    // Laisse le temps au DOM de se mettre à jour et aux images de charger avant de scroller,
+    // sinon la position calculée serait fausse (contenu encore en train de grandir sous nos pieds).
+    setTimeout(function(){
+      var target = document.querySelector('[data-act-key="'+CSS.escape(scrollToActKey)+'"].act-card');
+      if(target){
+        target.scrollIntoView({behavior:'smooth', block:'center'});
+        target.classList.add('act-card-highlight');
+        setTimeout(function(){ target.classList.remove('act-card-highlight'); }, 1400);
+      } else {
+        window.scrollTo(0,0);
+      }
+    }, 120);
+  } else {
+    window.scrollTo(0,0);
+  }
   backfillCityActivityPins(ck);
 }
 function closeCityDetail(){
@@ -6155,7 +6171,7 @@ function renderToday(){
 
   // ── Carte Aujourd'hui / Prochainement ──
   var actsCard;
-  var todayOnclick = c && ts.currentCity ? (' onclick="openCityDetail(\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
+  var todayOnclick = c && ts.currentCity ? (' onclick="openCityDetail(\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\''+(todayActs.length?(',\''+jsStrEsc(todayActs[0].key)+'\''):'')+')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
   var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>') : '';
   if(todayActs.length){
     var todayDoneCount = todayActs.filter(function(a){return a.done;}).length;
