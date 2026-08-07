@@ -5665,14 +5665,28 @@ function closeCityDetail(){
   save();
   renderContent();
 }
+// Variante utilisée quand on est déjà À L'INTÉRIEUR de renderContent() (ex: ville invalide/introuvable
+// détectée pendant le rendu de renderCityDetailScreen). Appeler renderContent() ici serait récursif :
+// le second appel s'exécuterait puis le premier (parent), encore en cours, écraserait son résultat
+// avec la chaîne vide qu'il s'apprêtait à retourner — d'où un écran vide après un refresh sur une
+// fiche ville devenue invalide. On met donc seulement à jour l'état et on renvoie directement le
+// HTML de la vue de secours, sans jamais ré-entrer dans renderContent().
+function closeCityDetailAndFallback(){
+  S.tab = 'country';
+  S.countryDetailTab = 'lieux';
+  save();
+  var c = getC();
+  if(!c) return renderCountriesScreen();
+  return renderCountryDetailShell(c, renderItinerary(c, true));
+}
 function renderCityDetailScreen(){
   var ck = S.currentCityKey;
-  if(!ck) { closeCityDetail(); return ''; }
+  if(!ck) { return closeCityDetailAndFallback(); }
   var countryId = ck.split('_')[0];
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) { closeCityDetail(); return ''; }
+  if(!c) { return closeCityDetailAndFallback(); }
   var city = c.cities.find(function(ci){return c.id+'_'+ci.city===ck;});
-  if(!city) { closeCityDetail(); return ''; }
+  if(!city) { return closeCityDetailAndFallback(); }
 
   const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
   const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
