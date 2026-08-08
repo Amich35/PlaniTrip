@@ -1,7 +1,8 @@
-const CACHE_NAME = 'planitrip-v4';
+const CACHE_NAME = 'planitrip-v5';
 const ASSETS = [
   'index.html',
-  'manifest.json'
+  'manifest.json',
+  'vendor/xlsx.full.min.js'
 ];
 
 // Installation : mise en cache des ressources essentielles (pour le mode hors-ligne)
