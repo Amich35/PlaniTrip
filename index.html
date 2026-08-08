@@ -5539,7 +5539,13 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   var timeVal = formatTimeRange(actKey);
   var mk = getActMoment(actKey, name, meta);
   var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
-  var hasExplicitDate = !!(S.actDate && S.actDate[actKey]);
+  // Correctif Lot 2 : le critère "à planifier" doit se baser sur dateVal (la date réellement
+  // utilisée pour le rendu, déjà calculée en amont via getActivityDate — incluant le repli par
+  // répartition automatique sur le séjour), pas sur S.actDate[actKey] seul. Sinon une activité
+  // déjà affichée sous "12 SAM" dans les chips pouvait quand même afficher "+ Planifier" sur sa
+  // carte, simplement parce qu'aucune date n'avait été choisie explicitement — contradiction
+  // visuelle entre le filtre actif et la carte elle-même.
+  var hasDate = !!dateVal;
   var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
   var isViewingSingleDay = activeDay && activeDay!=='Tous';
 
@@ -5548,7 +5554,7 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   }
 
   var label, hasInfo;
-  if(!hasExplicitDate && !timeVal && !mk){
+  if(!hasDate && !timeVal && !mk){
     label = 'Planifier'; hasInfo = false;
   } else if(isViewingSingleDay){
     // Vue filtrée sur un jour précis : ne pas répéter la date déjà donnée par le filtre actif.
@@ -5705,7 +5711,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'<div class="act-meta" style="color:rgba(110,110,115,0.4);font-style:italic">Pas de description</div>')
           +'<div class="act-footer">'
           +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone)
