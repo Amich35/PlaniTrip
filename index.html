@@ -5122,59 +5122,81 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
       if(sb && CURRENT_TRIP && act){
         var cpParts = cityKey.split('_');
         var cpCountryId = cpParts[0], cpCityName = cpParts.slice(1).join('_');
+        // Suppression de l'activité dans la table activities (fire-and-forget, pas de conflit de clé)
         sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',cpCountryId).eq('city',cpCityName).eq('name',act.n).then(function(r){
           if(r&&r.error){ console.error('[PlaniTrip] delete activity:', r.error); }
         });
-        // Lot 5A : re-synchroniser toutes les maps réindexées pour éviter que Supabase
-        // réintroduise d'anciennes clés (c1, c2…) au prochain reload.
-        var _now = new Date().toISOString();
-        var _upserts = [
-          {detail_key:'__planitrip__actDate',      data:S.actDate},
-          {detail_key:'__planitrip__actMoment',    data:S.actMoment},
-          {detail_key:'__planitrip__actTimeStart', data:S.actTimeStart},
-          {detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
-          {detail_key:'__planitrip__actTime',      data:S.actTime},
-          {detail_key:'__planitrip__actCategory',  data:S.actCategory},
-          {detail_key:'__planitrip__done',         data:S.done}
-        ];
-        _upserts.forEach(function(u){
-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:u.detail_key,data:u.data,updated_at:_now},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex sync '+u.detail_key+':', r.error); });
-        });
-        // Correctif Lot 5A — fiches détaillées individuelles (detail_key = actKey).
-        // Les clés custom sont des lignes séparées dans activity_details (une ligne par actKey).
-        // Après suppression de l'index `index`, chaque actKey suivant (c(i) → c(i-1)) doit
-        // être migré côté serveur : upsert de la fiche sous la nouvelle clé + suppression de l'ancienne.
-        // La fiche de l'activité supprimée est également supprimée.
-        var _deletedActKey = cityKey+'_c'+index;
-        sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_deletedActKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] del fiche supprimée:',r.error); });
-        for(var _mi=index+1; _mi<totalBefore; _mi++){
-          (function(_oldKey, _newKey){
-            var ficheData = window._customDetails[_newKey]; // déjà réindexé en local
-            if(ficheData){
-              sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_newKey,data:ficheData,updated_at:_now},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex fiche upsert '+_newKey+':', r.error); });
-              sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_oldKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex fiche delete '+_oldKey+':', r.error); });
-            }
-          })(cityKey+'_c'+_mi, cityKey+'_c'+(_mi-1));
-        }
-        // Correctif Lot 5A — table `favorites` (clé individuelle, pas un blob __planitrip__).
-        // Après réindexation : supprimer la ligne favorite de l'activité supprimée,
-        // puis pour chaque index décalé : delete oldKey + insert newKey (si elle était favorite).
-        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_deletedActKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] del fav supprimé:',r.error); });
-        for(var _fi=index+1; _fi<totalBefore; _fi++){
-          (function(_fOldKey, _fNewKey){
-            if(S.favorites[_fNewKey]){ // déjà réindexé en local
-              var _who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-              var _cid = _fNewKey.split('_')[0];
-              sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_fOldKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] fav reindex del '+_fOldKey+':', r.error); });
-              sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_fNewKey).then(function(r){
-                if(r&&r.error){ console.error('[PlaniTrip] fav reindex dedup '+_fNewKey+':', r.error); return; }
-                sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:_fNewKey,country_id:_cid,added_by_label:_who}).then(function(r2){ if(r2&&r2.error) console.error('[PlaniTrip] fav reindex ins '+_fNewKey+':', r2.error); });
-              });
-            } else {
-              sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_fOldKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] fav reindex del (nofav) '+_fOldKey+':', r.error); });
-            }
-          })(cityKey+'_c'+_fi, cityKey+'_c'+(_fi-1));
-        }
+        // ── Lot 5A — Migration Supabase ordonnée (stratégie snapshot → delete plage → recréer) ──
+        // Les blobs __planitrip__ (maps globales) n'ont pas de collision entre eux : Promise.all OK.
+        // Les fiches individuelles (detail_key = city_cN) et les favoris doivent être traités
+        // en deux phases séquentielles (await) pour éviter toute race condition :
+        //   Phase 1 : DELETE toute la plage impactée côté serveur (toutes les clés cN concernées).
+        //   Phase 2 : UPSERT/INSERT l'état final (snapshot local déjà réindexé).
+        // Ainsi aucun DELETE de Phase 1 ne peut effacer un UPSERT de Phase 2.
+        (async function _migrateAfterDelete(){
+          var _tid = CURRENT_TRIP.id;
+          var _now = new Date().toISOString();
+          var _who = (CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+
+          // ── Étape 1 : blobs globaux (parallel, pas de collision entre eux) ─────────────────────
+          await Promise.all([
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_now},{onConflict:'trip_id,detail_key'}),
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_now},{onConflict:'trip_id,detail_key'}),
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_now},{onConflict:'trip_id,detail_key'}),
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'}),
+            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__done',         data:S.done,         updated_at:_now},{onConflict:'trip_id,detail_key'})
+          ]).catch(function(e){ console.error('[PlaniTrip] blobs reindex:', e); });
+
+          // ── Snapshot local : état final après réindexation locale déjà effectuée ────────────────
+          // Fiches finales : toutes les clés de la plage [index, totalBefore-1[ (déjà réindexées).
+          var _fichesFinales = [];
+          for(var _si = index; _si < totalBefore-1; _si++){
+            var _sk = cityKey+'_c'+_si;
+            var _fd = window._customDetails[_sk];
+            if(_fd) _fichesFinales.push({key:_sk, data:_fd});
+          }
+          // Favoris finaux : clés de la plage qui sont favorites dans l'état local réindexé.
+          var _favsFinales = [];
+          for(var _fsi = index; _fsi < totalBefore-1; _fsi++){
+            var _fsk = cityKey+'_c'+_fsi;
+            if(S.favorites[_fsk]) _favsFinales.push({key:_fsk, country_id:_fsk.split('_')[0]});
+          }
+
+          // ── Étape 2A : DELETE toute la plage impactée dans activity_details ──────────────────────
+          // Plage complète : city_c<index> → city_c<totalBefore-1>.
+          // On supprime d'abord TOUTES les clés (anciennes et nouvelles) pour repartir propre,
+          // puis on recrée uniquement l'état final. Aucun UPSERT de Phase 3 ne sera précédé
+          // d'un DELETE concurrent : la Phase 2 est entièrement terminée avant la Phase 3.
+          var _plageKeys = [];
+          for(var _pi = index; _pi < totalBefore; _pi++) _plageKeys.push(cityKey+'_c'+_pi);
+
+          await sb.from('activity_details')
+            .delete()
+            .eq('trip_id', _tid)
+            .in('detail_key', _plageKeys);
+
+          // ── Étape 2B : DELETE toute la plage dans favorites ──────────────────────────────────────
+          await sb.from('favorites')
+            .delete()
+            .eq('trip_id', _tid)
+            .in('key', _plageKeys);
+
+          // ── Étape 3A : UPSERT fiches finales (plage côté serveur est vide, aucun risque) ────────
+          if(_fichesFinales.length){
+            await Promise.all(_fichesFinales.map(function(f){
+              return sb.from('activity_details').upsert({trip_id:_tid,detail_key:f.key,data:f.data,updated_at:_now},{onConflict:'trip_id,detail_key'});
+            })).catch(function(e){ console.error('[PlaniTrip] fiches reindex upsert:', e); });
+          }
+
+          // ── Étape 3B : INSERT favoris finaux ────────────────────────────────────────────────────
+          if(_favsFinales.length){
+            await Promise.all(_favsFinales.map(function(f){
+              return sb.from('favorites').insert({trip_id:_tid,key:f.key,country_id:f.country_id,added_by_label:_who});
+            })).catch(function(e){ console.error('[PlaniTrip] favs reindex insert:', e); });
+          }
+        })().catch(function(e){ console.error('[PlaniTrip] _migrateAfterDelete:', e); });
       }
     } else {
       if(!S.deletedActs) S.deletedActs={};
