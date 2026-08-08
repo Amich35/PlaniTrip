@@ -2951,7 +2951,16 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   renderContent();
 }
 function unlockCustomActDetail(actKey, cityKey, actName){
-  if(!window._customDetails || !window._customDetails[actKey]) return;
+  // Le bouton "Modifier" doit fonctionner aussi bien pour une activité custom (fiche vivant déjà
+  // dans window._customDetails) que pour une activité de base dont le contenu vient des données
+  // statiques ACT_DETAILS (ex: Château d'Osaka) — dans ce dernier cas window._customDetails[actKey]
+  // n'existe pas encore, donc on l'initialise ici à partir de ACT_DETAILS avant de débloquer
+  // l'édition, sinon le clic ne faisait rigoureusement rien.
+  if(!window._customDetails) window._customDetails = {};
+  if(!window._customDetails[actKey]){
+    var staticSrc = ACT_DETAILS[actKey] || {};
+    window._customDetails[actKey] = Object.assign({}, staticSrc);
+  }
   window._customDetails[actKey]._editUnlocked = true;
   S.customDetails = window._customDetails;
   save();
