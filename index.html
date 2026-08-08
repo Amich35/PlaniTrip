@@ -3044,6 +3044,12 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
         // Cas C : pas de _sid local (activité créée avant ce correctif ou non syncée).
         // Garde-fou : compter les lignes serveur avec cet ancien nom pour éviter un UPDATE ambigu.
         sb.from('activities').select('id',{count:'exact',head:true}).eq('trip_id',CURRENT_TRIP.id).eq('country_id',_rnCountry).eq('city',_rnCity).eq('name',_oldName).then(function(_rc){
+          // Traiter l'erreur réseau/serveur en premier : ne jamais interpréter un échec comme count=0.
+          if(_rc && _rc.error){
+            console.error('[PlaniTrip] rename count error:',_rc.error);
+            alert('Impossible de renommer cette activité pour le moment. Vérifie ta connexion puis réessaie.');
+            return;
+          }
           var _count = (_rc && _rc.count != null) ? _rc.count : 0;
           if(_count > 1){
             // Ambiguïté : plusieurs lignes portent le même nom — on bloque le rename serveur.
