@@ -989,7 +989,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <button id="ct-submit-btn" class="ct-primary-btn">Créer mon voyage</button>
     <button type="button" id="ct-import-btn" style="width:100%;margin-top:10px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--ink-muted);font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:color .15s;" onclick="openImportTripFlow()"><span data-icon="upload" data-icon-size="15"></span> Importer un voyage existant</button>
     <!-- input file masqué pour l'import — accepte les formats documentaires (pas les images) -->
-    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown,.xlsx,.xls" style="display:none" onchange="handleImportFileSelected(event)">
+    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown,.xlsx,.xls,.docx" style="display:none" onchange="handleImportFileSelected(event)">
   </div>
 </div>
 
@@ -12578,18 +12578,28 @@ function closeImportTripModal() {
 // ── Gestionnaire sélection fichier ──────────────────────────────────────────
 // Correctif #1 : accept limité aux formats réellement supportés en A2.1
 // A2.2 : formats désormais supportés — CSV / TXT / MD / XLSX (multi-feuilles).
+// A2.3a : formats désormais supportés — CSV / TXT / MD / XLSX / DOCX.
+// Correctif de taille (section 6 du cahier des charges A2.3) : au-delà de cette
+// limite, un DOCX/PDF risque de saturer la mémoire du navigateur sur iPhone.
+var _IMP_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+var _IMP_MAX_FILE_SIZE_MB = 10;
+
 function handleImportFileSelected(e) {
   var file = e.target.files && e.target.files[0];
   if (!file) return;
   _IMP.filename = file.name;
   var ext = file.name.split('.').pop().toLowerCase();
-  var supported = ['csv','txt','md','markdown','xlsx','xls'];
+  var supported = ['csv','txt','md','markdown','xlsx','xls','docx'];
   if (!supported.includes(ext)) {
-    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLS/XLSX).');
+    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLS/XLSX), Word (DOCX).');
     return;
   }
   if (ext === 'xlsx' || ext === 'xls') {
     _handleImportXLSXFile(file);
+    return;
+  }
+  if (ext === 'docx') {
+    _handleImportDOCXFile(file);
     return;
   }
   var reader = new FileReader();
@@ -12681,6 +12691,133 @@ async function _handleImportXLSXFile(file) {
       _showImportPreview();
     } catch(err) {
       _showImportError('Erreur lors de l\'analyse du fichier Excel : ' + err.message);
+    }
+  };
+  reader.onerror = function() {
+    _showImportError('Impossible de lire ce fichier.');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A2.3a — IMPORT DOCX (Word)
+// Architecture : Mammoth extrait un HTML sémantique local (aucun envoi réseau)
+// → tableaux → _impFindHeaderRow()/_impConsumeRow() (identique CSV/XLSX)
+// → texte libre → _parseTxtMd() (identique TXT/MD, aucun nouveau parser métier)
+// → fusion via _impMergeResultInto() (même règle d'enrichissement que A2.2).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Lazy-load Mammoth — même pattern que SheetJS (asset local vendorisé, chargé
+// uniquement à la demande, précaché par le service worker pour l'offline).
+var _mammothLoadPromise = null;
+function _loadMammoth() {
+  if (window.mammoth) return Promise.resolve();
+  if (_mammothLoadPromise) return _mammothLoadPromise;
+  _mammothLoadPromise = new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'vendor/mammoth.browser.min.js';
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ _mammothLoadPromise = null; reject(new Error('module indisponible')); };
+    document.head.appendChild(s);
+  });
+  return _mammothLoadPromise;
+}
+
+// Extrait {text, tables} d'un DOCX via Mammoth → HTML sémantique → DOMParser
+// (natif, aucune dépendance supplémentaire). Les tableaux sont retirés du DOM
+// avant l'extraction du texte narratif pour éviter tout double comptage.
+async function _extractDOCX(arrayBuffer) {
+  var conv = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+  var html = (conv && conv.value) || '';
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(html, 'text/html');
+
+  var tables = [];
+  var tableEls = doc.querySelectorAll('table');
+  tableEls.forEach(function(table) {
+    var rows = [];
+    table.querySelectorAll('tr').forEach(function(tr) {
+      var cells = [];
+      tr.querySelectorAll('th,td').forEach(function(td) {
+        cells.push((td.textContent || '').replace(/\s+/g,' ').trim());
+      });
+      if (cells.length) rows.push(cells);
+    });
+    if (rows.length > 1) tables.push(rows); // en-tête + au moins 1 ligne pour être exploitable
+    if (table.parentNode) table.parentNode.removeChild(table);
+  });
+
+  var lines = [];
+  Array.prototype.forEach.call(doc.body.children, function(node) {
+    var tag = node.tagName.toLowerCase();
+    if (tag === 'ul' || tag === 'ol') {
+      node.querySelectorAll('li').forEach(function(li) {
+        var t = (li.textContent || '').replace(/\s+/g,' ').trim();
+        if (t) lines.push('- '+t);
+      });
+      return;
+    }
+    var text = (node.textContent || '').replace(/\s+/g,' ').trim();
+    if (!text) return;
+    if (/^h[12]$/.test(tag)) lines.push('# '+text);
+    else if (tag === 'h3') lines.push('## '+text);
+    else if (tag === 'h4' || tag === 'h5' || tag === 'h6') lines.push('### '+text);
+    else lines.push(text);
+  });
+
+  return { text: lines.join('\n'), tables: tables };
+}
+
+// Consolide {text, tables} extrait d'un DOCX vers le modèle _IMP.parsed —
+// priorité aux tableaux structurés (plus fiables), le texte libre vient enrichir
+// ensuite sans dupliquer (section 15 du cahier des charges A2.3).
+function _parseDOCXContent(extracted) {
+  var result = _impEmptyResult();
+  var seenCountries = {}, seenCities = {}, seenActs = {}, seenAccoms = {};
+
+  extracted.tables.forEach(function(rows) {
+    var found = _impFindHeaderRow(rows, '', 10);
+    if (!found) return; // tableau sans en-têtes reconnus — ignoré, pas d'invention de structure
+    for (var r = found.idx + 1; r < rows.length; r++) {
+      var row = rows[r];
+      if (!row || !row.some(function(c){ return String(c||'').trim(); })) continue;
+      _impConsumeRow(found.H, row, result, seenCountries, seenCities, seenActs, seenAccoms);
+    }
+  });
+
+  var textResult = _parseTxtMd(extracted.text);
+  _impMergeResultInto(result, textResult, seenCountries, seenCities, seenActs, seenAccoms);
+
+  return result;
+}
+
+async function _handleImportDOCXFile(file) {
+  if (file.size > _IMP_MAX_FILE_SIZE) {
+    _showImportError('Ce fichier est trop volumineux pour être analysé sur mobile (limite '+_IMP_MAX_FILE_SIZE_MB+' Mo).');
+    return;
+  }
+  _showImportLoading('Chargement du module Word…');
+  try {
+    await _loadMammoth();
+  } catch(e) {
+    _showImportError('Impossible de charger le module Word. Vérifie ta connexion et réessaie.');
+    return;
+  }
+  _showImportLoading('Analyse du document…');
+  var reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      var extracted = await _extractDOCX(ev.target.result);
+      var parsed = _parseDOCXContent(extracted);
+      _IMP.parsed = parsed;
+      var hasData = parsed.countries.length || parsed.cities.length || parsed.activities.length || parsed.accommodations.length;
+      if (!hasData) {
+        _showImportError('Nous n\'avons pas identifié d\'itinéraire exploitable dans ce document.');
+        return;
+      }
+      _showImportPreview();
+    } catch(err) {
+      _showImportError('Impossible de lire ce document Word.');
     }
   };
   reader.onerror = function() {
@@ -12931,6 +13068,57 @@ function _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs, see
       if (existingAccom.confidence !== 'ok' && country && city) existingAccom.confidence = 'ok';
     }
   }
+}
+
+// ── A2.3 : fusionner un second résultat d'analyse dans un premier sans dupliquer.
+// Utilisé quand une même source (DOCX, PDF) produit à la fois des tableaux
+// structurés et du texte libre (ex: _parseTxtMd) qui peuvent se recouper.
+// Applique EXACTEMENT la même règle d'enrichissement que _impConsumeRow — champs
+// vides complétés, valeurs déjà renseignées jamais écrasées — mais au niveau
+// d'items déjà construits plutôt que ligne par ligne. Ce n'est pas un second
+// mécanisme de dédoublonnage : c'est la même règle, appliquée au bon grain.
+function _impMergeResultInto(target, source, seenCountries, seenCities, seenActs, seenAccoms) {
+  source.countries.forEach(function(c) {
+    var key = _impNorm(c.name);
+    if (!seenCountries[key]) { seenCountries[key] = true; target.countries.push(c); }
+  });
+  source.cities.forEach(function(ci) {
+    var key = _impNorm(ci.country)+'|'+_impNorm(ci.city);
+    var existing = seenCities[key];
+    if (!existing) { seenCities[key] = ci; target.cities.push(ci); }
+    else {
+      if (!existing.dateStart && !existing.dateStartRaw && (ci.dateStart || ci.dateStartRaw)) { existing.dateStart = ci.dateStart; existing.dateStartRaw = ci.dateStartRaw; }
+      if (!existing.dateEnd && !existing.dateEndRaw && (ci.dateEnd || ci.dateEndRaw)) { existing.dateEnd = ci.dateEnd; existing.dateEndRaw = ci.dateEndRaw; }
+      if (!existing.nights && ci.nights) existing.nights = ci.nights;
+      if (existing.confidence !== 'ok' && ci.confidence === 'ok') existing.confidence = 'ok';
+    }
+  });
+  source.activities.forEach(function(a) {
+    var key = _impNorm(a.country)+'|'+_impNorm(a.city)+'|'+_impNorm(a.name)+'|'+(a.date||a.dateRaw);
+    var existing = seenActs[key];
+    if (!existing) { seenActs[key] = a; target.activities.push(a); }
+    else {
+      if (!existing.time && a.time) existing.time = a.time;
+      if (!existing.note && a.note) existing.note = a.note;
+      if (!existing.price && a.price) existing.price = a.price;
+      if (existing.confidence !== 'ok' && a.confidence === 'ok') existing.confidence = 'ok';
+    }
+  });
+  source.accommodations.forEach(function(a) {
+    var key = _impNorm(a.city)+'|'+_impNorm(a.name);
+    var existing = seenAccoms[key];
+    if (!existing) { seenAccoms[key] = a; target.accommodations.push(a); }
+    else {
+      if (!existing.dateStart && !existing.dateStartRaw && (a.dateStart || a.dateStartRaw)) { existing.dateStart = a.dateStart; existing.dateStartRaw = a.dateStartRaw; }
+      if (!existing.dateEnd && !existing.dateEndRaw && (a.dateEnd || a.dateEndRaw)) { existing.dateEnd = a.dateEnd; existing.dateEndRaw = a.dateEndRaw; }
+      if (!existing.nights && a.nights) existing.nights = a.nights;
+      if (!existing.link && a.link) existing.link = a.link;
+      if (!existing.note && a.note) existing.note = a.note;
+      if (existing.confidence !== 'ok' && a.confidence === 'ok') existing.confidence = 'ok';
+    }
+  });
+  source.notes.forEach(function(n) { target.notes.push(n); });
+  if (!target.trip.name && source.trip.name) target.trip.name = source.trip.name;
 }
 
 // ── PARSER CSV ───────────────────────────────────────────────────────────────
