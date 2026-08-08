@@ -12777,7 +12777,17 @@ function _parseDOCXContent(extracted) {
 
   extracted.tables.forEach(function(rows) {
     var found = _impFindHeaderRow(rows, '', 10);
-    if (!found) return; // tableau sans en-têtes reconnus — ignoré, pas d'invention de structure
+    if (!found) {
+      // Tableau non structuré (aucun en-tête reconnu) — jamais jeté silencieusement.
+      // Chaque ligne non vide est conservée telle quelle dans les notes non
+      // classées, pour rester cohérent avec la promesse "aucune donnée absente
+      // n'est inventée, aucune information visible n'est perdue".
+      rows.forEach(function(row) {
+        var line = row.filter(function(c){ return String(c||'').trim(); }).join(' — ').trim();
+        if (line) result.notes.push(line.length > 160 ? line.slice(0,160)+'…' : line);
+      });
+      return;
+    }
     for (var r = found.idx + 1; r < rows.length; r++) {
       var row = rows[r];
       if (!row || !row.some(function(c){ return String(c||'').trim(); })) continue;
