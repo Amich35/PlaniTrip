@@ -5789,7 +5789,7 @@ function renderCityPanelContentBody(c, city){
         } else {
           // Lot 3 §3 : libellé renommé "Horaire non défini" — l'activité a déjà une date connue
           // dans cette vue Jour, "Non planifié" était sémantiquement trompeur.
-          var header2 = hasAnyPlanned ? '<div class="planning-group-header planning-group-header--muted">Horaire non d\u00e9fini</div>' : '';
+          var header2 = '<div class="planning-group-header planning-group-header--muted">Horaire non d\u00e9fini</div>';
           return header2+items.map(function(it){return it.html;}).join('');
         }
       }).join('');
