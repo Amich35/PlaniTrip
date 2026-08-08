@@ -2273,6 +2273,11 @@ function toggleAct(k){
   var wasUndone = !S.done[k];
   S.done[k]=!S.done[k];
   save();
+  // Lot 5A : synchroniser S.done vers Supabase pour que le statut "Fait" soit partagé
+  // entre voyageurs et survive à un reload depuis le serveur.
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',data:S.done,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync done:',r.error); });
+  }
   renderContent();
   // Peak moment: animate the check if just completed
   if(wasUndone && S.done[k]){
@@ -3888,14 +3893,8 @@ function duplicateActivity(cityKey, actKey, actName, isCustom, origIdx, targetCi
     var srcCat = S.actCategory[actKey];
     S.actCategory[newActKey] = Array.isArray(srcCat) ? srcCat.slice() : srcCat;
   }
-  if(S.actMoment && S.actMoment[actKey]!==undefined){
-    if(!S.actMoment) S.actMoment={};
-    S.actMoment[newActKey] = S.actMoment[actKey];
-  }
-  if(S.actTime && S.actTime[actKey]){
-    if(!S.actTime) S.actTime={};
-    S.actTime[newActKey] = S.actTime[actKey];
-  }
+  // Lot 5A : le planning (moment, heures, date, done, favori) n'est PAS copié lors d'une
+  // duplication standard. La copie est un nouvel objet à planifier indépendamment.
   // Copie la fiche détail complète (fusion statique + locale de la source)
   var staticSrc = ACT_DETAILS[actKey] || {};
   var localSrc = (window._customDetails && window._customDetails[actKey]) || {};
@@ -3918,8 +3917,7 @@ function duplicateActivity(cityKey, actKey, actName, isCustom, origIdx, targetCi
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:newActKey, data:window._customDetails[newActKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
     }
     if(S.actCategory){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
-    if(S.actMoment){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
-    if(S.actTime){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
+    // Lot 5A : actMoment et actTime ne sont plus copiés — pas d'upsert nécessaire.
   }
 }
 
@@ -3946,7 +3944,26 @@ function confirmMoveToCity(targetCityKey){
   var ctx = _moveActivityCtx;
   if(!ctx) return;
   document.getElementById('moveToCityModal').classList.remove('open');
+  // Lot 5A : un déplacement est sémantiquement différent d'une duplication.
+  // duplicateActivity() copie le contenu (nom, description, catégorie, fiche, coords).
+  // Le planning (date, moment, heures) n'est pas transporté : l'activité doit être
+  // replanifiée dans le contexte du séjour de la ville cible.
+  // Le favori, en revanche, appartient à l'objet et doit être conservé.
+  var wasFavorite = !!(S.favorites && S.favorites[ctx.actKey]);
   duplicateActivity(ctx.cityKey, ctx.actKey, ctx.actName, ctx.isCustom, ctx.origIdx, targetCityKey);
+  // Retrouver la nouvelle clé (dernier élément ajouté dans la ville cible) et transférer le favori.
+  if(wasFavorite){
+    var newIdx = (S.customActs[targetCityKey]||[]).length - 1;
+    if(newIdx >= 0){
+      var newKey = targetCityKey+'_c'+newIdx;
+      if(!S.favorites) S.favorites={};
+      S.favorites[newKey] = true;
+      if(sb && CURRENT_TRIP){
+        var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+        sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:newKey,country_id:targetCityKey.split('_')[0],added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] move fav sync:',_r.error); });
+      }
+    }
+  }
   deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName);
 }
 
@@ -3962,7 +3979,11 @@ function _createActivityCore(cityKey, val, opts){
   var actKey = cityKey+'_c'+newIdx;
   if(opts.categories && opts.categories.length){ if(!S.actCategory) S.actCategory={}; S.actCategory[actKey]=opts.categories.slice(); }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
-  if(opts.time){ if(!S.actTime) S.actTime={}; S.actTime[actKey]=opts.time; var derivedMoment=momentFromTime(opts.time); if(derivedMoment){ if(!S.actMoment) S.actMoment={}; S.actMoment[actKey]=derivedMoment; } }
+  // Lot 5A : heure de création via setActTimeRange + setActMoment (setters synchronisés Supabase)
+  // au lieu de l'écriture directe dans S.actTime (legacy). S.actTime reste un fallback pour
+  // les anciens textes approximatifs, mais une nouvelle activité avec heure structurée doit
+  // passer par actTimeStart dès la création.
+  if(opts.time){ setActTimeRange(actKey, opts.time, '', ''); setActMoment(actKey, getDayPeriod(opts.time)); }
   save();
   renderContent();
   fetchActivityDetailAI(cityKey, val, actKey, newIdx);
@@ -5069,10 +5090,15 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
       var totalBefore = (S.customActs[cityKey]||[]).length;
       var act = (S.customActs[cityKey]||[]).splice(index,1)[0];
       if(act){ act._wasCustom=true; S.trash[cityKey].push(act); }
-      // Réindexer tous les états liés (fait, favori, date, fiche détaillée) pour éviter
-      // qu'une activité suivante n'hérite de l'état de celle qu'on vient de supprimer.
+      // Réindexer tous les états liés pour éviter qu'une activité suivante n'hérite de l'état
+      // de celle qu'on vient de supprimer. Inclut toutes les maps indexées par actKey (Lot 5A).
       if(!window._customDetails) window._customDetails={};
-      var maps = [S.done, S.favorites, S.actDate, window._customDetails];
+      if(!S.actMoment) S.actMoment={};
+      if(!S.actTimeStart) S.actTimeStart={};
+      if(!S.actTimeEnd) S.actTimeEnd={};
+      if(!S.actTime) S.actTime={};
+      if(!S.actCategory) S.actCategory={};
+      var maps = [S.done, S.favorites, S.actDate, S.actMoment, S.actTimeStart, S.actTimeEnd, S.actTime, S.actCategory, window._customDetails];
       for(var ni=index+1; ni<totalBefore; ni++){
         var oldKey = cityKey+'_c'+ni, newKey = cityKey+'_c'+(ni-1);
         maps.forEach(function(m){
@@ -5090,6 +5116,21 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
         var cpCountryId = cpParts[0], cpCityName = cpParts.slice(1).join('_');
         sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',cpCountryId).eq('city',cpCityName).eq('name',act.n).then(function(r){
           if(r&&r.error){ console.error('[PlaniTrip] delete activity:', r.error); }
+        });
+        // Lot 5A : re-synchroniser toutes les maps réindexées pour éviter que Supabase
+        // réintroduise d'anciennes clés (c1, c2…) au prochain reload.
+        var _now = new Date().toISOString();
+        var _upserts = [
+          {detail_key:'__planitrip__actDate',      data:S.actDate},
+          {detail_key:'__planitrip__actMoment',    data:S.actMoment},
+          {detail_key:'__planitrip__actTimeStart', data:S.actTimeStart},
+          {detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
+          {detail_key:'__planitrip__actTime',      data:S.actTime},
+          {detail_key:'__planitrip__actCategory',  data:S.actCategory},
+          {detail_key:'__planitrip__done',         data:S.done}
+        ];
+        _upserts.forEach(function(u){
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:u.detail_key,data:u.data,updated_at:_now},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex sync '+u.detail_key+':', r.error); });
         });
       }
     } else {
@@ -5511,6 +5552,13 @@ function savePlanningModal(){
   //   SINON SI moment manuel   -> moment = _planningModalMoment    (choix explicite conservé)
   //   SINON                    -> moment = ''                     (aucun horaire du tout)
   var finalMoment = startVal ? getDayPeriod(startVal) : _planningModalMoment;
+  // Lot 5A : garde-fou — heure de fin sans heure de début ignorée.
+  // Une plage end<start est acceptée (activité nocturne traversant minuit).
+  if(endVal && !startVal){
+    endVal = '';
+    var endEl = document.getElementById('planningModalTimeEnd');
+    if(endEl){ endEl.value = ''; endEl.style.borderColor = 'var(--red-muted)'; setTimeout(function(){ endEl.style.borderColor=''; }, 1200); }
+  }
   // La date passe par setActivityDate (déjà existante) qui valide les bornes du séjour et peut
   // annuler la sauvegarde (alert + renderContent) si la date est hors séjour — comportement
   // préexistant conservé tel quel, pas de nouvelle règle de validation créée ici.
@@ -11322,6 +11370,8 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.actMoment = row.data; }
     } else if(row.detail_key === '__planitrip__actTime'){
       if(row.data && typeof row.data === 'object'){ S.actTime = row.data; }
+    } else if(row.detail_key === '__planitrip__done'){
+      if(row.data && typeof row.data === 'object'){ S.done = row.data; }
     } else if(row.detail_key === '__planitrip__actTimeStart'){
       if(row.data && typeof row.data === 'object'){ S.actTimeStart = row.data; }
     } else if(row.detail_key === '__planitrip__actTimeEnd'){
