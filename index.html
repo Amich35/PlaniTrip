@@ -4097,6 +4097,10 @@ function _createActivityCore(cityKey, val, opts){
     if(!window._customDetails) window._customDetails={};
     window._customDetails[actKey] = Object.assign({}, opts.initialDetails, {_editUnlocked:false, _userValidated:false, _aiGenerated:false});
     S.customDetails = window._customDetails;
+    // Lot 6 correctif : initialiser COORDS depuis les détails statiques si lat/lng présents,
+    // sans déclencher de géocodage réseau inutile.
+    var _id = opts.initialDetails;
+    if(_id.lat && _id.lng && !COORDS[actKey]) COORDS[actKey] = [_id.lat, _id.lng, val];
   }
   if(opts.categories && opts.categories.length){
     if(!S.actCategory) S.actCategory={};
@@ -4134,6 +4138,12 @@ function _createActivityCore(cityKey, val, opts){
     })(newIdx);
     if(opts.date){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    }
+    // Lot 6 correctif : upsert de la fiche détaillée si elle provient d'une suggestion statique.
+    // Rend la fiche persistante pour les autres voyageurs / autres appareils sans dépendance
+    // au cache local. Aucun appel IA — les données viennent de opts.initialDetails déjà copié.
+    if(opts.initialDetails && Object.keys(opts.initialDetails).length && window._customDetails && window._customDetails[actKey]){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:actKey,data:window._customDetails[actKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
     }
   }
 }
