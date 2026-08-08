@@ -12585,7 +12585,7 @@ function handleImportFileSelected(e) {
   var ext = file.name.split('.').pop().toLowerCase();
   var supported = ['csv','txt','md','markdown','xlsx','xls'];
   if (!supported.includes(ext)) {
-    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLSX).');
+    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLS/XLSX).');
     return;
   }
   if (ext === 'xlsx' || ext === 'xls') {
@@ -12630,12 +12630,19 @@ function _runImportPipeline() {
 // ── A2.2 : XLSX — chargement paresseux de SheetJS (aucun poids au chargement
 // initial de l'app, uniquement si l'utilisateur importe un fichier Excel) ────
 var _sheetJsLoadPromise = null;
+// Correctif #1 : asset local versionné (vendor/xlsx.full.min.js) au lieu du CDN
+// distant. PlaniTrip est offline-first — un CDN externe romprait l'import Excel
+// dès la première utilisation hors connexion. Le lazy-load est conservé (aucun
+// chargement au démarrage) ; le service worker existant (stratégie réseau
+// prioritaire, cache en secours pour toute requête GET réussie) met en cache
+// cet asset automatiquement dès la première utilisation en ligne, le rendant
+// disponible hors-ligne ensuite — aucune modification du service worker requise.
 function _loadSheetJS() {
   if (window.XLSX) return Promise.resolve();
   if (_sheetJsLoadPromise) return _sheetJsLoadPromise;
   _sheetJsLoadPromise = new Promise(function(resolve, reject) {
     var s = document.createElement('script');
-    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.src = 'vendor/xlsx.full.min.js';
     s.onload = function(){ resolve(); };
     s.onerror = function(){ _sheetJsLoadPromise = null; reject(new Error('module indisponible')); };
     document.head.appendChild(s);
@@ -12730,12 +12737,25 @@ function _impParseDateSmart(s) {
   return { iso:'', raw:'', needsYear:false };
 }
 function _impParseTime(s) {
-  if (!s) return '';
+  if (s === undefined || s === null || s === '') return '';
   s = String(s).trim();
+  if (!s) return '';
   var m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (m) return m[1].padStart(2,'0')+':'+m[2];
   m = s.match(/^(\d{1,2})h(\d{0,2})$/i);
   if (m) return m[1].padStart(2,'0')+':'+(m[2]||'00').padStart(2,'0');
+  // Correctif #2 : heure Excel native stockée comme fraction de journée
+  // (ex: 0.3541666667 = 08:30). Uniquement 0 <= n < 1 et chaîne purement numérique,
+  // pour ne jamais interpréter un texte ambigu comme une heure.
+  if (/^\d*\.?\d+$/.test(s)) {
+    var n = parseFloat(s);
+    if (!isNaN(n) && n >= 0 && n < 1) {
+      var totalMin = Math.round(n * 24 * 60);
+      var hh = Math.floor(totalMin / 60) % 24;
+      var mm = totalMin % 60;
+      return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+    }
+  }
   return '';
 }
 function _impValidDateStr(s) {
@@ -12754,10 +12774,12 @@ function _impEmptyResult() {
 }
 
 // ── Table de correspondance des en-têtes — partagée CSV et XLSX ─────────────
+// Correctif #4 : 'nom'/'name' retirés des alias explicites d'activité — ce sont
+// des libellés génériques ambigus, traités séparément via _impSheetContext().
 var _IMP_COL_ALIASES = {
   country:  ['pays','country','destination','pays/région'],
   city:     ['ville','city','étape','etape','stop','location'],
-  activity: ['activité','activite','activity','visite','lieu','spot','nom','name'],
+  activity: ['activité','activite','activity','visite','lieu','spot'],
   date:     ['date','jour','day','date de visite'],
   time:     ['heure','time','début','debut','start','horaire'],
   hotel:    ['hôtel','hotel','logement','accommodation','hébergement','hebergement'],
@@ -12768,11 +12790,31 @@ var _IMP_COL_ALIASES = {
   note:     ['note','notes','commentaire','commentaires','description','remarque'],
   price:    ['prix','price','coût','cout','budget']
 };
+var _IMP_GENERIC_NAME_WORDS = ['nom','name'];
+// Détermine un contexte léger à partir du nom de feuille — règle simple et
+// déterministe, pas de moteur NLP. Sert uniquement à désambiguïser une colonne
+// générique 'Nom'/'Name' entre logement et activité.
+function _impSheetContext(sheetName) {
+  var n = _impNorm(sheetName || '');
+  if (!n) return '';
+  if (/hotel|hôtel|logement|héberg|heberg|accommodation/.test(n)) return 'hotel';
+  if (/activit|visite/.test(n)) return 'activity';
+  return '';
+}
 // Construit le mapping {champ: indexColonne} à partir d'une ligne d'en-têtes.
-function _impMapHeaders(headers) {
+// sheetName (optionnel) sert uniquement à désambiguïser 'Nom'/'Name'. Les
+// en-têtes explicites ('Hôtel', 'Activité'...) restent toujours prioritaires —
+// ils sont mappés directement, jamais réinterprétés selon le contexte.
+function _impMapHeaders(headers, sheetName) {
   var H = {};
+  var ctx = _impSheetContext(sheetName);
   headers.forEach(function(h, idx) {
     var hn = _impNorm(h);
+    if (_IMP_GENERIC_NAME_WORDS.indexOf(hn) > -1) {
+      var field = (ctx === 'hotel') ? 'hotel' : 'activity';
+      if (H[field] === undefined) H[field] = idx;
+      return;
+    }
     Object.keys(_IMP_COL_ALIASES).forEach(function(field) {
       if (H[field] === undefined && _IMP_COL_ALIASES[field].includes(hn)) H[field] = idx;
     });
@@ -12784,7 +12826,13 @@ function _impRowGet(H, row, field) {
 }
 // Traite une ligne de données (CSV ou XLSX) et alimente result — partagé entre
 // les deux parsers pour garantir un comportement identique (dates, dédoublonnage).
-function _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs) {
+// Correctif #5 : les maps seen* stockent désormais une référence vers l'objet
+// déjà créé (au lieu d'un simple booléen). Sur un doublon détecté (ex: la même
+// ville réapparaît dans une autre feuille avec des dates), on COMPLÈTE les
+// champs vides de l'objet existant au lieu de l'ignorer — l'ordre des feuilles
+// ne détermine donc plus la richesse finale des données. Aucune valeur déjà
+// renseignée n'est jamais écrasée par une valeur vide.
+function _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs, seenAccoms) {
   var rawCountry = _impRowGet(H, row, 'country');
   var rawCity    = _impRowGet(H, row, 'city');
   var rawAct     = _impRowGet(H, row, 'activity');
@@ -12813,43 +12861,74 @@ function _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs) {
 
   if (city) {
     var ck = _impNorm(country)+'|'+_impNorm(city);
-    if (!seenCities[ck]) {
-      seenCities[ck] = true;
-      result.cities.push({
+    var existingCity = seenCities[ck];
+    if (!existingCity) {
+      var newCity = {
         _id:_impNextId(), country: country, city: city,
         dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
         dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
         nights: nights, confidence: (country ? 'ok' : 'warn')
-      });
+      };
+      result.cities.push(newCity);
+      seenCities[ck] = newCity;
+    } else {
+      if (!existingCity.dateStart && !existingCity.dateStartRaw && (dSInfo.iso || dSInfo.needsYear)) {
+        existingCity.dateStart = dSInfo.iso; existingCity.dateStartRaw = dSInfo.needsYear ? dSInfo.raw : '';
+      }
+      if (!existingCity.dateEnd && !existingCity.dateEndRaw && (dEInfo.iso || dEInfo.needsYear)) {
+        existingCity.dateEnd = dEInfo.iso; existingCity.dateEndRaw = dEInfo.needsYear ? dEInfo.raw : '';
+      }
+      if (!existingCity.nights && nights) existingCity.nights = nights;
+      if (existingCity.confidence !== 'ok' && country) existingCity.confidence = 'ok';
     }
   }
 
   if (rawAct && rawAct.trim()) {
     var actName = rawAct.trim();
     var actKey = _impNorm(country)+'|'+_impNorm(city)+'|'+_impNorm(actName)+'|'+(dInfo.iso||dInfo.raw);
-    if (!seenActs[actKey]) {
-      seenActs[actKey] = true;
-      result.activities.push({
+    var existingAct = seenActs[actKey];
+    if (!existingAct) {
+      var newAct = {
         _id:_impNextId(), country: country, city: city, name: actName,
         date: dInfo.iso, dateRaw: dInfo.needsYear ? dInfo.raw : '',
         time: time, note: rawNote.trim(), price: rawPrice,
         confidence: (country && city && !dInfo.needsYear) ? 'ok' : 'warn'
-      });
+      };
+      result.activities.push(newAct);
+      seenActs[actKey] = newAct;
+    } else {
+      if (!existingAct.time && time) existingAct.time = time;
+      if (!existingAct.note && rawNote.trim()) existingAct.note = rawNote.trim();
+      if (!existingAct.price && rawPrice) existingAct.price = rawPrice;
+      if (existingAct.confidence !== 'ok' && country && city && !dInfo.needsYear) existingAct.confidence = 'ok';
     }
   }
 
   if (rawHotel && rawHotel.trim()) {
     var hotelName = rawHotel.trim();
     var hKey = _impNorm(city)+'|'+_impNorm(hotelName);
-    var existing = result.accommodations.find(function(a){ return _impNorm(a.city)+'|'+_impNorm(a.name) === hKey; });
-    if (!existing) {
-      result.accommodations.push({
+    var existingAccom = seenAccoms[hKey];
+    if (!existingAccom) {
+      var newAccom = {
         _id:_impNextId(), country: country, city: city, name: hotelName,
         dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
         dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
         nights: nights, link: rawLink.trim(), note: rawNote.trim(),
         confidence: (country && city) ? 'ok' : 'warn'
-      });
+      };
+      result.accommodations.push(newAccom);
+      seenAccoms[hKey] = newAccom;
+    } else {
+      if (!existingAccom.dateStart && !existingAccom.dateStartRaw && (dSInfo.iso || dSInfo.needsYear)) {
+        existingAccom.dateStart = dSInfo.iso; existingAccom.dateStartRaw = dSInfo.needsYear ? dSInfo.raw : '';
+      }
+      if (!existingAccom.dateEnd && !existingAccom.dateEndRaw && (dEInfo.iso || dEInfo.needsYear)) {
+        existingAccom.dateEnd = dEInfo.iso; existingAccom.dateEndRaw = dEInfo.needsYear ? dEInfo.raw : '';
+      }
+      if (!existingAccom.nights && nights) existingAccom.nights = nights;
+      if (!existingAccom.link && rawLink.trim()) existingAccom.link = rawLink.trim();
+      if (!existingAccom.note && rawNote.trim()) existingAccom.note = rawNote.trim();
+      if (existingAccom.confidence !== 'ok' && country && city) existingAccom.confidence = 'ok';
     }
   }
 }
@@ -12891,25 +12970,49 @@ function _parseCSV(raw) {
   var H = _impMapHeaders(headers);
   if (Object.keys(H).length === 0) return _parseTxtMd(raw);
 
-  var seenCountries = {}, seenCities = {}, seenActs = {};
+  var seenCountries = {}, seenCities = {}, seenActs = {}, seenAccoms = {};
 
   for (var i2 = headerIdx + 1; i2 < lines.length; i2++) {
     var line = lines[i2];
     if (!line.trim()) continue;
     var row = parseLine(line);
-    _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs);
+    _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs, seenAccoms);
   }
 
   return result;
 }
 
+// Correctif #3 : détection robuste de la ligne d'en-têtes. Scanne une fenêtre
+// des premières lignes non vides (au lieu de supposer que la 1ère = header) et
+// retient celle avec le meilleur score de colonnes reconnues. Une feuille reste
+// valide avec ne serait-ce qu'1 ou 2 colonnes reconnues (pas de seuil rigide) —
+// mais une simple ligne-titre ("Voyage Japon 2027") obtient un score de 0 car
+// aucune cellule ne correspond exactement à un alias, donc n'est jamais retenue.
+function _impFindHeaderRow(rows, sheetName, maxScan) {
+  maxScan = Math.min(rows.length, maxScan || 20);
+  var best = -1, bestScore = 0, bestH = null;
+  for (var i = 0; i < maxScan; i++) {
+    var r = rows[i];
+    if (!r || !r.some(function(c){ return String(c||'').trim(); })) continue;
+    var headers = r.map(function(c){ return String(c||'').trim(); });
+    var H = _impMapHeaders(headers, sheetName);
+    var score = Object.keys(H).length;
+    if (score > bestScore) { bestScore = score; best = i; bestH = H; }
+    if (score >= 3) break; // score suffisant — règle simple, pas besoin de scanner davantage
+  }
+  if (best === -1 || bestScore === 0) return null;
+  return { idx: best, H: bestH };
+}
+
 // ── PARSER XLSX (A2.2) — multi-feuilles, dédoublonnage partagé entre feuilles ─
 // Ignore les feuilles sans en-têtes reconnus ou vides. Ne suppose jamais que la
-// première feuille contient tout le voyage : toutes les feuilles pertinentes
-// sont analysées et consolidées dans le même résultat.
+// première feuille contient tout le voyage, ni que la première ligne non vide
+// est forcément la ligne d'en-têtes (correctif #3). Correctif #4 : le nom de la
+// feuille sert de contexte léger pour désambiguïser une colonne 'Nom'/'Name'
+// entre logement et activité.
 function _parseXLSX(workbook) {
   var result = _impEmptyResult();
-  var seenCountries = {}, seenCities = {}, seenActs = {};
+  var seenCountries = {}, seenCities = {}, seenActs = {}, seenAccoms = {};
 
   workbook.SheetNames.forEach(function(sheetName) {
     var sheet = workbook.Sheets[sheetName];
@@ -12917,20 +13020,13 @@ function _parseXLSX(workbook) {
     var rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', blankrows:false });
     if (!rows || !rows.length) return; // feuille vide — ignorée
 
-    var headerIdx = -1;
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i].some(function(c){ return String(c||'').trim(); })) { headerIdx = i; break; }
-    }
-    if (headerIdx === -1) return; // feuille vide — ignorée
+    var found = _impFindHeaderRow(rows, sheetName, 20);
+    if (!found) return; // aucune ligne d'en-têtes reconnue — feuille ignorée
 
-    var headers = rows[headerIdx].map(function(c){ return String(c||'').trim(); });
-    var H = _impMapHeaders(headers);
-    if (Object.keys(H).length === 0) return; // feuille sans en-têtes reconnus — ignorée
-
-    for (var r = headerIdx + 1; r < rows.length; r++) {
+    for (var r = found.idx + 1; r < rows.length; r++) {
       var row = rows[r];
       if (!row || !row.some(function(c){ return String(c||'').trim(); })) continue;
-      _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs);
+      _impConsumeRow(found.H, row, result, seenCountries, seenCities, seenActs, seenAccoms);
     }
   });
 
