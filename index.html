@@ -3886,12 +3886,11 @@ function showSuggestions(ck) {
     el.addEventListener('click', function(e){
       e.stopPropagation();
       var a = matches[i];
-      // Add as custom act with full detail
-      if(!S.customActs[ck]) S.customActs[ck]=[];
-      S.customActs[ck].push({n:a.n, m:a.m, tags:a.tags, custom:true, _detailKey:a.key});
+      // Lot 6 : router via _createActivityCore pour insert Supabase, _sid et geocoding.
+      // skipAiEnrichment=true : la fiche statique est déjà connue, pas besoin d'appel IA.
       list.classList.remove('open'); list.innerHTML='';
       inp.value='';
-      save(); renderContent();
+      _createActivityCore(ck, a.n, {meta:a.m, tags:a.tags, detailKey:a.key, skipAiEnrichment:true, initialDetails:a.detail||{}});
     });
   });
 }
@@ -4073,7 +4072,9 @@ function confirmMoveToCity(targetCityKey){
       }
     }
   }
-  deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName);
+  // Lot 6 : l'utilisateur a déjà confirmé via le choix de la ville cible —
+  // pas de deuxième dialogue de suppression.
+  deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName, {skipConfirm:true});
 }
 
 function _createActivityCore(cityKey, val, opts){
@@ -4082,10 +4083,21 @@ function _createActivityCore(cityKey, val, opts){
   opts = opts || {};
   if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
   const newIdx = S.customActs[cityKey].length;
-  const actObj = {n:val, m:(opts.meta||'Chargement des infos…'), tags:[], custom:true, _loading:true};
+  // Lot 6 : opts.tags (suggestion), opts.detailKey, opts.skipAiEnrichment, opts.initialDetails
+  var _isSuggestion = !!(opts.skipAiEnrichment);
+  var _initMeta = opts.meta || (_isSuggestion ? '' : 'Chargement des infos…');
+  const actObj = {n:val, m:_initMeta, tags:(opts.tags||[]).slice(), custom:true, _loading:!_isSuggestion};
   if(opts.meta) actObj._userMeta = true;
+  if(opts.detailKey) actObj._detailKey = opts.detailKey;
   S.customActs[cityKey].push(actObj);
   var actKey = cityKey+'_c'+newIdx;
+  // Lot 6 : si un détail statique est fourni (suggestion depuis pool statique), le copier
+  // dans _customDetails sous la nouvelle clé pour que la fiche custom soit immédiatement riche.
+  if(opts.initialDetails && Object.keys(opts.initialDetails).length){
+    if(!window._customDetails) window._customDetails={};
+    window._customDetails[actKey] = Object.assign({}, opts.initialDetails, {_editUnlocked:false, _userValidated:false, _aiGenerated:false});
+    S.customDetails = window._customDetails;
+  }
   if(opts.categories && opts.categories.length){
     if(!S.actCategory) S.actCategory={};
     S.actCategory[actKey]=opts.categories.slice();
@@ -4103,7 +4115,8 @@ function _createActivityCore(cityKey, val, opts){
   if(opts.time){ setActTimeRange(actKey, opts.time, '', ''); setActMoment(actKey, getDayPeriod(opts.time)); }
   save();
   renderContent();
-  fetchActivityDetailAI(cityKey, val, actKey, newIdx);
+  // Lot 6 : ne pas déclencher l'IA si la fiche est déjà connue (suggestion statique).
+  if(!opts.skipAiEnrichment){ fetchActivityDetailAI(cityKey, val, actKey, newIdx); }
   if(!S.apiKey) geocodePinForActivity(actKey, val, cityKey);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
@@ -4194,10 +4207,9 @@ function showModalActSuggestions(ck){
     el.addEventListener('click', function(e){
       e.stopPropagation();
       var a = matches[i];
-      if(!S.customActs[ck]) S.customActs[ck]=[];
-      S.customActs[ck].push({n:a.n, m:a.m, tags:a.tags, custom:true, _detailKey:a.key});
+      // Lot 6 : même chemin que showSuggestions — passe par _createActivityCore.
       closeGuideItemModal();
-      save(); renderContent();
+      _createActivityCore(ck, a.n, {meta:a.m, tags:a.tags, detailKey:a.key, skipAiEnrichment:true, initialDetails:a.detail||{}});
     });
   });
 }
@@ -5224,15 +5236,30 @@ function deleteActivityFromEl(el){
   var actName = el.getAttribute('data-act-name');
   deleteActivity(cityKey, idx, isCustom, actName);
 }
-async function deleteActivity(cityKey, index, isCustom, actName) {
+async function deleteActivity(cityKey, index, isCustom, actName, opts) {
   var label = actName ? actName : 'cette activité';
-  showConfirm('Supprimer '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', function(){
+  var _skipConfirm = opts && opts.skipConfirm;
+  function _doDelete(){
     if(!S.trash) S.trash={};
     if(!S.trash[cityKey]) S.trash[cityKey]=[];
     if(isCustom) {
       var totalBefore = (S.customActs[cityKey]||[]).length;
+      // Lot 6 : snapshot AVANT splice et réindexation — capture l'état complet de l'activité
+      // sous son actKey courant, avant que les maps soient décalées.
+      var _deletedActKey = cityKey+'_c'+index;
+      var _trashState = {};
+      if(S.actDate && S.actDate[_deletedActKey] !== undefined) _trashState.actDate = S.actDate[_deletedActKey];
+      if(S.actMoment && S.actMoment[_deletedActKey] !== undefined) _trashState.actMoment = S.actMoment[_deletedActKey];
+      if(S.actTimeStart && S.actTimeStart[_deletedActKey] !== undefined) _trashState.actTimeStart = S.actTimeStart[_deletedActKey];
+      if(S.actTimeEnd && S.actTimeEnd[_deletedActKey] !== undefined) _trashState.actTimeEnd = S.actTimeEnd[_deletedActKey];
+      if(S.actTime && S.actTime[_deletedActKey] !== undefined) _trashState.actTime = S.actTime[_deletedActKey];
+      if(S.actCategory && S.actCategory[_deletedActKey] !== undefined) _trashState.actCategory = Array.isArray(S.actCategory[_deletedActKey]) ? S.actCategory[_deletedActKey].slice() : S.actCategory[_deletedActKey];
+      if(S.done && S.done[_deletedActKey]) _trashState.done = true;
+      if(S.favorites && S.favorites[_deletedActKey]) _trashState.favorite = true;
+      if(window._customDetails && window._customDetails[_deletedActKey]) _trashState.customDetails = JSON.parse(JSON.stringify(window._customDetails[_deletedActKey]));
+      if(COORDS[_deletedActKey]) _trashState.coords = COORDS[_deletedActKey].slice();
       var act = (S.customActs[cityKey]||[]).splice(index,1)[0];
-      if(act){ act._wasCustom=true; S.trash[cityKey].push(act); }
+      if(act){ act._wasCustom=true; act._trashState=_trashState; S.trash[cityKey].push(act); }
       // Réindexer tous les états liés pour éviter qu'une activité suivante n'hérite de l'état
       // de celle qu'on vient de supprimer. Inclut toutes les maps indexées par actKey (Lot 5A).
       if(!window._customDetails) window._customDetails={};
@@ -5340,7 +5367,8 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
     }
     save(); renderContent();
     syncDeletedActs();
-  }, 'Supprimer');
+  }
+  if(_skipConfirm){ _doDelete(); } else { showConfirm('Supprimer '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', _doDelete, 'Supprimer'); }
 }
 if(!S.deletedActs) S.deletedActs={};
 if(!S.trash) S.trash={};
@@ -5353,23 +5381,83 @@ function restoreActivity(cityKey, trashIndex) {
   if(!item) return;
   if(item._wasCustom) {
     if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
+    // Lot 6 : restauration complète depuis le snapshot _trashState.
+    // L'actKey sera différent (activité repoussée en fin de liste).
+    var _ts = item._trashState || {};
     delete item._wasCustom;
+    delete item._trashState;
+    // L'ancien _sid correspond à la ligne Supabase supprimée — ne pas réutiliser.
+    delete item._sid;
     S.customActs[cityKey].push(item);
+    var newIdx = S.customActs[cityKey].length - 1;
+    var newActKey = cityKey+'_c'+newIdx;
+    // Restaurer chaque map sous le nouveau actKey
+    if(!S.actDate) S.actDate={};
+    if(!S.actMoment) S.actMoment={};
+    if(!S.actTimeStart) S.actTimeStart={};
+    if(!S.actTimeEnd) S.actTimeEnd={};
+    if(!S.actTime) S.actTime={};
+    if(!S.actCategory) S.actCategory={};
+    if(!S.done) S.done={};
+    if(!S.favorites) S.favorites={};
+    if(_ts.actDate !== undefined) S.actDate[newActKey] = _ts.actDate; else delete S.actDate[newActKey];
+    if(_ts.actMoment !== undefined) S.actMoment[newActKey] = _ts.actMoment; else delete S.actMoment[newActKey];
+    if(_ts.actTimeStart !== undefined) S.actTimeStart[newActKey] = _ts.actTimeStart; else delete S.actTimeStart[newActKey];
+    if(_ts.actTimeEnd !== undefined) S.actTimeEnd[newActKey] = _ts.actTimeEnd; else delete S.actTimeEnd[newActKey];
+    if(_ts.actTime !== undefined) S.actTime[newActKey] = _ts.actTime; else delete S.actTime[newActKey];
+    if(_ts.actCategory !== undefined) S.actCategory[newActKey] = _ts.actCategory; else delete S.actCategory[newActKey];
+    if(_ts.done) S.done[newActKey] = true; else delete S.done[newActKey];
+    if(_ts.favorite) S.favorites[newActKey] = true; else delete S.favorites[newActKey];
+    if(_ts.customDetails){
+      if(!window._customDetails) window._customDetails={};
+      window._customDetails[newActKey] = _ts.customDetails;
+      S.customDetails = window._customDetails;
+    }
+    if(_ts.coords) COORDS[newActKey] = _ts.coords.slice();
     unmarkDeletedTombstone('activities', cityKey+'||'+item.n);
+    save(); renderContent();
     if(sb && CURRENT_TRIP){
       var rpParts = cityKey.split('_');
       var rpCountryId = rpParts[0], rpCityName = rpParts.slice(1).join('_');
       var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||item.addedBy||'';
-      sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:rpCountryId,city:rpCityName,name:item.n,tip:item.m||null,added_by_label:who}).then(function(r){
-        if(r&&r.error){ console.error('[PlaniTrip] restore activity:', r.error); }
-      });
+      var _now2 = new Date().toISOString();
+      // Recréer la ligne activities + récupérer le nouvel UUID
+      (function(_capIdx){
+        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:rpCountryId,city:rpCityName,name:item.n,tip:item.m||null,added_by_label:who}).select('id').single().then(function(r){
+          if(r&&r.error){ console.error('[PlaniTrip] restore activity:', r.error); return; }
+          if(r&&r.data&&r.data.id && S.customActs[cityKey] && S.customActs[cityKey][_capIdx]){
+            S.customActs[cityKey][_capIdx]._sid = r.data.id;
+            save();
+          }
+        });
+      })(newIdx);
+      // Restaurer la fiche détaillée
+      if(_ts.customDetails){
+        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:newActKey,data:_ts.customDetails,updated_at:_now2},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore detail:',r.error); });
+      }
+      // Restaurer les maps globales modifiées
+      var _rUpserts = [
+        {detail_key:'__planitrip__actDate',      data:S.actDate},
+        {detail_key:'__planitrip__actMoment',    data:S.actMoment},
+        {detail_key:'__planitrip__actTimeStart', data:S.actTimeStart},
+        {detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
+        {detail_key:'__planitrip__actTime',      data:S.actTime},
+        {detail_key:'__planitrip__actCategory',  data:S.actCategory},
+        {detail_key:'__planitrip__done',         data:S.done}
+      ];
+      _rUpserts.forEach(function(u){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:u.detail_key,data:u.data,updated_at:_now2},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore map '+u.detail_key+':',r.error); }); });
+      // Restaurer le favori dans la table favorites
+      if(_ts.favorite){
+        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',newActKey).then(function(){
+          sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:newActKey,country_id:rpCountryId,added_by_label:who}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore fav:',r.error); });
+        });
+      }
     }
   } else {
     // Restore built-in
     if(S.deletedActs) delete S.deletedActs[item._cityKey+'_'+item._builtinIndex];
+    save(); renderContent();
   }
-  save();
-  renderContent();
   syncDeletedActs();
 }
 function deleteActivityPermanently(cityKey, trashIndex){
@@ -5965,12 +6053,12 @@ function renderCityPanelContentBody(c, city){
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(a.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(a.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
+        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(a.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(a.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
-          +(a.m?'<div class="act-meta">'+a.m+'</div>':'<div class="act-meta" style="color:rgba(110,110,115,0.4);font-style:italic">Pas de description</div>')
+          +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
           +'<div class="act-footer">'
           +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done)
           +categoryPill(actCat,k)
@@ -5994,12 +6082,12 @@ function renderCityPanelContentBody(c, city){
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(ca.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
+        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(ca.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+'</div>'
-          +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'<div class="act-meta" style="color:rgba(110,110,115,0.4);font-style:italic">Pas de description</div>')
+          +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
           +'<div class="act-footer">'
           +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone)
           +categoryPill(caCat,ck2)
