@@ -907,7 +907,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 <!-- Create trip screen -->
 <div id="create-trip-screen" class="auth-screen" style="display:none;">
-  <div id="ct-back-btn" onclick="backToTripSelector()" style="display:none;position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;align-items:center;gap:4px;color:var(--ink-muted);font-size:14px;font-weight:600;cursor:pointer;z-index:10;padding:6px 4px">‹ Retour</div>
+  <div id="ct-back-btn" onclick="backToTripSelector()" style="display:none;position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;align-items:center;gap:4px;color:var(--ink-muted);font-size:14px;font-weight:600;cursor:pointer;z-index:10;padding:6px 4px"><span data-icon="chevron-left" data-icon-size="16"></span> Retour</div>
   <div class="auth-hero">
     <h1 style="font-size:22px;">Créer mon voyage</h1>
     <p class="auth-subtitle">Quelques infos pour démarrer</p>
@@ -915,8 +915,9 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   <div class="auth-card ct-card">
 
     <div class="ct-section">
-      <div class="ct-section-label"><span data-icon="pencil" data-icon-size="15"></span> Nom du voyage <span class="opt">(optionnel)</span></div>
-      <input type="text" id="ct-name-input" class="ct-input" maxlength="30" placeholder="Auto-généré à partir des pays">
+      <div class="ct-section-label"><span data-icon="globe" data-icon-size="15"></span> Pays visités</div>
+      <div id="ct-countries-list" class="ct-chips-wrap"></div>
+      <button id="ct-add-country-btn" class="ct-pill-btn" type="button">+ Ajouter un pays</button>
     </div>
 
     <div class="ct-section">
@@ -943,18 +944,21 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     </div>
 
     <div class="ct-section">
-      <div class="ct-section-label"><span data-icon="globe" data-icon-size="15"></span> Pays visités</div>
-      <div id="ct-countries-list" class="ct-chips-wrap"></div>
-      <button id="ct-add-country-btn" class="ct-pill-btn" type="button">+ Ajouter un pays</button>
+      <div class="ct-section-label"><span data-icon="pencil" data-icon-size="15"></span> Nom du voyage <span class="opt">(optionnel)</span></div>
+      <input type="text" id="ct-name-input" class="ct-input" maxlength="30" placeholder="Auto-généré à partir des pays">
     </div>
 
-    <div class="ct-section">
-      <div class="ct-section-label"><span data-icon="users" data-icon-size="15"></span> Voyageurs <span class="opt">(optionnel)</span></div>
-      <div id="ct-travelers-list" class="ct-chips-wrap"></div>
-      <div class="ct-invite-row">
-        <input type="email" id="ct-traveler-email-input" class="ct-invite-input" placeholder="email@exemple.com">
-        <button id="ct-add-traveler-btn" class="ct-invite-btn" type="button">+ Inviter</button>
-      </div>
+    <!-- Voyageurs masqués du formulaire principal — les éléments DOM restent présents pour
+         éviter les erreurs getElementById dans les listeners et dans showCreateTripScreen().
+         L'invitation se fait après la création depuis l'écran Voyageurs. -->
+    <div style="display:none;" aria-hidden="true">
+      <div id="ct-travelers-list"></div>
+      <input type="email" id="ct-traveler-email-input">
+      <button id="ct-add-traveler-btn" type="button"></button>
+    </div>
+
+    <div style="font-size:12px;color:var(--ink-subtle);text-align:center;margin-bottom:6px;">
+      <span data-icon="users" data-icon-size="12" style="vertical-align:middle;opacity:0.6;margin-right:4px;"></span>Tu pourras inviter tes compagnons après la création.
     </div>
 
     <div id="ct-error" class="auth-error" style="display:none;"></div>
@@ -12454,10 +12458,11 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
     .select()
     .single();
 
-  btn.disabled = false;
-  btn.textContent = 'Créer mon voyage';
-
+  // A1.5 : le bouton reste désactivé jusqu'à la fin du flow complet (enterTrip + modale).
+  // Il n'est réactivé qu'en cas d'erreur INSERT, pour permettre une nouvelle tentative.
   if (error) {
+    btn.disabled = false;
+    btn.textContent = 'Créer mon voyage';
     errEl.textContent = 'Erreur : ' + error.message;
     errEl.style.display = 'block';
     return;
@@ -12555,24 +12560,45 @@ function enablePullToRefresh(el){
 }
 document.querySelectorAll('.auth-screen').forEach(enablePullToRefresh);
 
-// ── PROMPT POST-CRÉATION : préparer le voyage (IA / vide / import) ──
+// ── PROMPT POST-CRÉATION : voyage créé, données déterministes déjà initialisées ──
 function showPostCreateModal(trip){
   var hasKey = !!S.apiKey;
-  var body = '<div class="modal-title" style="font-size:18px;margin-bottom:4px">Voulez-vous que PlaniTrip prépare votre voyage ?</div>'
-    +'<div style="font-size:13px;color:var(--ink-subtle);margin-bottom:16px">Tu peux tout modifier ensuite.</div>'
+  // Résumé des pays déjà initialisés (drapeau + devise) — rassure l'utilisateur
+  var countrySummary = '';
+  if(COUNTRIES && COUNTRIES.length){
+    var _visibleC = COUNTRIES.filter(function(c){ return (trip && trip.countries) ? trip.countries.indexOf(c.name)>-1 : true; });
+    if(_visibleC.length){
+      countrySummary = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px;">'
+        + _visibleC.map(function(c){
+            var _cc = (c.currency||'').match(/\(([A-Z]+)\)/);
+            var _sub = _cc ? _cc[1] : (c.lang || '');
+            return '<div style="display:inline-flex;align-items:center;gap:5px;background:var(--sand,#F5F5F3);border-radius:10px;padding:5px 9px;font-size:12.5px;">'
+              +'<span style="font-size:14px">'+(c.flag||'🌍')+'</span>'
+              +'<span style="font-weight:600;color:var(--ink)">'+escHtml(c.name)+'</span>'
+              +(_sub ? '<span style="color:var(--ink-subtle)">'+escHtml(_sub)+'</span>' : '')
+              +'</div>';
+          }).join('')
+        + '</div>';
+    }
+  }
+  var body = '<div style="text-align:center;margin-bottom:6px">'
+    +'<div style="width:44px;height:44px;border-radius:50%;background:rgba(45,106,79,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:var(--accent)">'+svgIcon('check',22)+'</div>'
+    +'<div class="modal-title" style="font-size:18px;margin-bottom:4px;color:var(--accent)">Ton voyage est créé !</div>'
+    +'<div style="font-size:13px;color:var(--ink-subtle);line-height:1.5">PlaniTrip a déjà préparé les informations disponibles pour tes destinations.</div>'
+    +'</div>'
+    + countrySummary
     +'<div id="postCreateOptions">'
-    +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="'+(hasKey?'showPostCreatePersonaStep()':'showPostCreateAiKeyStep()')+'">'
-    +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Générer avec l\'IA</div>'
-    +'<div class="status-sub">Infos pratiques, checklist, budget suggéré et conseils par pays'+(hasKey?'':' — une clé API te sera demandée à l\'étape suivante')+'</div>'
-    +'</div>'
-    +'<div class="info-card" style="cursor:pointer;margin-bottom:10px" onclick="closePostCreateModal()">'
-    +'<div class="ic-header">'+svgIcon('file-text',18)+' Partir d\'un voyage vide</div>'
-    +'<div class="status-sub">Tu rempliras tout toi-même, à ton rythme</div>'
-    +'</div>'
-    +'<div class="info-card" style="opacity:0.5">'
-    +'<div class="ic-header">'+svgIcon('download',18)+' Importer un itinéraire</div>'
-    +'<div class="status-sub">Bientôt disponible</div>'
-    +'</div>'
+    +'<button class="ct-primary-btn" style="margin-bottom:10px" onclick="closePostCreateModal()">Ouvrir mon voyage</button>'
+    +(hasKey
+      ? '<div class="info-card" style="cursor:pointer;margin-bottom:0" onclick="showPostCreatePersonaStep()">'
+        +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Personnaliser avec l\'IA</div>'
+        +'<div class="status-sub">Génère villes, activités et conseils selon ton profil de voyageur</div>'
+        +'</div>'
+      : '<div class="info-card" style="cursor:pointer;margin-bottom:0" onclick="showPostCreatePersonaStep()">'
+        +'<div class="ic-header">'+svgIcon('sliders-horizontal',18)+' Mes préférences de voyage</div>'
+        +'<div class="status-sub">Rythme, budget, centres d\'intérêt — sauvegardés pour plus tard</div>'
+        +'</div>'
+    )
     +'</div>';
   document.getElementById('postCreateModalBody').innerHTML = body;
   document.getElementById('postCreateModal').classList.add('open');
@@ -12609,6 +12635,7 @@ var _personaAnswers = {pace:'', interests:[], budget:'', withWho:'', reducedMobi
 var _personaValidationError = '';
 function showPostCreatePersonaStep(){
   var optsEl = document.getElementById('postCreateOptions');
+  var hasKey = !!S.apiKey;
   var paceOpts = [['intense','Intense — voir un maximum'],['equilibre','Équilibré'],['detente','Détente']];
   var interestOpts = [['nature','Nature & randonnée'],['culture','Culture & histoire'],['gastronomie','Vie nocturne & gastronomie'],['plages','Plages & farniente']];
   var budgetOpts = [['backpacker','Backpacker'],['confort','Confort'],['luxe','Luxe']];
@@ -12621,9 +12648,15 @@ function showPostCreatePersonaStep(){
       }).join('')
       +'</div>';
   }
+  // En-tête : IA si clé dispo, sinon préférences simples
+  var headerIcon = hasKey ? svgIcon('sparkles',18) : svgIcon('sliders-horizontal',18);
+  var headerLabel = hasKey ? 'Personnaliser avec l\'IA' : 'Mes préférences de voyage';
+  var headerSub = hasKey
+    ? 'Ça aide PlaniTrip à générer un programme qui te ressemble.'
+    : 'Sauvegardées pour personnaliser ton voyage — aucune clé IA requise.';
   optsEl.innerHTML = '<div class="info-card">'
-    +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Quelques infos pour toi</div>'
-    +'<div class="status-sub" style="margin-bottom:14px">Ça aide PlaniTrip à proposer un programme qui te ressemble.</div>'
+    +'<div class="ic-header" style="color:var(--accent)">'+headerIcon+' '+headerLabel+'</div>'
+    +'<div class="status-sub" style="margin-bottom:14px">'+headerSub+'</div>'
     +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Avec qui pars-tu ?</div>'
     +chipRow('withWho', withWhoOpts, false)
     +'<div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px">Rythme du voyage</div>'
@@ -12641,8 +12674,11 @@ function showPostCreatePersonaStep(){
     +'<span style="font-size:12.5px;color:var(--ink)">Restrictions alimentaires (végétarien/végan/allergies)</span>'
     +'</label>'
     +(_personaValidationError ? '<div style="font-size:12px;color:var(--red-muted);margin:6px 2px 0;font-weight:600">'+escHtml(_personaValidationError)+'</div>' : '')
-    +'<button class="modal-cta" style="width:100%;margin-top:10px" onclick="submitPersonaAndGenerate()">Générer mon voyage</button>'
-    +'<button style="width:100%;margin-top:10px;padding:12px;border-radius:var(--r12);font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif" onclick="closePostCreateModal()">Annuler</button>'
+    // CTA primaire : sauvegarde seule (toujours disponible)
+    +'<button class="modal-cta" style="width:100%;margin-top:10px" onclick="saveTripPersona(false)">Enregistrer mes préférences</button>'
+    // CTA secondaire : sauvegarde + génération IA (uniquement si clé présente)
+    +(hasKey ? '<button class="modal-cta" style="width:100%;margin-top:8px;background:transparent;border:1.5px solid var(--accent);color:var(--accent)" onclick="saveTripPersona(true)">'+svgIcon('sparkles',14)+' Enregistrer et générer avec l\'IA</button>' : '')
+    +'<button style="width:100%;margin-top:10px;padding:12px;border-radius:var(--r12);font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif" onclick="closePostCreateModal()">Passer</button>'
     +'</div>';
 }
 function toggleReducedMobility(){
@@ -12663,17 +12699,38 @@ function setPersonaAnswer(name, val, multi){
   }
   showPostCreatePersonaStep();
 }
-function submitPersonaAndGenerate(){
-  if(!_personaAnswers.withWho || !_personaAnswers.pace || !_personaAnswers.budget || !_personaAnswers.interests.length){
-    _personaValidationError = 'Merci de répondre à toutes les questions (au moins un centre d\'intérêt) avant de générer.';
-    showPostCreatePersonaStep();
-    return;
+// A1.4 — saveTripPersona : découplé de runAiTripPrep.
+// withAI=false -> sauvegarde seule (S.tripPersona + save()), aucun appel Anthropic.
+// withAI=true  -> sauvegarde + runAiTripPrep() si clé disponible (validation complète requise).
+function saveTripPersona(withAI){
+  if(withAI){
+    // Avec génération IA : validation complète requise
+    if(!_personaAnswers.withWho || !_personaAnswers.pace || !_personaAnswers.budget || !_personaAnswers.interests.length){
+      _personaValidationError = 'Merci de répondre à toutes les questions (au moins un centre d\'intérêt) avant de générer.';
+      showPostCreatePersonaStep();
+      return;
+    }
   }
   _personaValidationError = '';
   S.tripPersona = Object.assign({}, _personaAnswers);
   save();
-  runAiTripPrep();
+  if(withAI && S.apiKey){
+    runAiTripPrep();
+  } else {
+    // Sauvegarde sans IA : confirmation discrète puis retour au voyage
+    var optsEl = document.getElementById('postCreateOptions');
+    if(optsEl){
+      optsEl.innerHTML = '<div class="info-card" style="text-align:center;padding:20px 16px">'
+        +'<div style="color:var(--accent);margin-bottom:8px">'+svgIcon('check',24)+'</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Préférences sauvegardées</div>'
+        +'<div style="font-size:13px;color:var(--ink-subtle)">Tu pourras les modifier depuis les réglages du voyage.</div>'
+        +'</div>';
+    }
+    setTimeout(closePostCreateModal, 1200);
+  }
 }
+// Alias de compatibilité : submitPersonaAndGenerate reste appelable si besoin (ne pas supprimer)
+function submitPersonaAndGenerate(){ saveTripPersona(true); }
 function closePostCreateModal(){
   document.getElementById('postCreateModal').classList.remove('open');
 }
