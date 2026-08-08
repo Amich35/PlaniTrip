@@ -2622,7 +2622,28 @@ function openDetail(actKey, actName, cityKey) {
     var doneBtn = document.getElementById('detailDoneBtn');
     var isDone = !!S.done[actKey];
     var planning = formatDetailPlanningLabel();
-    dateBtnInner.innerHTML = '<span class="dab-circle">'+svgIcon('calendar',17)+'</span><span>'+escHtml(planning.label)+'</span>';
+    // Hiérarchie visuelle dans le bouton Calendrier : même logique que timeCapsuleHTML.
+    // Le label peut être "12 SAM · 08h30" ou "12 SAM · Matin" etc.
+    // On décompose uniquement si le label contient un séparateur · et une heure (HH:MM ou HHhMM).
+    var _planningInner = (function(){
+      var lbl = planning.label;
+      var sepIdx = lbl.indexOf(' · ');
+      if(sepIdx < 0) return escHtml(lbl);
+      var leftPart = lbl.slice(0, sepIdx);
+      var rightPart = lbl.slice(sepIdx + 3);
+      // Détecter si la partie droite est une heure précise (format HHhMM ou HH:MM)
+      var isHour = /^\d{1,2}[h:]\d{2}/.test(rightPart) || /^\d{1,2}h$/.test(rightPart);
+      var _sDate2 = 'color:#6E6E73;font-weight:500';
+      var _sSep2  = 'color:rgba(110,110,115,0.45);margin:0 1px';
+      var _sHour2 = 'color:var(--accent);font-weight:600';
+      if(isHour){
+        return '<span style="'+_sDate2+'">'+escHtml(leftPart)+'</span>'
+          +'<span style="'+_sSep2+'"> · </span>'
+          +'<span style="'+_sHour2+'">'+escHtml(rightPart)+'</span>';
+      }
+      return escHtml(lbl);
+    })();
+    dateBtnInner.innerHTML = '<span class="dab-circle">'+svgIcon('calendar',17)+'</span><span>'+_planningInner+'</span>';
     dateBtn.classList.toggle('dab-active', planning.hasInfo);
     doneBtn.innerHTML = '<span class="dab-circle">'+svgIcon('check',17)+'</span><span>'+(isDone?'Fait':'Marquer fait')+'</span>';
     doneBtn.classList.toggle('dab-active', isDone);
@@ -5938,26 +5959,53 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
     return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.10);padding:2px 8px;border-radius:20px;cursor:pointer">'+svgIcon('check',9)+' Fait</span>';
   }
 
-  var label, hasInfo;
+  // Styles inline réutilisés — aucune nouvelle classe CSS pour rester dans le pattern du projet.
+  var _sDate = 'color:#6E6E73;font-weight:500';         // date/jour : secondaire, normal
+  var _sSep  = 'color:rgba(110,110,115,0.45);margin:0 1px'; // séparateur : très discret
+  var _sHour = 'color:var(--accent);font-weight:600';   // heure : accent + bold
+  var _sMuted= 'color:#6E6E73;font-weight:500';         // moment sans heure : neutre
+  function _sep(){ return '<span style="'+_sSep+'"> · </span>'; }
+  function _d(t){ return '<span style="'+_sDate+'">'+escHtml(t)+'</span>'; }
+  function _h(t){ return '<span style="'+_sHour+'">'+escHtml(t)+'</span>'; }
+  function _m(t){ return '<span style="'+_sMuted+'">'+escHtml(t)+'</span>'; }
+
+  var innerHTML, hasInfo;
+
   if(!hasDate && !timeVal && !mk){
-    label = 'Planifier'; hasInfo = false;
+    // Aucune info temporelle : état "Planifier"
+    innerHTML = escHtml('Planifier'); hasInfo = false;
   } else if(isViewingSingleDay){
-    // Vue filtrée sur un jour précis : ne pas répéter la date déjà donnée par le filtre actif.
-    if(timeVal) label = timeVal+(mo?' \u00b7 '+mo.label:'');
-    else if(mo) label = mo.label;
-    else label = 'Horaire non d\u00e9fini';
+    // Vue Jour — la date est déjà connue via le filtre actif, on ne la répète pas.
+    if(timeVal){
+      // 08h30 [· Matin] — heure accentuée, moment secondaire
+      innerHTML = _h(timeVal)+(mo?_sep()+_m(mo.label):'');
+    } else if(mo){
+      // Matin seul — neutre (pas d'heure précise)
+      innerHTML = _m(mo.label);
+    } else {
+      innerHTML = _m('Horaire non défini');
+    }
     hasInfo = true;
   } else {
-    // Vue "Tout" : préfixer par la date courte (12 SAM) pour situer l'activité dans le séjour.
+    // Vue Tout — préfixer par la date courte pour situer dans le séjour.
     var dayShort = formatDayShort(dateVal);
-    if(timeVal) label = (dayShort?dayShort+' \u00b7 ':'')+timeVal;
-    else if(mo) label = (dayShort?dayShort+' \u00b7 ':'')+mo.label;
-    else label = dayShort || 'Horaire non d\u00e9fini';
+    if(timeVal){
+      // 12 SAM · 08h30 — date secondaire, heure accentuée
+      innerHTML = (dayShort?_d(dayShort)+_sep():'')+_h(timeVal);
+    } else if(mo){
+      // 12 SAM · Matin — tout neutre/secondaire (pas d'heure précise)
+      innerHTML = (dayShort?_d(dayShort)+_sep()+_m(mo.label):_m(mo.label));
+    } else {
+      // Date seule
+      innerHTML = dayShort ? _d(dayShort) : _m('Horaire non défini');
+    }
     hasInfo = true;
   }
-  var color = hasInfo ? 'var(--accent)' : 'var(--ink-subtle)';
+
   var bg = hasInfo ? 'rgba(45,106,79,0.10)' : 'rgba(29,29,31,0.045)';
-  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:'+color+';background:'+bg+';padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.85')+'">'+escHtml(label)+'</span>';
+  // La couleur de base du conteneur est désormais neutre — la hiérarchie vit dans les spans enfants.
+  var containerColor = hasInfo ? 'var(--ink-muted,#6E6E73)' : 'var(--ink-subtle)';
+  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:0;font-size:10px;font-weight:500;color:'+containerColor+';background:'+bg+';padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.85')+'">'+innerHTML+'</span>';
 }
 // Dérivation automatique : convertit une heure HH:MM en clé de moment
 // Fonction centrale unique pour dériver le moment de la journée (Matin/Midi/Après-midi/Soir)
