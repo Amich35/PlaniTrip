@@ -1054,9 +1054,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <div id="detailQuickInfo" style="margin:10px 0"></div>
       <div style="display:flex;gap:8px" id="detailActionsRow">
         <button class="detail-action-btn" id="detailMapBtn"></button>
-        <div class="detail-action-btn" id="detailDateBtn" style="position:relative;padding:0">
-          <input type="date" id="detailDateInput" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;cursor:pointer"/>
-          <div id="detailDateBtnInner" style="pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:14px 6px"></div>
+        <div class="detail-action-btn" id="detailDateBtn" style="position:relative;padding:0;cursor:pointer">
+          <div id="detailDateBtnInner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:14px 6px"></div>
         </div>
         <button class="detail-action-btn" id="detailDoneBtn"></button>
       </div>
@@ -2582,32 +2581,44 @@ function openDetail(actKey, actName, cityKey) {
   // Actions — toujours visibles, en haut, style grille icône/label
   document.getElementById('detailMapBtn').innerHTML = '<span class="dab-circle">'+svgIcon('map-pin',17)+'</span><span>Carte</span>';
   document.getElementById('detailMapBtn').onclick = function(){ closeDetail(); openMap(actKey, actName); };
-  function fmtDetailDateLabel(iso){
-    if(!iso) return 'Date';
-    return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-  }
-  function fmtDetailDateFull(iso){
-    if(!iso) return '';
-    return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  // Lot 4A §5/§6 : le bouton "Date" devient une action "Calendrier" qui affiche la temporalité
+  // de planning complète (date + heure/moment), au lieu de perdre cette info visible sur la carte
+  // au moment où l'utilisateur ouvre la fiche détail. Purement présentationnel — aucune règle de
+  // dérivation heure→moment n'est recréée ici, tout vient de getActivityDate/getActMoment/
+  // formatTimeRange déjà fiabilisés aux Lots 1-3.
+  function formatDetailPlanningLabel(){
+    var ckForPlanning = (cityKey||actKey.replace(/_c?\d+$/,''));
+    var ctryIdForPlanning = ckForPlanning.split('_')[0];
+    var cityNameForPlanning = ckForPlanning.slice(ctryIdForPlanning.length+1);
+    var dateVal = getActivityDate(actKey, ctryIdForPlanning, cityNameForPlanning, 0, 1);
+    if(!dateVal) return {label:'Calendrier', hasInfo:false};
+    var dayShort = formatDayShort(dateVal);
+    var timeVal = formatTimeRange(actKey);
+    var mk = getActMoment(actKey, actName, actMeta);
+    var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
+    var suffix = timeVal ? timeVal : (mo ? mo.label : 'Horaire non d\u00e9fini');
+    return {label:dayShort+' \u00b7 '+suffix, hasInfo:true};
   }
   function refreshActionButtons(){
     var dateBtn = document.getElementById('detailDateBtn');
     var dateBtnInner = document.getElementById('detailDateBtnInner');
     var doneBtn = document.getElementById('detailDoneBtn');
     var isDone = !!S.done[actKey];
-    var curDate = S.actDate && S.actDate[actKey];
-    dateBtnInner.innerHTML = '<span class="dab-circle">'+svgIcon('calendar',17)+'</span><span>'+fmtDetailDateLabel(curDate)+'</span>';
-    dateBtn.classList.toggle('dab-active', !!curDate);
+    var planning = formatDetailPlanningLabel();
+    dateBtnInner.innerHTML = '<span class="dab-circle">'+svgIcon('calendar',17)+'</span><span>'+escHtml(planning.label)+'</span>';
+    dateBtn.classList.toggle('dab-active', planning.hasInfo);
     doneBtn.innerHTML = '<span class="dab-circle">'+svgIcon('check',17)+'</span><span>'+(isDone?'Fait':'Marquer fait')+'</span>';
     doneBtn.classList.toggle('dab-active', isDone);
   }
-  var dateInputEl = document.getElementById('detailDateInput');
-  var ckForDate = (cityKey||actKey.replace(/_c?\d+$/,''));
-  var stayRangeForDate = (typeof cityStayRange==='function') ? cityStayRange(ckForDate) : null;
-  dateInputEl.min = stayRangeForDate ? stayRangeForDate.start : '';
-  dateInputEl.max = stayRangeForDate ? stayRangeForDate.end : '';
-  dateInputEl.value = (S.actDate && S.actDate[actKey]) || (stayRangeForDate ? stayRangeForDate.start : '');
-  dateInputEl.onchange = function(){ setActivityDate(actKey, dateInputEl.value); refreshActionButtons(); };
+  // Tap sur l'action Calendrier -> ouvre le mécanisme de planification EXISTANT (modal Planifier),
+  // pas un nouveau composant. La modification de date reste séparée (voir setActivityDate, appelée
+  // depuis le sélecteur de date à l'intérieur de ce même modal) : lecture = date de rendu ;
+  // modification = écrit toujours explicitement dans S.actDate, sans transformer automatiquement
+  // les dates de repli en dates explicites au simple affichage.
+  document.getElementById('detailDateBtn').onclick = function(){
+    closeDetail();
+    openPlanningModal(actKey, actName, actMeta);
+  };
   document.getElementById('detailDoneBtn').onclick = function(){ toggleAct(actKey); refreshActionButtons(); };
   refreshActionButtons();
 
@@ -2623,8 +2634,9 @@ function openDetail(actKey, actName, cityKey) {
 
   let html = '';
 
-  // Badge IA si applicable
-  if(d._aiGenerated) html += '<div class="ai-badge">G\u00e9n\u00e9r\u00e9 par IA (avec recherche web) \u2014 v\u00e9rifie les horaires et tarifs avant de partir'+(d._aiGeneratedAt?' \u00b7 '+new Date(d._aiGeneratedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'')+'</div>';
+  // Lot 4A §7 : badge IA visible retiré, conformément au principe déjà appliqué aux cartes au
+  // Lot 2 ("IA = accélérateur invisible"). d._aiGenerated et d._aiGeneratedAt restent intacts
+  // en données (utilisés ailleurs par la logique d'édition _isEditable), seul l'affichage change.
 
   // Si aucune fiche n'existe encore : lance l'IA si une clé est configurée, sinon les sections
   // ci-dessous s'affichent directement en mode édition (fallback manuel sans IA).
@@ -2657,27 +2669,27 @@ function openDetail(actKey, actName, cityKey) {
   // Infos pratiques (quickInfo)
   if(_isEditable){
     var _qFields = [
+      {key:'duration',        icon:'history',      label:'Dur\u00e9e de visite',    placeholder:'ex\u00a0: 1h30'},
       {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: t\u00f4t le matin'},
       {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'},
       {key:'address',         icon:'map-pin',      label:'Adresse',           placeholder:'Adresse pr\u00e9cise', full:true},
       {key:'tag',             icon:'landmark',     label:'Type de lieu',      placeholder:'ex\u00a0: Temple, Restaurant\u2026', full:true}
     ];
-    // Horaires d'ouverture : deux sélecteurs heure (comme le modal Planifier) + un petit champ
-    // texte optionnel pour les jours de fermeture (ex: "Fermé lundi") que deux heures seules ne
-    // peuvent pas exprimer. d.hours (texte affiché, ex: "9h–17h · Fermé lundi") et d.duration
-    // (ex: "8h") sont recalculés automatiquement à chaque changement — plus de saisie manuelle.
+    // Horaires d'ouverture du LIEU uniquement (jamais le planning personnel — voir S.actDate /
+    // S.actTimeStart / S.actMoment, gérés par le modal Planifier) : deux sélecteurs heure + un
+    // petit champ texte optionnel pour les jours de fermeture (ex: "Fermé lundi"). d.hours (texte
+    // affiché, ex: "9h–17h · Fermé lundi") est recalculé automatiquement à chaque changement.
+    // d.duration (durée de visite conseillée) n'est PAS dérivée de ces horaires — c'est un champ
+    // texte libre séparé (voir _qFields ci-dessus), avec la même sémantique qu'en mode IA.
     var _hOpenVal = escHtml(_dSaved.hoursOpen||'');
     var _hCloseVal = escHtml(_dSaved.hoursClose||'');
     var _hClosedDaysVal = escHtml(_dSaved.hoursClosedDays||'');
-    var _hoursBody = '<div style="grid-column:1/-1"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon('sun',11)+' Horaires d\'ouverture</div>'
+    var _hoursBody = '<div style="grid-column:1/-1"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon('sun',11)+' Horaires d\'ouverture (du lieu)</div>'
       +'<div style="display:flex;gap:8px;margin-bottom:8px">'
       +'<input type="time" value="'+_hOpenVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'open\',this.value)"/>'
       +'<input type="time" value="'+_hCloseVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'close\',this.value)"/>'
       +'</div>'
       +'<input type="text" placeholder="Jours de fermeture (optionnel), ex\u00a0: Ferm\u00e9 lundi" value="'+_hClosedDaysVal+'" style="'+_inStyle2+'" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'closedDays\',this.value)"/>'
-      +'</div>'
-      +'<div style="grid-column:1/-1"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon('history',11)+' Dur\u00e9e (calcul\u00e9e automatiquement)</div>'
-      +'<div id="detailDurationDisplay" style="'+_inStyle2+';background:var(--sand);color:var(--ink-subtle)">'+(escHtml(_dSaved.duration||'')||'\u2014')+'</div>'
       +'</div>';
     var _qBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">'+_hoursBody;
     _qFields.forEach(function(f){
@@ -2716,7 +2728,7 @@ function openDetail(actKey, actName, cityKey) {
     var _tBody = '<textarea rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>';
     html += _detailAccordion('Conseils & astuces', _tBody, !!_tipsVal);
   } else if(d.tips && d.tips.length) {
-    var _tipsHtml = '<div class="detail-text">'+d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+t+'</div>';}).join('')+'</div>';
+    var _tipsHtml = '<div class="detail-text">'+d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+escHtml(t)+'</div>';}).join('')+'</div>';
     html += _detailAccordion('Conseils & astuces', _tipsHtml, true);
   }
 
@@ -2726,7 +2738,7 @@ function openDetail(actKey, actName, cityKey) {
     var _hBody = '<textarea rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>';
     html += _detailAccordion('Histoire & contexte', _hBody, false);
   } else if(d.history) {
-    html += _detailAccordion('Histoire & contexte', '<div class="detail-text">'+d.history+'</div>', false);
+    html += _detailAccordion('Histoire & contexte', '<div class="detail-text">'+escHtml(d.history)+'</div>', false);
   }
 
   // Liens
@@ -2890,7 +2902,7 @@ function buildQuickInfoHTML(d){
         var iconBorder = (isHoursItem && isClosedNow) ? quickCardIconBorder : 'rgba(45,106,79,0.18)';
         return '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px">'
           +'<span style="width:38px;height:38px;border-radius:50%;border:1px solid '+iconBorder+';display:flex;align-items:center;justify-content:center;color:'+iconColor+'">'+svgIcon(item.icon,17)+'</span>'
-          +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Fermé':'Ouvert'):item.label)+'</span>'
+          +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Lieu ferm\u00e9':'Lieu ouvert'):item.label)+'</span>'
           +'<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(item.value)+'</span>'
           +'</div>';
       }).join('')
@@ -2926,27 +2938,17 @@ function saveActDetailHours(actKey, cityKey, custIdx, subfield, val){
   else if(d.hoursClose) parts.push('Ferme \u00e0 '+d.hoursClose.replace(':','h'));
   if(d.hoursClosedDays) parts.push(d.hoursClosedDays);
   d.hours = parts.join(' \u00b7 ');
-  // Recalcule la durée (temps entre ouverture et fermeture) — gère le passage minuit si besoin
-  if(d.hoursOpen && d.hoursClose){
-    var om = d.hoursOpen.split(':'); var cm = d.hoursClose.split(':');
-    var openMin = parseInt(om[0],10)*60+parseInt(om[1],10);
-    var closeMin = parseInt(cm[0],10)*60+parseInt(cm[1],10);
-    var diffMin = closeMin - openMin;
-    if(diffMin < 0) diffMin += 24*60;
-    var h = Math.floor(diffMin/60), m = diffMin%60;
-    d.duration = h>0 ? (h+'h'+(m>0?(m<10?'0'+m:m):'')) : (m+'min');
-  } else {
-    d.duration = '';
-  }
+  // d.duration ne se calcule plus depuis l'amplitude d'ouverture du lieu (hoursClose-hoursOpen) —
+  // ce n'était pas une "durée de visite" mais l'amplitude d'ouverture, un concept différent qui
+  // contredisait le sens que lui donne l'IA (durée de visite conseillée, ex: "1h30"). Le champ
+  // duration est désormais saisi librement via un champ texte dédié dans le formulaire (voir
+  // _qFields "Durée de visite"), avec la même sémantique quelle que soit l'origine des données.
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
   }
   refreshDetailHeaderLive(actKey);
-  // Met à jour l'affichage en lecture seule de la durée sans reconstruire toute la fiche
-  var durEl = document.getElementById('detailDurationDisplay');
-  if(durEl) durEl.textContent = d.duration || '\u2014';
 }
 function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(!window._customDetails) window._customDetails = {};
@@ -5446,8 +5448,20 @@ function openPlanningModal(actKey, name, meta){
     var isActive = _planningModalMoment===mk;
     return '<div class="moment-seg'+(isActive?' active':'')+'" onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'">'+svgIcon(mo.icon,16)+'<span>'+mo.label+'</span></div>';
   }).join('');
+  // Sélecteur de date : ajouté au modal existant (Lot 4A §5/§6) pour permettre de modifier le
+  // jour depuis le même point d'entrée que l'heure/le moment, sans créer un second mécanisme.
+  // Modification = écrit toujours explicitement dans S.actDate via setActivityDate (déjà
+  // existante, avec sa validation de bornes de séjour) — jamais de transformation automatique
+  // d'une date de repli en date explicite au simple affichage.
+  var ckForDate = actKey.replace(/_c?\d+$/,'');
+  var stayRangeForDate = (typeof cityStayRange==='function') ? cityStayRange(ckForDate) : null;
+  var curExplicitDate = (S.actDate && S.actDate[actKey]) || '';
   document.getElementById('planningModalBody').innerHTML =
-    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
+    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Date</div>'
+    +'<input class="ef-input" id="planningModalDate" type="date" value="'+escHtml(curExplicitDate)+'"'
+    +(stayRangeForDate?(' min="'+stayRangeForDate.start+'" max="'+stayRangeForDate.end+'"'):'')
+    +' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:16px"/>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
     +'<div class="moment-segctrl" style="margin-bottom:16px">'+segments+'</div>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Plage horaire</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:8px">'
@@ -5469,6 +5483,8 @@ function clearPlanningTime(){
   document.getElementById('planningModalTimeEnd').value = '';
 }
 function savePlanningModal(){
+  var dateEl = document.getElementById('planningModalDate');
+  var dateVal = dateEl ? dateEl.value : '';
   var startVal = document.getElementById('planningModalTimeStart').value;
   var endVal = document.getElementById('planningModalTimeEnd').value;
   // Logique cible (Correctif Lot 1 §3) :
@@ -5476,6 +5492,10 @@ function savePlanningModal(){
   //   SINON SI moment manuel   -> moment = _planningModalMoment    (choix explicite conservé)
   //   SINON                    -> moment = ''                     (aucun horaire du tout)
   var finalMoment = startVal ? getDayPeriod(startVal) : _planningModalMoment;
+  // La date passe par setActivityDate (déjà existante) qui valide les bornes du séjour et peut
+  // annuler la sauvegarde (alert + renderContent) si la date est hors séjour — comportement
+  // préexistant conservé tel quel, pas de nouvelle règle de validation créée ici.
+  if(dateEl) setActivityDate(_planningModalActKey, dateVal);
   setActMoment(_planningModalActKey, finalMoment);
   setActTimeRange(_planningModalActKey, startVal, endVal, '');
   document.getElementById('planningModal').classList.remove('open');
