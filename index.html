@@ -2473,14 +2473,14 @@ function openActionMenu(el){
   _actionMenuCtx = {actKey:actKey, actName:actName, cityKey:cityKey, origIdx:origIdx, isCustom:isCustom};
   var isFav = !!S.favorites[actKey];
   var items = [
-    {icon:'pencil',   label:'Modifier',                                  action:'edit'},
-    {icon:'history',  label:'Planifier (moment et horaire)',             action:'plan'},
-    {icon:'compass',  label:'Changer la cat\u00e9gorie',                 action:'category'},
-    {icon:'calendar', label:'D\u00e9placer vers un autre jour',          action:'date'},
+    {icon:'pencil',   label:'Modifier la fiche',                        action:'edit'},
+    {icon:'history',  label:'Planifier',                                action:'plan'},
+    {icon:'compass',  label:'Changer la cat\u00e9gorie',                action:'category'},
+    {icon:'calendar', label:'Changer la date',                          action:'date'},
     {icon:'star',     label:isFav?'Retirer des favoris':'Ajouter aux favoris', action:'fav'},
-    {icon:'repeat',   label:'Dupliquer',                                 action:'duplicate'},
-    {icon:'map',      label:'D\u00e9placer vers une autre ville',        action:'moveCity'},
-    {icon:'trash-2',  label:'Supprimer',                                 action:'delete', danger:true}
+    {icon:'repeat',   label:'Dupliquer',                                action:'duplicate'},
+    {icon:'map',      label:'D\u00e9placer vers une autre ville',       action:'moveCity'},
+    {icon:'trash-2',  label:'Supprimer',                                action:'delete', danger:true}
   ];
   document.getElementById('actionMenuTitle').textContent = actName;
   document.getElementById('actionMenuBody').innerHTML = items.map(function(it,i){
@@ -2497,7 +2497,16 @@ function handleActionMenuTap(action){
   if(!ctx) return;
   closeActionMenu();
   if(action==='edit'){
-    openDetail(ctx.actKey, ctx.actName, ctx.cityKey);
+    // Lot 5B : "Modifier la fiche" depuis le menu → ouvre directement en mode édition
+    // pour les activités custom (pas de tap supplémentaire sur "Modifier").
+    // Pour les activités de base statiques, ouvre en lecture (pas de rename possible).
+    var _editIdxPart = ctx.actKey.slice(ctx.cityKey.length+1);
+    var _editIsCustom = _editIdxPart.indexOf('c')===0;
+    if(_editIsCustom){
+      unlockCustomActDetail(ctx.actKey, ctx.cityKey, ctx.actName);
+    } else {
+      openDetail(ctx.actKey, ctx.actName, ctx.cityKey);
+    }
   } else if(action==='plan'){
     openPlanningModal(ctx.actKey, ctx.actName, '');
   } else if(action==='category'){
@@ -2641,6 +2650,17 @@ function openDetail(actKey, actName, cityKey) {
   var _esc = jsStrEsc;
 
   let html = '';
+
+  // Lot 5B : champ "Nom" en haut de la fiche, uniquement pour les activités custom éditables.
+  // Les activités de base statiques (ACT_DETAILS) n'exposent pas de champ de renommage.
+  if(_isEditable && _isCustom){
+    var _nameVal = escHtml(S.customActs[cityKey] && S.customActs[cityKey][_custIdx] ? (S.customActs[cityKey][_custIdx].n||actName) : actName);
+    html += '<div class="detail-section" style="padding-bottom:0">'
+      +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;margin-bottom:6px">Nom</div>'
+      +'<input type="text" value="'+_nameVal+'" placeholder="Nom de l\'activité" style="'+_inStyle2+';font-weight:600" '
+      +'onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'name\',this.value)"/>'
+      +'</div>';
+  }
 
   // Lot 4A §7 : badge IA visible retiré, conformément au principe déjà appliqué aux cartes au
   // Lot 2 ("IA = accélérateur invisible"). d._aiGenerated et d._aiGeneratedAt restent intacts
@@ -2985,6 +3005,32 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
     save();
     if(sb && CURRENT_TRIP){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
+    return;
+  } else if(field === 'name'){
+    // Lot 5B : renommage d'une activité custom.
+    // Source de vérité : S.customActs[][n]. L'actKey reste inchangé.
+    if(!val) return; // nom vide ignoré
+    if(!S.customActs[cityKey] || !S.customActs[cityKey][custIdx]) return;
+    var _oldName = S.customActs[cityKey][custIdx].n;
+    if(_oldName === val) return; // pas de changement
+    S.customActs[cityKey][custIdx].n = val;
+    S.customDetails = window._customDetails;
+    save();
+    renderContent();
+    // Mettre à jour le titre de la fiche si elle est encore ouverte
+    var _dtEl = document.getElementById('detailTitle');
+    if(_dtEl && _dtEl.textContent === _oldName) _dtEl.textContent = val;
+    // Sync Supabase : UPDATE par ancien nom (le nom est l'identifiant fonctionnel dans la table)
+    if(sb && CURRENT_TRIP){
+      var _rnParts = cityKey.split('_');
+      sb.from('activities')
+        .update({name:val})
+        .eq('trip_id',CURRENT_TRIP.id)
+        .eq('country_id',_rnParts[0])
+        .eq('city',_rnParts.slice(1).join('_'))
+        .eq('name',_oldName)
+        .then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] rename sync:',_r.error); });
     }
     return;
   } else if(field === 'm'){
@@ -4028,17 +4074,22 @@ function openAddActivityModal(ck){
   }).join('');
   document.getElementById('guideItemModalTitle').textContent = 'Ajouter une activité';
   document.getElementById('guideItemModalBody').innerHTML =
-    '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
+    // Nom — seul champ obligatoire, toujours visible en premier
+    '<div style="margin-bottom:10px"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%;font-size:16px;font-weight:500" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
     +'<div class="suggestions-list" id="guideModalActSuggestions" style="position:static;margin-bottom:8px"></div>'
-    +'<div class="ef-row" style="margin-bottom:10px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Description courte (optionnel)" style="width:100%"/></div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Cat\u00e9gories (optionnel, plusieurs possibles)</div>'
+    // Bloc "Options rapides" : catégories + planning côte à côte (compact)
+    +'<div style="font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--ink-subtle);margin-bottom:8px">Options</div>'
     +'<div style="margin-bottom:10px">'+catPills+'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:10px">'
-    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date (optionnel)</div>'
-    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div>'
-    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Horaire (optionnel)</div>'
-    +'<input class="ef-input" id="guideModalActTime" type="time" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/></div>'
-    +'</div>';
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date</div>'
+    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de début</div>'
+    +'<input class="ef-input" id="guideModalActTime" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +'</div>'
+    // Description — zone secondaire, visuellement moins prioritaire
+    +'<details style="margin-top:2px"><summary style="font-size:12px;color:var(--ink-subtle);cursor:pointer;list-style:none;display:flex;align-items:center;gap:4px;padding:4px 0">'+svgIcon('chevron-right',11)+'<span>Description (optionnel)</span></summary>'
+    +'<div style="margin-top:6px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Quelques mots sur ce lieu…" style="width:100%;margin-top:2px"/></div>'
+    +'</details>';
   _guideModalSaveFn = saveAddActivityModal;
   document.getElementById('guideItemModal').classList.add('open');
 }
@@ -5080,7 +5131,18 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
 }
 
 function editActivityFromSwipe(el){
-  openDetail(el.getAttribute('data-act-key'), el.getAttribute('data-act-name'), el.getAttribute('data-city-key'));
+  var _sActKey = el.getAttribute('data-act-key');
+  var _sCityKey = el.getAttribute('data-city-key');
+  var _sActName = el.getAttribute('data-act-name');
+  // Lot 5B : même comportement que "Modifier la fiche" dans le menu —
+  // ouvre directement en mode édition pour les activités custom.
+  var _sIdxPart = _sActKey ? _sActKey.slice((_sCityKey||'').length+1) : '';
+  var _sIsCustom = _sIdxPart.indexOf('c')===0;
+  if(_sIsCustom){
+    unlockCustomActDetail(_sActKey, _sCityKey, _sActName);
+  } else {
+    openDetail(_sActKey, _sActName, _sCityKey);
+  }
 }
 function deleteActivityFromEl(el){
   var cityKey = el.getAttribute('data-city-key');
