@@ -2588,9 +2588,7 @@ function openDetail(actKey, actName, cityKey) {
   // formatTimeRange déjà fiabilisés aux Lots 1-3.
   function formatDetailPlanningLabel(){
     var ckForPlanning = (cityKey||actKey.replace(/_c?\d+$/,''));
-    var ctryIdForPlanning = ckForPlanning.split('_')[0];
-    var cityNameForPlanning = ckForPlanning.slice(ctryIdForPlanning.length+1);
-    var dateVal = getActivityDate(actKey, ctryIdForPlanning, cityNameForPlanning, 0, 1);
+    var dateVal = getRenderedActivityDate(actKey, ckForPlanning);
     if(!dateVal) return {label:'Calendrier', hasInfo:false};
     var dayShort = formatDayShort(dateVal);
     var timeVal = formatTimeRange(actKey);
@@ -5450,15 +5448,17 @@ function openPlanningModal(actKey, name, meta){
   }).join('');
   // Sélecteur de date : ajouté au modal existant (Lot 4A §5/§6) pour permettre de modifier le
   // jour depuis le même point d'entrée que l'heure/le moment, sans créer un second mécanisme.
-  // Modification = écrit toujours explicitement dans S.actDate via setActivityDate (déjà
-  // existante, avec sa validation de bornes de séjour) — jamais de transformation automatique
-  // d'une date de repli en date explicite au simple affichage.
+  // Correctif §4/§5 : le champ se PRÉ-REMPLIT avec la date réellement rendue (getRenderedActivityDate,
+  // incluant le fallback) — sinon un tap sur Planning pouvait afficher un champ vide alors que la
+  // fiche/la carte montraient déjà une date. Mais l'ouverture seule n'écrit jamais S.actDate :
+  // seule une validation explicite (bouton Enregistrer, voir savePlanningModal) peut transformer
+  // cette date affichée en date explicite.
   var ckForDate = actKey.replace(/_c?\d+$/,'');
   var stayRangeForDate = (typeof cityStayRange==='function') ? cityStayRange(ckForDate) : null;
-  var curExplicitDate = (S.actDate && S.actDate[actKey]) || '';
+  var renderedDate = getRenderedActivityDate(actKey, ckForDate) || '';
   document.getElementById('planningModalBody').innerHTML =
     '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Date</div>'
-    +'<input class="ef-input" id="planningModalDate" type="date" value="'+escHtml(curExplicitDate)+'"'
+    +'<input class="ef-input" id="planningModalDate" type="date" value="'+escHtml(renderedDate)+'"'
     +(stayRangeForDate?(' min="'+stayRangeForDate.start+'" max="'+stayRangeForDate.end+'"'):'')
     +' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:16px"/>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
@@ -6577,6 +6577,35 @@ function getCityStartDayInCountry(countryId, cityName){
     cum += parseInt((orderedCities[i].sub||'').match(/\d+/))||1;
   }
   return 0;
+}
+// Correctif Lot 4A §2 : retrouve la même date de rendu que la page Ville utilise pour une
+// activité donnée, en reconstruisant le vrai index/total via getOrder() — le même algorithme
+// qui construit l'ordre affiché dans renderCityPanelContentBody. Sans ça, appeler
+// getActivityDate() avec des index fictifs (ex: 0,1) donne un fallback DIFFÉRENT de celui
+// réellement affiché sur la carte/les chips, créant une contradiction entre la fiche détail
+// et la page Ville pour toute activité sans S.actDate explicite.
+// N'appelle getActivityDate() qu'UNE SEULE fois, sans réimplémenter l'algorithme de répartition.
+function getRenderedActivityDate(actKey, cityKey){
+  if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
+  var ck = cityKey || actKey.replace(/_c?\d+$/,'');
+  var countryId = ck.split('_')[0];
+  var cityName = ck.slice(countryId.length+1);
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return null;
+  var cityObj = c.cities.find(function(ci){return ci.city===cityName;});
+  if(!cityObj) return null;
+  var totalBase = cityObj.acts.length;
+  var totalCustom = (S.customActs[ck]||[]).length;
+  var order = getOrder(ck, totalBase, totalCustom);
+  // Reconstruit le slot ('b0','c2',...) correspondant à cet actKey, exactement comme le fait
+  // renderCityPanelContentBody lors de la construction des cartes.
+  var idxPart = actKey.slice(ck.length+1);
+  var isCustom = idxPart.indexOf('c')===0;
+  var origIdx = isCustom ? parseInt(idxPart.slice(1)) : parseInt(idxPart);
+  var slot = (isCustom?'c':'b')+origIdx;
+  var slotIdx = order.indexOf(slot);
+  if(slotIdx<0) slotIdx = 0; // repli prudent si jamais le slot n'est pas trouvé (activité supprimée entre-temps, etc.)
+  return getActivityDate(actKey, countryId, cityName, slotIdx, order.length);
 }
 function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
