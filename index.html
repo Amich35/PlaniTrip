@@ -5387,14 +5387,16 @@ function guessActivityMoment(name, meta){
   }
   return null;
 }
-// Retourne la clé du moment ('morning'/'noon'/'afternoon'/'evening') ou '' si non assigné
-// (aucune heure de début renseignée → l'activité reste dans "Non planifié"). Le moment est
-// dérivé uniquement de S.actTimeStart, jamais deviné depuis le nom/description de l'activité —
-// ça évite toute ambiguïté entre suggestion automatique et choix réel de l'utilisateur.
+// Retourne la clé du moment ('morning'/'noon'/'afternoon'/'evening') ou '' si non assigné.
+// Logique cible (Correctif Lot 1 §3) :
+//   SI une heure de début existe -> moment = getDayPeriod(startTime)  (l'heure prime toujours)
+//   SINON SI un moment a été choisi manuellement (S.actMoment) -> ce moment est conservé
+//   SINON -> ''  (aucun horaire du tout)
 function getActMoment(actKey, name, meta){
-  if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
   var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
-  return start ? momentFromTime(start) : '';
+  if(start) return getDayPeriod(start);
+  if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
+  return '';
 }
 function setActMoment(actKey, momentKey){
   if(!S.actMoment) S.actMoment={};
@@ -5431,19 +5433,36 @@ function setActTimeRange(actKey, start, end, freeText){
   }
 }
 var _planningModalActKey = '';
+var _planningModalMoment = '';
 function openPlanningModal(actKey, name, meta){
   _planningModalActKey = actKey;
   var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
   var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+  // Moment actuel : dérivé de l'heure si elle existe, sinon le moment manuel déjà enregistré.
+  // Pré-remplit le sélecteur avec l'état réel de l'activité à l'ouverture du modal.
+  _planningModalMoment = getActMoment(actKey, name||'', meta||'');
+  var segments = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
+    var mo = ACTIVITY_MOMENTS[mk];
+    var isActive = _planningModalMoment===mk;
+    return '<div class="moment-seg'+(isActive?' active':'')+'" onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'">'+svgIcon(mo.icon,16)+'<span>'+mo.label+'</span></div>';
+  }).join('');
   document.getElementById('planningModalBody').innerHTML =
-    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Plage horaire</div>'
+    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
+    +'<div class="moment-segctrl" style="margin-bottom:16px">'+segments+'</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Plage horaire</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:8px">'
     +'<input class="ef-input" id="planningModalTimeStart" type="time" value="'+escHtml(startVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
     +'<input class="ef-input" id="planningModalTimeEnd" type="time" value="'+escHtml(endVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
     +'</div>'
-    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:10px">Le moment de la journée (Matin / Midi / Après-midi / Soir) est déduit automatiquement de l\'heure de début.</div>'
+    +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:10px">Avec une heure de début, le moment ci-dessus est recalculé automatiquement à la sauvegarde.</div>'
     +((startVal||endVal)?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
   document.getElementById('planningModal').classList.add('open');
+}
+function selectPlanningMoment(mk){
+  _planningModalMoment = (_planningModalMoment===mk) ? '' : mk;
+  document.querySelectorAll('[data-moment-pill]').forEach(function(el){
+    el.classList.toggle('active', el.getAttribute('data-moment-pill')===_planningModalMoment);
+  });
 }
 function clearPlanningTime(){
   document.getElementById('planningModalTimeStart').value = '';
@@ -5452,9 +5471,12 @@ function clearPlanningTime(){
 function savePlanningModal(){
   var startVal = document.getElementById('planningModalTimeStart').value;
   var endVal = document.getElementById('planningModalTimeEnd').value;
-  // Le moment de la journée est désormais uniquement dérivé de l'heure de début — pas de choix
-  // manuel possible. Sans heure, l'activité reste dans "Non planifié" (moment vide).
-  setActMoment(_planningModalActKey, startVal ? momentFromTime(startVal) : '');
+  // Logique cible (Correctif Lot 1 §3) :
+  //   SI startVal existe       -> moment = getDayPeriod(startVal)  (l'heure prime toujours)
+  //   SINON SI moment manuel   -> moment = _planningModalMoment    (choix explicite conservé)
+  //   SINON                    -> moment = ''                     (aucun horaire du tout)
+  var finalMoment = startVal ? getDayPeriod(startVal) : _planningModalMoment;
+  setActMoment(_planningModalActKey, finalMoment);
   setActTimeRange(_planningModalActKey, startVal, endVal, '');
   document.getElementById('planningModal').classList.remove('open');
   renderContent();
