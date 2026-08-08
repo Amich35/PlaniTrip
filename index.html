@@ -5692,7 +5692,7 @@ function renderCityPanelContentBody(c, city){
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
           +'</div></div></div>';
-        return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m};
+        return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m, dateVal:actDateVal};
       } else {
         var ca=custs[origIdx];
         if(!ca) return null;
@@ -5721,47 +5721,79 @@ function renderCityPanelContentBody(c, city){
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
           +'</div></div></div>';
-        return {html:chtml, moment:caMoment, actKey:ck2, name:ca.n, meta:ca.m};
+        return {html:chtml, moment:caMoment, actKey:ck2, name:ca.n, meta:ca.m, dateVal:cDateVal};
       }
     }).filter(Boolean);
 
     // Regroupement visuel façon "planning" : Matin / Midi / Après-midi / Soir, puis Non planifié
-    var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
-    baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
-    // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
-    // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
-    // sans heure gardent leur position relative issue de l'ordre existant (manuel ou par défaut),
-    // placées après les activités horodatées. Sans ce tri, deux activités affectées au même
-    // moment (ex: 08:00 et 09:00, toutes deux "Matin") pouvaient apparaître dans le désordre —
-    // c'était l'incohérence signalée dans ce lot.
-    Object.keys(momentGroups).forEach(function(mk){
-      momentGroups[mk].sort(function(a, b){
+    // Lot 3 : le regroupement visuel par moment (MATIN/MIDI/...) n'a de sens QUE dans une vue
+    // filtrée sur un jour précis — en vue "Tout", il mélangerait visuellement des activités de
+    // jours différents sous un même bandeau "MATIN". La vue "Tout" devient donc une liste plate,
+    // chaque carte portant déjà sa propre temporalité complète via timeCapsuleHTML (Lot 2).
+    var baseActsHTML;
+    if(activeDay==='Tous'){
+      // Tri stable : date de rendu -> heure de début -> moment (repli) -> ordre existant en cas
+      // d'égalité totale. N'utilise que des valeurs déjà produites ailleurs (getActivityDate,
+      // S.actTimeStart, getActMoment) — aucune nouvelle logique temporelle n'est recréée ici.
+      var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
+      var _flatItems = baseActsItems.map(function(item, idx){ item._origIdx = idx; return item; });
+      _flatItems.sort(function(a, b){
+        var aDate = a.dateVal || '';
+        var bDate = b.dateVal || '';
+        if(aDate !== bDate) return aDate < bDate ? -1 : 1;
         var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
         var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
         if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
         if(aStart && !bStart) return -1;
         if(!aStart && bStart) return 1;
-        return 0; // égalité (même heure, ou aucune heure des deux) : conserve l'ordre stable d'origine
+        var aMoment = _momentSortRank[a.moment||''] ?? 4;
+        var bMoment = _momentSortRank[b.moment||''] ?? 4;
+        if(aMoment !== bMoment) return aMoment - bMoment;
+        return a._origIdx - b._origIdx; // égalité totale : ordre stable existant
       });
-    });
-    var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
-    var momentOrder = ['morning','noon','afternoon','evening',''];
-    const baseActsHTML = momentOrder.map(function(mk){
-      var items = momentGroups[mk];
-      if(!items.length) return '';
-      if(mk && ACTIVITY_MOMENTS[mk]){
-        var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)
-          +'<span style="display:inline-block"><span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span>'
-          +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin-top:4px"></div></span></div>';
-        var rows = items.map(function(it){
-          return it.html;
-        }).join('');
-        return '<div class="planning-group">'+header+rows+'</div>';
-      } else {
-        var header2 = hasAnyPlanned ? '<div class="planning-group-header planning-group-header--muted">Non planifié</div>' : '';
-        return header2+items.map(function(it){return it.html;}).join('');
-      }
-    }).join('');
+      baseActsHTML = _flatItems.map(function(it){ return it.html; }).join('');
+    } else {
+      // Vue Jour (comportement du Lot 1/2, inchangé) : regroupement par moment, tri intra-groupe,
+      // groupes vides masqués.
+      var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
+      baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
+      // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
+      // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
+      // sans heure gardent leur position relative issue de l'ordre existant (manuel ou par défaut),
+      // placées après les activités horodatées. Sans ce tri, deux activités affectées au même
+      // moment (ex: 08:00 et 09:00, toutes deux "Matin") pouvaient apparaître dans le désordre —
+      // c'était l'incohérence signalée dans ce lot.
+      Object.keys(momentGroups).forEach(function(mk){
+        momentGroups[mk].sort(function(a, b){
+          var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+          var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+          if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+          if(aStart && !bStart) return -1;
+          if(!aStart && bStart) return 1;
+          return 0; // égalité (même heure, ou aucune heure des deux) : conserve l'ordre stable d'origine
+        });
+      });
+      var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
+      var momentOrder = ['morning','noon','afternoon','evening',''];
+      baseActsHTML = momentOrder.map(function(mk){
+        var items = momentGroups[mk];
+        if(!items.length) return '';
+        if(mk && ACTIVITY_MOMENTS[mk]){
+          var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)
+            +'<span style="display:inline-block"><span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span>'
+            +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin-top:4px"></div></span></div>';
+          var rows = items.map(function(it){
+            return it.html;
+          }).join('');
+          return '<div class="planning-group">'+header+rows+'</div>';
+        } else {
+          // Lot 3 §3 : libellé renommé "Horaire non défini" — l'activité a déjà une date connue
+          // dans cette vue Jour, "Non planifié" était sémantiquement trompeur.
+          var header2 = hasAnyPlanned ? '<div class="planning-group-header planning-group-header--muted">Horaire non d\u00e9fini</div>' : '';
+          return header2+items.map(function(it){return it.html;}).join('');
+        }
+      }).join('');
+    }
 
     const activityTrashBtn = activityTrashButtonHTML(ck);
 
