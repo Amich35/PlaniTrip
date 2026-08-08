@@ -989,7 +989,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <button id="ct-submit-btn" class="ct-primary-btn">Créer mon voyage</button>
     <button type="button" id="ct-import-btn" style="width:100%;margin-top:10px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--ink-muted);font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:color .15s;" onclick="openImportTripFlow()"><span data-icon="upload" data-icon-size="15"></span> Importer un voyage existant</button>
     <!-- input file masqué pour l'import — accepte les formats documentaires (pas les images) -->
-    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.xlsx,.xls,.docx,.pdf" style="display:none" onchange="handleImportFileSelected(event)">
+    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown" style="display:none" onchange="handleImportFileSelected(event)">
   </div>
 </div>
 
@@ -12545,30 +12545,38 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // A2.1 — IMPORT VOYAGE DEPUIS DOCUMENTS (CSV / TXT / MD)
 // Architecture : fichier → extraction locale → parsing déterministe
-//                → aperçu éditable → confirmation → création
-// Aucune dépendance externe pour P1 (CSV/TXT/MD).
+//                → aperçu éditable (corrections + orphelins) → confirmation → création
+// Aucune dépendance externe pour P1 (CSV/TXT/MD). Aucune invention silencieuse
+// de donnée absente (années de date notamment — voir _impParseDateSmart).
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── État de l'import (temporaire, jamais persisté) ──────────────────────────
+var _impIdCounter = 1;
+function _impNextId(){ return 'i'+(_impIdCounter++); }
+
 var _IMP = {
-  raw: '',           // texte brut extrait
-  filename: '',      // nom du fichier source
-  parsed: null,      // résultat du parser : {trip, countries, cities, activities, accommodations, notes}
-  creating: false    // verrou anti-double-submit
+  raw: '',
+  filename: '',
+  parsed: null,
+  creating: false,
+  uiState: { openAccordions: {}, editing: {} }
 };
 
 // ── Ouvrir le flow d'import ──────────────────────────────────────────────────
-function openImportTripFlow() {
+async function openImportTripFlow() {
+  await loadCountryList();
   document.getElementById('ct-import-file-input').value = '';
   document.getElementById('ct-import-file-input').click();
 }
 
 function closeImportTripModal() {
   document.getElementById('importTripModal').classList.remove('open');
-  _IMP = { raw: '', filename: '', parsed: null, creating: false };
+  _impIdCounter = 1;
+  _IMP = { raw: '', filename: '', parsed: null, creating: false, uiState: { openAccordions: {}, editing: {} } };
 }
 
 // ── Gestionnaire sélection fichier ──────────────────────────────────────────
+// Correctif #1 : accept limité aux formats réellement supportés en A2.1
 function handleImportFileSelected(e) {
   var file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -12576,7 +12584,7 @@ function handleImportFileSelected(e) {
   var ext = file.name.split('.').pop().toLowerCase();
   var supported = ['csv','txt','md','markdown'];
   if (!supported.includes(ext)) {
-    _showImportError('Ce format n\'est pas encore pris en charge pour l\'import automatique. Formats disponibles : CSV, TXT, Markdown.');
+    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown.');
     return;
   }
   var reader = new FileReader();
@@ -12599,62 +12607,68 @@ function _runImportPipeline() {
   var ext = _IMP.filename.split('.').pop().toLowerCase();
   var parsed;
   try {
-    if (ext === 'csv') {
-      parsed = _parseCSV(_IMP.raw);
-    } else {
-      parsed = _parseTxtMd(_IMP.raw);
-    }
+    if (ext === 'csv') parsed = _parseCSV(_IMP.raw);
+    else parsed = _parseTxtMd(_IMP.raw);
   } catch(e) {
     _showImportError('Erreur lors de l\'analyse du fichier : ' + e.message);
     return;
   }
   _IMP.parsed = parsed;
   var hasData = parsed.countries.length || parsed.cities.length || parsed.activities.length || parsed.accommodations.length;
-  if (!hasData && !parsed.trip.name && !parsed.trip.start) {
+  if (!hasData && !parsed.trip.name) {
     _showImportError('Nous n\'avons pas identifié d\'itinéraire dans ce fichier. Vérifie que le fichier contient bien des destinations, villes ou activités.');
     return;
   }
   _showImportPreview();
 }
 
-// ── Parsers ──────────────────────────────────────────────────────────────────
-
-// Normalise une chaîne pour comparaison (sans accents, minuscules)
+// ── Helpers de normalisation / correspondance ────────────────────────────────
 function _impNorm(s) {
   return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 }
+function _impMatchCountry(s) {
+  if (!s || !CT_ALL_COUNTRY_NAMES.length) return '';
+  var n = _impNorm(s);
+  return CT_ALL_COUNTRY_NAMES.find(function(c){ return _impNorm(c) === n; }) || '';
+}
 
-// Parse une date dans de nombreux formats → ISO YYYY-MM-DD ou ''
-function _impParseDate(s) {
-  if (!s) return '';
+// Correctif #3 : ne jamais inventer une année absente.
+// Retourne {iso, raw, needsYear}. Si l'année manque, iso='' et needsYear=true —
+// la date brute est conservée pour affichage ("12/09 · année à vérifier") mais
+// n'est JAMAIS complétée automatiquement avec l'année courante.
+function _impParseDateSmart(s) {
+  if (!s) return { iso:'', raw:'', needsYear:false };
   s = String(s).trim();
-  // YYYY-MM-DD ou YYYY/MM/DD
-  var m = s.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})$/);
-  if (m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
-  // DD/MM/YYYY ou DD-MM-YYYY
+  if (!s) return { iso:'', raw:'', needsYear:false };
+  var m;
+  // YYYY-MM-DD ou YYYY/MM/DD — année explicite
+  m = s.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})$/);
+  if (m) return { iso: m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'), raw: s, needsYear:false };
+  // DD/MM/YYYY ou DD-MM-YYYY — année explicite
   m = s.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{4})$/);
-  if (m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  // DD/MM (sans année → année courante)
+  if (m) return { iso: m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'), raw: s, needsYear:false };
+  // DD/MM sans année — needsYear
   m = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
-  if (m) { var yr = new Date().getFullYear(); return yr+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); }
-  // "12 septembre", "12 sept" en français
-  var monthsFr = {janvier:1,jan:1,février:2,fev:2,'févr':2,mars:3,avril:4,avr:4,mai:5,juin:6,juillet:7,juil:7,
-    août:8,aout:8,septembre:9,sept:9,octobre:10,oct:10,novembre:11,nov:11,décembre:12,dec:12};
+  if (m) return { iso:'', raw: m[1].padStart(2,'0')+'/'+m[2].padStart(2,'0'), needsYear:true };
+  // "12 septembre 2027" ou "12 septembre" (sans année)
+  var monthsFr = {janvier:1,jan:1,fevrier:2,fev:2,mars:3,avril:4,avr:4,mai:5,juin:6,juillet:7,juil:7,
+    aout:8,septembre:9,sept:9,octobre:10,oct:10,novembre:11,nov:11,decembre:12,dec:12};
   m = s.match(/^(\d{1,2})\s+([a-záàâéèêëîïôùûü]+)\.?(?:\s+(\d{4}))?$/i);
   if (m) {
     var mn = monthsFr[_impNorm(m[2])];
-    if (mn) { var yr2 = m[3]||new Date().getFullYear(); return yr2+'-'+String(mn).padStart(2,'0')+'-'+m[1].padStart(2,'0'); }
+    if (mn) {
+      if (m[3]) return { iso: m[3]+'-'+String(mn).padStart(2,'0')+'-'+m[1].padStart(2,'0'), raw: s, needsYear:false };
+      return { iso:'', raw: m[1].padStart(2,'0')+'/'+String(mn).padStart(2,'0'), needsYear:true };
+    }
   }
-  // Excel serial date number (numeric)
+  // Excel serial date number — toujours une date complète (année incluse)
   var n = parseFloat(s);
   if (!isNaN(n) && n > 40000 && n < 60000) {
     var d = new Date(Math.round((n - 25569) * 86400 * 1000));
-    return toLocalISODate(d);
+    return { iso: toLocalISODate(d), raw: s, needsYear:false };
   }
-  return '';
+  return { iso:'', raw:'', needsYear:false };
 }
-
-// Parse une heure → HH:MM ou ''
 function _impParseTime(s) {
   if (!s) return '';
   s = String(s).trim();
@@ -12664,30 +12678,24 @@ function _impParseTime(s) {
   if (m) return m[1].padStart(2,'0')+':'+(m[2]||'00').padStart(2,'0');
   return '';
 }
-
-// Détecte si une chaîne ressemble à un pays connu
-function _impMatchCountry(s) {
-  if (!s || !CT_ALL_COUNTRY_NAMES.length) return '';
-  var n = _impNorm(s);
-  return CT_ALL_COUNTRY_NAMES.find(function(c){ return _impNorm(c) === n; }) || '';
+function _impValidDateStr(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s+'T00:00:00').getTime());
 }
 
-// Structure de résultat vide
 function _impEmptyResult() {
   return {
     trip: { name: '', start: '', end: '' },
-    countries: [],   // [{name, dateStart, dateEnd}]
-    cities: [],      // [{country, city, dateStart, dateEnd, nights, confidence}]
-    activities: [],  // [{country, city, name, date, time, note, confidence}]
-    accommodations: [], // [{country, city, name, dateStart, dateEnd, nights, link, note}]
-    notes: []        // lignes non classées
+    countries: [],
+    cities: [],
+    activities: [],
+    accommodations: [],
+    notes: []
   };
 }
 
 // ── PARSER CSV ───────────────────────────────────────────────────────────────
 function _parseCSV(raw) {
   var result = _impEmptyResult();
-  // Détecter le séparateur dominant
   var sep = ',';
   var counts = {',': 0, ';': 0, '\t': 0};
   var sample = raw.slice(0, 2000);
@@ -12695,32 +12703,31 @@ function _parseCSV(raw) {
   if (counts[';'] > counts[','] && counts[';'] > counts['\t']) sep = ';';
   else if (counts['\t'] > counts[','] && counts['\t'] > counts[';']) sep = '\t';
 
-  // Split lignes, gérer les CRLF
   var lines = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
 
-  // Parser une ligne CSV en tenant compte des guillemets
+  // Correctif #8 : support des guillemets doublés "" à l'intérieur d'un champ
+  // entre guillemets (norme CSV standard, ex: "Restaurant ""Chez Pierre""").
   function parseLine(line) {
     var fields = [], cur = '', inQ = false;
     for (var i = 0; i < line.length; i++) {
       var ch = line[i];
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === sep && !inQ) { fields.push(cur.trim()); cur = ''; }
+      if (ch === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else { inQ = !inQ; }
+      } else if (ch === sep && !inQ) { fields.push(cur.trim()); cur = ''; }
       else { cur += ch; }
     }
     fields.push(cur.trim());
     return fields;
   }
 
-  // Trouver la ligne d'en-têtes (première ligne non vide)
-  var headerIdx = -1;
-  var headers = [];
+  var headerIdx = -1, headers = [];
   for (var i = 0; i < lines.length; i++) {
     if (lines[i].trim()) { headerIdx = i; headers = parseLine(lines[i]); break; }
   }
   if (headerIdx === -1) return result;
 
-  // Mapping des en-têtes vers les champs connus
-  var H = {}; // {champ: idx}
+  var H = {};
   var colAliases = {
     country:  ['pays','country','destination','pays/région'],
     city:     ['ville','city','étape','etape','stop','location'],
@@ -12742,19 +12749,13 @@ function _parseCSV(raw) {
     });
   });
 
-  // Si aucune colonne reconnue → tenter un import ligne par ligne en texte libre
-  var knownCols = Object.keys(H).length;
-  if (knownCols === 0) {
-    // Fallback : traiter comme TXT
-    return _parseTxtMd(raw);
-  }
+  if (Object.keys(H).length === 0) return _parseTxtMd(raw);
 
   var get = function(row, field) { return H[field] !== undefined ? (row[H[field]] || '') : ''; };
-
   var seenCountries = {}, seenCities = {}, seenActs = {};
 
-  for (var i = headerIdx + 1; i < lines.length; i++) {
-    var line = lines[i];
+  for (var i2 = headerIdx + 1; i2 < lines.length; i2++) {
+    var line = lines[i2];
     if (!line.trim()) continue;
     var row = parseLine(line);
 
@@ -12772,44 +12773,56 @@ function _parseCSV(raw) {
 
     var country = rawCountry ? (_impMatchCountry(rawCountry) || rawCountry) : '';
     var city    = rawCity ? rawCity.trim() : '';
-    var date    = _impParseDate(rawDate);
-    var dateS   = _impParseDate(rawDateS);
-    var dateE   = _impParseDate(rawDateE);
+    var dInfo   = _impParseDateSmart(rawDate);
+    var dSInfo  = _impParseDateSmart(rawDateS);
+    var dEInfo  = _impParseDateSmart(rawDateE);
     var time    = _impParseTime(rawTime);
     var nights  = parseInt(rawNights,10) || 0;
 
-    // Pays
     if (country && !seenCountries[_impNorm(country)]) {
       seenCountries[_impNorm(country)] = true;
-      result.countries.push({ name: country, dateStart: '', dateEnd: '', confidence: 'ok' });
+      result.countries.push({ _id:_impNextId(), name: country, dateStart:'', dateEnd:'', confidence: (_impMatchCountry(rawCountry) ? 'ok' : 'warn') });
     }
 
-    // Ville
     if (city) {
       var ck = _impNorm(country)+'|'+_impNorm(city);
       if (!seenCities[ck]) {
         seenCities[ck] = true;
-        result.cities.push({ country: country, city: city, dateStart: dateS, dateEnd: dateE, nights: nights, confidence: 'ok' });
+        result.cities.push({
+          _id:_impNextId(), country: country, city: city,
+          dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
+          dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
+          nights: nights, confidence: (country ? 'ok' : 'warn')
+        });
       }
     }
 
-    // Activité
     if (rawAct && rawAct.trim()) {
       var actName = rawAct.trim();
-      var actKey = _impNorm(country)+'|'+_impNorm(city)+'|'+_impNorm(actName)+'|'+date;
+      var actKey = _impNorm(country)+'|'+_impNorm(city)+'|'+_impNorm(actName)+'|'+(dInfo.iso||dInfo.raw);
       if (!seenActs[actKey]) {
         seenActs[actKey] = true;
-        result.activities.push({ country: country, city: city, name: actName, date: date, time: time, note: rawNote.trim(), price: get(row,'price'), confidence: 'ok' });
+        result.activities.push({
+          _id:_impNextId(), country: country, city: city, name: actName,
+          date: dInfo.iso, dateRaw: dInfo.needsYear ? dInfo.raw : '',
+          time: time, note: rawNote.trim(), price: get(row,'price'),
+          confidence: (country && city && !dInfo.needsYear) ? 'ok' : 'warn'
+        });
       }
     }
 
-    // Logement
     if (rawHotel && rawHotel.trim()) {
       var hotelName = rawHotel.trim();
       var hKey = _impNorm(city)+'|'+_impNorm(hotelName);
       var existing = result.accommodations.find(function(a){ return _impNorm(a.city)+'|'+_impNorm(a.name) === hKey; });
       if (!existing) {
-        result.accommodations.push({ country: country, city: city, name: hotelName, dateStart: dateS, dateEnd: dateE, nights: nights, link: rawLink.trim(), note: rawNote.trim(), confidence: 'ok' });
+        result.accommodations.push({
+          _id:_impNextId(), country: country, city: city, name: hotelName,
+          dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
+          dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
+          nights: nights, link: rawLink.trim(), note: rawNote.trim(),
+          confidence: (country && city) ? 'ok' : 'warn'
+        });
       }
     }
   }
@@ -12823,17 +12836,16 @@ function _parseTxtMd(raw) {
   var lines = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
 
   var currentCountry = '';
+  var currentCountryConf = 'ok';
   var currentCity = '';
   var seenCountries = {}, seenCities = {}, seenActs = {};
 
-  // Patterns de dates dans le texte libre
   var DATE_PAT = /\b(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{4}[\/-]\d{2}[\/-]\d{2}|\d{1,2}\s+(?:jan(?:vier)?|f[eé]v(?:r(?:ier)?)?|mars|avr(?:il)?|mai|juin|juill?(?:et)?|ao[uû]t|sept?(?:embre)?|oct(?:obre)?|nov(?:embre)?|d[eé]c(?:embre)?)(?:\s+\d{4})?)\b/i;
   var TIME_PAT = /\b(\d{1,2}[h:]\d{2})\b/i;
 
-  function extractDate(s){ var m = s.match(DATE_PAT); return m ? _impParseDate(m[1]) : ''; }
+  function extractDateInfo(s){ var m = s.match(DATE_PAT); return m ? _impParseDateSmart(m[1]) : { iso:'', raw:'', needsYear:false }; }
   function extractTime(s){ var m = s.match(TIME_PAT); return m ? _impParseTime(m[1].replace('h',':')) : ''; }
 
-  // Hôtels : mots-clés fréquents
   var HOTEL_KEYWORDS = /\b(h[oô]tel|auberge|hostel|airbnb|guesthouse|ryokan|resort|villa|bnb|maison d[''\u2019]h[oô]tes|appartement)\b/i;
 
   for (var i = 0; i < lines.length; i++) {
@@ -12841,94 +12853,250 @@ function _parseTxtMd(raw) {
     var stripped = line.replace(/^[#\s*\->]+/, '').trim();
     if (!stripped) continue;
 
-    // Titre Markdown # → pays ou ville
     var headLevel = (line.match(/^(#{1,4})\s/) || [,''])[1].length;
     if (headLevel >= 1) {
-      var headText = stripped.replace(/\s*[—–-].*$/, '').trim(); // ignorer "Kyoto — 12 au 15 sept"
-      var dateInHead = extractDate(stripped);
+      var headText = stripped.replace(/\s*[—–-].*$/, '').trim();
+      var dateInHead = extractDateInfo(stripped);
 
       if (headLevel === 1 || headLevel === 2) {
-        // Tester si c'est un pays connu
         var asCountry = _impMatchCountry(headText);
         if (asCountry) {
-          currentCountry = asCountry;
-          currentCity = '';
+          currentCountry = asCountry; currentCountryConf = 'ok'; currentCity = '';
           if (!seenCountries[_impNorm(currentCountry)]) {
             seenCountries[_impNorm(currentCountry)] = true;
-            result.countries.push({ name: currentCountry, dateStart: '', dateEnd: '', confidence: 'ok' });
+            result.countries.push({ _id:_impNextId(), name: currentCountry, dateStart:'', dateEnd:'', confidence:'ok' });
           }
           continue;
         }
-        // Sinon c'est probablement une ville (si on a déjà un pays)
         if (currentCountry) {
           currentCity = headText;
           var ck2 = _impNorm(currentCountry)+'|'+_impNorm(currentCity);
           if (!seenCities[ck2]) {
             seenCities[ck2] = true;
-            result.cities.push({ country: currentCountry, city: currentCity, dateStart: dateInHead, dateEnd: '', nights: 0, confidence: 'ok' });
+            result.cities.push({
+              _id:_impNextId(), country: currentCountry, city: currentCity,
+              dateStart: dateInHead.iso, dateStartRaw: dateInHead.needsYear ? dateInHead.raw : '',
+              dateEnd:'', dateEndRaw:'', nights:0, confidence:'ok'
+            });
           }
         } else {
-          // Pays non reconnu — garder comme pays probable
-          currentCountry = headText;
-          currentCity = '';
+          currentCountry = headText; currentCountryConf = 'warn'; currentCity = '';
           if (!seenCountries[_impNorm(currentCountry)]) {
             seenCountries[_impNorm(currentCountry)] = true;
-            result.countries.push({ name: currentCountry, dateStart: '', dateEnd: '', confidence: 'warn' });
+            result.countries.push({ _id:_impNextId(), name: currentCountry, dateStart:'', dateEnd:'', confidence:'warn' });
           }
         }
       } else if (headLevel >= 3 && currentCountry) {
-        // ### → ville
         currentCity = headText;
         var ck3 = _impNorm(currentCountry)+'|'+_impNorm(currentCity);
         if (!seenCities[ck3]) {
           seenCities[ck3] = true;
-          result.cities.push({ country: currentCountry, city: currentCity, dateStart: dateInHead, dateEnd: '', nights: 0, confidence: 'ok' });
+          result.cities.push({
+            _id:_impNextId(), country: currentCountry, city: currentCity,
+            dateStart: dateInHead.iso, dateStartRaw: dateInHead.needsYear ? dateInHead.raw : '',
+            dateEnd:'', dateEndRaw:'', nights:0, confidence:'ok'
+          });
         }
       }
       continue;
     }
 
-    // Ligne de liste (- ou *) → activité ou logement
     var isList = /^[-*•]\s+/.test(line);
-    var content = isList ? stripped : stripped;
-    var dateVal = extractDate(content);
+    var content = stripped;
+    var dInfo2 = extractDateInfo(content);
     var timeVal = extractTime(content);
-
-    // Contenu sans date/heure pour le nom
     var namePart = content.replace(DATE_PAT,'').replace(TIME_PAT,'').replace(/\s+/g,' ').trim();
 
     if (HOTEL_KEYWORDS.test(content)) {
-      // Logement
       var hotelKey = _impNorm(currentCity)+'|'+_impNorm(namePart);
       var existH = result.accommodations.find(function(a){ return _impNorm(a.city)+'|'+_impNorm(a.name) === hotelKey; });
       if (!existH && namePart) {
-        result.accommodations.push({ country: currentCountry, city: currentCity, name: namePart, dateStart: dateVal, dateEnd: '', nights: 0, link: '', note: '', confidence: 'ok' });
+        result.accommodations.push({
+          _id:_impNextId(), country: currentCountry, city: currentCity, name: namePart,
+          dateStart: dInfo2.iso, dateStartRaw: dInfo2.needsYear ? dInfo2.raw : '',
+          dateEnd:'', dateEndRaw:'', nights:0, link:'', note:'',
+          confidence: (currentCountry && currentCity) ? 'ok' : 'warn'
+        });
       }
     } else if (namePart && (currentCountry || currentCity) && (isList || (timeVal && namePart.length > 2))) {
-      // Activité
-      var actKey2 = _impNorm(currentCity)+'|'+_impNorm(namePart)+'|'+(dateVal||'any');
+      var actKey2 = _impNorm(currentCity)+'|'+_impNorm(namePart)+'|'+(dInfo2.iso||dInfo2.raw||'any');
       if (!seenActs[actKey2]) {
         seenActs[actKey2] = true;
-        result.activities.push({ country: currentCountry, city: currentCity, name: namePart, date: dateVal, time: timeVal, note: '', price: '', confidence: (dateVal||timeVal) ? 'ok' : 'warn' });
+        result.activities.push({
+          _id:_impNextId(), country: currentCountry, city: currentCity, name: namePart,
+          date: dInfo2.iso, dateRaw: dInfo2.needsYear ? dInfo2.raw : '',
+          time: timeVal, note:'', price:'',
+          confidence: (currentCountry && currentCity && (dInfo2.iso || timeVal) && !dInfo2.needsYear) ? 'ok' : 'warn'
+        });
       }
     } else if (namePart && !currentCountry && !currentCity) {
-      // Texte libre sans contexte → notes non classées
       result.notes.push(namePart);
-    } else if (namePart && !isList && !timeVal && !dateVal && namePart.length > 40) {
-      // Long paragraphe → note non classée
+    } else if (namePart && !isList && !timeVal && !dInfo2.iso && namePart.length > 40) {
       result.notes.push(namePart.slice(0, 120) + (namePart.length > 120 ? '…' : ''));
     }
   }
 
-  // Auto-détecter un nom de voyage (première ligne non vide si pas déjà un pays/ville)
   var firstLine = lines.find(function(l){ return l.trim() && !/^#/.test(l); });
   if (firstLine && !result.trip.name && result.countries.length > 0) {
-    // Ne pas mettre la première ligne comme nom si c'est un pays
     var fl = firstLine.trim();
     if (!_impMatchCountry(fl) && fl.length < 60) result.trip.name = fl;
   }
 
   return result;
+}
+
+// ── Select réutilisable pour choisir un pays dans l'aperçu ───────────────────
+// Correctif #6 : réutilise CT_ALL_COUNTRY_NAMES (référentiel existant), pas de
+// deuxième base pays. Inclut aussi les pays déjà présents dans l'import (au cas
+// où ils ne matchent aucun nom canonique) et la valeur actuellement sélectionnée.
+function _impCountrySelect(id, selected) {
+  var opts = CT_ALL_COUNTRY_NAMES.slice();
+  (_IMP.parsed.countries||[]).forEach(function(c){ if (opts.indexOf(c.name)===-1) opts.push(c.name); });
+  if (selected && opts.indexOf(selected)===-1) opts.push(selected);
+  opts.sort();
+  var html = '<select class="imp-field" id="'+id+'">';
+  html += '<option value="">— Choisir un pays —</option>';
+  opts.forEach(function(o){ html += '<option value="'+escHtml(o)+'"'+(o===selected?' selected':'')+'>'+escHtml(o)+'</option>'; });
+  html += '</select>';
+  return html;
+}
+
+// ── Cartes éditables de l'aperçu ─────────────────────────────────────────────
+function _impCountryCard(c) {
+  var editing = !!_IMP.uiState.editing['country_'+c._id];
+  var flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[c.name]) || '🌍';
+  var p = _IMP.parsed;
+  var citiesOfC = p.cities.filter(function(ci){ return _impNorm(ci.country)===_impNorm(c.name); });
+  var actsOfC   = p.activities.filter(function(a){ return _impNorm(a.country)===_impNorm(c.name); });
+  var accomsOfC = p.accommodations.filter(function(a){ return _impNorm(a.country)===_impNorm(c.name); });
+  var html = '<div class="imp-card" style="margin-bottom:8px;">';
+  if (editing) {
+    html += '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Nom du pays</div>';
+    html += '<input class="imp-field" id="imp-edit-country-name-'+c._id+'" value="'+escHtml(c.name)+'" list="imp-country-datalist">';
+    html += '<div style="display:flex;gap:8px;">';
+    html += '<button class="imp-create-btn" style="height:38px;font-size:13px;flex:1" onclick="_impSaveCountryEdit(\''+c._id+'\')">Enregistrer</button>';
+    html += '<button style="height:38px;font-size:13px;flex:1;border-radius:12px;border:1px solid rgba(29,29,31,0.15);background:transparent;color:var(--ink-muted);cursor:pointer" onclick="_impCancelEdit(\'country\',\''+c._id+'\')">Annuler</button>';
+    html += '</div>';
+  } else {
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+    html += '<span style="font-size:18px">'+flag+'</span>';
+    html += '<span class="imp-card-name" style="flex:1">'+escHtml(c.name)+'</span>';
+    html += (c.confidence==='warn'
+      ? '<span class="imp-badge imp-badge-warn">'+svgIcon('alert-circle',10)+' À vérifier</span>'
+      : '<span class="imp-badge imp-badge-ok">'+svgIcon('check',10)+' Reconnu</span>');
+    html += '<button class="imp-del" style="position:static;width:26px;height:26px" onclick="_impStartEdit(\'country\',\''+c._id+'\')" title="Modifier">'+svgIcon('pencil',11)+'</button>';
+    html += '<button class="imp-del" style="position:static;width:26px;height:26px" onclick="_impRemoveItem(\'country\',\''+c._id+'\')" title="Retirer">'+svgIcon('x',11)+'</button>';
+    html += '</div>';
+    var subBits = [];
+    if (citiesOfC.length) subBits.push(citiesOfC.length+' ville'+(citiesOfC.length>1?'s':''));
+    if (actsOfC.length) subBits.push(actsOfC.length+' activité'+(actsOfC.length>1?'s':''));
+    if (accomsOfC.length) subBits.push(accomsOfC.length+' logement'+(accomsOfC.length>1?'s':''));
+    if (subBits.length) html += '<div style="font-size:12px;color:var(--ink-subtle)">'+escHtml(subBits.join(' · '))+'</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _impCityCard(ci) {
+  var editing = !!_IMP.uiState.editing['city_'+ci._id];
+  var incomplete = !ci.country;
+  var html = '<div class="imp-card" style="margin-bottom:8px;'+(incomplete?'border:1.5px solid rgba(244,162,97,0.55);':'')+'">';
+  if (editing || incomplete) {
+    if (incomplete && !editing) html += '<div class="imp-badge imp-badge-warn" style="margin-bottom:8px">'+svgIcon('alert-circle',10)+' Pays manquant</div>';
+    html += '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Nom de la ville</div>';
+    html += '<input class="imp-field" id="imp-edit-city-name-'+ci._id+'" value="'+escHtml(ci.city)+'">';
+    html += '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Pays</div>';
+    html += _impCountrySelect('imp-edit-city-country-'+ci._id, ci.country);
+    html += '<div style="display:flex;gap:8px;margin-top:6px;">';
+    html += '<button class="imp-create-btn" style="height:38px;font-size:13px;flex:1" onclick="_impSaveCityEdit(\''+ci._id+'\')">Enregistrer</button>';
+    html += '<button style="height:38px;font-size:13px;flex:1;border-radius:12px;border:1px solid rgba(29,29,31,0.15);background:transparent;color:var(--ink-muted);cursor:pointer" onclick="_impRemoveItem(\'city\',\''+ci._id+'\')">Retirer</button>';
+    html += '</div>';
+  } else {
+    html += '<div style="display:flex;align-items:flex-start;gap:6px">';
+    html += '<div style="flex:1"><div class="imp-card-name">'+escHtml(ci.city)+'</div>';
+    html += '<div class="imp-card-sub">'+escHtml(ci.country||'?');
+    if (ci.dateStart) html += ' · '+escHtml(ci.dateStart);
+    else if (ci.dateStartRaw) html += ' · '+escHtml(ci.dateStartRaw)+' (année à vérifier)';
+    html += '</div></div>';
+    html += '<button class="imp-del" style="position:static;width:24px;height:24px" onclick="_impStartEdit(\'city\',\''+ci._id+'\')" title="Modifier">'+svgIcon('pencil',10)+'</button>';
+    html += '<button class="imp-del" style="position:static;width:24px;height:24px" onclick="_impRemoveItem(\'city\',\''+ci._id+'\')" title="Retirer">'+svgIcon('x',10)+'</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _impActivityCard(a) {
+  var editing = !!_IMP.uiState.editing['activity_'+a._id];
+  var incomplete = !a.country || !a.city;
+  var html = '<div class="imp-card" style="margin-bottom:8px;'+(incomplete?'border:1.5px solid rgba(244,162,97,0.55);':'')+'">';
+  if (editing || incomplete) {
+    if (incomplete && !editing) html += '<div class="imp-badge imp-badge-warn" style="margin-bottom:8px">'+svgIcon('alert-circle',10)+' Pays / ville manquant</div>';
+    html += '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Nom de l\'activité</div>';
+    html += '<input class="imp-field" id="imp-edit-act-name-'+a._id+'" value="'+escHtml(a.name)+'">';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Pays</div>'+_impCountrySelect('imp-edit-act-country-'+a._id, a.country)+'</div>';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Ville</div><input class="imp-field" id="imp-edit-act-city-'+a._id+'" value="'+escHtml(a.city||'')+'"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date</div><input class="imp-field" id="imp-edit-act-date-'+a._id+'" value="'+escHtml(a.date||a.dateRaw||'')+'" placeholder="AAAA-MM-JJ"></div>';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure</div><input class="imp-field" id="imp-edit-act-time-'+a._id+'" value="'+escHtml(a.time||'')+'" placeholder="HH:MM"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;margin-top:2px;">';
+    html += '<button class="imp-create-btn" style="height:38px;font-size:13px;flex:1" onclick="_impSaveActivityEdit(\''+a._id+'\')">Enregistrer</button>';
+    html += '<button style="height:38px;font-size:13px;flex:1;border-radius:12px;border:1px solid rgba(29,29,31,0.15);background:transparent;color:var(--ink-muted);cursor:pointer" onclick="_impRemoveItem(\'activity\',\''+a._id+'\')">Retirer</button>';
+    html += '</div>';
+  } else {
+    html += '<div style="display:flex;align-items:flex-start;gap:6px">';
+    html += '<div style="flex:1"><div class="imp-card-name">'+escHtml(a.name)+'</div>';
+    html += '<div class="imp-card-sub">'+escHtml(a.city||'?')+' · '+escHtml(a.country||'?');
+    if (a.date) html += ' · '+escHtml(a.date);
+    else if (a.dateRaw) html += ' · '+escHtml(a.dateRaw)+' (année à vérifier)';
+    if (a.time) html += ' '+escHtml(a.time);
+    html += '</div></div>';
+    if (a.confidence==='warn') html += '<span class="imp-badge imp-badge-warn" style="flex-shrink:0">'+svgIcon('alert-circle',10)+'</span>';
+    html += '<button class="imp-del" style="position:static;width:24px;height:24px" onclick="_impStartEdit(\'activity\',\''+a._id+'\')" title="Modifier">'+svgIcon('pencil',10)+'</button>';
+    html += '<button class="imp-del" style="position:static;width:24px;height:24px" onclick="_impRemoveItem(\'activity\',\''+a._id+'\')" title="Retirer">'+svgIcon('x',10)+'</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _impAccomCard(a) {
+  var editing = !!_IMP.uiState.editing['accommodation_'+a._id];
+  var incomplete = !a.country || !a.city;
+  var html = '<div class="imp-card" style="margin-bottom:8px;'+(incomplete?'border:1.5px solid rgba(244,162,97,0.55);':'')+'">';
+  if (editing || incomplete) {
+    if (incomplete && !editing) html += '<div class="imp-badge imp-badge-warn" style="margin-bottom:8px">'+svgIcon('alert-circle',10)+' Pays / ville manquant</div>';
+    html += '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Nom du logement</div>';
+    html += '<input class="imp-field" id="imp-edit-accom-name-'+a._id+'" value="'+escHtml(a.name)+'">';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Pays</div>'+_impCountrySelect('imp-edit-accom-country-'+a._id, a.country)+'</div>';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Ville</div><input class="imp-field" id="imp-edit-accom-city-'+a._id+'" value="'+escHtml(a.city||'')+'"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="imp-field" id="imp-edit-accom-start-'+a._id+'" value="'+escHtml(a.dateStart||a.dateStartRaw||'')+'" placeholder="AAAA-MM-JJ"></div>';
+    html += '<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="imp-field" id="imp-edit-accom-end-'+a._id+'" value="'+escHtml(a.dateEnd||a.dateEndRaw||'')+'" placeholder="AAAA-MM-JJ"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;margin-top:2px;">';
+    html += '<button class="imp-create-btn" style="height:38px;font-size:13px;flex:1" onclick="_impSaveAccomEdit(\''+a._id+'\')">Enregistrer</button>';
+    html += '<button style="height:38px;font-size:13px;flex:1;border-radius:12px;border:1px solid rgba(29,29,31,0.15);background:transparent;color:var(--ink-muted);cursor:pointer" onclick="_impRemoveItem(\'accommodation\',\''+a._id+'\')">Retirer</button>';
+    html += '</div>';
+  } else {
+    html += '<div style="display:flex;align-items:flex-start;gap:6px">';
+    html += '<div style="flex:1"><div class="imp-card-name">'+escHtml(a.name)+'</div>';
+    html += '<div class="imp-card-sub">'+escHtml(a.city||'?')+' · '+escHtml(a.country||'?');
+    if (a.dateStart) html += ' · '+escHtml(a.dateStart);
+    else if (a.dateStartRaw) html += ' · '+escHtml(a.dateStartRaw)+' (année à vérifier)';
+    if (a.dateEnd) html += ' → '+escHtml(a.dateEnd);
+    html += '</div></div>';
+    html += '<button class="imp-del" style="position:static;width:24px;height:24px" onclick="_impStartEdit(\'accommodation\',\''+a._id+'\')" title="Modifier">'+svgIcon('pencil',10)+'</button>';
+    html += '<button class="imp-del" style="position:static;width:24px;height:24px" onclick="_impRemoveItem(\'accommodation\',\''+a._id+'\')" title="Retirer">'+svgIcon('x',10)+'</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
 }
 
 // ── APERÇU ───────────────────────────────────────────────────────────────────
@@ -12938,178 +13106,245 @@ function _showImportPreview() {
   var body = document.getElementById('importTripBody');
   modal.classList.add('open');
 
-  var warnItems = p.activities.filter(function(a){ return a.confidence==='warn'; }).length
-                + p.countries.filter(function(c){ return c.confidence==='warn'; }).length;
+  var hasIncompleteCities = p.cities.some(function(c){ return !c.country; });
+  var hasIncompleteActs   = p.activities.some(function(a){ return !a.country || !a.city; });
+  var hasIncompleteAccoms = p.accommodations.some(function(a){ return !a.country || !a.city; });
+  if (_IMP.uiState.openAccordions.cities === undefined) _IMP.uiState.openAccordions.cities = hasIncompleteCities;
+  if (_IMP.uiState.openAccordions.acts === undefined) _IMP.uiState.openAccordions.acts = hasIncompleteActs;
+  if (_IMP.uiState.openAccordions.accoms === undefined) _IMP.uiState.openAccordions.accoms = hasIncompleteAccoms;
 
-  // Compter par pays/ville pour le résumé
-  var countrySummary = p.countries.map(function(c) {
-    var cities = p.cities.filter(function(ci){ return _impNorm(ci.country) === _impNorm(c.name); });
-    var acts   = p.activities.filter(function(a){ return _impNorm(a.country) === _impNorm(c.name); });
-    var accoms = p.accommodations.filter(function(a){ return _impNorm(a.country) === _impNorm(c.name); });
-    return { country: c, cities: cities, acts: acts, accoms: accoms };
-  });
-
-  // Si aucun pays mais des villes/activités → créer un groupe "Pays inconnu"
-  var orphanCities = p.cities.filter(function(ci){ return !ci.country; });
-  var orphanActs   = p.activities.filter(function(a){ return !a.country; });
-
-  function countryBlock(group) {
-    var c = group.country;
-    var flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[c.name]) || '🌍';
-    var isWarn = c.confidence === 'warn';
-    var html = '<div class="imp-card" style="margin-bottom:12px;">';
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
-    html += '<span style="font-size:18px">'+flag+'</span>';
-    html += '<span class="imp-card-name" style="flex:1">'+escHtml(c.name)+'</span>';
-    if (isWarn) html += '<span class="imp-badge imp-badge-warn">'+svgIcon('alert-circle',10)+' À vérifier</span>';
-    else html += '<span class="imp-badge imp-badge-ok">'+svgIcon('check',10)+' Reconnu</span>';
-    html += '<button class="imp-del" onclick="_impRemoveCountry(\'' + escHtml(c.name).replace(/'/g,"\\'") + '\')" title="Retirer">'+svgIcon('x',11)+'</button>';
-    html += '</div>';
-    if (group.cities.length) {
-      html += '<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">'+svgIcon('map-pin',11)+' '+group.cities.length+' ville'+(group.cities.length>1?'s':'')+' : '+group.cities.map(function(ci){ return escHtml(ci.city); }).join(', ')+'</div>';
-    }
-    if (group.acts.length) html += '<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:2px">'+svgIcon('star',11)+' '+group.acts.length+' activité'+(group.acts.length>1?'s':'')+'</div>';
-    if (group.accoms.length) html += '<div style="font-size:12px;color:var(--ink-subtle)">'+svgIcon('bed-double',11)+' '+group.accoms.length+' logement'+(group.accoms.length>1?'s':'')+'</div>';
-    html += '</div>';
-    return html;
-  }
+  var warnCount = p.countries.filter(function(c){return c.confidence==='warn';}).length
+    + p.cities.filter(function(c){return !c.country || c.confidence==='warn';}).length
+    + p.activities.filter(function(a){return !a.country || !a.city || a.confidence==='warn';}).length
+    + p.accommodations.filter(function(a){return !a.country || !a.city;}).length;
 
   var html = '<div style="padding:20px 16px 0">';
-  // En-tête
+  html += '<datalist id="imp-country-datalist">'+CT_ALL_COUNTRY_NAMES.map(function(n){return '<option value="'+escHtml(n)+'">';}).join('')+'</datalist>';
+
   html += '<div style="margin-bottom:16px">';
   html += '<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:4px">'+svgIcon('file-text',16)+' Aperçu de l\'import</div>';
   html += '<div style="font-size:12.5px;color:var(--ink-subtle)">Vérifie et corrige avant de créer le voyage.</div>';
-  if (warnItems) html += '<div style="margin-top:6px;font-size:12px;color:#C47B2B;font-weight:600">'+svgIcon('alert-circle',12)+' '+warnItems+' élément'+(warnItems>1?'s':'')+' à vérifier</div>';
+  if (warnCount) html += '<div style="margin-top:6px;font-size:12px;color:#C47B2B;font-weight:600">'+svgIcon('alert-circle',12)+' '+warnCount+' élément'+(warnCount>1?'s':'')+' à vérifier</div>';
   html += '</div>';
 
-  // Champs voyage
+  // Voyage
   html += '<div class="imp-section">';
   html += '<div class="imp-section-title">Voyage</div>';
   html += '<div class="imp-card">';
   html += '<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Nom du voyage <span style="font-weight:400">(optionnel)</span></div>';
   html += '<input class="imp-field" id="imp-trip-name" value="'+escHtml(p.trip.name||'')+'" placeholder="Auto-généré à partir des pays">';
   html += '<div style="display:flex;gap:8px;">';
-  html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="imp-field" id="imp-trip-start" value="'+escHtml(p.trip.start||'')+'" placeholder="YYYY-MM-DD" style="margin-bottom:0"></div>';
-  html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Retour</div><input class="imp-field" id="imp-trip-end" value="'+escHtml(p.trip.end||'')+'" placeholder="YYYY-MM-DD" style="margin-bottom:0"></div>';
+  html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="imp-field" id="imp-trip-start" value="'+escHtml(p.trip.start||'')+'" placeholder="AAAA-MM-JJ" style="margin-bottom:0"></div>';
+  html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Retour</div><input class="imp-field" id="imp-trip-end" value="'+escHtml(p.trip.end||'')+'" placeholder="AAAA-MM-JJ" style="margin-bottom:0"></div>';
   html += '</div>';
   html += '</div>';
   html += '</div>';
 
-  // Pays reconnus
-  if (countrySummary.length) {
-    html += '<div class="imp-section" id="imp-countries-section">';
-    html += '<div class="imp-section-title">'+svgIcon('globe',11)+' Pays ('+countrySummary.length+')</div>';
-    countrySummary.forEach(function(g){ html += countryBlock(g); });
-    html += '</div>';
-  }
+  // Pays
+  html += '<div class="imp-section">';
+  html += '<div class="imp-section-title">'+svgIcon('globe',11)+' Pays ('+p.countries.length+')</div>';
+  p.countries.forEach(function(c){ html += _impCountryCard(c); });
+  html += '<div style="display:flex;gap:6px;margin-top:4px;">';
+  html += '<input class="imp-field" id="imp-add-country-input" style="margin-bottom:0;flex:1" placeholder="Ajouter un pays" list="imp-country-datalist">';
+  html += '<button type="button" onclick="_impAddCountry()" style="width:44px;height:42px;border-radius:12px;border:1.5px dashed #D9D6CE;background:transparent;color:var(--accent);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">'+svgIcon('plus',16)+'</button>';
+  html += '</div>';
+  html += '</div>';
 
-  // Orphelins (villes/activités sans pays)
-  if (orphanCities.length || orphanActs.length) {
+  // Villes (accordéon)
+  if (p.cities.length) {
     html += '<div class="imp-section">';
-    html += '<div class="imp-section-title imp-badge-warn">'+svgIcon('alert-circle',11)+' Éléments sans pays</div>';
-    orphanCities.forEach(function(ci){
-      html += '<div class="imp-card"><div class="imp-card-name">'+escHtml(ci.city)+'</div><div class="imp-card-sub">Ville — pays non identifié</div></div>';
-    });
-    orphanActs.slice(0,5).forEach(function(a){
-      html += '<div class="imp-card"><div class="imp-card-name">'+escHtml(a.name)+'</div><div class="imp-card-sub">Activité — pays/ville non identifié'+(a.date ? ' · '+escHtml(a.date):'')+'</div></div>';
-    });
-    if (orphanActs.length > 5) html += '<div style="font-size:12px;color:var(--ink-subtle);padding:4px 0">+ '+(orphanActs.length-5)+' autre(s) activité(s) sans pays</div>';
+    html += '<div class="imp-accordion" onclick="_impToggleAccordion(\'cities\')">';
+    html += '<div class="imp-section-title" style="margin-bottom:0">'+svgIcon('map-pin',11)+' Villes ('+p.cities.length+')'+(hasIncompleteCities?' <span class="imp-badge imp-badge-warn" style="margin-left:4px">'+svgIcon('alert-circle',9)+'</span>':'')+'</div>';
+    html += '<span data-icon="chevron-down" data-icon-size="14" style="color:var(--ink-subtle)"></span>';
     html += '</div>';
+    html += '<div class="imp-accordion-body'+(_IMP.uiState.openAccordions.cities?' open':'')+'" id="imp-cities-body">';
+    p.cities.forEach(function(ci){ html += _impCityCard(ci); });
+    html += '</div></div>';
   }
 
   // Activités (accordéon)
-  var totalActs = p.activities.filter(function(a){ return a.country; }).length;
-  if (totalActs) {
+  if (p.activities.length) {
     html += '<div class="imp-section">';
-    html += '<div class="imp-accordion" onclick="_impToggleAccordion(\'imp-acts-body\')">';
-    html += '<div class="imp-section-title" style="margin-bottom:0">'+svgIcon('star',11)+' Activités ('+totalActs+')</div>';
+    html += '<div class="imp-accordion" onclick="_impToggleAccordion(\'acts\')">';
+    html += '<div class="imp-section-title" style="margin-bottom:0">'+svgIcon('star',11)+' Activités ('+p.activities.length+')'+(hasIncompleteActs?' <span class="imp-badge imp-badge-warn" style="margin-left:4px">'+svgIcon('alert-circle',9)+'</span>':'')+'</div>';
     html += '<span data-icon="chevron-down" data-icon-size="14" style="color:var(--ink-subtle)"></span>';
     html += '</div>';
-    html += '<div class="imp-accordion-body" id="imp-acts-body">';
-    p.activities.filter(function(a){ return a.country; }).forEach(function(a,idx){
-      html += '<div class="imp-card">';
-      html += '<div style="display:flex;align-items:flex-start;gap:6px">';
-      html += '<div style="flex:1"><div class="imp-card-name">'+escHtml(a.name)+'</div>';
-      html += '<div class="imp-card-sub">'+escHtml(a.city||'?')+' · '+escHtml(a.country||'?');
-      if (a.date) html += ' · '+escHtml(a.date);
-      if (a.time) html += ' '+escHtml(a.time);
-      html += '</div></div>';
-      if (a.confidence==='warn') html += '<span class="imp-badge imp-badge-warn">'+svgIcon('alert-circle',10)+' Vérifier</span>';
-      html += '<button class="imp-del" onclick="_impRemoveActivity('+idx+')" title="Retirer">'+svgIcon('x',11)+'</button>';
-      html += '</div></div>';
-    });
+    html += '<div class="imp-accordion-body'+(_IMP.uiState.openAccordions.acts?' open':'')+'" id="imp-acts-body">';
+    p.activities.forEach(function(a){ html += _impActivityCard(a); });
     html += '</div></div>';
   }
 
   // Logements (accordéon)
   if (p.accommodations.length) {
     html += '<div class="imp-section">';
-    html += '<div class="imp-accordion" onclick="_impToggleAccordion(\'imp-accoms-body\')">';
-    html += '<div class="imp-section-title" style="margin-bottom:0">'+svgIcon('bed-double',11)+' Logements ('+p.accommodations.length+')</div>';
+    html += '<div class="imp-accordion" onclick="_impToggleAccordion(\'accoms\')">';
+    html += '<div class="imp-section-title" style="margin-bottom:0">'+svgIcon('bed-double',11)+' Logements ('+p.accommodations.length+')'+(hasIncompleteAccoms?' <span class="imp-badge imp-badge-warn" style="margin-left:4px">'+svgIcon('alert-circle',9)+'</span>':'')+'</div>';
     html += '<span data-icon="chevron-down" data-icon-size="14" style="color:var(--ink-subtle)"></span>';
     html += '</div>';
-    html += '<div class="imp-accordion-body" id="imp-accoms-body">';
-    p.accommodations.forEach(function(a,idx){
-      html += '<div class="imp-card">';
-      html += '<div style="display:flex;align-items:flex-start;gap:6px">';
-      html += '<div style="flex:1"><div class="imp-card-name">'+escHtml(a.name)+'</div>';
-      html += '<div class="imp-card-sub">'+escHtml(a.city||'?');
-      if (a.dateStart) html += ' · '+escHtml(a.dateStart);
-      if (a.dateEnd) html += ' → '+escHtml(a.dateEnd);
-      html += '</div></div>';
-      html += '<button class="imp-del" onclick="_impRemoveAccom('+idx+')" title="Retirer">'+svgIcon('x',11)+'</button>';
-      html += '</div></div>';
-    });
+    html += '<div class="imp-accordion-body'+(_IMP.uiState.openAccordions.accoms?' open':'')+'" id="imp-accoms-body">';
+    p.accommodations.forEach(function(a){ html += _impAccomCard(a); });
     html += '</div></div>';
   }
 
-  // Notes non classées
+  // Notes non classées — Correctif #9 : clarifier explicitement qu'elles ne sont
+  // PAS persistées automatiquement (aucune table dédiée créée pour ce lot).
   if (p.notes.length) {
     html += '<div class="imp-section">';
     html += '<div class="imp-notes">';
-    html += '<div class="imp-notes-title">'+svgIcon('message-square',12)+' Notes non classées ('+p.notes.length+')</div>';
+    html += '<div class="imp-notes-title">'+svgIcon('message-square',12)+' Notes non classées ('+p.notes.length+') — non importées</div>';
     p.notes.slice(0,8).forEach(function(n){
       html += '<div class="imp-note-item">'+svgIcon('minus',10)+' '+escHtml(n)+'</div>';
     });
     if (p.notes.length > 8) html += '<div style="font-size:12px;color:var(--ink-subtle)">+ '+(p.notes.length-8)+' autre(s)</div>';
+    html += '<div style="font-size:11px;color:var(--ink-subtle);margin-top:6px;padding-top:6px;border-top:1px solid rgba(244,162,97,0.2)">Ces notes ne seront pas enregistrées dans le voyage. Copie-les ailleurs si tu veux les garder.</div>';
     html += '</div></div>';
   }
 
-  // CTA
   html += '<div id="imp-create-error" class="auth-error" style="display:none;margin-bottom:10px;"></div>';
   html += '<button class="imp-create-btn" id="imp-create-btn" onclick="_impCreateTrip()">'+svgIcon('check',16)+' Créer ce voyage</button>';
   html += '<button style="width:100%;margin-top:8px;padding:12px;border-radius:14px;font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;" onclick="closeImportTripModal()">Annuler — créer manuellement</button>';
-  html += '</div>'; // padding wrapper
+  html += '</div>';
 
   body.innerHTML = html;
   setTimeout(renderIcons, 10);
 }
 
-// ── Helpers aperçu ───────────────────────────────────────────────────────────
-function _impToggleAccordion(id) {
-  var el = document.getElementById(id);
-  if (el) el.classList.toggle('open');
+// ── Accordéon ────────────────────────────────────────────────────────────────
+function _impToggleAccordion(key) {
+  _IMP.uiState.openAccordions[key] = !_IMP.uiState.openAccordions[key];
+  _showImportPreview();
 }
 
-function _impRemoveCountry(name) {
+// ── Édition inline : start / cancel ──────────────────────────────────────────
+function _impStartEdit(type, id) { _IMP.uiState.editing[type+'_'+id] = true; _showImportPreview(); }
+function _impCancelEdit(type, id) { delete _IMP.uiState.editing[type+'_'+id]; _showImportPreview(); }
+
+// ── Ajouter un pays manuellement — Correctif #6 ──────────────────────────────
+function _impAddCountry() {
+  var input = document.getElementById('imp-add-country-input');
+  var val = (input && input.value || '').trim();
+  if (!val) return;
+  var matched = _impMatchCountry(val);
+  var finalName = matched || val;
+  if (_IMP.parsed.countries.find(function(c){ return _impNorm(c.name)===_impNorm(finalName); })) {
+    if (input) input.value = '';
+    _showImportPreview();
+    return;
+  }
+  _IMP.parsed.countries.push({ _id:_impNextId(), name: finalName, dateStart:'', dateEnd:'', confidence: matched ? 'ok' : 'warn' });
+  _showImportPreview();
+}
+
+// ── Suppressions — Correctif #2 : toujours par _id stable, jamais par index
+// d'un tableau filtré. Supprimer un pays retire aussi ses villes/activités/
+// logements associés (dépendance directe, cohérent avec le modèle).
+function _impRemoveItem(type, id) {
   if (!_IMP.parsed) return;
-  var n = _impNorm(name);
-  _IMP.parsed.countries = _IMP.parsed.countries.filter(function(c){ return _impNorm(c.name) !== n; });
-  _IMP.parsed.cities = _IMP.parsed.cities.filter(function(c){ return _impNorm(c.country) !== n; });
-  _IMP.parsed.activities = _IMP.parsed.activities.filter(function(a){ return _impNorm(a.country) !== n; });
-  _IMP.parsed.accommodations = _IMP.parsed.accommodations.filter(function(a){ return _impNorm(a.country) !== n; });
+  if (type === 'country') {
+    var c = _IMP.parsed.countries.find(function(x){ return x._id===id; });
+    if (c) {
+      var n = _impNorm(c.name);
+      _IMP.parsed.countries = _IMP.parsed.countries.filter(function(x){ return x._id!==id; });
+      _IMP.parsed.cities = _IMP.parsed.cities.filter(function(x){ return _impNorm(x.country)!==n; });
+      _IMP.parsed.activities = _IMP.parsed.activities.filter(function(x){ return _impNorm(x.country)!==n; });
+      _IMP.parsed.accommodations = _IMP.parsed.accommodations.filter(function(x){ return _impNorm(x.country)!==n; });
+    }
+  } else if (type === 'city') {
+    _IMP.parsed.cities = _IMP.parsed.cities.filter(function(x){ return x._id!==id; });
+  } else if (type === 'activity') {
+    _IMP.parsed.activities = _IMP.parsed.activities.filter(function(x){ return x._id!==id; });
+  } else if (type === 'accommodation') {
+    _IMP.parsed.accommodations = _IMP.parsed.accommodations.filter(function(x){ return x._id!==id; });
+  }
+  delete _IMP.uiState.editing[type+'_'+id];
   _showImportPreview();
 }
 
-function _impRemoveActivity(idx) {
-  if (!_IMP.parsed || !_IMP.parsed.activities[idx]) return;
-  _IMP.parsed.activities.splice(idx, 1);
+// ── Sauvegardes d'édition — Correctif #4 : l'aperçu devient réellement éditable.
+// Chaque save écrit directement dans _IMP.parsed ; la création utilise ensuite
+// ces valeurs corrigées. Renommer un pays/ville propage aux éléments liés
+// (cascade) pour garder la cohérence des références par nom.
+function _impSaveCountryEdit(id) {
+  var c = _IMP.parsed.countries.find(function(x){ return x._id===id; });
+  if (!c) return;
+  var input = document.getElementById('imp-edit-country-name-'+id);
+  var newName = (input && input.value || '').trim();
+  if (!newName) return;
+  var oldNorm = _impNorm(c.name);
+  var matched = _impMatchCountry(newName);
+  var finalName = matched || newName;
+  c.name = finalName;
+  c.confidence = matched ? 'ok' : 'warn';
+  var newNorm = _impNorm(finalName);
+  if (oldNorm !== newNorm) {
+    _IMP.parsed.cities.forEach(function(x){ if (_impNorm(x.country)===oldNorm) x.country = finalName; });
+    _IMP.parsed.activities.forEach(function(x){ if (_impNorm(x.country)===oldNorm) x.country = finalName; });
+    _IMP.parsed.accommodations.forEach(function(x){ if (_impNorm(x.country)===oldNorm) x.country = finalName; });
+  }
+  delete _IMP.uiState.editing['country_'+id];
   _showImportPreview();
 }
 
-function _impRemoveAccom(idx) {
-  if (!_IMP.parsed || !_IMP.parsed.accommodations[idx]) return;
-  _IMP.parsed.accommodations.splice(idx, 1);
+function _impSaveCityEdit(id) {
+  var ci = _IMP.parsed.cities.find(function(x){ return x._id===id; });
+  if (!ci) return;
+  var nameInput = document.getElementById('imp-edit-city-name-'+id);
+  var countrySel = document.getElementById('imp-edit-city-country-'+id);
+  var newName = (nameInput && nameInput.value || '').trim();
+  var newCountry = (countrySel && countrySel.value || '').trim();
+  if (!newName || !newCountry) return; // garde-fou : pas de sauvegarde incomplète silencieuse
+  var oldCityNorm = _impNorm(ci.city), oldCountryNorm = _impNorm(ci.country);
+  ci.city = newName; ci.country = newCountry;
+  _IMP.parsed.activities.forEach(function(a){
+    if (_impNorm(a.city)===oldCityNorm && _impNorm(a.country)===oldCountryNorm) { a.city = newName; a.country = newCountry; }
+  });
+  _IMP.parsed.accommodations.forEach(function(a){
+    if (_impNorm(a.city)===oldCityNorm && _impNorm(a.country)===oldCountryNorm) { a.city = newName; a.country = newCountry; }
+  });
+  delete _IMP.uiState.editing['city_'+id];
+  _showImportPreview();
+}
+
+function _impSaveActivityEdit(id) {
+  var a = _IMP.parsed.activities.find(function(x){ return x._id===id; });
+  if (!a) return;
+  var nameI = document.getElementById('imp-edit-act-name-'+id);
+  var countryS = document.getElementById('imp-edit-act-country-'+id);
+  var cityI = document.getElementById('imp-edit-act-city-'+id);
+  var dateI = document.getElementById('imp-edit-act-date-'+id);
+  var timeI = document.getElementById('imp-edit-act-time-'+id);
+  var newName = (nameI && nameI.value || '').trim();
+  var newCountry = (countryS && countryS.value || '').trim();
+  var newCity = (cityI && cityI.value || '').trim();
+  if (!newName || !newCountry || !newCity) return;
+  var dInfo = _impParseDateSmart((dateI && dateI.value || '').trim());
+  var timeVal = _impParseTime((timeI && timeI.value || '').trim());
+  a.name = newName; a.country = newCountry; a.city = newCity;
+  a.date = dInfo.iso; a.dateRaw = dInfo.needsYear ? dInfo.raw : '';
+  a.time = timeVal;
+  a.confidence = dInfo.needsYear ? 'warn' : 'ok';
+  delete _IMP.uiState.editing['activity_'+id];
+  _showImportPreview();
+}
+
+function _impSaveAccomEdit(id) {
+  var a = _IMP.parsed.accommodations.find(function(x){ return x._id===id; });
+  if (!a) return;
+  var nameI = document.getElementById('imp-edit-accom-name-'+id);
+  var countryS = document.getElementById('imp-edit-accom-country-'+id);
+  var cityI = document.getElementById('imp-edit-accom-city-'+id);
+  var startI = document.getElementById('imp-edit-accom-start-'+id);
+  var endI = document.getElementById('imp-edit-accom-end-'+id);
+  var newName = (nameI && nameI.value || '').trim();
+  var newCountry = (countryS && countryS.value || '').trim();
+  var newCity = (cityI && cityI.value || '').trim();
+  if (!newName || !newCountry || !newCity) return;
+  var sInfo = _impParseDateSmart((startI && startI.value || '').trim());
+  var eInfo = _impParseDateSmart((endI && endI.value || '').trim());
+  a.name = newName; a.country = newCountry; a.city = newCity;
+  a.dateStart = sInfo.iso; a.dateStartRaw = sInfo.needsYear ? sInfo.raw : '';
+  a.dateEnd = eInfo.iso; a.dateEndRaw = eInfo.needsYear ? eInfo.raw : '';
+  delete _IMP.uiState.editing['accommodation_'+id];
   _showImportPreview();
 }
 
@@ -13132,27 +13367,34 @@ async function _impCreateTrip() {
   if (_IMP.creating) return;
   var p = _IMP.parsed;
   if (!p) return;
+  var errEl = document.getElementById('imp-create-error');
+  function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+  if (errEl) errEl.style.display = 'none';
 
-  // Lire les champs éditables de l'aperçu
   var tripName  = (document.getElementById('imp-trip-name')  || {}).value || '';
   var tripStart = (document.getElementById('imp-trip-start') || {}).value || '';
   var tripEnd   = (document.getElementById('imp-trip-end')   || {}).value || '';
+  tripStart = tripStart.trim(); tripEnd = tripEnd.trim();
+
+  // Correctif #7 : validation des dates globales avant tout INSERT
+  if (tripStart && !_impValidDateStr(tripStart)) { showErr('Date de départ invalide (format attendu AAAA-MM-JJ).'); return; }
+  if (tripEnd && !_impValidDateStr(tripEnd)) { showErr('Date de retour invalide (format attendu AAAA-MM-JJ).'); return; }
+  if (tripStart && tripEnd && tripEnd < tripStart) { showErr('La date de retour doit être postérieure à la date de départ.'); return; }
 
   var countries = p.countries.map(function(c){ return c.name; });
-  if (!countries.length) {
-    // Essayer de déduire les pays depuis les villes/activités
-    var seen = {};
-    p.cities.concat(p.activities).concat(p.accommodations).forEach(function(item){
-      if (item.country && !seen[_impNorm(item.country)]) { seen[_impNorm(item.country)]=true; countries.push(item.country); }
-    });
-  }
-  if (!countries.length) {
-    var errEl = document.getElementById('imp-create-error');
-    if (errEl) { errEl.textContent = 'Ajoute au moins un pays avant de créer le voyage.'; errEl.style.display='block'; }
+  if (!countries.length) { showErr('Ajoute au moins un pays avant de créer le voyage.'); return; }
+
+  // Correctif #5 : garde-fou — bloquer si des éléments restent incomplets
+  // (pays/ville manquant) plutôt que de les perdre silencieusement à l'injection.
+  var incompleteCities = p.cities.filter(function(c){ return !c.country; });
+  var incompleteActs = p.activities.filter(function(a){ return !a.country || !a.city; });
+  var incompleteAccoms = p.accommodations.filter(function(a){ return !a.country || !a.city; });
+  var totalIncomplete = incompleteCities.length + incompleteActs.length + incompleteAccoms.length;
+  if (totalIncomplete > 0) {
+    showErr(totalIncomplete+' élément'+(totalIncomplete>1?'s sont incomplets':' est incomplet')+' (pays ou ville manquant). Corrige-les ou retire-les avant de créer le voyage.');
     return;
   }
 
-  // Auto-générer le nom si vide
   if (!tripName.trim()) {
     var yr = tripStart ? (' '+new Date(tripStart+'T00:00:00').getFullYear()) : '';
     if (countries.length===1) tripName = countries[0]+yr;
@@ -13160,17 +13402,12 @@ async function _impCreateTrip() {
     else tripName = countries.slice(0,-1).join(', ')+' & '+countries[countries.length-1]+yr;
   }
 
-  if (!sb || !CURRENT_USER) {
-    var errEl2 = document.getElementById('imp-create-error');
-    if (errEl2) { errEl2.textContent = 'Erreur de connexion. Recharge la page.'; errEl2.style.display='block'; }
-    return;
-  }
+  if (!sb || !CURRENT_USER) { showErr('Erreur de connexion. Recharge la page.'); return; }
 
   _IMP.creating = true;
   var btn = document.getElementById('imp-create-btn');
-  if (btn) { btn.disabled=true; btn.textContent='Création…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Création…'; }
 
-  // 1. Créer le Trip Supabase
   var insertRes = await sb.from('trips').insert({
     name: tripName.trim(),
     owner_id: CURRENT_USER.id,
@@ -13181,26 +13418,27 @@ async function _impCreateTrip() {
 
   if (insertRes.error) {
     _IMP.creating = false;
-    if (btn) { btn.disabled=false; btn.textContent=svgIcon('check',16)+' Créer ce voyage'; }
-    var errEl3 = document.getElementById('imp-create-error');
-    if (errEl3) { errEl3.textContent = 'Erreur : '+insertRes.error.message; errEl3.style.display='block'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = svgIcon('check',16)+' Créer ce voyage'; }
+    showErr('Erreur : '+insertRes.error.message);
     return;
   }
 
   var tripData = insertRes.data;
+  var savedCountries = countries.slice();
+  var savedCities = p.cities.slice();
+  var savedActs = p.activities.slice();
+  var savedAccoms = p.accommodations.slice();
   closeImportTripModal();
 
-  // 2. Entrer dans le voyage (initialise les pays déterministes)
   await enterTrip(tripData, true, true);
 
-  // 3. Répartir les dates si disponibles
-  if (tripStart && tripEnd && countries.length) {
+  if (tripStart && tripEnd && savedCountries.length) {
     var startD = new Date(tripStart+'T00:00:00');
     var endD   = new Date(tripEnd+'T00:00:00');
     var totalDays = Math.round((endD-startD)/86400000)+1;
-    var perC = Math.floor(totalDays/countries.length);
-    var extras = totalDays - perC*countries.length;
-    countries.forEach(function(countryName,i){
+    var perC = Math.floor(totalDays/savedCountries.length);
+    var extras = totalDays - perC*savedCountries.length;
+    savedCountries.forEach(function(countryName,i){
       var realC = COUNTRIES.find(function(co){ return co.name===countryName; });
       if (!realC) return;
       var offset = i*perC + Math.min(i,extras);
@@ -13212,26 +13450,26 @@ async function _impCreateTrip() {
   }
   autofillMissingCountryDates();
 
-  // 4. Injecter les villes (skipAutoActivities=true pour ne pas déclencher l'IA par défaut)
+  // Correctif #10 : les erreurs d'injection sont collectées puis explicitement
+  // présentées à l'utilisateur — jamais avalées silencieusement.
   var injectionErrors = [];
-  for (var ci=0; ci<p.cities.length; ci++) {
-    var cityItem = p.cities[ci];
+
+  for (var ci=0; ci<savedCities.length; ci++) {
+    var cityItem = savedCities[ci];
     if (!cityItem.city || !cityItem.country) continue;
     var realC2 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(cityItem.country); });
-    if (!realC2) continue;
+    if (!realC2) { injectionErrors.push('Ville '+cityItem.city+' : pays introuvable après création'); continue; }
     try {
       await _createCityFromModal(realC2.id, cityItem.city, '', cityItem.dateStart||'', cityItem.dateEnd||'', true);
     } catch(e) { injectionErrors.push('Ville '+cityItem.city+' : '+e.message); }
   }
 
-  // 5. Injecter les activités
-  for (var ai=0; ai<p.activities.length; ai++) {
-    var act = p.activities[ai];
+  for (var ai=0; ai<savedActs.length; ai++) {
+    var act = savedActs[ai];
     if (!act.name || !act.city || !act.country) continue;
     var realC3 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(act.country); });
-    if (!realC3) continue;
+    if (!realC3) { injectionErrors.push('Activité '+act.name+' : pays introuvable après création'); continue; }
     var cityKey = realC3.id+'_'+act.city;
-    // Vérifier que la ville existe (sinon créer)
     var cityExists = realC3.cities && realC3.cities.find(function(ci2){ return _impNorm(ci2.city)===_impNorm(act.city); });
     if (!cityExists) {
       try { await _createCityFromModal(realC3.id, act.city, '', '', '', true); } catch(e) {}
@@ -13246,39 +13484,40 @@ async function _impCreateTrip() {
     } catch(e) { injectionErrors.push('Activité '+act.name+' : '+e.message); }
   }
 
-  // 6. Injecter les logements
-  for (var hi=0; hi<p.accommodations.length; hi++) {
-    var accom = p.accommodations[hi];
+  for (var hi=0; hi<savedAccoms.length; hi++) {
+    var accom = savedAccoms[hi];
     if (!accom.name || !accom.city || !accom.country) continue;
     var realC4 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(accom.country); });
-    if (!realC4) continue;
+    if (!realC4) { injectionErrors.push('Logement '+accom.name+' : pays introuvable après création'); continue; }
     var ck4 = realC4.id+'_'+accom.city;
     if (!S.accom) S.accom = {};
     if (!Array.isArray(S.accom[ck4])) S.accom[ck4] = [];
     var newAccom = {
       id: 'imp_'+Date.now()+'_'+hi,
-      name: accom.name,
-      link: accom.link||'',
-      start: accom.dateStart||'',
-      end: accom.dateEnd||'',
-      nights: accom.nights||0,
-      checkin: '', checkout: '',
-      note: accom.note||'',
-      status: 'confirmed'
+      name: accom.name, link: accom.link||'',
+      start: accom.dateStart||'', end: accom.dateEnd||'',
+      nights: accom.nights||0, checkin:'', checkout:'',
+      note: accom.note||'', status:'confirmed'
     };
     S.accom[ck4].push(newAccom);
     if (sb && CURRENT_TRIP) {
       var cId4 = ck4.split('_')[0];
-      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck4, country_id:cId4, data:S.accom[ck4], updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'}).catch(function(e){ console.error('[PlaniTrip] import accom sync:',e); });
+      try {
+        await sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck4, country_id:cId4, data:S.accom[ck4], updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'});
+      } catch(e) { injectionErrors.push('Logement '+accom.name+' : synchronisation échouée'); }
     }
   }
 
   save();
   renderContent();
 
-  // 7. Modale post-création
-  showPostCreateModal(tripData);
+  // Correctif #10 : feedback explicite avant d'ouvrir la modale post-création
+  if (injectionErrors.length) {
+    alert('Le voyage a été créé, mais '+injectionErrors.length+' élément'+(injectionErrors.length>1?'s n\'ont':' n\'a')+' pas pu être importé'+(injectionErrors.length>1?'s':'')+' :\n'
+      + injectionErrors.slice(0,6).join('\n') + (injectionErrors.length>6 ? '\n…' : ''));
+  }
 
+  showPostCreateModal(tripData);
   _IMP.creating = false;
 }
 
