@@ -989,7 +989,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <button id="ct-submit-btn" class="ct-primary-btn">Créer mon voyage</button>
     <button type="button" id="ct-import-btn" style="width:100%;margin-top:10px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--ink-muted);font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:color .15s;" onclick="openImportTripFlow()"><span data-icon="upload" data-icon-size="15"></span> Importer un voyage existant</button>
     <!-- input file masqué pour l'import — accepte les formats documentaires (pas les images) -->
-    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown" style="display:none" onchange="handleImportFileSelected(event)">
+    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown,.xlsx,.xls" style="display:none" onchange="handleImportFileSelected(event)">
   </div>
 </div>
 
@@ -12577,14 +12577,19 @@ function closeImportTripModal() {
 
 // ── Gestionnaire sélection fichier ──────────────────────────────────────────
 // Correctif #1 : accept limité aux formats réellement supportés en A2.1
+// A2.2 : formats désormais supportés — CSV / TXT / MD / XLSX (multi-feuilles).
 function handleImportFileSelected(e) {
   var file = e.target.files && e.target.files[0];
   if (!file) return;
   _IMP.filename = file.name;
   var ext = file.name.split('.').pop().toLowerCase();
-  var supported = ['csv','txt','md','markdown'];
+  var supported = ['csv','txt','md','markdown','xlsx','xls'];
   if (!supported.includes(ext)) {
-    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown.');
+    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLSX).');
+    return;
+  }
+  if (ext === 'xlsx' || ext === 'xls') {
+    _handleImportXLSXFile(file);
     return;
   }
   var reader = new FileReader();
@@ -12602,7 +12607,7 @@ function handleImportFileSelected(e) {
   reader.readAsText(file, 'UTF-8');
 }
 
-// ── Pipeline principal ───────────────────────────────────────────────────────
+// ── Pipeline principal (CSV / TXT / MD) ──────────────────────────────────────
 function _runImportPipeline() {
   var ext = _IMP.filename.split('.').pop().toLowerCase();
   var parsed;
@@ -12620,6 +12625,61 @@ function _runImportPipeline() {
     return;
   }
   _showImportPreview();
+}
+
+// ── A2.2 : XLSX — chargement paresseux de SheetJS (aucun poids au chargement
+// initial de l'app, uniquement si l'utilisateur importe un fichier Excel) ────
+var _sheetJsLoadPromise = null;
+function _loadSheetJS() {
+  if (window.XLSX) return Promise.resolve();
+  if (_sheetJsLoadPromise) return _sheetJsLoadPromise;
+  _sheetJsLoadPromise = new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ _sheetJsLoadPromise = null; reject(new Error('module indisponible')); };
+    document.head.appendChild(s);
+  });
+  return _sheetJsLoadPromise;
+}
+function _showImportLoading(msg) {
+  var modal = document.getElementById('importTripModal');
+  var body = document.getElementById('importTripBody');
+  modal.classList.add('open');
+  body.innerHTML = '<div style="padding:44px 16px;text-align:center">'
+    + '<div class="ai-spinner"></div>'
+    + '<div style="font-size:14px;color:var(--ink-muted)">'+escHtml(msg)+'</div>'
+    + '</div>';
+}
+async function _handleImportXLSXFile(file) {
+  _showImportLoading('Chargement du module Excel…');
+  try {
+    await _loadSheetJS();
+  } catch(e) {
+    _showImportError('Impossible de charger le module Excel. Vérifie ta connexion et réessaie.');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var data = new Uint8Array(ev.target.result);
+      var workbook = XLSX.read(data, {type:'array'});
+      var parsed = _parseXLSX(workbook);
+      _IMP.parsed = parsed;
+      var hasData = parsed.countries.length || parsed.cities.length || parsed.activities.length || parsed.accommodations.length;
+      if (!hasData) {
+        _showImportError('Nous n\'avons pas identifié d\'itinéraire dans ce fichier Excel. Vérifie que les feuilles utilisent des en-têtes reconnus (Pays, Ville, Date, Activité…).');
+        return;
+      }
+      _showImportPreview();
+    } catch(err) {
+      _showImportError('Erreur lors de l\'analyse du fichier Excel : ' + err.message);
+    }
+  };
+  reader.onerror = function() {
+    _showImportError('Impossible de lire ce fichier.');
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ── Helpers de normalisation / correspondance ────────────────────────────────
@@ -12693,6 +12753,107 @@ function _impEmptyResult() {
   };
 }
 
+// ── Table de correspondance des en-têtes — partagée CSV et XLSX ─────────────
+var _IMP_COL_ALIASES = {
+  country:  ['pays','country','destination','pays/région'],
+  city:     ['ville','city','étape','etape','stop','location'],
+  activity: ['activité','activite','activity','visite','lieu','spot','nom','name'],
+  date:     ['date','jour','day','date de visite'],
+  time:     ['heure','time','début','debut','start','horaire'],
+  hotel:    ['hôtel','hotel','logement','accommodation','hébergement','hebergement'],
+  dateStart:['date début','date debut','date arrivée','date arrivee','check-in','checkin','début séjour'],
+  dateEnd:  ['date fin','date retour','date départ','date depart','check-out','checkout','fin séjour'],
+  nights:   ['nuits','nights','nb nuits','durée','duree'],
+  link:     ['lien','link','url','booking','réservation','reservation'],
+  note:     ['note','notes','commentaire','commentaires','description','remarque'],
+  price:    ['prix','price','coût','cout','budget']
+};
+// Construit le mapping {champ: indexColonne} à partir d'une ligne d'en-têtes.
+function _impMapHeaders(headers) {
+  var H = {};
+  headers.forEach(function(h, idx) {
+    var hn = _impNorm(h);
+    Object.keys(_IMP_COL_ALIASES).forEach(function(field) {
+      if (H[field] === undefined && _IMP_COL_ALIASES[field].includes(hn)) H[field] = idx;
+    });
+  });
+  return H;
+}
+function _impRowGet(H, row, field) {
+  return H[field] !== undefined ? String(row[H[field]] !== undefined && row[H[field]] !== null ? row[H[field]] : '').trim() : '';
+}
+// Traite une ligne de données (CSV ou XLSX) et alimente result — partagé entre
+// les deux parsers pour garantir un comportement identique (dates, dédoublonnage).
+function _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs) {
+  var rawCountry = _impRowGet(H, row, 'country');
+  var rawCity    = _impRowGet(H, row, 'city');
+  var rawAct     = _impRowGet(H, row, 'activity');
+  var rawHotel   = _impRowGet(H, row, 'hotel');
+  var rawDate    = _impRowGet(H, row, 'date');
+  var rawTime    = _impRowGet(H, row, 'time');
+  var rawDateS   = _impRowGet(H, row, 'dateStart') || rawDate;
+  var rawDateE   = _impRowGet(H, row, 'dateEnd');
+  var rawNights  = _impRowGet(H, row, 'nights');
+  var rawLink    = _impRowGet(H, row, 'link');
+  var rawNote    = _impRowGet(H, row, 'note');
+  var rawPrice   = _impRowGet(H, row, 'price');
+
+  var country = rawCountry ? (_impMatchCountry(rawCountry) || rawCountry) : '';
+  var city    = rawCity ? rawCity.trim() : '';
+  var dInfo   = _impParseDateSmart(rawDate);
+  var dSInfo  = _impParseDateSmart(rawDateS);
+  var dEInfo  = _impParseDateSmart(rawDateE);
+  var time    = _impParseTime(rawTime);
+  var nights  = parseInt(rawNights,10) || 0;
+
+  if (country && !seenCountries[_impNorm(country)]) {
+    seenCountries[_impNorm(country)] = true;
+    result.countries.push({ _id:_impNextId(), name: country, dateStart:'', dateEnd:'', confidence: (_impMatchCountry(rawCountry) ? 'ok' : 'warn') });
+  }
+
+  if (city) {
+    var ck = _impNorm(country)+'|'+_impNorm(city);
+    if (!seenCities[ck]) {
+      seenCities[ck] = true;
+      result.cities.push({
+        _id:_impNextId(), country: country, city: city,
+        dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
+        dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
+        nights: nights, confidence: (country ? 'ok' : 'warn')
+      });
+    }
+  }
+
+  if (rawAct && rawAct.trim()) {
+    var actName = rawAct.trim();
+    var actKey = _impNorm(country)+'|'+_impNorm(city)+'|'+_impNorm(actName)+'|'+(dInfo.iso||dInfo.raw);
+    if (!seenActs[actKey]) {
+      seenActs[actKey] = true;
+      result.activities.push({
+        _id:_impNextId(), country: country, city: city, name: actName,
+        date: dInfo.iso, dateRaw: dInfo.needsYear ? dInfo.raw : '',
+        time: time, note: rawNote.trim(), price: rawPrice,
+        confidence: (country && city && !dInfo.needsYear) ? 'ok' : 'warn'
+      });
+    }
+  }
+
+  if (rawHotel && rawHotel.trim()) {
+    var hotelName = rawHotel.trim();
+    var hKey = _impNorm(city)+'|'+_impNorm(hotelName);
+    var existing = result.accommodations.find(function(a){ return _impNorm(a.city)+'|'+_impNorm(a.name) === hKey; });
+    if (!existing) {
+      result.accommodations.push({
+        _id:_impNextId(), country: country, city: city, name: hotelName,
+        dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
+        dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
+        nights: nights, link: rawLink.trim(), note: rawNote.trim(),
+        confidence: (country && city) ? 'ok' : 'warn'
+      });
+    }
+  }
+}
+
 // ── PARSER CSV ───────────────────────────────────────────────────────────────
 function _parseCSV(raw) {
   var result = _impEmptyResult();
@@ -12727,105 +12888,51 @@ function _parseCSV(raw) {
   }
   if (headerIdx === -1) return result;
 
-  var H = {};
-  var colAliases = {
-    country:  ['pays','country','destination','pays/région'],
-    city:     ['ville','city','étape','etape','stop','location'],
-    activity: ['activité','activite','activity','visite','lieu','spot','nom','name'],
-    date:     ['date','jour','day','date de visite'],
-    time:     ['heure','time','début','debut','start','horaire'],
-    hotel:    ['hôtel','hotel','logement','accommodation','hébergement','hebergement'],
-    dateStart:['date début','date debut','date arrivée','date arrivee','check-in','checkin','début séjour'],
-    dateEnd:  ['date fin','date retour','date départ','date depart','check-out','checkout','fin séjour'],
-    nights:   ['nuits','nights','nb nuits','durée','duree'],
-    link:     ['lien','link','url','booking','réservation','reservation'],
-    note:     ['note','notes','commentaire','commentaires','description','remarque'],
-    price:    ['prix','price','coût','cout','budget']
-  };
-  headers.forEach(function(h, idx) {
-    var hn = _impNorm(h);
-    Object.keys(colAliases).forEach(function(field) {
-      if (H[field] === undefined && colAliases[field].includes(hn)) H[field] = idx;
-    });
-  });
-
+  var H = _impMapHeaders(headers);
   if (Object.keys(H).length === 0) return _parseTxtMd(raw);
 
-  var get = function(row, field) { return H[field] !== undefined ? (row[H[field]] || '') : ''; };
   var seenCountries = {}, seenCities = {}, seenActs = {};
 
   for (var i2 = headerIdx + 1; i2 < lines.length; i2++) {
     var line = lines[i2];
     if (!line.trim()) continue;
     var row = parseLine(line);
-
-    var rawCountry = get(row,'country');
-    var rawCity    = get(row,'city');
-    var rawAct     = get(row,'activity');
-    var rawHotel   = get(row,'hotel');
-    var rawDate    = get(row,'date');
-    var rawTime    = get(row,'time');
-    var rawDateS   = get(row,'dateStart') || rawDate;
-    var rawDateE   = get(row,'dateEnd');
-    var rawNights  = get(row,'nights');
-    var rawLink    = get(row,'link');
-    var rawNote    = get(row,'note');
-
-    var country = rawCountry ? (_impMatchCountry(rawCountry) || rawCountry) : '';
-    var city    = rawCity ? rawCity.trim() : '';
-    var dInfo   = _impParseDateSmart(rawDate);
-    var dSInfo  = _impParseDateSmart(rawDateS);
-    var dEInfo  = _impParseDateSmart(rawDateE);
-    var time    = _impParseTime(rawTime);
-    var nights  = parseInt(rawNights,10) || 0;
-
-    if (country && !seenCountries[_impNorm(country)]) {
-      seenCountries[_impNorm(country)] = true;
-      result.countries.push({ _id:_impNextId(), name: country, dateStart:'', dateEnd:'', confidence: (_impMatchCountry(rawCountry) ? 'ok' : 'warn') });
-    }
-
-    if (city) {
-      var ck = _impNorm(country)+'|'+_impNorm(city);
-      if (!seenCities[ck]) {
-        seenCities[ck] = true;
-        result.cities.push({
-          _id:_impNextId(), country: country, city: city,
-          dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
-          dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
-          nights: nights, confidence: (country ? 'ok' : 'warn')
-        });
-      }
-    }
-
-    if (rawAct && rawAct.trim()) {
-      var actName = rawAct.trim();
-      var actKey = _impNorm(country)+'|'+_impNorm(city)+'|'+_impNorm(actName)+'|'+(dInfo.iso||dInfo.raw);
-      if (!seenActs[actKey]) {
-        seenActs[actKey] = true;
-        result.activities.push({
-          _id:_impNextId(), country: country, city: city, name: actName,
-          date: dInfo.iso, dateRaw: dInfo.needsYear ? dInfo.raw : '',
-          time: time, note: rawNote.trim(), price: get(row,'price'),
-          confidence: (country && city && !dInfo.needsYear) ? 'ok' : 'warn'
-        });
-      }
-    }
-
-    if (rawHotel && rawHotel.trim()) {
-      var hotelName = rawHotel.trim();
-      var hKey = _impNorm(city)+'|'+_impNorm(hotelName);
-      var existing = result.accommodations.find(function(a){ return _impNorm(a.city)+'|'+_impNorm(a.name) === hKey; });
-      if (!existing) {
-        result.accommodations.push({
-          _id:_impNextId(), country: country, city: city, name: hotelName,
-          dateStart: dSInfo.iso, dateStartRaw: dSInfo.needsYear ? dSInfo.raw : '',
-          dateEnd: dEInfo.iso, dateEndRaw: dEInfo.needsYear ? dEInfo.raw : '',
-          nights: nights, link: rawLink.trim(), note: rawNote.trim(),
-          confidence: (country && city) ? 'ok' : 'warn'
-        });
-      }
-    }
+    _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs);
   }
+
+  return result;
+}
+
+// ── PARSER XLSX (A2.2) — multi-feuilles, dédoublonnage partagé entre feuilles ─
+// Ignore les feuilles sans en-têtes reconnus ou vides. Ne suppose jamais que la
+// première feuille contient tout le voyage : toutes les feuilles pertinentes
+// sont analysées et consolidées dans le même résultat.
+function _parseXLSX(workbook) {
+  var result = _impEmptyResult();
+  var seenCountries = {}, seenCities = {}, seenActs = {};
+
+  workbook.SheetNames.forEach(function(sheetName) {
+    var sheet = workbook.Sheets[sheetName];
+    if (!sheet) return;
+    var rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', blankrows:false });
+    if (!rows || !rows.length) return; // feuille vide — ignorée
+
+    var headerIdx = -1;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].some(function(c){ return String(c||'').trim(); })) { headerIdx = i; break; }
+    }
+    if (headerIdx === -1) return; // feuille vide — ignorée
+
+    var headers = rows[headerIdx].map(function(c){ return String(c||'').trim(); });
+    var H = _impMapHeaders(headers);
+    if (Object.keys(H).length === 0) return; // feuille sans en-têtes reconnus — ignorée
+
+    for (var r = headerIdx + 1; r < rows.length; r++) {
+      var row = rows[r];
+      if (!row || !row.some(function(c){ return String(c||'').trim(); })) continue;
+      _impConsumeRow(H, row, result, seenCountries, seenCities, seenActs);
+    }
+  });
 
   return result;
 }
