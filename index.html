@@ -5919,8 +5919,16 @@ function formatTimeRange(actKey){
   var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
   var end = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
   var legacy = (S.actTime && S.actTime[actKey]) || '';
-  if(start && end) return start.replace(':','h')+'-'+end.replace(':','h');
-  if(start) return start.replace(':','h');
+  // Helper de formatage d'affichage uniquement — les valeurs stockées (HH:MM) restent inchangées.
+  // Règle : masquer les minutes si elles valent exactement 00 (09:00 → 09h), sinon les conserver
+  // (09:30 → 09h30). Le zéro devant les heures < 10 est conservé (09h, pas 9h).
+  function _fmtTime(t){
+    var m = /^(\d{2}):(\d{2})$/.exec(t);
+    if(!m) return t.replace(':','h'); // fallback legacy
+    return m[2] === '00' ? m[1]+'h' : m[1]+'h'+m[2];
+  }
+  if(start && end) return _fmtTime(start)+'-'+_fmtTime(end);
+  if(start) return _fmtTime(start);
   if(legacy) return legacy;
   return '';
 }
