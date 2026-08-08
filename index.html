@@ -108,7 +108,7 @@ a{color:var(--ink);}
 .act-body{flex:1;min-width:0;}
 .act-name{font-size:14.5px;color:#1D1D1F;font-weight:600;line-height:1.3;letter-spacing:-0.15px;}
 .act-meta{font-size:11.5px;color:#6E6E73;margin-top:3px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.act-footer{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:6px;}
+.act-footer{display:flex;flex-direction:column;align-items:flex-start;gap:7px;margin-top:6px;}
 .act-actions{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;align-self:stretch;}
 .act-tags{display:flex;gap:4px;flex-wrap:wrap;flex:1;}
 .tag{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:500;letter-spacing:0.2px;}
@@ -5962,7 +5962,7 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   // Styles inline réutilisés — aucune nouvelle classe CSS pour rester dans le pattern du projet.
   var _sDate = 'color:#6E6E73;font-weight:500';         // date/jour : secondaire, normal
   var _sSep  = 'color:rgba(110,110,115,0.45);margin:0 1px'; // séparateur : très discret
-  var _sHour = 'color:var(--accent);font-weight:600';   // heure : accent + bold
+  var _sHour = 'color:#6E6E73;font-weight:500';        // heure : même gris que date/jour (pas d'accent)
   var _sMuted= 'color:#6E6E73;font-weight:500';         // moment sans heure : neutre
   function _sep(){ return '<span style="'+_sSep+'"> · </span>'; }
   function _d(t){ return '<span style="'+_sDate+'">'+escHtml(t)+'</span>'; }
@@ -5977,7 +5977,7 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   } else if(isViewingSingleDay){
     // Vue Jour — la date est déjà connue via le filtre actif, on ne la répète pas.
     if(timeVal){
-      // 08h30 [· Matin] — heure accentuée, moment secondaire
+      // 08h30 [· Matin] — heure et moment tous deux gris/secondaires
       innerHTML = _h(timeVal)+(mo?_sep()+_m(mo.label):'');
     } else if(mo){
       // Matin seul — neutre (pas d'heure précise)
@@ -5990,7 +5990,7 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
     // Vue Tout — préfixer par la date courte pour situer dans le séjour.
     var dayShort = formatDayShort(dateVal);
     if(timeVal){
-      // 12 SAM · 08h30 — date secondaire, heure accentuée
+      // 12 SAM · 08h30 — date et heure tous deux gris/secondaires
       innerHTML = (dayShort?_d(dayShort)+_sep():'')+_h(timeVal);
     } else if(mo){
       // 12 SAM · Matin — tout neutre/secondaire (pas d'heure précise)
@@ -6002,7 +6002,7 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
     hasInfo = true;
   }
 
-  var bg = hasInfo ? 'rgba(45,106,79,0.10)' : 'rgba(29,29,31,0.045)';
+  var bg = hasInfo ? 'rgba(29,29,31,0.045)' : 'rgba(29,29,31,0.045)'; // fond uniforme discret, plus de vert
   // La couleur de base du conteneur est désormais neutre — la hiérarchie vit dans les spans enfants.
   var containerColor = hasInfo ? 'var(--ink-muted,#6E6E73)' : 'var(--ink-subtle)';
   return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:0;font-size:10px;font-weight:500;color:'+containerColor+';background:'+bg+';padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.85')+'">'+innerHTML+'</span>';
