@@ -2575,7 +2575,12 @@ function openDetail(actKey, actName, cityKey) {
   }
 
 // Infos rapides — grille de scan ultra-rapide (icône / label / valeur), à la Flighty
-  document.getElementById('detailQuickInfo').innerHTML = buildQuickInfoHTML(d);
+  var _quickInfoHTML = buildQuickInfoHTML(d);
+  // Lot 4B §4 : micro-libellé discret distinguant "informations du lieu" du planning personnel
+  // (action Calendrier juste au-dessus) — affiché uniquement si le quick info contient du contenu,
+  // jamais un libellé au-dessus d'un bloc vide.
+  var _quickInfoLabel = _quickInfoHTML ? '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;margin:2px 0 4px 2px">Infos du lieu</div>' : '';
+  document.getElementById('detailQuickInfo').innerHTML = _quickInfoLabel+_quickInfoHTML;
 
 
   // Actions — toujours visibles, en haut, style grille icône/label
@@ -2711,35 +2716,34 @@ function openDetail(actKey, actName, cityKey) {
     html += _detailAccordion('Tarifs', _costsHtml, false);
   }
 
-  // À savoir
+  // À savoir — Lot 4B §1 : en lecture seule, la section n'est affichée que si d.m apporte une
+  // information réellement DISTINCTE de actMeta (la micro-description déjà visible sur la carte
+  // activité). Un fallback silencieux vers actMeta seul créait une duplication sans valeur
+  // ajoutée (carte et fiche répétant mot pour mot la même phrase). En édition, le fallback
+  // d.m || actMeta est conservé tel quel — la règle ne s'applique qu'à la LECTURE, pour ne pas
+  // gêner l'enrichissement manuel (l'utilisateur doit pouvoir partir de ce texte et l'éditer).
   if(_isEditable){
     var _mVal = _dSaved.m || actMeta || '';
     var _mBody = '<textarea rows="3" placeholder="Description, infos pratiques\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'m\',this.value)">'+escHtml(_mVal)+'</textarea>';
     html += _detailAccordion('\u00c0 savoir', _mBody, !!_mVal);
-  } else if(d.m || actMeta) {
-    html += _detailAccordion('\u00c0 savoir', '<div class="detail-text">'+escHtml(d.m || actMeta)+'</div>', true);
+  } else {
+    var _showKnow = !!(d.m && d.m.trim() && d.m.trim() !== (actMeta||'').trim());
+    if(_showKnow) html += _detailAccordion('\u00c0 savoir', '<div class="detail-text">'+escHtml(d.m)+'</div>', true);
   }
 
-  // Conseils & astuces
+  // Conseils & astuces — Lot 4B §3 : fermé par défaut en lecture (auparavant ouvert dès que du
+  // contenu existait, ce qui faisait dérouler plusieurs blocs longs automatiquement à l'ouverture).
   if(_isEditable){
     var _tipsVal = (_dSaved.tips||[]).join('\n');
     var _tBody = '<textarea rows="3" placeholder="Un conseil par ligne\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'tips\',this.value)">'+escHtml(_tipsVal)+'</textarea>';
     html += _detailAccordion('Conseils & astuces', _tBody, !!_tipsVal);
   } else if(d.tips && d.tips.length) {
     var _tipsHtml = '<div class="detail-text">'+d.tips.map(function(t){return '<div style="padding:6px 0;border-bottom:1px solid #E8ECEA">'+escHtml(t)+'</div>';}).join('')+'</div>';
-    html += _detailAccordion('Conseils & astuces', _tipsHtml, true);
+    html += _detailAccordion('Conseils & astuces', _tipsHtml, false);
   }
 
-  // Histoire & contexte
-  if(_isEditable){
-    var _histVal = _dSaved.history || '';
-    var _hBody = '<textarea rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>';
-    html += _detailAccordion('Histoire & contexte', _hBody, false);
-  } else if(d.history) {
-    html += _detailAccordion('Histoire & contexte', '<div class="detail-text">'+escHtml(d.history)+'</div>', false);
-  }
-
-  // Liens
+  // Liens — Lot 4B §5 : libellé Google Maps clarifié pour distinguer explicitement ce lien externe
+  // du bouton "Carte" (carte intégrée PlaniTrip) situé en haut de fiche. Fermé par défaut en lecture.
   if(_isEditable){
     var _websiteVal = escHtml(_dSaved.website||'');
     var _mapsVal = escHtml(_dSaved.mapsUrl||'');
@@ -2750,8 +2754,19 @@ function openDetail(actKey, actName, cityKey) {
     html += _detailAccordion('Liens', _lBody, !!(_websiteVal||_mapsVal));
   } else if(d.website || d.mapsUrl) {
     var _lHtml = (d.website?'<a href="'+escHtml(d.website)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600;margin-bottom:4px">Site officiel \u2197</a>':'')
-      +(d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Voir sur Google Maps \u2197</a>':'');
-    html += _detailAccordion('Liens', _lHtml, true);
+      +(d.mapsUrl?'<a href="'+escHtml(d.mapsUrl)+'" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:13px;font-weight:600">Ouvrir dans Google Maps \u2197</a>':'');
+    html += _detailAccordion('Liens', _lHtml, false);
+  }
+
+  // Histoire & contexte — Lot 4B §6 : déplacée après Liens dans l'ordre de lecture (contenu
+  // intéressant mais secondaire pour organiser la journée). Contenu, style, chevron et champ de
+  // données inchangés — seule sa position dans le flux HTML a bougé. Fermée par défaut, inchangé.
+  if(_isEditable){
+    var _histVal = _dSaved.history || '';
+    var _hBody = '<textarea rows="3" placeholder="Histoire, anecdote, contexte\u2026" style="'+_taStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'history\',this.value)">'+escHtml(_histVal)+'</textarea>';
+    html += _detailAccordion('Histoire & contexte', _hBody, false);
+  } else if(d.history) {
+    html += _detailAccordion('Histoire & contexte', '<div class="detail-text">'+escHtml(d.history)+'</div>', false);
   }
 
   // Bouton Valider unique — bascule toute la fiche en lecture seule (style IA)
@@ -2916,7 +2931,11 @@ function refreshDetailHeaderLive(actKey){
   var subEl = document.getElementById('detailSub');
   if(subEl){ subEl.textContent = d.address || ''; subEl.style.display = d.address ? '' : 'none'; }
   var quickEl = document.getElementById('detailQuickInfo');
-  if(quickEl) quickEl.innerHTML = buildQuickInfoHTML(d);
+  if(quickEl){
+    var _qHtml = buildQuickInfoHTML(d);
+    var _qLabel = _qHtml ? '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;margin:2px 0 4px 2px">Infos du lieu</div>' : '';
+    quickEl.innerHTML = _qLabel+_qHtml;
+  }
 }
 // Sauvegarde un des 3 sous-champs des horaires d'ouverture (open/close/closedDays) puis
 // recalcule automatiquement d.hours (texte affiché, ex: "9h–17h · Fermé lundi") et d.duration
