@@ -3977,7 +3977,15 @@ function _createActivityCore(cityKey, val, opts){
   if(opts.meta) actObj._userMeta = true;
   S.customActs[cityKey].push(actObj);
   var actKey = cityKey+'_c'+newIdx;
-  if(opts.categories && opts.categories.length){ if(!S.actCategory) S.actCategory={}; S.actCategory[actKey]=opts.categories.slice(); }
+  if(opts.categories && opts.categories.length){
+    if(!S.actCategory) S.actCategory={};
+    S.actCategory[actKey]=opts.categories.slice();
+    // Correctif Lot 5A : synchroniser immédiatement vers Supabase (même comportement
+    // qu'une catégorie choisie ensuite via le modal catégorie → toggleCategoryForAct).
+    if(sb && CURRENT_TRIP){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync actCategory création:',_r.error); });
+    }
+  }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
   // Lot 5A : heure de création via setActTimeRange + setActMoment (setters synchronisés Supabase)
   // au lieu de l'écriture directe dans S.actTime (legacy). S.actTime reste un fallback pour
@@ -5132,6 +5140,41 @@ async function deleteActivity(cityKey, index, isCustom, actName) {
         _upserts.forEach(function(u){
           sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:u.detail_key,data:u.data,updated_at:_now},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex sync '+u.detail_key+':', r.error); });
         });
+        // Correctif Lot 5A — fiches détaillées individuelles (detail_key = actKey).
+        // Les clés custom sont des lignes séparées dans activity_details (une ligne par actKey).
+        // Après suppression de l'index `index`, chaque actKey suivant (c(i) → c(i-1)) doit
+        // être migré côté serveur : upsert de la fiche sous la nouvelle clé + suppression de l'ancienne.
+        // La fiche de l'activité supprimée est également supprimée.
+        var _deletedActKey = cityKey+'_c'+index;
+        sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_deletedActKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] del fiche supprimée:',r.error); });
+        for(var _mi=index+1; _mi<totalBefore; _mi++){
+          (function(_oldKey, _newKey){
+            var ficheData = window._customDetails[_newKey]; // déjà réindexé en local
+            if(ficheData){
+              sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_newKey,data:ficheData,updated_at:_now},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex fiche upsert '+_newKey+':', r.error); });
+              sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_oldKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] reindex fiche delete '+_oldKey+':', r.error); });
+            }
+          })(cityKey+'_c'+_mi, cityKey+'_c'+(_mi-1));
+        }
+        // Correctif Lot 5A — table `favorites` (clé individuelle, pas un blob __planitrip__).
+        // Après réindexation : supprimer la ligne favorite de l'activité supprimée,
+        // puis pour chaque index décalé : delete oldKey + insert newKey (si elle était favorite).
+        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_deletedActKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] del fav supprimé:',r.error); });
+        for(var _fi=index+1; _fi<totalBefore; _fi++){
+          (function(_fOldKey, _fNewKey){
+            if(S.favorites[_fNewKey]){ // déjà réindexé en local
+              var _who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+              var _cid = _fNewKey.split('_')[0];
+              sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_fOldKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] fav reindex del '+_fOldKey+':', r.error); });
+              sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_fNewKey).then(function(r){
+                if(r&&r.error){ console.error('[PlaniTrip] fav reindex dedup '+_fNewKey+':', r.error); return; }
+                sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:_fNewKey,country_id:_cid,added_by_label:_who}).then(function(r2){ if(r2&&r2.error) console.error('[PlaniTrip] fav reindex ins '+_fNewKey+':', r2.error); });
+              });
+            } else {
+              sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_fOldKey).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] fav reindex del (nofav) '+_fOldKey+':', r.error); });
+            }
+          })(cityKey+'_c'+_fi, cityKey+'_c'+(_fi-1));
+        }
       }
     } else {
       if(!S.deletedActs) S.deletedActs={};
