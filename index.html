@@ -5506,15 +5506,24 @@ function timeCapsuleHTML(actKey, name, meta, momentColor){
   return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:'+color+';background:rgba(29,29,31,0.045);padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.65')+'">'+label+'</span>';
 }
 // Dérivation automatique : convertit une heure HH:MM en clé de moment
-function momentFromTime(timeStr){
+// Fonction centrale unique pour dériver le moment de la journée (Matin/Midi/Après-midi/Soir)
+// à partir d'une heure HH:MM. Tous les seuils vivent ici et nulle part ailleurs — les modifier
+// suffit à changer le comportement de toute l'app de façon cohérente.
+//   Matin      05:00 → 11:29
+//   Midi       11:30 → 13:59
+//   Après-midi 14:00 → 17:29
+//   Soir       17:30 → 04:59 (passe minuit)
+function getDayPeriod(timeStr){
   var m = /^(\d{2}):(\d{2})$/.exec(timeStr);
   if(!m) return '';
-  var h = parseInt(m[1],10);
-  if(h>=5 && h<12) return 'morning';
-  if(h>=12 && h<14) return 'noon';
-  if(h>=14 && h<19) return 'afternoon';
+  var totalMin = parseInt(m[1],10)*60 + parseInt(m[2],10);
+  if(totalMin>=5*60 && totalMin<11*60+30) return 'morning';
+  if(totalMin>=11*60+30 && totalMin<14*60) return 'noon';
+  if(totalMin>=14*60 && totalMin<17*60+30) return 'afternoon';
   return 'evening';
 }
+// Alias conservé pour compatibilité avec le nom historique utilisé ailleurs dans le code.
+function momentFromTime(timeStr){ return getDayPeriod(timeStr); }
 function categoryPill(catKeys, actKey){
   catKeys = catKeys || [];
   if(!catKeys.length){
@@ -5651,6 +5660,22 @@ function renderCityPanelContentBody(c, city){
     // Regroupement visuel façon "planning" : Matin / Midi / Après-midi / Soir, puis Non planifié
     var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
     baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
+    // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
+    // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
+    // sans heure gardent leur position relative issue de l'ordre existant (manuel ou par défaut),
+    // placées après les activités horodatées. Sans ce tri, deux activités affectées au même
+    // moment (ex: 08:00 et 09:00, toutes deux "Matin") pouvaient apparaître dans le désordre —
+    // c'était l'incohérence signalée dans ce lot.
+    Object.keys(momentGroups).forEach(function(mk){
+      momentGroups[mk].sort(function(a, b){
+        var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+        var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+        if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+        if(aStart && !bStart) return -1;
+        if(!aStart && bStart) return 1;
+        return 0; // égalité (même heure, ou aucune heure des deux) : conserve l'ordre stable d'origine
+      });
+    });
     var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
     var momentOrder = ['morning','noon','afternoon','evening',''];
     const baseActsHTML = momentOrder.map(function(mk){
