@@ -5518,14 +5518,55 @@ function formatTimeRange(actKey){
   if(legacy) return legacy;
   return '';
 }
-function timeCapsuleHTML(actKey, name, meta, momentColor){
+// Helper purement présentationnel : formate une date ISO en "12 SAM" (jour + abréviation du
+// jour de semaine), même pattern que celui déjà utilisé pour les chips de filtre par jour.
+// N'encode aucune règle métier — juste du formatage d'affichage.
+function formatDayShort(iso){
+  if(!iso) return '';
+  var d = new Date(iso+'T00:00:00');
+  var dayNum = d.toLocaleDateString('fr-FR',{day:'numeric'});
+  var weekday = d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','').toUpperCase();
+  return dayNum+' '+weekday;
+}
+// Capsule de temporalité affichée sur chaque carte activité (Lot 2). Purement présentationnelle :
+// toute la logique métier (dérivation heure→moment, valeur de la date) vient de fonctions déjà
+// fiabilisées au Lot 1 (getActMoment, formatTimeRange) et de l'existant (getActivityDate/S.actDate).
+// hasExplicitDate distingue une vraie date assignée (S.actDate[actKey]) d'une date de repli
+// calculée automatiquement par répartition sur le séjour — seule l'absence de date EXPLICITE
+// ET d'heure ET de moment déclenche l'état "+ Planifier" (garde-fou §1 : une activité qui a
+// déjà une date, même sans heure ni moment, n'est jamais "à planifier").
+function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   var timeVal = formatTimeRange(actKey);
-  var mk = (S.actMoment && S.actMoment[actKey] !== undefined) ? S.actMoment[actKey] : null;
+  var mk = getActMoment(actKey, name, meta);
+  var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
+  var hasExplicitDate = !!(S.actDate && S.actDate[actKey]);
   var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
-  var hasInfo = !!timeVal;
-  var label = hasInfo ? escHtml(timeVal) : 'Planifier';
+  var isViewingSingleDay = activeDay && activeDay!=='Tous';
+
+  if(isDone){
+    return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.10);padding:2px 8px;border-radius:20px;cursor:pointer">'+svgIcon('check',9)+' Fait</span>';
+  }
+
+  var label, hasInfo;
+  if(!hasExplicitDate && !timeVal && !mk){
+    label = 'Planifier'; hasInfo = false;
+  } else if(isViewingSingleDay){
+    // Vue filtrée sur un jour précis : ne pas répéter la date déjà donnée par le filtre actif.
+    if(timeVal) label = timeVal+(mo?' \u00b7 '+mo.label:'');
+    else if(mo) label = mo.label;
+    else label = 'Horaire non d\u00e9fini';
+    hasInfo = true;
+  } else {
+    // Vue "Tout" : préfixer par la date courte (12 SAM) pour situer l'activité dans le séjour.
+    var dayShort = formatDayShort(dateVal);
+    if(timeVal) label = (dayShort?dayShort+' \u00b7 ':'')+timeVal;
+    else if(mo) label = (dayShort?dayShort+' \u00b7 ':'')+mo.label;
+    else label = dayShort || 'Horaire non d\u00e9fini';
+    hasInfo = true;
+  }
   var color = hasInfo ? 'var(--accent)' : 'var(--ink-subtle)';
-  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:'+color+';background:rgba(29,29,31,0.045);padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.65')+'">'+label+'</span>';
+  var bg = hasInfo ? 'rgba(45,106,79,0.10)' : 'rgba(29,29,31,0.045)';
+  return '<span '+dataAttrs+' onclick="event.stopPropagation();openPlanningModalFromEl(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:'+color+';background:'+bg+';padding:2px 8px;border-radius:20px;cursor:pointer;opacity:'+(hasInfo?'1':'0.85')+'">'+escHtml(label)+'</span>';
 }
 // Dérivation automatique : convertit une heure HH:MM en clé de moment
 // Fonction centrale unique pour dériver le moment de la journée (Matin/Midi/Après-midi/Soir)
@@ -5638,12 +5679,11 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
           +(a.m?'<div class="act-meta">'+a.m+'</div>':'<div class="act-meta" style="color:rgba(110,110,115,0.4);font-style:italic">Pas de description</div>')
           +'<div class="act-footer">'
-          +timeCapsuleHTML(k,a.n,a.m,actMoment?momentAccent[actMoment]:null)
+          +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done)
           +categoryPill(actCat,k)
           +'</div></div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
-          +'<button class="map-btn" onclick="event.stopPropagation();openMapFromCard(this)">'+(hasCoord?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>')+'</button>'
           +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
           +'</div></div></div>';
         return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m};
@@ -5668,7 +5708,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+(ca.ai?' <span title="Généré par l\'IA" style="font-size:10px;color:var(--accent);vertical-align:middle;opacity:0.7">'+svgIcon('sparkles',11)+'</span>':'')+'</div>'
           +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'<div class="act-meta" style="color:rgba(110,110,115,0.4);font-style:italic">Pas de description</div>')
           +'<div class="act-footer">'
-          +timeCapsuleHTML(ck2,ca.n,ca.m,caMoment?momentAccent[caMoment]:null)
+          +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone)
           +categoryPill(caCat,ck2)
           +'</div></div>'
           +'<div class="act-actions">'
