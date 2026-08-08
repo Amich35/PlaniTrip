@@ -3008,29 +3008,77 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
     }
     return;
   } else if(field === 'name'){
-    // Lot 5B : renommage d'une activité custom.
-    // Source de vérité : S.customActs[][n]. L'actKey reste inchangé.
-    if(!val) return; // nom vide ignoré
+    // Lot 5B correctif : renommage sécurisé par UUID (_sid).
+    // Source de vérité locale : S.customActs[][n]. L'actKey reste inchangé.
+    if(!val) return;
     if(!S.customActs[cityKey] || !S.customActs[cityKey][custIdx]) return;
     var _oldName = S.customActs[cityKey][custIdx].n;
-    if(_oldName === val) return; // pas de changement
-    S.customActs[cityKey][custIdx].n = val;
-    S.customDetails = window._customDetails;
-    save();
-    renderContent();
-    // Mettre à jour le titre de la fiche si elle est encore ouverte
-    var _dtEl = document.getElementById('detailTitle');
-    if(_dtEl && _dtEl.textContent === _oldName) _dtEl.textContent = val;
-    // Sync Supabase : UPDATE par ancien nom (le nom est l'identifiant fonctionnel dans la table)
+    if(_oldName === val) return;
+    var _sid = S.customActs[cityKey][custIdx]._sid || null;
+
     if(sb && CURRENT_TRIP){
       var _rnParts = cityKey.split('_');
-      sb.from('activities')
-        .update({name:val})
-        .eq('trip_id',CURRENT_TRIP.id)
-        .eq('country_id',_rnParts[0])
-        .eq('city',_rnParts.slice(1).join('_'))
-        .eq('name',_oldName)
-        .then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] rename sync:',_r.error); });
+      var _rnCountry = _rnParts[0], _rnCity = _rnParts.slice(1).join('_');
+
+      if(_sid){
+        // Cas B : identifiant stable disponible — UPDATE ciblé par UUID.
+        // Optimistic UI : on renomme localement d'abord, rollback si erreur serveur.
+        S.customActs[cityKey][custIdx].n = val;
+        S.customDetails = window._customDetails;
+        save(); renderContent();
+        var _dtEl = document.getElementById('detailTitle');
+        if(_dtEl && _dtEl.textContent === _oldName) _dtEl.textContent = val;
+        sb.from('activities').update({name:val}).eq('id',_sid).eq('trip_id',CURRENT_TRIP.id).then(function(_r){
+          if(_r&&_r.error){
+            console.error('[PlaniTrip] rename sync:',_r.error);
+            // Rollback local
+            if(S.customActs[cityKey] && S.customActs[cityKey][custIdx]){
+              S.customActs[cityKey][custIdx].n = _oldName;
+              save(); renderContent();
+              var _dtEl2 = document.getElementById('detailTitle');
+              if(_dtEl2 && _dtEl2.textContent === val) _dtEl2.textContent = _oldName;
+            }
+          }
+        });
+      } else {
+        // Cas C : pas de _sid local (activité créée avant ce correctif ou non syncée).
+        // Garde-fou : compter les lignes serveur avec cet ancien nom pour éviter un UPDATE ambigu.
+        sb.from('activities').select('id',{count:'exact',head:true}).eq('trip_id',CURRENT_TRIP.id).eq('country_id',_rnCountry).eq('city',_rnCity).eq('name',_oldName).then(function(_rc){
+          var _count = (_rc && _rc.count != null) ? _rc.count : 0;
+          if(_count > 1){
+            // Ambiguïté : plusieurs lignes portent le même nom — on bloque le rename serveur.
+            alert('Impossible de renommer cette activité : plusieurs activités portent ce nom. Recharge la page pour synchroniser, puis réessaie.');
+            return;
+          }
+          // Une seule ligne (ou zéro si non encore syncée) : rename safe.
+          S.customActs[cityKey][custIdx].n = val;
+          S.customDetails = window._customDetails;
+          save(); renderContent();
+          var _dtEl3 = document.getElementById('detailTitle');
+          if(_dtEl3 && _dtEl3.textContent === _oldName) _dtEl3.textContent = val;
+          if(_count === 1){
+            sb.from('activities').update({name:val}).eq('trip_id',CURRENT_TRIP.id).eq('country_id',_rnCountry).eq('city',_rnCity).eq('name',_oldName).then(function(_r2){
+              if(_r2&&_r2.error){
+                console.error('[PlaniTrip] rename sync:',_r2.error);
+                // Rollback local
+                if(S.customActs[cityKey] && S.customActs[cityKey][custIdx]){
+                  S.customActs[cityKey][custIdx].n = _oldName;
+                  save(); renderContent();
+                  var _dtEl4 = document.getElementById('detailTitle');
+                  if(_dtEl4 && _dtEl4.textContent === val) _dtEl4.textContent = _oldName;
+                }
+              }
+            });
+          }
+        });
+      }
+    } else {
+      // Offline / sans Supabase : rename local uniquement.
+      S.customActs[cityKey][custIdx].n = val;
+      S.customDetails = window._customDetails;
+      save(); renderContent();
+      var _dtElOff = document.getElementById('detailTitle');
+      if(_dtElOff && _dtElOff.textContent === _oldName) _dtElOff.textContent = val;
     }
     return;
   } else if(field === 'm'){
@@ -3958,7 +4006,16 @@ function duplicateActivity(cityKey, actKey, actName, isCustom, origIdx, targetCi
   if(sb && CURRENT_TRIP){
     var parts = destCityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:newName,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    // Lot 5B correctif : récupérer l'id UUID pour rename ultérieur sans ambiguïté.
+    (function(_capIdx, _capCk, _capName){
+      sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:newName,added_by_label:who}).select('id').single().then(function(_r){
+        if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); return; }
+        if(_r&&_r.data&&_r.data.id && S.customActs[_capCk] && S.customActs[_capCk][_capIdx]){
+          S.customActs[_capCk][_capIdx]._sid = _r.data.id;
+          save();
+        }
+      });
+    })(newIdx, destCityKey, newName);
     if(window._customDetails[newActKey]){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:newActKey, data:window._customDetails[newActKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
     }
@@ -4045,7 +4102,17 @@ function _createActivityCore(cityKey, val, opts){
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    // Lot 5B correctif : récupérer l'id UUID retourné par Supabase pour permettre
+    // un rename ultérieur sans ambiguïté (même si deux activités portent le même nom).
+    (function(_captureIdx){
+      sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).select('id').single().then(function(_r){
+        if(_r&&_r.error){ console.error("[PlaniTrip] sync error:",_r.error); return; }
+        if(_r&&_r.data&&_r.data.id && S.customActs[cityKey] && S.customActs[cityKey][_captureIdx]){
+          S.customActs[cityKey][_captureIdx]._sid = _r.data.id;
+          save();
+        }
+      });
+    })(newIdx);
     if(opts.date){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
@@ -11371,7 +11438,7 @@ async function loadCitiesActivities(){
   (actsData||[]).forEach(function(row){
     var ck=row.country_id+'_'+row.city;
     if(!serverActsMap[ck]) serverActsMap[ck]=[];
-    serverActsMap[ck].push({n:row.name,m:row.tip||'',tags:[],custom:true,addedBy:row.added_by_label});
+    serverActsMap[ck].push({n:row.name,m:row.tip||'',tags:[],custom:true,addedBy:row.added_by_label,_sid:row.id});
   });
   var allActCityKeys = Object.keys(serverActsMap).concat(Object.keys(S.customActs||{}));
   allActCityKeys.filter(function(v,i,a){return a.indexOf(v)===i;}).forEach(function(ck){
