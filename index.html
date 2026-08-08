@@ -989,7 +989,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <button id="ct-submit-btn" class="ct-primary-btn">Créer mon voyage</button>
     <button type="button" id="ct-import-btn" style="width:100%;margin-top:10px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--ink-muted);font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:color .15s;" onclick="openImportTripFlow()"><span data-icon="upload" data-icon-size="15"></span> Importer un voyage existant</button>
     <!-- input file masqué pour l'import — accepte les formats documentaires (pas les images) -->
-    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown,.xlsx,.xls,.docx" style="display:none" onchange="handleImportFileSelected(event)">
+    <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown,.xlsx,.xls,.docx,.pdf" style="display:none" onchange="handleImportFileSelected(event)">
   </div>
 </div>
 
@@ -12589,9 +12589,9 @@ function handleImportFileSelected(e) {
   if (!file) return;
   _IMP.filename = file.name;
   var ext = file.name.split('.').pop().toLowerCase();
-  var supported = ['csv','txt','md','markdown','xlsx','xls','docx'];
+  var supported = ['csv','txt','md','markdown','xlsx','xls','docx','pdf'];
   if (!supported.includes(ext)) {
-    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLS/XLSX), Word (DOCX).');
+    _showImportError('Ce format n\'est pas encore pris en charge. Formats disponibles : CSV, TXT, Markdown, Excel (XLS/XLSX), Word (DOCX), PDF texte.');
     return;
   }
   if (ext === 'xlsx' || ext === 'xls') {
@@ -12600,6 +12600,10 @@ function handleImportFileSelected(e) {
   }
   if (ext === 'docx') {
     _handleImportDOCXFile(file);
+    return;
+  }
+  if (ext === 'pdf') {
+    _handleImportPDFFile(file);
     return;
   }
   var reader = new FileReader();
@@ -12828,6 +12832,144 @@ async function _handleImportDOCXFile(file) {
       _showImportPreview();
     } catch(err) {
       _showImportError('Impossible de lire ce document Word.');
+    }
+  };
+  reader.onerror = function() {
+    _showImportError('Impossible de lire ce fichier.');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A2.3b — IMPORT PDF (texte extractible)
+// Architecture : pdf.js extrait le texte page par page (aucun envoi réseau) →
+// reconstruction de lignes par proximité verticale → texte consolidé →
+// _parseTxtMd() (identique TXT/MD/DOCX, aucun nouveau parser métier).
+// Version retenue : pdfjs-dist 3.9.179 (build "legacy" classique, expose un
+// global pdfjsLib via <script> standard) plutôt que la 6.x qui n'expose plus
+// que des modules ES (.mjs) — compatibilité Safari iOS et pattern de lazy-load
+// identique à SheetJS/Mammoth (voir audit A2.3, point 6).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Seuil de détection "PDF scanné" (section 12 du cahier des charges) : sous ce
+// nombre de caractères significatifs (espaces exclus) extraits sur l'ensemble
+// du document, on considère qu'il s'agit probablement d'un scan/image plutôt
+// que d'un texte réel — évite de se fier à un simple text.length > 0 qui
+// laisserait passer des PDF scannés ne contenant que quelques métadonnées.
+var _IMP_PDF_MIN_CHARS = 40;
+// Garde-fou mémoire/performance iPhone : au-delà de ce nombre de pages, le
+// document est tronqué plutôt que de risquer de bloquer le navigateur — la
+// troncature est toujours signalée explicitement en note, jamais silencieuse.
+var _IMP_PDF_MAX_PAGES = 150;
+
+var _pdfJsLoadPromise = null;
+function _loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  if (_pdfJsLoadPromise) return _pdfJsLoadPromise;
+  _pdfJsLoadPromise = new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'vendor/pdf.min.js';
+    s.onload = function() {
+      try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        resolve();
+      } catch(e) { reject(e); }
+    };
+    s.onerror = function() { _pdfJsLoadPromise = null; reject(new Error('module indisponible')); };
+    document.head.appendChild(s);
+  });
+  return _pdfJsLoadPromise;
+}
+
+// Variante de _showImportError avec deux actions (section 11 du cahier des
+// charges) : utilisée spécifiquement pour le cas "PDF scanné", où proposer de
+// choisir un autre fichier directement (sans repasser par le formulaire) a du
+// sens en plus du repli vers la création manuelle.
+function _showImportScanError(msg) {
+  var modal = document.getElementById('importTripModal');
+  var body = document.getElementById('importTripBody');
+  modal.classList.add('open');
+  body.innerHTML = '<div style="padding:20px 16px">'
+    + '<div style="text-align:center;margin-bottom:16px;color:var(--red-muted)">'+svgIcon('triangle-alert',32)+'</div>'
+    + '<div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px;text-align:center">PDF non exploitable</div>'
+    + '<div style="font-size:13.5px;color:var(--ink-muted);text-align:center;line-height:1.5;margin-bottom:20px">'+escHtml(msg)+'</div>'
+    + '<button class="imp-create-btn" onclick="document.getElementById(\'ct-import-file-input\').click()">Choisir un autre fichier</button>'
+    + '<button style="width:100%;margin-top:8px;padding:12px;border-radius:14px;font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;" onclick="closeImportTripModal()">Créer mon voyage manuellement</button>'
+    + '</div>';
+  setTimeout(renderIcons, 10);
+}
+
+// Extrait le texte d'une page PDF en reconstruisant approximativement les
+// lignes : les items de texte proches en position Y sont regroupés sur une
+// même ligne, un saut de ligne est inséré dès que la position Y change de
+// façon significative. Heuristique simple, suffisante pour des documents
+// texte standards (pas de reconstruction de mise en page complexe).
+async function _extractPDFPageText(page) {
+  var content = await page.getTextContent();
+  var lines = [];
+  var curLine = '';
+  var lastY = null;
+  content.items.forEach(function(item) {
+    var y = item.transform ? item.transform[5] : null;
+    if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) {
+      if (curLine.trim()) lines.push(curLine.trim());
+      curLine = '';
+    }
+    curLine += item.str + ' ';
+    lastY = y;
+  });
+  if (curLine.trim()) lines.push(curLine.trim());
+  return lines.join('\n');
+}
+
+async function _handleImportPDFFile(file) {
+  if (file.size > _IMP_MAX_FILE_SIZE) {
+    _showImportError('Ce fichier est trop volumineux pour être analysé sur mobile (limite '+_IMP_MAX_FILE_SIZE_MB+' Mo).');
+    return;
+  }
+  _showImportLoading('Chargement du module PDF…');
+  try {
+    await _loadPdfJs();
+  } catch(e) {
+    _showImportError('Impossible de charger le module PDF. Vérifie ta connexion et réessaie.');
+    return;
+  }
+  _showImportLoading('Analyse du document…');
+  var reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      var data = new Uint8Array(ev.target.result);
+      var pdfDoc = await pdfjsLib.getDocument({ data: data }).promise;
+      var pageCount = pdfDoc.numPages;
+      var maxPages = Math.min(pageCount, _IMP_PDF_MAX_PAGES);
+      var pageTexts = [];
+      var totalMeaningfulChars = 0;
+      for (var p = 1; p <= maxPages; p++) {
+        var page = await pdfDoc.getPage(p);
+        var pageText = await _extractPDFPageText(page);
+        totalMeaningfulChars += pageText.replace(/\s+/g,'').length;
+        pageTexts.push(pageText);
+      }
+
+      if (totalMeaningfulChars < _IMP_PDF_MIN_CHARS) {
+        _showImportScanError('Ce PDF semble être un scan ou une image. L\'import OCR n\'est pas encore pris en charge.');
+        return;
+      }
+
+      var fullText = pageTexts.join('\n\n');
+      var parsed = _parseTxtMd(fullText);
+      if (maxPages < pageCount) {
+        parsed.notes.unshift('Document tronqué : seules les '+maxPages+' premières pages sur '+pageCount+' ont été analysées.');
+      }
+      _IMP.parsed = parsed;
+      var hasData = parsed.countries.length || parsed.cities.length || parsed.activities.length || parsed.accommodations.length;
+      if (!hasData) {
+        _showImportError('Nous n\'avons pas identifié d\'itinéraire exploitable dans ce document.');
+        return;
+      }
+      _showImportPreview();
+    } catch(err) {
+      _showImportError('Impossible de lire ce PDF. Il est peut-être protégé ou corrompu.');
     }
   };
   reader.onerror = function() {
