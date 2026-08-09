@@ -1914,15 +1914,12 @@ function _isCustomStableKey(k){
 // Guard updated_at : si le serveur a une version plus récente (cas de concurrence),
 // on fait un merge silencieux champ par champ — la valeur serveur gagne pour les
 // champs non présents dans le patch courant.
-function _syncActivityState(actKey, tripId){
+async function _syncActivityState(actKey, tripId){
   if(!sb || !tripId) return;
-  // Construire l'état COMPLET de cette activité depuis S.
-  // On écrit tous les champs connus d'un coup — pas de select préalable,
-  // ce qui évitait des lost-updates en cascade quand plusieurs champs sont
-  // sauvegardés dans le même save (ex: savePlanningModal appelle setActivityDate
-  // + setActMoment + setActTimeRange : trois _syncActivityState concurrents
-  // lisaient tous le même état serveur avant que l'un d'eux ait écrit).
-  // La source de vérité est S (état local complet et cohérent après save()).
+  // Snapshot COMPLET depuis S — une seule écriture atomique.
+  // Pas de select préalable : S est la source de vérité après save().
+  // Les callers composites (savePlanningModal) doivent appeler les setters
+  // avec {sync:false} puis awaiter UN seul _syncActivityState final.
   var state = {};
   if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
   if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
@@ -1931,10 +1928,11 @@ function _syncActivityState(actKey, tripId){
   if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
   if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
   if(!Object.keys(state).length) return;
-  sb.from('activity_details')
+  var r = await sb.from('activity_details')
     .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
-            {onConflict:'trip_id,detail_key'})
-    .then(function(r){ if(r&&r.error) console.error('[PlaniTrip] _syncActivityState:', r.error); });
+            {onConflict:'trip_id,detail_key'});
+  if(r && r.error) console.error('[PlaniTrip] _syncActivityState:', r.error);
+  return r;
 }
 // ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
 
@@ -4643,7 +4641,14 @@ function _createActivityCore(cityKey, val, opts){
   // au lieu de l'écriture directe dans S.actTime (legacy). S.actTime reste un fallback pour
   // les anciens textes approximatifs, mais une nouvelle activité avec heure structurée doit
   // passer par actTimeStart dès la création.
-  if(opts.time){ setActTimeRange(actKey, opts.time, '', ''); setActMoment(actKey, getDayPeriod(opts.time)); }
+  if(opts.time){
+    var _isStbl = _isCustomStableKey(actKey);
+    var _noSync = _isStbl ? {sync:false} : undefined;
+    setActTimeRange(actKey, opts.time, '', '', _noSync);
+    setActMoment(actKey, getDayPeriod(opts.time), _noSync);
+    // Sync unique si custom stable (les mutations locales sont déjà dans S)
+    if(_isStbl && sb && CURRENT_TRIP) _syncActivityState(actKey, CURRENT_TRIP.id);
+  }
   save();
   renderContent();
   // Lot 6 : ne pas déclencher l'IA si la fiche est déjà connue (suggestion statique).
@@ -6355,10 +6360,11 @@ function getActMoment(actKey, name, meta){
   if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
   return '';
 }
-function setActMoment(actKey, momentKey){
+function setActMoment(actKey, momentKey, opts){
   if(!S.actMoment) S.actMoment={};
   S.actMoment[actKey] = momentKey;
   save();
+  if(opts && opts.sync === false) return;
   if(sb && CURRENT_TRIP){
     if(_isCustomStableKey(actKey)){
       _syncActivityState(actKey, CURRENT_TRIP.id);
@@ -6377,7 +6383,7 @@ function setActSuggestedTime(actKey, val){
 }
 // Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
 // pour les horaires approximatifs type "Avant 7h" que la plage ne peut pas exprimer.
-function setActTimeRange(actKey, start, end, freeText){
+function setActTimeRange(actKey, start, end, freeText, opts){
   if(!S.actTimeStart) S.actTimeStart={};
   if(!S.actTimeEnd) S.actTimeEnd={};
   if(!S.actTime) S.actTime={};
@@ -6387,6 +6393,7 @@ function setActTimeRange(actKey, start, end, freeText){
   // Le texte libre n'est utilisé que si aucune plage structurée n'est renseignée
   S.actTime[actKey] = (start||end) ? '' : freeText;
   save();
+  if(opts && opts.sync === false) return;
   if(sb && CURRENT_TRIP){
     if(_isCustomStableKey(actKey)){
       _syncActivityState(actKey, CURRENT_TRIP.id);
@@ -6452,26 +6459,35 @@ function savePlanningModal(){
   var dateVal = dateEl ? dateEl.value : '';
   var startVal = document.getElementById('planningModalTimeStart').value;
   var endVal = document.getElementById('planningModalTimeEnd').value;
-  // Logique cible (Correctif Lot 1 §3) :
-  //   SI startVal existe       -> moment = getDayPeriod(startVal)  (l'heure prime toujours)
-  //   SINON SI moment manuel   -> moment = _planningModalMoment    (choix explicite conservé)
-  //   SINON                    -> moment = ''                     (aucun horaire du tout)
   var finalMoment = startVal ? getDayPeriod(startVal) : _planningModalMoment;
-  // Lot 5A : garde-fou — heure de fin sans heure de début ignorée.
-  // Une plage end<start est acceptée (activité nocturne traversant minuit).
+  // Garde-fou : heure de fin sans heure de début ignorée
   if(endVal && !startVal){
     endVal = '';
     var endEl = document.getElementById('planningModalTimeEnd');
     if(endEl){ endEl.value = ''; endEl.style.borderColor = 'var(--red-muted)'; setTimeout(function(){ endEl.style.borderColor=''; }, 1200); }
   }
-  // La date passe par setActivityDate (déjà existante) qui valide les bornes du séjour et peut
-  // annuler la sauvegarde (alert + renderContent) si la date est hors séjour — comportement
-  // préexistant conservé tel quel, pas de nouvelle règle de validation créée ici.
-  if(dateEl) setActivityDate(_planningModalActKey, dateVal);
-  setActMoment(_planningModalActKey, finalMoment);
-  setActTimeRange(_planningModalActKey, startVal, endVal, '');
+  var actKey = _planningModalActKey;
+  var isStable = _isCustomStableKey(actKey);
+  // P0.3 — batch local : toutes les mutations S sont appliquées sans déclencher
+  // de sync intermédiaire, puis UN seul upsert atomique est émis à la fin.
+  // Cela évite la race condition où 3 upserts concurrents s'écrasaient mutuellement.
+  var noSync = isStable ? {sync:false} : undefined;
+  if(dateEl) setActivityDate(actKey, dateVal, noSync);
+  setActMoment(actKey, finalMoment, noSync);
+  setActTimeRange(actKey, startVal, endVal, '', noSync);
   document.getElementById('planningModal').classList.remove('open');
   renderContent();
+  // Sync unique après toutes les mutations locales
+  if(isStable && sb && CURRENT_TRIP){
+    var btn = document.getElementById('planningModalSaveBtn');
+    if(btn){ btn.disabled = true; btn.textContent = '…'; }
+    _syncActivityState(actKey, CURRENT_TRIP.id).then(function(){
+      if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
+    }).catch(function(e){
+      console.error('[PlaniTrip] savePlanningModal sync:', e);
+      if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
+    });
+  }
 }
 function getActCategory(actKey, name, meta){
   if(S.actCategory && S.actCategory[actKey]!==undefined){
@@ -7663,7 +7679,7 @@ function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   d.setDate(d.getDate()+totalOffset);
   return toLocalISODate(d);
 }
-function setActivityDate(actKey, dateVal){
+function setActivityDate(actKey, dateVal, opts){
   if(dateVal){
     var ck = actKey.replace(/_c?\d+$/,'');
     var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
@@ -7678,12 +7694,11 @@ function setActivityDate(actKey, dateVal){
   if(dateVal) S.actDate[actKey]=dateVal; else delete S.actDate[actKey];
   save();
   renderContent();
+  if(opts && opts.sync === false) return; // caller gère le sync
   if(sb && CURRENT_TRIP){
     if(_isCustomStableKey(actKey)){
-      // Phase S : écriture granulaire — n'impacte que cette activité
       _syncActivityState(actKey, CURRENT_TRIP.id);
     } else {
-      // Built-in ou legacy : blob global (comportement historique)
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
     }
   }
