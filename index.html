@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p08a-1b';
+var APP_BUILD = '2026-08-09·sha:timeend';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -4690,7 +4690,7 @@ function _createActivityCore(cityKey, val, opts){
   // passer par actTimeStart dès la création.
   if(opts.time){
     // À la création actKey est _cN (jamais stable) — pas de {sync:false} nécessaire.
-    setActTimeRange(actKey, opts.time, '', '');
+    setActTimeRange(actKey, opts.time, opts.timeEnd||'', '');
     setActMoment(actKey, getDayPeriod(opts.time));
   }
   save();
@@ -4794,8 +4794,10 @@ function openAddActivityModal(ck){
     +'<div style="display:flex;gap:8px;margin-bottom:10px">'
     +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date</div>'
     +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
-    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de début</div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Début</div>'
     +'<input class="ef-input" id="guideModalActTime" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Fin</div>'
+    +'<input class="ef-input" id="guideModalActTimeEnd" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
     +'</div>'
     +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Type de lieu (optionnel)</div>'
     +'<input class="ef-input" id="guideModalActPlaceType" type="text" placeholder="Ex. temple, marché, café…" style="width:100%"/></div>'
@@ -4846,9 +4848,10 @@ function saveAddActivityModal(){
   var meta = ((document.getElementById('guideModalActMeta')||{}).value||'').trim();
   var date = ((document.getElementById('guideModalActDate')||{}).value||'').trim();
   var timeVal = ((document.getElementById('guideModalActTime')||{}).value||'').trim();
+  var timeEndVal = ((document.getElementById('guideModalActTimeEnd')||{}).value||'').trim();
   var placeType = ((document.getElementById('guideModalActPlaceType')||{}).value||'').trim();
   closeGuideItemModal();
-  var opts = {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal};
+  var opts = {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal, timeEnd:timeEndVal};
   // Type de lieu saisi manuellement : même champ ("tag") que celui rempli par l'IA ou
   // les suggestions statiques, via le mécanisme initialDetails déjà utilisé pour ces cas.
   // _userTag protège ce choix explicite d'un écrasement par fetchActivityDetailAI(), qui
