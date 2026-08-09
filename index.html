@@ -2686,7 +2686,25 @@ function openDetail(actKey, actName, cityKey) {
   });
   document.getElementById('detailTag').textContent = d.tag || '';
   document.getElementById('detailTag').style.display = d.tag ? '' : 'none';
-  document.getElementById('detailTitle').textContent = actName;
+  // Titre : texte + crayon inline pour les activités custom (identité _sid protégée)
+  var _dtEl = document.getElementById('detailTitle');
+  if(_dtEl){
+    var _idxPartDT = cityKey ? actKey.slice(cityKey.length+1) : '';
+    var _isCustomDT = _idxPartDT.indexOf('c')===0 || _idxPartDT.indexOf('sid')===0;
+    var _custIdxDT = (_idxPartDT.indexOf('c')===0) ? parseInt(_idxPartDT.slice(1)) : -1;
+    // Recalculate custIdx for sid_ keys
+    if(_idxPartDT.indexOf('sid')===0 && cityKey){
+      var _sidVal = _idxPartDT.replace('sid_','');
+      var _acts2 = S.customActs[cityKey]||[];
+      for(var _di=0;_di<_acts2.length;_di++){ if(_acts2[_di]._sid===_sidVal){ _custIdxDT=_di; break; } }
+    }
+    if(_isCustomDT && cityKey && _custIdxDT>=0){
+      _dtEl.innerHTML = escHtml(actName)
+        +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdxDT+',\''+jsStrEsc(actName)+'\')" style="margin-left:8px;background:none;border:none;cursor:pointer;color:var(--ink-muted);vertical-align:middle;padding:2px;line-height:1;opacity:0.55">'+svgIcon('pencil',13)+'</button>';
+    } else {
+      _dtEl.textContent = actName;
+    }
+  }
   document.getElementById('detailSub').textContent = d.address || '';
   document.getElementById('detailSub').style.display = d.address ? '' : 'none';
 
@@ -2786,8 +2804,8 @@ function openDetail(actKey, actName, cityKey) {
   let html = '';
 
   // Lot 5B : champ "Nom" en haut de la fiche, uniquement pour les activités custom éditables.
-  // // Nom toujours éditable inline pour les activités custom — saveCustomActDetail('name') est sécurisé par _sid.
-  if(_isCustom){
+  // // Les activités de base statiques (ACT_DETAILS) n'exposent pas de champ de renommage.
+  if(_isEditable && _isCustom){
     var _nameVal = escHtml(S.customActs[cityKey] && S.customActs[cityKey][_custIdx] ? (S.customActs[cityKey][_custIdx].n||actName) : actName);
     html += '<div class="detail-section" style="padding-bottom:0">'
       +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;margin-bottom:6px">Nom</div>'
@@ -6999,7 +7017,7 @@ function renderCityDetailScreen(){
     +'<div class="country-detail-header" style="position:relative;background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+');border-radius:0;overflow:hidden" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
     +'<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="position:absolute;bottom:14px;right:14px;z-index:2;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
-    +'<div class="cdh-content"><div class="cdh-name">'+escHtml(city.city)+'</div>'
+    +'<div class="cdh-content"><div class="cdh-name" id="cdh-name-'+escHtml(ck)+'">'+escHtml(_cityDisplayName(ck,city))+'<button onclick="event.stopPropagation();startEditCity(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(_cityDisplayName(ck,city))+'\')" style="margin-left:7px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.7);vertical-align:middle;padding:2px;line-height:1">'+svgIcon('pencil',13)+'</button></div>'
     +'<div class="cdh-tagline">'+taglineTxt+'</div>'
     +renderTravelerAvatarStack(ck)
     +'</div>'
@@ -7073,7 +7091,7 @@ function renderItinerary(c, embedded){
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-query="'+escHtml(imgQuery)+'"></div>'
-      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(city.city)+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
+      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div>';
   }).join('');
@@ -7348,7 +7366,7 @@ function getCityActivitiesForToday(c, city, todayStr){
     var actKey = isBase ? (ck+'_'+oi) : getCustomActivityKey(ck, a, oi);
     var date = getActivityDate(actKey, c.id, city.city, idx, nonDeleted.length);
     if(date===todayStr){
-      results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:city.city, ck:ck});
+      results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:_cityDisplayName(ck,city), ck:ck});
     }
   });
   return results;
@@ -7455,7 +7473,7 @@ function renderToday(){
   // ── Carte Aujourd'hui / Prochainement ──
   var actsCard;
   var todayOnclick = c && ts.currentCity ? (' onclick="openCityDetail(\''+c.id+'_'+jsStrEsc(ts.currentCity.city)+'\''+(todayActs.length?(',\''+jsStrEsc(todayActs[0].key)+'\''):'')+')"') : (c ? (' onclick="openCountryDetail(\''+c.id+'\',\'lieux\')"') : '');
-  var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(ts.currentCity.city)+'</div>') : '';
+  var todayCityLabel = ts.currentCity ? ('<div style="font-size:12px;color:var(--ink-subtle);margin:-4px 0 8px;display:flex;align-items:center;gap:4px">'+svgIcon('map-pin',12)+' '+escHtml(_cityDisplayName(c?c.id+'_'+ts.currentCity.city:'', ts.currentCity))+'</div>') : '';
   if(todayActs.length){
     var todayDoneCount = todayActs.filter(function(a){return a.done;}).length;
     var visibleActsCount = Math.min(todayActs.length, 3 + todayDoneCount);
@@ -9976,13 +9994,13 @@ function _buildSearchIndex(){
       city.acts.forEach(function(a,i){
         if(S.deletedActs[ck+'_'+i]) return;
         items.push({
-          k:ck+'_'+i, countryId:c.id, flag:c.flag, country:c.name, city:city.city,
+          k:ck+'_'+i, countryId:c.id, flag:c.flag, country:c.name, city:_cityDisplayName(ck,city),
           name:a.n, meta:a.m||'', tags:a.tags||[]
         });
       });
       (S.customActs[ck]||[]).forEach(function(ca,i){
         items.push({
-          k:getCustomActivityKey(ck,ca,i), countryId:c.id, flag:c.flag, country:c.name, city:city.city,
+          k:getCustomActivityKey(ck,ca,i), countryId:c.id, flag:c.flag, country:c.name, city:_cityDisplayName(ck,city),
           name:ca.n, meta:'', tags:[]
         });
       });
@@ -10670,13 +10688,14 @@ function renderMap(c) {
 
 // ── INLINE EDIT ──────────────────────────────────────────────
 function startEditCity(ck, currentName) {
-  var header = document.querySelector('[data-city="'+CSS.escape(ck)+'"] .cah-city');
+  // Fiche détaillée (cdh-name) ou accordéon pays (cah-city)
+  var header = document.getElementById('cdh-name-'+ck)
+    || document.querySelector('[data-city="'+CSS.escape(ck)+'\'] .cah-city');
   if(!header) return;
-  var orig = currentName;
-  header.innerHTML = '<div class="editable-wrap">'
-    +'<input class="edit-inline" id="edit-city-'+ck+'" value="'+escHtml(orig)+'" />'
-    +'<button class="edit-confirm" onclick="confirmEditCity(\''+jsStrEsc(ck)+'\')">✓</button>'
-    +'<button class="edit-cancel" onclick="renderContent()">✕</button>'
+  header.innerHTML = '<div class="editable-wrap" style="display:flex;align-items:center;gap:6px">'
+    +'<input class="edit-inline" id="edit-city-'+ck+'" value="'+escHtml(currentName)+'" style="font-size:inherit;font-weight:inherit;color:inherit;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:2px 8px;min-width:100px;outline:none" />'
+    +'<button onclick="event.stopPropagation();confirmEditCity(\''+jsStrEsc(ck)+'\'" style="background:rgba(255,255,255,0.2);border:none;border-radius:6px;padding:3px 8px;color:#fff;cursor:pointer;font-size:12px">✓</button>'
+    +'<button onclick="event.stopPropagation();renderContent()" style="background:rgba(255,255,255,0.12);border:none;border-radius:6px;padding:3px 8px;color:#fff;cursor:pointer;font-size:12px">✕</button>'
     +'</div>';
   var inp = document.getElementById('edit-city-'+ck);
   if(inp){ inp.focus(); inp.select(); }
@@ -10691,6 +10710,11 @@ function confirmEditCity(ck) {
   S.cityNames[ck] = newName;
   save(); renderContent();
 }
+// Retourne le nom affiché d'une ville : override local si défini, sinon city.city.
+// NE JAMAIS utiliser pour construire ck ou interroger Supabase — uniquement pour l'affichage.
+function _cityDisplayName(ck, city){
+  return (S.cityNames && S.cityNames[ck]) ? S.cityNames[ck] : city.city;
+}
 
 function startEditAct(actKey, currentName) {
   var el = document.querySelector('[data-detail="'+CSS.escape(actKey)+'"] .act-name');
@@ -10701,6 +10725,28 @@ function startEditAct(actKey, currentName) {
     +'</div>';
   var inp = document.getElementById('edit-act-'+actKey);
   if(inp){ inp.focus(); inp.select(); }
+}
+
+function startEditActTitle(actKey, cityKey, custIdx, currentName){
+  var el = document.getElementById('detailTitle');
+  if(!el) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap">'
+    +'<input id="detail-rename-input" type="text" value="'+escHtml(currentName)+'" '
+     +'style="font-size:inherit;font-weight:inherit;color:var(--ink);background:var(--sand);border:1px solid rgba(29,29,31,0.18);border-radius:10px;padding:3px 10px;min-width:120px;max-width:200px;outline:none;font-family:inherit" />'
+    +'<button onclick="event.stopPropagation();confirmEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+custIdx+')" '
+     +'style="background:var(--accent);border:none;border-radius:8px;padding:4px 10px;color:#fff;cursor:pointer;font-size:12px;flex-shrink:0">✓</button>'
+    +'<button onclick="event.stopPropagation();openDetail(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(currentName)+'\',\''+jsStrEsc(cityKey)+'\')" '
+     +'style="background:transparent;border:1px solid rgba(29,29,31,0.14);border-radius:8px;padding:4px 10px;color:var(--ink-muted);cursor:pointer;font-size:12px;flex-shrink:0">✕</button>'
+    +'</div>';
+  var inp = document.getElementById('detail-rename-input');
+  if(inp){ inp.focus(); inp.select(); }
+}
+function confirmEditActTitle(actKey, cityKey, custIdx){
+  var inp = document.getElementById('detail-rename-input');
+  if(!inp) return;
+  var val = stripHtml(inp.value.trim());
+  if(!val) return;
+  saveCustomActDetail(actKey, cityKey, custIdx, 'name', val);
 }
 
 function confirmEditAct(actKey) {
