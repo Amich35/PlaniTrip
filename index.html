@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p09c';
+var APP_BUILD = '2026-08-09·sha:p08a-2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5831,10 +5831,43 @@ function openCityDatesModal(ck, cityLabel){
     if(_ctaBtn) _ctaBtn.style.cssText='flex:1;padding:13px;min-height:44px;border-radius:var(--r16);font-size:14px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 8px rgba(28,24,20,0.2);margin-bottom:0;';
   }
 }
-function saveCityDatesModal(){
+async function saveCityDatesModal(){
+  var ck = _cityDatesModalCk;
   var start=((document.getElementById('guideModalDateStart')||{}).value||'');
   var end=((document.getElementById('guideModalDateEnd')||{}).value||'');
-  editCityDateRange(_cityDatesModalCk, start, end);
+  // Validation inversion de dates (réplique exacte de editCityDateRange)
+  if(start && end && end < start){
+    alert("La date de départ doit être postérieure à la date d'arrivée.");
+    return;
+  }
+  // Guard connexion — pas de faux succès hors ligne
+  if(!sb || !CURRENT_TRIP){
+    alert('Connexion requise pour enregistrer les dates.');
+    return;
+  }
+  // Désactiver le bouton Enregistrer pendant la sync
+  var _btn = document.querySelector('#guideItemModal .modal-cta');
+  if(_btn){ _btn.disabled = true; _btn.textContent = '…'; }
+  // État candidat — S.cityDates pas encore muté
+  var _nextCityDates = Object.assign({}, S.cityDates || {});
+  _nextCityDates[ck] = {start: start || '', end: end || ''};
+  // Await Supabase — Supabase confirme avant toute mutation locale
+  try{
+    var _r = await sb.from('activity_details').upsert(
+      {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__cityDates', data:_nextCityDates, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,detail_key'}
+    );
+    if(_r && _r.error) throw _r.error;
+  } catch(e){
+    console.error('[PlaniTrip] saveCityDatesModal sync error:', e);
+    if(_btn){ _btn.disabled = false; _btn.textContent = 'Enregistrer'; }
+    alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
+    return; // modal reste ouverte, S.cityDates inchangé
+  }
+  // Supabase confirmé : mutation locale, save, render, fermeture
+  S.cityDates = _nextCityDates;
+  save();
+  renderContent();
   closeGuideItemModal();
   window.scrollTo(0,0);
 }
