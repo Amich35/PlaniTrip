@@ -3049,6 +3049,10 @@ async function _aiCallOpenAI(key, options){
   if(options.webSearch) payload.tools = [{ type:'web_search' }];
   if(options.system) payload.instructions = options.system;
   if(options.maxTokens) payload.max_output_tokens = Math.max(options.maxTokens, 16); // évite un output tronqué avant même le texte final
+  // B4 : Structured Outputs — transmis uniquement si la fonction métier fournit
+  // un schema (aucune ne le fait actuellement, donc ce chemin reste inerte tant
+  // qu'aucun appelant ne l'active — fallback texte+parseAiJson() inchangé).
+  if(options.schema){ payload.schema = options.schema; if(options.task) payload.schemaName = options.task; }
 
   var invokeRes;
   try{
@@ -3133,6 +3137,10 @@ async function _aiCallGemini(key, options){
   if(options.webSearch) payload.tools = [{ google_search: {} }];
   if(options.system) payload.systemInstruction = options.system;
   if(options.maxTokens) payload.max_output_tokens = Math.max(options.maxTokens, 16);
+  // B4 : Structured Outputs — transmis uniquement si la fonction métier fournit
+  // un schema (aucune ne le fait actuellement, donc ce chemin reste inerte tant
+  // qu'aucun appelant ne l'active — fallback texte+parseAiJson() inchangé).
+  if(options.schema){ payload.schema = options.schema; }
 
   var invokeRes;
   try{
@@ -3181,9 +3189,9 @@ async function _aiCallGemini(key, options){
 
 // Traduit un code d'erreur normalisé en message UX — jamais de JSON brut
 // fournisseur affiché à l'utilisateur (section 17 du cahier des charges).
-function aiErrorMessage(errObj){
+function aiErrorMessage(errObj, providerOverride){
   if(!errObj) return 'Erreur inconnue.';
-  var providerLabel = (AI_PROVIDERS[getAIConfig().provider] || {}).label || 'IA';
+  var providerLabel = (AI_PROVIDERS[providerOverride || getAIConfig().provider] || {}).label || 'IA';
   var map = {
     missing_key: 'Aucune clé API configurée.',
     invalid_key: 'Ta clé '+providerLabel+' semble invalide.',
@@ -3196,6 +3204,28 @@ function aiErrorMessage(errObj){
     network_error: 'Impossible de contacter le service IA. Vérifie ta connexion.'
   };
   return map[errObj.code] || (errObj.message || 'Erreur IA.');
+}
+
+// ── B4 : test de clé léger (section 18 du cahier des charges) — une requête
+// minimale et peu coûteuse (texte court, pas de web search, pas de génération
+// de voyage) pour vérifier qu'une clé fonctionne avant de l'enregistrer.
+// Appelle l'adapter DIRECTEMENT avec la clé tapée (pas encore forcément
+// sauvegardée dans planitrip_ai_config), donc ne passe pas par aiRequest()
+// qui lit toujours la config déjà persistée.
+async function _aiTestKey(provider, key){
+  if(!key) return _aiError('missing_key', 'Aucune clé à tester.');
+  var providerDef = AI_PROVIDERS[provider];
+  if(!providerDef) return _aiError('provider_unavailable', 'Fournisseur IA inconnu.');
+  if(!providerDef.implemented) return _aiError('provider_unavailable', providerDef.label+' n\'est pas encore disponible dans cette version de PlaniTrip.');
+  var opts = { prompt: 'Réponds uniquement par le mot ok.', output:'text', webSearch:false, maxTokens: 16 };
+  try{
+    if(provider === 'anthropic') return await _aiCallAnthropic(key, opts);
+    if(provider === 'openai') return await _aiCallOpenAI(key, opts);
+    if(provider === 'gemini') return await _aiCallGemini(key, opts);
+  }catch(e){
+    return _aiError('network_error', (e && e.message) || 'Erreur réseau.');
+  }
+  return _aiError('provider_unavailable', 'Fournisseur IA inconnu.');
 }
 
 // Extracts the final text from an Anthropic API response that may include
@@ -4640,9 +4670,18 @@ function _renderApiModalKeyField(){
   var input = document.getElementById('apiKeyModal');
   var titleEl = document.querySelector('#apiModal .modal-title');
   if(titleEl) titleEl.textContent = 'Clé API '+(AI_PROVIDERS[_apiModalSelectedProvider]||{}).label;
+  var hasStoredKey = !!(cfg.keys && cfg.keys[_apiModalSelectedProvider]);
   if(input){
     input.value = (cfg.keys && cfg.keys[_apiModalSelectedProvider]) || '';
-    input.placeholder = _apiModalSelectedProvider === 'openai' ? 'sk-…' : 'sk-ant-api03-…';
+    var placeholders = { anthropic:'sk-ant-api03-…', openai:'sk-…', gemini:'AIza…' };
+    input.placeholder = placeholders[_apiModalSelectedProvider] || 'Clé API…';
+  }
+  // B4 : ligne d'état (section 19) — Non configurée / Configurée par défaut ;
+  // écrasée par "Clé valide ✓" ou un message d'erreur après un Tester explicite.
+  var statusEl = document.getElementById('apiModalKeyStatus');
+  if(statusEl){
+    statusEl.textContent = hasStoredKey ? 'Configurée' : 'Non configurée';
+    statusEl.style.color = hasStoredKey ? 'var(--green-muted)' : 'var(--ink-subtle)';
   }
 }
 function _apiModalSelectProvider(provider){
@@ -4650,6 +4689,37 @@ function _apiModalSelectProvider(provider){
   _apiModalKeyEdited = false;
   _renderApiModalChips();
   _renderApiModalKeyField();
+}
+// B4 : action "Tester" (section 18) — requête minimale et peu coûteuse,
+// jamais une génération de voyage complète.
+async function testApiModalKey(){
+  var val = (document.getElementById('apiKeyModal').value || '').trim();
+  var statusEl = document.getElementById('apiModalKeyStatus');
+  var btn = document.getElementById('apiModalTestBtn');
+  if(!val){
+    if(statusEl){ statusEl.textContent = 'Aucune clé saisie'; statusEl.style.color = 'var(--red-muted)'; }
+    return;
+  }
+  if(statusEl){ statusEl.textContent = 'Test en cours…'; statusEl.style.color = 'var(--ink-muted)'; }
+  if(btn) btn.disabled = true;
+  var provider = _apiModalSelectedProvider;
+  var res = await _aiTestKey(provider, val);
+  if(btn) btn.disabled = false;
+  if(!statusEl) return;
+  if(res.ok){
+    statusEl.textContent = 'Clé valide ✓';
+    statusEl.style.color = 'var(--green-muted)';
+  } else {
+    statusEl.textContent = aiErrorMessage(res.error, provider);
+    statusEl.style.color = 'var(--red-muted)';
+  }
+}
+// B4 : action "Supprimer" (section 19) — efface uniquement la clé du provider
+// actuellement sélectionné dans la modale, sans toucher aux autres.
+function deleteApiModalKey(){
+  setAIKey(_apiModalSelectedProvider, '');
+  _renderApiModalKeyField();
+  renderContent();
 }
 function saveApiKeyFromSettingsModal(){
   var val = document.getElementById('apiKeyModal').value;
@@ -15182,6 +15252,14 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div style="font-size:12px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5">Ta clé reste stockée uniquement sur cet appareil. Jamais partagée.</div>
     <div id="apiModalProviderChips" style="display:flex;gap:8px;margin-bottom:14px;"></div>
     <input class="modal-field api-key-field" type="password" id="apiKeyModal" placeholder="sk-…" style="font-family:monospace;font-size:12px" oninput="_apiModalKeyEdited=true"/>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 2px 4px;">
+      <span style="font-size:11.5px;color:var(--ink-subtle);">Modèle : Recommandé</span>
+      <span id="apiModalKeyStatus" style="font-size:12px;font-weight:600;"></span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button id="apiModalTestBtn" onclick="testApiModalKey()" style="flex:1;height:44px;border-radius:14px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-weight:600;font-size:13.5px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">Tester</button>
+      <button id="apiModalDeleteBtn" onclick="deleteApiModalKey()" style="flex:1;height:44px;border-radius:14px;border:1.5px solid rgba(231,111,81,0.4);background:transparent;color:var(--red-muted);font-weight:600;font-size:13.5px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">Supprimer</button>
+    </div>
     <button class="modal-cta" onclick="saveApiKeyFromSettingsModal()">Enregistrer</button>
     <button class="modal-cancel-btn" onclick="document.getElementById('apiModal').classList.remove('open')">Annuler</button>
   </div>
