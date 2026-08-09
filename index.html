@@ -2696,7 +2696,7 @@ function openDetail(actKey, actName, cityKey) {
   var _isCustom = _idxPart.indexOf('c')===0;
   var _custIdx = _isCustom ? parseInt(_idxPart.slice(1)) : -1;
   var _hasStaticContent = Object.keys(_staticDetail).length > 0;
-  var _aiFetchInFlight = !hasAnyDetail && !!S.apiKey;
+  var _aiFetchInFlight = !hasAnyDetail && aiHasActiveKey();
   var _isEditable = !_aiFetchInFlight && ((!_hasStaticContent && !d._aiGenerated && !d._userValidated) || d._editUnlocked);
   var _dSaved = _isEditable ? d : {};
   var _esc = jsStrEsc;
@@ -2720,7 +2720,7 @@ function openDetail(actKey, actName, cityKey) {
 
   // Si aucune fiche n'existe encore : lance l'IA si une clé est configurée, sinon les sections
   // ci-dessous s'affichent directement en mode édition (fallback manuel sans IA).
-  if(!hasAnyDetail && S.apiKey){
+  if(!hasAnyDetail && aiHasActiveKey()){
     html += '<div class="detail-section" id="detailAiStatus"><div class="detail-text">G\u00e9n\u00e9ration des d\u00e9tails avec l\'IA\u2026</div></div>';
     fetchActivityDetailAI(cityKey, actName, actKey);
   }
@@ -2916,15 +2916,17 @@ function setAIConfig(config){
 }
 // Écrit une clé pour un provider donné sans perturber les autres clés déjà
 // enregistrées (section 20 : changer de fournisseur ne doit pas effacer le
-// reste). Miroir vers S.apiKey conservé pour compatibilité avec les gates UI
-// existants (S.apiKey ? ... : ...) — aucun changement visuel en B1.
+// reste). Micro-correctif post-B1 : n'écrit plus dans S.apiKey — seule
+// planitrip_ai_config fait foi désormais pour toute NOUVELLE saisie de clé.
+// S.apiKey reste lu (jamais supprimé) uniquement pour la migration one-shot
+// des anciens états locaux dans getAIConfig() ci-dessus — une clé mise à jour
+// après ce Lot ne doit plus jamais être répercutée dans le blob trip-scoped.
 function setAIKey(provider, key){
   var cfg = getAIConfig();
   if(!cfg.keys) cfg.keys = {anthropic:'',openai:'',gemini:''};
   cfg.keys[provider] = key;
   cfg.provider = provider;
   setAIConfig(cfg);
-  if(provider === 'anthropic'){ S.apiKey = key; save(); }
 }
 function aiHasActiveKey(){
   var cfg = getAIConfig();
@@ -4332,7 +4334,7 @@ function _createActivityCore(cityKey, val, opts){
   renderContent();
   // Lot 6 : ne pas déclencher l'IA si la fiche est déjà connue (suggestion statique).
   if(!opts.skipAiEnrichment){ fetchActivityDetailAI(cityKey, val, actKey, newIdx); }
-  if(!S.apiKey) geocodePinForActivity(actKey, val, cityKey);
+  if(!aiHasActiveKey()) geocodePinForActivity(actKey, val, cityKey);
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
@@ -4446,10 +4448,10 @@ function saveAddActivityModal(){
 
 function saveApiKeyFromSettingsModal(){
   var val = document.getElementById('apiKeyModal').value;
-  setAIKey('anthropic', val); // Lot B1 : écrit S.apiKey (compat) + planitrip_ai_config (device-level)
+  setAIKey('anthropic', val); // Lot B1 : écrit planitrip_ai_config (device-level) uniquement
   document.getElementById('apiModal').classList.remove('open');
   renderContent();
-  if(!S.apiKey || !CURRENT_TRIP) return;
+  if(!val || !CURRENT_TRIP) return;
   var toPrepare = COUNTRIES.filter(function(c){ return !c._aiGenerated || !c.cities || !c.cities.length; });
   if(!toPrepare.length) return;
   showConfirm(
@@ -5334,7 +5336,7 @@ async function _createCityFromModal(countryId, name, sub, dateStart, dateEnd, sk
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     try{ await sb.from('cities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:newCity.city,added_by_label:who}); }catch(e){ console.error('[PlaniTrip] insert cities:', e); }
   }
-  if(S.apiKey && !skipAutoActivities) suggestActivitiesWithAI(countryId, newCity.city);
+  if(aiHasActiveKey() && !skipAutoActivities) suggestActivitiesWithAI(countryId, newCity.city);
 }
 // Traduit les réponses du questionnaire persona (S.tripPersona) en contexte textuel pour les
 // prompts IA. Retourne '' si aucune réponse n'a été donnée (génération neutre par défaut).
@@ -6639,7 +6641,7 @@ function renderItinerary(c, embedded){
     +weatherSection
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'
     +'<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px">'
-    +(S.apiKey
+    +(aiHasActiveKey()
       ? '<div class="info-card">'
         +'<div class="ic-header" style="color:var(--accent);cursor:pointer" onclick="toggleLieuxAiGen(\''+jsStrEsc(c.id)+'\')">G\u00e9n\u00e9rer avec l\'IA <span data-icon="chevron-right" data-icon-size="12" style="margin-left:auto;transition:transform .2s ease;transform:rotate('+((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id])?'90deg':'0deg')+')"></span></div>'
         +((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id]) ?
@@ -9155,7 +9157,7 @@ function renderGuide(c){
   }).join('');
   return '<div class="section" style="padding-bottom:20px"><div class="section-header" style="margin-bottom:14px"><div class="section-title">Infos pratiques</div></div>'
     +aiBadge
-    +(S.apiKey
+    +(aiHasActiveKey()
       ?'<div class="info-card" style="cursor:pointer" onclick="autofillCountryWithAI(\''+c.id+'\')">'
         +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
         +'<div class="status-sub" id="guide-autofill-status">Visa, conseils, urgences, checklist — à vérifier avant de partir.</div></div>'
@@ -10329,7 +10331,7 @@ function toggleMgCtry(cid){
   renderContent();
 }
 function renderManageCountriesScreen(){
-  var hasKey = !!S.apiKey;
+  var hasKey = aiHasActiveKey();
   var noKeyHTML = '<div class="info-card">'
     +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
     +(hasKey
@@ -10437,7 +10439,7 @@ function renderMyAccountScreen(){
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
     +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
-    +(S.apiKey ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
+    +(aiHasActiveKey() ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
     +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN de sécurité défini' : 'Aucun PIN défini — protège l\'accès à ta clé API')+'</div>'
     +'<button onclick="changePinFlowApi()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> '+(S.pin?'Changer mon PIN':'Créer un PIN')+'</button>'
@@ -12029,7 +12031,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     var _savedArchActivitiesCity = localStorage.getItem(namespacedKey+'_archivedActivitiesCity');
     if(_savedArchActivitiesCity !== null) S.archivedActivitiesCity = _savedArchActivitiesCity || undefined;
   }catch(e){}
-  console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- S.apiKey présente=', !!S.apiKey);
+  console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- clé IA active=', aiHasActiveKey());
   rebuildCountriesFromState();
 
   await loadCollaborators();
@@ -14234,7 +14236,7 @@ document.querySelectorAll('.auth-screen').forEach(enablePullToRefresh);
 
 // ── PROMPT POST-CRÉATION : voyage créé, données déterministes déjà initialisées ──
 function showPostCreateModal(trip){
-  var hasKey = !!S.apiKey;
+  var hasKey = aiHasActiveKey();
   // Résumé des pays déjà initialisés (drapeau + devise) — rassure l'utilisateur
   var countrySummary = '';
   if(COUNTRIES && COUNTRIES.length){
@@ -14297,7 +14299,7 @@ function submitPostCreateAiKey(){
     errEl.style.display = 'block';
     return;
   }
-  setAIKey('anthropic', val); // Lot B1 : écrit S.apiKey (compat) + planitrip_ai_config (device-level)
+  setAIKey('anthropic', val); // Lot B1 : écrit planitrip_ai_config (device-level) uniquement
   showPostCreatePersonaStep();
 }
 // Questionnaire persona (3 questions), pour orienter la future generation du Programme
@@ -14306,7 +14308,7 @@ var _personaAnswers = {pace:'', interests:[], budget:'', withWho:'', reducedMobi
 var _personaValidationError = '';
 function showPostCreatePersonaStep(){
   var optsEl = document.getElementById('postCreateOptions');
-  var hasKey = !!S.apiKey;
+  var hasKey = aiHasActiveKey();
   var paceOpts = [['intense','Intense — voir un maximum'],['equilibre','Équilibré'],['detente','Détente']];
   var interestOpts = [['nature','Nature & randonnée'],['culture','Culture & histoire'],['gastronomie','Vie nocturne & gastronomie'],['plages','Plages & farniente']];
   var budgetOpts = [['backpacker','Backpacker'],['confort','Confort'],['luxe','Luxe']];
@@ -14385,7 +14387,7 @@ function saveTripPersona(withAI){
   _personaValidationError = '';
   S.tripPersona = Object.assign({}, _personaAnswers);
   save();
-  if(withAI && S.apiKey){
+  if(withAI && aiHasActiveKey()){
     runAiTripPrep();
   } else {
     // Sauvegarde sans IA : confirmation discrète puis retour au voyage
@@ -14441,7 +14443,7 @@ La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de vil
 // des activités pour chacune (suggestActivitiesWithAI, déjà appelée par _createCityFromModal).
 async function generateProgramForCountry(countryId, onProgress, errorsOut, citiesOnly){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c || !S.apiKey) return;
+  if(!c || !aiHasActiveKey()) return;
   if(c.cities && c.cities.length) return; // des villes existent déjà, on ne duplique/écrase rien
   if(!c.dateStart || !c.dateEnd) return; // dates du pays pas encore connues, rien à répartir
   var cityPlan = await suggestCitiesWithAI(countryId);
