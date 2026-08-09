@@ -1931,7 +1931,10 @@ async function _syncActivityState(actKey, tripId){
   var r = await sb.from('activity_details')
     .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
             {onConflict:'trip_id,detail_key'});
-  if(r && r.error) console.error('[PlaniTrip] _syncActivityState:', r.error);
+  if(r && r.error){
+    console.error('[PlaniTrip] _syncActivityState:', r.error);
+    throw r.error; // permet au caller de détecter l'échec et de ne pas annoncer un succès
+  }
   return r;
 }
 // ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
@@ -4628,12 +4631,10 @@ function _createActivityCore(cityKey, val, opts){
     S.actCategory[actKey]=opts.categories.slice();
     // Correctif Lot 5A : synchroniser immédiatement vers Supabase (même comportement
     // qu'une catégorie choisie ensuite via le modal catégorie → toggleCategoryForAct).
+    // À la création, actKey est toujours _cN (le _sid n'est pas encore connu).
+    // _isCustomStableKey est donc toujours false ici — on écrit le blob global.
     if(sb && CURRENT_TRIP){
-      if(_isCustomStableKey(actKey)){
-        _syncActivityState(actKey, CURRENT_TRIP.id);
-      } else {
-        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync actCategory création:',_r.error); });
-      }
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync actCategory création:',_r.error); });
     }
   }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
@@ -4642,12 +4643,9 @@ function _createActivityCore(cityKey, val, opts){
   // les anciens textes approximatifs, mais une nouvelle activité avec heure structurée doit
   // passer par actTimeStart dès la création.
   if(opts.time){
-    var _isStbl = _isCustomStableKey(actKey);
-    var _noSync = _isStbl ? {sync:false} : undefined;
-    setActTimeRange(actKey, opts.time, '', '', _noSync);
-    setActMoment(actKey, getDayPeriod(opts.time), _noSync);
-    // Sync unique si custom stable (les mutations locales sont déjà dans S)
-    if(_isStbl && sb && CURRENT_TRIP) _syncActivityState(actKey, CURRENT_TRIP.id);
+    // À la création actKey est _cN (jamais stable) — pas de {sync:false} nécessaire.
+    setActTimeRange(actKey, opts.time, '', '');
+    setActMoment(actKey, getDayPeriod(opts.time));
   }
   save();
   renderContent();
@@ -6454,7 +6452,7 @@ function clearPlanningTime(){
   document.getElementById('planningModalTimeStart').value = '';
   document.getElementById('planningModalTimeEnd').value = '';
 }
-function savePlanningModal(){
+async function savePlanningModal(){
   var dateEl = document.getElementById('planningModalDate');
   var dateVal = dateEl ? dateEl.value : '';
   var startVal = document.getElementById('planningModalTimeStart').value;
@@ -6468,26 +6466,31 @@ function savePlanningModal(){
   }
   var actKey = _planningModalActKey;
   var isStable = _isCustomStableKey(actKey);
-  // P0.3 — batch local : toutes les mutations S sont appliquées sans déclencher
-  // de sync intermédiaire, puis UN seul upsert atomique est émis à la fin.
-  // Cela évite la race condition où 3 upserts concurrents s'écrasaient mutuellement.
+  // P0.3 — batch local sans sync intermédiaire
   var noSync = isStable ? {sync:false} : undefined;
+  var btn = isStable ? document.getElementById('planningModalSaveBtn') : null;
+  // 1. Désactiver le bouton avant toute mutation
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  // 2. Mutations locales (0 upsert Supabase pour les clés stables)
   if(dateEl) setActivityDate(actKey, dateVal, noSync);
   setActMoment(actKey, finalMoment, noSync);
   setActTimeRange(actKey, startVal, endVal, '', noSync);
+  // 3. Pour les clés stables : await le sync AVANT de fermer la modale.
+  //    Si l'upsert échoue, la modale reste ouverte, le bouton est réactivé,
+  //    et les données locales sont conservées (S est déjà à jour).
+  if(isStable && sb && CURRENT_TRIP){
+    try{
+      await _syncActivityState(actKey, CURRENT_TRIP.id);
+    } catch(e){
+      console.error('[PlaniTrip] savePlanningModal sync failed:', e);
+      if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
+      return; // modale reste ouverte — l'utilisateur peut réessayer
+    }
+  }
+  // 4. Succès confirmé : fermer et render
+  if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
   document.getElementById('planningModal').classList.remove('open');
   renderContent();
-  // Sync unique après toutes les mutations locales
-  if(isStable && sb && CURRENT_TRIP){
-    var btn = document.getElementById('planningModalSaveBtn');
-    if(btn){ btn.disabled = true; btn.textContent = '…'; }
-    _syncActivityState(actKey, CURRENT_TRIP.id).then(function(){
-      if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
-    }).catch(function(e){
-      console.error('[PlaniTrip] savePlanningModal sync:', e);
-      if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
-    });
-  }
 }
 function getActCategory(actKey, name, meta){
   if(S.actCategory && S.actCategory[actKey]!==undefined){
