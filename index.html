@@ -4608,6 +4608,8 @@ function openAddActivityModal(ck){
     +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de début</div>'
     +'<input class="ef-input" id="guideModalActTime" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
     +'</div>'
+    +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Type de lieu (optionnel)</div>'
+    +'<input class="ef-input" id="guideModalActPlaceType" type="text" placeholder="Ex. temple, marché, café…" style="width:100%"/></div>'
     // Description — zone secondaire, visuellement moins prioritaire
     +'<details style="margin-top:2px"><summary style="font-size:12px;color:var(--ink-subtle);cursor:pointer;list-style:none;display:flex;align-items:center;gap:4px;padding:4px 0">'+svgIcon('chevron-right',11)+'<span>Description (optionnel)</span></summary>'
     +'<div style="margin-top:6px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Quelques mots sur ce lieu…" style="width:100%;margin-top:2px"/></div>'
@@ -4655,8 +4657,15 @@ function saveAddActivityModal(){
   var meta = ((document.getElementById('guideModalActMeta')||{}).value||'').trim();
   var date = ((document.getElementById('guideModalActDate')||{}).value||'').trim();
   var timeVal = ((document.getElementById('guideModalActTime')||{}).value||'').trim();
+  var placeType = ((document.getElementById('guideModalActPlaceType')||{}).value||'').trim();
   closeGuideItemModal();
-  _createActivityCore(_addActivityModalCk, val, {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal});
+  var opts = {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal};
+  // Type de lieu saisi manuellement : même champ ("tag") que celui rempli par l'IA ou
+  // les suggestions statiques, via le mécanisme initialDetails déjà utilisé pour ces cas.
+  // skipAiEnrichment évite que fetchActivityDetailAI() écrase ce choix explicite juste après
+  // (elle remplace intégralement _customDetails[actKey], sans fusion — comportement existant).
+  if(placeType){ opts.initialDetails = {tag: placeType}; opts.skipAiEnrichment = true; }
+  _createActivityCore(_addActivityModalCk, val, opts);
 }
 
 // ── B2 : sélecteur de fournisseur minimal dans la modale Réglages (les
@@ -6563,6 +6572,9 @@ function renderCityPanelContentBody(c, city){
         var hasDetail=true;
         var actCat = getActCategory(k, a.n, a.m);
         var actMoment = getActMoment(k, a.n, a.m);
+        // Type de lieu (ex: "Temple shinto") : priorité à l'édition locale de l'utilisateur
+        // sur la fiche détaillée, repli sur la donnée statique — même logique que openDetail().
+        var actPlaceType = (window._customDetails && window._customDetails[k] && window._customDetails[k].tag) || (ACT_DETAILS[k] && ACT_DETAILS[k].tag) || '';
         var actCityStay = cityStayRange(ck);
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
@@ -6572,7 +6584,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
-          +(a.m?'<div class="act-meta">'+a.m+'</div>':'')
+          +(actPlaceType?'<div class="act-meta">'+escHtml(actPlaceType)+'</div>':'')
           +'<div class="act-footer">'
           +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done)
           +categoryPill(actCat,k)
@@ -6591,6 +6603,9 @@ function renderCityPanelContentBody(c, city){
         var caCat = getActCategory(ck2, ca.n, ca.m);
         if(activeCat!=='Tous' && caCat.indexOf(activeCat)===-1) return null;
         var caMoment = getActMoment(ck2, ca.n, ca.m);
+        // Type de lieu (ex: "Marché couvert") : issu de la fiche détaillée (IA ou édition
+        // manuelle) — pas de repli statique, une activité custom n'a pas d'entrée ACT_DETAILS.
+        var caPlaceType = (window._customDetails && window._customDetails[ck2] && window._customDetails[ck2].tag) || '';
         var cdone=!!S.done[ck2];
         var cCityStay = cityStayRange(ck);
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
@@ -6601,7 +6616,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+'</div>'
-          +(ca.m?'<div class="act-meta">'+escHtml(ca.m)+'</div>':'')
+          +(caPlaceType?'<div class="act-meta">'+escHtml(caPlaceType)+'</div>':'')
           +'<div class="act-footer">'
           +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone)
           +categoryPill(caCat,ck2)
