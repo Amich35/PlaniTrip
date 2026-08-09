@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p09b';
+var APP_BUILD = '2026-08-09·sha:p09c';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -4670,14 +4670,28 @@ async function _createActivityCore(cityKey, val, opts){
     var _id = opts.initialDetails;
     if(_id.lat && _id.lng && !COORDS[actKey]) COORDS[actKey] = [_id.lat, _id.lng, val];
   }
-  // P0.9 : mutation locale uniquement — PAS d'upsert Supabase sous _cN.
+  // P0.9c : snapshot des données propres à CETTE création.
+  // Source unique de vérité pour le transfert vers _stableKey après UUID.
+  // Ne jamais lire depuis _cN après l'UUID — risque de collision avec données historiques.
+  var _pendingState = {
+    hasDate:           !!opts.date,
+    date:              opts.date || '',
+    hasTime:           !!opts.time,
+    timeStart:         opts.time || '',
+    timeEnd:           opts.timeEnd || '',
+    moment:            opts.time ? getDayPeriod(opts.time) : '',
+    hasCategories:     !!(opts.categories && opts.categories.length),
+    categories:        (opts.categories || []).slice(),
+    hasInitialDetails: !!(opts.initialDetails && Object.keys(opts.initialDetails).length),
+    initialDetails:    opts.initialDetails || null
+  };
+  // Mutations locales sous _cN — UI transitoire uniquement, jamais source pour _stableKey.
   if(opts.categories && opts.categories.length){
     if(!S.actCategory) S.actCategory={};
     S.actCategory[actKey]=opts.categories.slice();
-    // Pas de sync ici : l'UUID n'est pas encore connu. La sync se fera sous _sid_ après INSERT.
   }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
-  // P0.9 : {sync:false} — aucune écriture Supabase sous _cN pour les horaires/moment.
+  // {sync:false} — aucune écriture Supabase sous _cN.
   if(opts.time){
     setActTimeRange(actKey, opts.time, opts.timeEnd||'', '', {sync:false});
     setActMoment(actKey, getDayPeriod(opts.time), {sync:false});
@@ -4700,28 +4714,53 @@ async function _createActivityCore(cityKey, val, opts){
       // Pas de rollback local — l'utilisateur voit l'activité et peut réessayer.
     } else if(_insertResult && _insertResult.data && _insertResult.data.id){
       var _sid = _insertResult.data.id;
-      var _legacyActKey = actKey;
       var _stableKey = cityKey+'_sid_'+_sid;
       // Affecter le _sid à l'objet activité
       if(S.customActs[cityKey] && S.customActs[cityKey][newIdx]){
         S.customActs[cityKey][newIdx]._sid = _sid;
       }
-      // Migration locale _cN → _sid_ via le mécanisme existant
-      _migrateActivityKeyIfNeeded(_stableKey, _legacyActKey);
+      // P0.9c : transfert explicite depuis _pendingState uniquement.
+      // Ne jamais lire ce qui existe sous _cN — cela peut être un résidu historique
+      // d'une ancienne activité ayant occupé le même index.
+      // _migrateActivityKeyIfNeeded est intentionnellement absent de ce chemin.
+      if(_pendingState.hasDate){
+        if(!S.actDate) S.actDate={};
+        S.actDate[_stableKey] = _pendingState.date;
+      }
+      if(_pendingState.hasTime){
+        if(!S.actTimeStart) S.actTimeStart={};
+        if(!S.actTimeEnd)   S.actTimeEnd={};
+        if(!S.actMoment)    S.actMoment={};
+        if(!S.actTime)      S.actTime={};
+        S.actTimeStart[_stableKey] = _pendingState.timeStart;
+        S.actTimeEnd[_stableKey]   = _pendingState.timeEnd;
+        S.actMoment[_stableKey]    = _pendingState.moment;
+        S.actTime[_stableKey]      = '';
+      }
+      if(_pendingState.hasCategories){
+        if(!S.actCategory) S.actCategory={};
+        S.actCategory[_stableKey] = _pendingState.categories.slice();
+      }
+      // initialDetails + COORDS : copie explicite depuis opts, jamais depuis _cN
+      if(_pendingState.hasInitialDetails){
+        if(!window._customDetails) window._customDetails={};
+        window._customDetails[_stableKey] = Object.assign({}, _pendingState.initialDetails, {_editUnlocked:false, _userValidated:false, _aiGenerated:false});
+        if(_pendingState.initialDetails.lat && _pendingState.initialDetails.lng){
+          COORDS[_stableKey] = [_pendingState.initialDetails.lat, _pendingState.initialDetails.lng, val];
+        }
+      }
       S.customDetails = window._customDetails;
       save();
-      // Sync Supabase UNIQUEMENT sous la clé stable _sid_
+      // Sync Supabase sous la clé stable uniquement
       // _syncActivityState couvre : date, moment, timeStart, timeEnd, category, done
       try{
         await _syncActivityState(_stableKey, CURRENT_TRIP.id);
       } catch(e){
         console.error('[PlaniTrip] _createActivityCore sync state:', e);
       }
-      // Fiche détaillée statique : migrer sous la clé stable si présente
-      if(opts.initialDetails && Object.keys(opts.initialDetails).length){
-        if(window._customDetails && window._customDetails[_stableKey]){
-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_stableKey,data:window._customDetails[_stableKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
-        }
+      // Fiche détaillée statique sous la clé stable
+      if(_pendingState.hasInitialDetails && window._customDetails && window._customDetails[_stableKey]){
+        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_stableKey,data:window._customDetails[_stableKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
       }
     }
   }
