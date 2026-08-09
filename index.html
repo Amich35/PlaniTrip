@@ -3267,8 +3267,13 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
     if(!aiRes.ok) throw new Error(aiErrorMessage(aiRes.error));
     var info = aiRes.data;
     if(!window._customDetails) window._customDetails={};
+    // Préserver un type de lieu ("tag") saisi manuellement : l'IA peut compléter tout le
+    // reste de la fiche (description, adresse, conseils...) mais ne doit jamais écraser
+    // une valeur explicite posée par l'utilisateur.
+    var _prevDetail = window._customDetails[detailKey] || {};
+    var _keepUserTag = !!_prevDetail._userTag;
     window._customDetails[detailKey] = {
-      emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'', m: info.m||'',
+      emoji: info.emoji||'📍', tag: _keepUserTag ? _prevDetail.tag : (info.tag||''), history: info.history||'', m: info.m||'',
       hours: info.hours||'', costs: info.costs||[], tips: info.tips||[],
       address: info.address||'', lat: info.lat||null, lng: info.lng||null,
       duration: (info.duration && info.duration!=='Inconnu') ? info.duration : '',
@@ -3279,6 +3284,7 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
       _aiGenerated: true,
       _aiGeneratedAt: new Date().toISOString()
     };
+    if(_keepUserTag) window._customDetails[detailKey]._userTag = true;
     S.customDetails = window._customDetails;
     if(sb && CURRENT_TRIP){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:detailKey, data:window._customDetails[detailKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -3521,6 +3527,7 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
     d.address = val;
   } else if(field === 'tag'){
     d.tag = val;
+    d._userTag = true;
   } else if(field === 'costs'){
     d.costs = val.split('\n').map(function(l){return l.trim();}).filter(Boolean);
   } else if(field === 'mapsUrl'){
@@ -4662,9 +4669,10 @@ function saveAddActivityModal(){
   var opts = {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal};
   // Type de lieu saisi manuellement : même champ ("tag") que celui rempli par l'IA ou
   // les suggestions statiques, via le mécanisme initialDetails déjà utilisé pour ces cas.
-  // skipAiEnrichment évite que fetchActivityDetailAI() écrase ce choix explicite juste après
-  // (elle remplace intégralement _customDetails[actKey], sans fusion — comportement existant).
-  if(placeType){ opts.initialDetails = {tag: placeType}; opts.skipAiEnrichment = true; }
+  // _userTag protège ce choix explicite d'un écrasement par fetchActivityDetailAI(), qui
+  // continue de tourner normalement pour enrichir le reste de la fiche (description,
+  // adresse, conseils...).
+  if(placeType) opts.initialDetails = {tag: placeType, _userTag: true};
   _createActivityCore(_addActivityModalCk, val, opts);
 }
 
