@@ -6146,17 +6146,22 @@ function swipeEnd(e, el){
       el.style.transform = 'translateX(-160px)';
       el.dataset.swipeOpen = '1';
       snapBg(true);
+      e.preventDefault();
     } else if(_swipeState.dx > 50 && el.dataset.actKey){
       el.style.transform = 'translateX(0)';
       el.dataset.swipeOpen = '';
       snapBg(false);
       toggleAct(el.dataset.actKey);
+      e.preventDefault();
     } else {
       el.style.transform = '';
       el.dataset.swipeOpen = '';
       snapBg(false);
+      // Bug 1 (fix) : mouvement resté sous le seuil de swipe — jitter naturel
+      // d'un tap. Ne PAS preventDefault ici, sinon le click synthétique iOS
+      // Safari qui suit le touchend est supprimé et le tap simple ne navigue
+      // plus jamais vers la fiche ville (openCityDetail jamais appelé).
     }
-    e.preventDefault();
   } else if(_swipeState.wasOpen){
     el.style.transform = '';
     el.dataset.swipeOpen = '';
@@ -7014,7 +7019,7 @@ function renderArchivedCitiesScreen(){
       }).join('')
     : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Corbeille vide.</div>';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
-    +'<div class="more-row" onclick="openCountryDetail(\''+countryId+'\',\'guide\');" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour'+(c?' à '+escHtml(c.name):'')+'</div>'
+    +'<div class="more-row" onclick="openCountryDetail(\''+countryId+'\',\'lieux\');" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour'+(c?' à '+escHtml(c.name):'')+'</div>'
     +'<div class="section-title" style="margin-bottom:12px">Corbeille'+(c?' — '+escHtml(c.name):'')+'</div>'
     +'<div class="info-card" style="padding:6px">'+rows+'</div>'
     +'</div>';
@@ -12531,50 +12536,57 @@ window.COUNTRY_TIMEZONES = {};
 window.COUNTRY_PHRASES = {};
 window.COUNTRY_EMERGENCY = {};
 
+// Bug 5 (renforcement défensif) : l'ancien early-return `if (Object.keys(window.
+// COUNTRY_FLAGS).length) return;` utilisait un seul référentiel comme indicateur
+// que TOUS étaient chargés — un échec réseau isolé sur un seul fetch (ex: emergency)
+// ou un appel concurrent pendant qu'un premier chargement était encore en cours
+// pouvait laisser ce référentiel vide en permanence pour la session. Chaque
+// dataset est maintenant vérifié et chargé indépendamment ; une promesse
+// partagée évite les fetch dupliqués en cas d'appels concurrents (le second
+// appelant attend la même promesse plutôt que de repartir de zéro).
+var _countryRefDataLoadPromise = null;
 async function loadCountryFlags() {
-  if (Object.keys(window.COUNTRY_FLAGS).length) return;
-  try {
-    const res = await fetch('country_flags.json');
-    window.COUNTRY_FLAGS = await res.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_flags.json', e);
-  }
-  try {
-    const res2 = await fetch('country_currencies.json');
-    window.COUNTRY_CURRENCIES = await res2.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_currencies.json', e);
-  }
-  try {
-    const res3 = await fetch('country_rates.json');
-    window.COUNTRY_RATES = await res3.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_rates.json', e);
-  }
-  try {
-    const res4 = await fetch('country_languages.json');
-    window.COUNTRY_LANGUAGES = await res4.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_languages.json', e);
-  }
-  try {
-    const res5 = await fetch('country_timezones.json');
-    window.COUNTRY_TIMEZONES = await res5.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_timezones.json', e);
-  }
-  try {
-    const res6 = await fetch('country_phrases.json');
-    window.COUNTRY_PHRASES = await res6.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_phrases.json', e);
-  }
-  try {
-    const res7 = await fetch('country_emergency.json');
-    window.COUNTRY_EMERGENCY = await res7.json();
-  } catch (e) {
-    console.error('[PlaniTrip] impossible de charger country_emergency.json', e);
-  }
+  var allLoaded = Object.keys(window.COUNTRY_FLAGS).length
+    && Object.keys(window.COUNTRY_CURRENCIES).length
+    && Object.keys(window.COUNTRY_RATES).length
+    && Object.keys(window.COUNTRY_LANGUAGES).length
+    && Object.keys(window.COUNTRY_TIMEZONES).length
+    && Object.keys(window.COUNTRY_PHRASES).length
+    && Object.keys(window.COUNTRY_EMERGENCY).length;
+  if (allLoaded) return;
+  if (_countryRefDataLoadPromise) return _countryRefDataLoadPromise;
+  _countryRefDataLoadPromise = (async function(){
+    if (!Object.keys(window.COUNTRY_FLAGS).length) {
+      try { const res = await fetch('country_flags.json'); window.COUNTRY_FLAGS = await res.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_flags.json', e); }
+    }
+    if (!Object.keys(window.COUNTRY_CURRENCIES).length) {
+      try { const res2 = await fetch('country_currencies.json'); window.COUNTRY_CURRENCIES = await res2.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_currencies.json', e); }
+    }
+    if (!Object.keys(window.COUNTRY_RATES).length) {
+      try { const res3 = await fetch('country_rates.json'); window.COUNTRY_RATES = await res3.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_rates.json', e); }
+    }
+    if (!Object.keys(window.COUNTRY_LANGUAGES).length) {
+      try { const res4 = await fetch('country_languages.json'); window.COUNTRY_LANGUAGES = await res4.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_languages.json', e); }
+    }
+    if (!Object.keys(window.COUNTRY_TIMEZONES).length) {
+      try { const res5 = await fetch('country_timezones.json'); window.COUNTRY_TIMEZONES = await res5.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_timezones.json', e); }
+    }
+    if (!Object.keys(window.COUNTRY_PHRASES).length) {
+      try { const res6 = await fetch('country_phrases.json'); window.COUNTRY_PHRASES = await res6.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_phrases.json', e); }
+    }
+    if (!Object.keys(window.COUNTRY_EMERGENCY).length) {
+      try { const res7 = await fetch('country_emergency.json'); window.COUNTRY_EMERGENCY = await res7.json(); }
+      catch (e) { console.error('[PlaniTrip] impossible de charger country_emergency.json', e); }
+    }
+  })();
+  try { await _countryRefDataLoadPromise; }
+  finally { _countryRefDataLoadPromise = null; }
 }
 // Résout les phrases utiles pour une langue de pays (ex: "Anglais / Français" → essaie chaque
 // langue dans l'ordre jusqu'à en trouver une couverte). Retourne [] si aucune correspondance.
@@ -12740,6 +12752,9 @@ async function openAddCountryToTripModal() {
 
 async function addCountryToCurrentTrip(countryName) {
   if (!sb || !CURRENT_TRIP) return;
+  // Bug 5 : s'assurer que les référentiels (dont country_emergency.json) sont
+  // chargés avant d'initialiser le pays — idempotent/rapide si déjà chargés.
+  await loadCountryFlags();
   const updatedCountries = effectiveTripCountries().concat([countryName]);
   const { error } = await sb.from('trips').update({ countries: updatedCountries }).eq('id', CURRENT_TRIP.id);
   if (error) {
@@ -12749,6 +12764,14 @@ async function addCountryToCurrentTrip(countryName) {
   CURRENT_TRIP.countries = updatedCountries;
   rebuildCountriesFromState();
   applyTripCountryFilter(CURRENT_TRIP);
+  // Bug 5 (cause certaine) : applyTripCountryFilter() initialise practical.emergency
+  // à [] pour tout nouveau pays — contrairement à enterTrip() qui remplit ensuite
+  // les urgences manquantes pour tous les pays, addCountryToCurrentTrip() ne le
+  // faisait jamais. Même boucle défensive que dans enterTrip(), pour garantir le
+  // même niveau d'initialisation qu'un pays créé au setup initial.
+  COUNTRIES.forEach(function(c){
+    if(!c.practical.emergency || !c.practical.emergency.length) applyEmergencyFromTable(c);
+  });
   autofillMissingCountryDates();
   save();
   renderContent();
