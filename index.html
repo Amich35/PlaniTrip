@@ -2874,7 +2874,7 @@ function openDetail(actKey, actName, cityKey) {
 var AI_MODELS = {
   anthropic: { auto: 'claude-sonnet-4-6' },
   openai:    { auto: 'gpt-5.6' },       // B2 — vérifié doc officielle OpenAI (Responses API) au moment de l'implémentation
-  gemini:    { auto: 'gemini-2.5-flash' } // réservé B3 — non appelé tant que implemented=false
+  gemini:    { auto: 'gemini-3.6-flash' } // B3 — vérifié doc officielle Google (GA stable ; 2.5 retiré oct. 2026)
 };
 
 // ── Registry des fournisseurs — capacités déclarées ici, jamais dispersées
@@ -2882,7 +2882,7 @@ var AI_MODELS = {
 var AI_PROVIDERS = {
   anthropic:   { label:'Anthropic',      supportsWebSearch:true, supportsStructuredOutput:false, implemented:true  },
   openai:      { label:'OpenAI',         supportsWebSearch:true, supportsStructuredOutput:true,  implemented:true  },
-  gemini:      { label:'Google Gemini',  supportsWebSearch:true, supportsStructuredOutput:true,  implemented:false }
+  gemini:      { label:'Google Gemini',  supportsWebSearch:true, supportsStructuredOutput:true,  implemented:true  }
 };
 
 // ── Configuration IA — stockage AU NIVEAU APPAREIL (localStorage dédié),
@@ -2957,6 +2957,7 @@ async function aiRequest(options){
   try{
     if(provider === 'anthropic') return await _aiCallAnthropic(key, options);
     if(provider === 'openai') return await _aiCallOpenAI(key, options);
+    if(provider === 'gemini') return await _aiCallGemini(key, options);
     return _aiError('provider_unavailable', providerDef.label+' n\'est pas encore implémenté.');
   }catch(e){
     return _aiError('network_error', (e && e.message) || 'Erreur réseau.');
@@ -3092,6 +3093,90 @@ async function _aiCallOpenAI(key, options){
     catch(e){ return _aiError('invalid_response', 'JSON invalide dans la réponse.'); }
   }
   return _aiOk(text, parsedData, 'openai', model, []);
+}
+
+// Extrait le texte final d'une réponse Gemini generateContent.
+function extractGeminiText(data){
+  if(!data || !data.candidates || !data.candidates.length) return '';
+  var cand = data.candidates[0];
+  if(!cand.content || !cand.content.parts) return '';
+  return cand.content.parts.filter(function(p){ return typeof p.text === 'string'; }).map(function(p){ return p.text; }).join('\n');
+}
+// Normalise les sources de grounding Gemini (groundingChunks) vers le format
+// commun {title,url} (section 16 du cahier des charges Lot B) — seul provider
+// pour lequel ça a été fait à ce stade : Anthropic/OpenAI restent sources:[]
+// (aucune fonction métier actuelle ne consomme sources, donc aucun risque
+// à normaliser Gemini en plus, mais aucune urgence à revenir en arrière sur
+// les deux autres adapters pour un gain non exploité).
+function extractGeminiSources(data){
+  try{
+    var chunks = data && data.candidates && data.candidates[0] && data.candidates[0].groundingMetadata && data.candidates[0].groundingMetadata.groundingChunks;
+    if(!chunks || !chunks.length) return [];
+    return chunks.filter(function(c){ return c && c.web && c.web.uri; }).map(function(c){ return { title: c.web.title||'', url: c.web.uri }; });
+  }catch(e){ return []; }
+}
+
+// ── Adapter Gemini (B3) — passe par l'Edge Function Supabase `gemini-proxy`,
+// même architecture sécurisée que l'adapter OpenAI (B2 corrigé) : la clé BYOK
+// de l'utilisateur est envoyée dans le corps de la requête à la fonction,
+// uniquement pour cet appel en cours, jamais stockée côté serveur, jamais
+// loggée. La fonction exige une session Supabase authentifiée et whiteliste
+// strictement model/tools — aucun prompt métier ni logique PlaniTrip dedans.
+// Endpoint stable generateContent (v1beta), recommandé pour la production par
+// Google au moment de l'implémentation (l'Interactions API plus récente reste
+// en Beta). Grounding via l'outil { google_search: {} }.
+async function _aiCallGemini(key, options){
+  var model = (AI_MODELS.gemini && AI_MODELS.gemini[options.model || 'auto']) || AI_MODELS.gemini.auto;
+  if(!sb) return _aiError('network_error', 'Connexion au service indisponible.');
+
+  var payload = { apiKey: key, model: model, input: options.prompt };
+  if(options.webSearch) payload.tools = [{ google_search: {} }];
+  if(options.system) payload.systemInstruction = options.system;
+  if(options.maxTokens) payload.max_output_tokens = Math.max(options.maxTokens, 16);
+
+  var invokeRes;
+  try{
+    invokeRes = await sb.functions.invoke('gemini-proxy', { body: payload });
+  }catch(e){
+    return _aiError('network_error', 'Impossible de contacter le service IA.');
+  }
+
+  if(invokeRes.error){
+    var status = (invokeRes.error.context && invokeRes.error.context.status) || 0;
+    var errBody = null;
+    try{
+      if(invokeRes.error.context && typeof invokeRes.error.context.json === 'function'){
+        errBody = await invokeRes.error.context.json();
+      }
+    }catch(e){}
+    // errBody.error peut être soit l'objet d'erreur Gemini {code,message,status}
+    // (relayé tel quel par le proxy), soit une chaîne (nos propres erreurs de
+    // garde-fou dans la fonction : unauthorized, paramètres manquants...).
+    var errDetail = '', geminiStatus = '';
+    if(errBody && errBody.error){
+      if(typeof errBody.error === 'object'){ errDetail = errBody.error.message || ''; geminiStatus = errBody.error.status || ''; }
+      else { errDetail = String(errBody.error); }
+    }
+    var code = 'invalid_response';
+    if(status === 401 && errDetail === 'unauthorized') code = 'network_error'; // session Supabase expirée, pas la clé Gemini
+    else if(status === 401 || status === 403 || geminiStatus === 'UNAUTHENTICATED' || geminiStatus === 'PERMISSION_DENIED' || /api key/i.test(errDetail)) code = 'invalid_key';
+    else if(geminiStatus === 'RESOURCE_EXHAUSTED') code = 'quota_exceeded';
+    else if(status === 429) code = 'rate_limited';
+    else if(status === 404 || geminiStatus === 'NOT_FOUND') code = 'model_unavailable';
+    else if(status === 500 || status === 503 || geminiStatus === 'UNAVAILABLE' || !status) code = 'provider_unavailable';
+    return _aiError(code, errDetail || ('Erreur '+(status||'réseau')));
+  }
+
+  var data = invokeRes.data;
+  var text = extractGeminiText(data);
+  if(!text) return _aiError('invalid_response', 'Réponse vide.');
+
+  var parsedData = null;
+  if(options.output === 'json'){
+    try{ parsedData = deepSanitize(parseAiJson(text)); }
+    catch(e){ return _aiError('invalid_response', 'JSON invalide dans la réponse.'); }
+  }
+  return _aiOk(text, parsedData, 'gemini', model, extractGeminiSources(data));
 }
 
 // Traduit un code d'erreur normalisé en message UX — jamais de JSON brut
