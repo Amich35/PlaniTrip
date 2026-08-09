@@ -3587,6 +3587,47 @@ function saveAccom(ck) {
   const note    = document.getElementById('am_note')?.value||'';
   const status  = S._accomModalStatus||'confirmed';
   const nights  = (start && end) ? String(Math.max(0, Math.round((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000))) : '';
+  if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
+  var thisId = _accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000));
+
+  // Sauvegarde effective — inchangée, seulement extraite pour pouvoir être
+  // appelée soit directement (aucun chevauchement), soit après confirmation
+  // explicite de l'utilisateur ("Continuer quand même").
+  function doCommit(){
+    var oldRange = cityStayRange(ck);
+    var entry = {id:thisId, name, link, start, end, nights, checkin, checkout, note, status};
+    var idx = S.accom[ck].findIndex(function(e){return e.id===entry.id;});
+    if(idx>-1) S.accom[ck][idx]=entry; else S.accom[ck].push(entry);
+    var newRange = cityStayRange(ck);
+    if(oldRange && newRange && (oldRange.start!==newRange.start || oldRange.end!==newRange.end)){
+      shiftActivityDatesForCity(ck, oldRange, newRange);
+    }
+    save();
+    if(sb && CURRENT_TRIP){
+      var countryId = ck.split('_')[0];
+      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    }
+    document.getElementById('accomModal').classList.remove('open');
+    renderContent();
+  }
+
+  // Chevauchement avec un autre logement de la même ville — désormais
+  // franchissable via confirmation explicite (comportement inchangé sinon).
+  function checkSameCityOverlapThenCommit(){
+    if(start && end){
+      var conflict = S.accom[ck].find(function(e){
+        if(e.id===thisId) return false;
+        if(!e.start || !e.end) return false;
+        return start < e.end && e.start < end;
+      });
+      if(conflict){
+        showConfirm('Ces dates chevauchent celles de "'+(conflict.name||'un autre logement')+'" ('+fmtDateRangeFr(conflict.start,conflict.end)+'). Veux-tu continuer quand même ?', doCommit, 'Continuer quand même', 'Annuler');
+        return;
+      }
+    }
+    doCommit();
+  }
+
   if(start && end){
     var countryIdCheck = ck.split('_')[0];
     var countryCheck = COUNTRIES.find(function(co){return co.id===countryIdCheck;});
@@ -3607,40 +3648,15 @@ function saveAccom(ck) {
           break;
         }
       }
+      // Chevauchement avec le séjour d'une autre ville — désormais
+      // franchissable via confirmation explicite (avant : blocage strict).
       if(otherCityConflict){
-        alert('Ces dates chevauchent le séjour à '+otherCityConflict.city+' ('+fmtDateRangeFr(otherCityConflict.range.start,otherCityConflict.range.end)+'). Tu ne peux pas être dans deux villes en même temps.');
+        showConfirm('Ces dates chevauchent le séjour à '+otherCityConflict.city+' ('+fmtDateRangeFr(otherCityConflict.range.start,otherCityConflict.range.end)+'). Veux-tu continuer quand même ?', checkSameCityOverlapThenCommit, 'Continuer quand même', 'Annuler');
         return;
       }
     }
   }
-  if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
-  var thisId = _accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000));
-  if(start && end){
-    var conflict = S.accom[ck].find(function(e){
-      if(e.id===thisId) return false;
-      if(!e.start || !e.end) return false;
-      return start < e.end && e.start < end;
-    });
-    if(conflict){
-      alert('Ces dates chevauchent celles de "'+(conflict.name||'un autre logement')+'" ('+fmtDateRangeFr(conflict.start,conflict.end)+'). Ajuste les dates pour éviter le chevauchement.');
-      return;
-    }
-  }
-  var oldRange = cityStayRange(ck);
-  var entry = {id:thisId, name, link, start, end, nights, checkin, checkout, note, status};
-  var idx = S.accom[ck].findIndex(function(e){return e.id===entry.id;});
-  if(idx>-1) S.accom[ck][idx]=entry; else S.accom[ck].push(entry);
-  var newRange = cityStayRange(ck);
-  if(oldRange && newRange && (oldRange.start!==newRange.start || oldRange.end!==newRange.end)){
-    shiftActivityDatesForCity(ck, oldRange, newRange);
-  }
-  save();
-  if(sb && CURRENT_TRIP){
-    var countryId = ck.split('_')[0];
-    sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-  }
-  document.getElementById('accomModal').classList.remove('open');
-  renderContent();
+  checkSameCityOverlapThenCommit();
 }
 // Quand les dates d'un logement changent, les activités qui avaient une date explicite
 // dans l'ancienne plage de séjour sont replacées proportionnellement dans la nouvelle
