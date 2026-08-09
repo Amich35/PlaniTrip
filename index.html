@@ -6624,8 +6624,8 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   } else if(isViewingSingleDay){
     // Vue Jour — la date est déjà connue via le filtre actif, on ne la répète pas.
     if(timeVal){
-      // 08h30 [· Matin] — heure et moment tous deux gris/secondaires
-      innerHTML = _h(timeVal)+(mo?_sep()+_m(mo.label):'');
+      // Heure seule — le moment est déjà exprimé par la section (Matin / Après-midi…)
+      innerHTML = _h(timeVal);
     } else if(mo){
       // Matin seul — neutre (pas d'heure précise)
       innerHTML = _m(mo.label);
