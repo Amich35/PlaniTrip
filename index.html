@@ -10694,7 +10694,7 @@ function startEditCity(ck, currentName) {
   if(!header) return;
   header.innerHTML = '<div class="editable-wrap" style="display:flex;align-items:center;gap:6px">'
     +'<input class="edit-inline" id="edit-city-'+ck+'" value="'+escHtml(currentName)+'" style="font-size:inherit;font-weight:inherit;color:inherit;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:2px 8px;min-width:100px;outline:none" />'
-    +'<button onclick="event.stopPropagation();confirmEditCity(\''+jsStrEsc(ck)+'\'" style="background:rgba(255,255,255,0.2);border:none;border-radius:6px;padding:3px 8px;color:#fff;cursor:pointer;font-size:12px">✓</button>'
+    +'<button onclick="event.stopPropagation();confirmEditCity(\''+jsStrEsc(ck)+'\')" style="background:rgba(255,255,255,0.2);border:none;border-radius:6px;padding:3px 8px;color:#fff;cursor:pointer;font-size:12px">✓</button>'
     +'<button onclick="event.stopPropagation();renderContent()" style="background:rgba(255,255,255,0.12);border:none;border-radius:6px;padding:3px 8px;color:#fff;cursor:pointer;font-size:12px">✕</button>'
     +'</div>';
   var inp = document.getElementById('edit-city-'+ck);
