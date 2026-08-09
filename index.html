@@ -14511,8 +14511,128 @@ async function _impCreateTrip() {
   _IMP.creating = false;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FIN A2.1
+// ── Ajout de l'import au voyage courant (Mode B) ─────────────────────────────
+// Miroir de _impCreateTrip() mais sans création de voyage : enrichit CURRENT_TRIP
+// avec les pays/villes/activités/logements détectés dans le document importé.
+async function _impAddToCurrentTrip() {
+  if (_IMP.creating) return;
+  var p = _IMP.parsed;
+  if (!p) return;
+  if (!sb || !CURRENT_TRIP) return;
+  var errEl = document.getElementById('imp-create-error');
+  function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+  if (errEl) errEl.style.display = 'none';
+
+  // Correctif #5 (repris) : garde-fou — bloquer si des éléments restent
+  // incomplets (pays/ville manquant) plutôt que de les perdre silencieusement.
+  var incompleteCities = p.cities.filter(function(c){ return !c.country; });
+  var incompleteActs = p.activities.filter(function(a){ return !a.country || !a.city; });
+  var incompleteAccoms = p.accommodations.filter(function(a){ return !a.country || !a.city; });
+  var totalIncomplete = incompleteCities.length + incompleteActs.length + incompleteAccoms.length;
+  if (totalIncomplete > 0) {
+    showErr(totalIncomplete+' élément'+(totalIncomplete>1?'s sont incomplets':' est incomplet')+' (pays ou ville manquant). Corrige-les ou retire-les avant d\'ajouter au voyage.');
+    return;
+  }
+
+  var countries = p.countries.map(function(c){ return c.name; });
+  if (!countries.length && !p.cities.length && !p.activities.length && !p.accommodations.length) {
+    showErr('Aucun élément détecté à ajouter au voyage.');
+    return;
+  }
+
+  _IMP.creating = true;
+  var btn = document.getElementById('imp-create-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Ajout…'; }
+
+  var savedCountries = countries.slice();
+  var savedCities = p.cities.slice();
+  var savedActs = p.activities.slice();
+  var savedAccoms = p.accommodations.slice();
+  closeImportTripModal();
+
+  var injectionErrors = [];
+
+  // Pays : n'ajouter que ceux qui ne sont pas déjà dans le voyage courant.
+  var existingCountryNames = effectiveTripCountries();
+  for (var pi=0; pi<savedCountries.length; pi++) {
+    var cName = savedCountries[pi];
+    var already = existingCountryNames.find(function(n){ return _impNorm(n)===_impNorm(cName); });
+    if (already) continue;
+    try { await addCountryToCurrentTrip(cName); } catch(e) { injectionErrors.push('Pays '+cName+' : '+e.message); }
+  }
+
+  // Villes : pré-vérifier l'existence — ne jamais écraser les dates d'une ville
+  // déjà présente (contrairement au mode création où toutes les villes sont neuves).
+  for (var ci=0; ci<savedCities.length; ci++) {
+    var cityItem = savedCities[ci];
+    if (!cityItem.city || !cityItem.country) continue;
+    var realC2 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(cityItem.country); });
+    if (!realC2) { injectionErrors.push('Ville '+cityItem.city+' : pays introuvable dans le voyage'); continue; }
+    var cityAlready = realC2.cities && realC2.cities.find(function(ci2){ return _impNorm(ci2.city)===_impNorm(cityItem.city); });
+    if (cityAlready) continue; // déjà présente : ne pas écraser ses dates
+    try {
+      await _createCityFromModal(realC2.id, cityItem.city, '', cityItem.dateStart||'', cityItem.dateEnd||'', true);
+    } catch(e) { injectionErrors.push('Ville '+cityItem.city+' : '+e.message); }
+  }
+
+  // Activités : logique identique au mode création (déjà testée).
+  for (var ai=0; ai<savedActs.length; ai++) {
+    var act = savedActs[ai];
+    if (!act.name || !act.city || !act.country) continue;
+    var realC3 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(act.country); });
+    if (!realC3) { injectionErrors.push('Activité '+act.name+' : pays introuvable dans le voyage'); continue; }
+    var cityKey = realC3.id+'_'+act.city;
+    var cityExists = realC3.cities && realC3.cities.find(function(ci3){ return _impNorm(ci3.city)===_impNorm(act.city); });
+    if (!cityExists) {
+      try { await _createCityFromModal(realC3.id, act.city, '', '', '', true); } catch(e) {}
+    }
+    try {
+      _createActivityCore(cityKey, act.name, {
+        skipAiEnrichment: true,
+        meta: act.note || '',
+        date: act.date || '',
+        time: act.time || ''
+      });
+    } catch(e) { injectionErrors.push('Activité '+act.name+' : '+e.message); }
+  }
+
+  // Logements : logique identique au mode création (déjà testée).
+  for (var hi=0; hi<savedAccoms.length; hi++) {
+    var accom = savedAccoms[hi];
+    if (!accom.name || !accom.city || !accom.country) continue;
+    var realC4 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(accom.country); });
+    if (!realC4) { injectionErrors.push('Logement '+accom.name+' : pays introuvable dans le voyage'); continue; }
+    var ck4 = realC4.id+'_'+accom.city;
+    if (!S.accom) S.accom = {};
+    if (!Array.isArray(S.accom[ck4])) S.accom[ck4] = [];
+    var newAccom = {
+      id: 'imp_'+Date.now()+'_'+hi,
+      name: accom.name, link: accom.link||'',
+      start: accom.dateStart||'', end: accom.dateEnd||'',
+      nights: accom.nights||0, checkin:'', checkout:'',
+      note: accom.note||'', status:'confirmed'
+    };
+    S.accom[ck4].push(newAccom);
+    if (sb && CURRENT_TRIP) {
+      var cId4 = ck4.split('_')[0];
+      try {
+        await sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck4, country_id:cId4, data:S.accom[ck4], updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'});
+      } catch(e) { injectionErrors.push('Logement '+accom.name+' : synchronisation échouée'); }
+    }
+  }
+
+  save();
+  renderContent();
+
+  if (injectionErrors.length) {
+    alert('Ajout terminé, mais '+injectionErrors.length+' élément'+(injectionErrors.length>1?'s n\'ont':' n\'a')+' pas pu être importé'+(injectionErrors.length>1?'s':'')+' :\n'
+      + injectionErrors.slice(0,6).join('\n') + (injectionErrors.length>6 ? '\n…' : ''));
+  } else {
+    alert('Import terminé : les données ont été ajoutées à '+CURRENT_TRIP.name+'.');
+  }
+
+  _IMP.creating = false;
+}
 // ═══════════════════════════════════════════════════════════════════════════
 
 loadCountryFlags();
