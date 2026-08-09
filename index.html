@@ -3683,7 +3683,7 @@ function shiftActivityDatesForCity(ck, oldRange, newRange){
   var oldSpan = oldEndMs - oldStartMs;
   var keys = [];
   for(var i=0;i<city.acts.length;i++) keys.push(ck+'_'+i);
-  (S.customActs[ck]||[]).forEach(function(_,i){ keys.push(ck+'_c'+i); });
+  (S.customActs[ck]||[]).forEach(function(ca,i){ keys.push(getCustomActivityKey(ck, ca, i)); });
   var changed = false;
   keys.forEach(function(k){
     var d = S.actDate[k];
@@ -4240,9 +4240,9 @@ function countActivitiesByDate(ck){
   order.forEach(function(slot, slotIdx){
     var isBase = slot[0]==='b';
     var origIdx = parseInt(slot.slice(1));
-    var k = isBase ? (ck+'_'+origIdx) : (ck+'_c'+origIdx);
     if(isBase && S.deletedActs[ck+'_'+origIdx]) return;
     if(!isBase && !customs[origIdx]) return;
+    var k = isBase ? (ck+'_'+origIdx) : getCustomActivityKey(ck, customs[origIdx], origIdx);
     var d = getActivityDate(k, countryId, cityName, slotIdx, order.length);
     if(d) counts[d] = (counts[d]||0)+1;
   });
@@ -4384,7 +4384,7 @@ function backfillCityActivityPins(ck){
   var customs = S.customActs[ck] || [];
   var queue = [];
   customs.forEach(function(ca, i){
-    var key = ck+'_c'+i;
+    var key = getCustomActivityKey(ck, ca, i);
     if(!COORDS[key] && !_pinAttempted[key]) queue.push({key:key, name:ca.n});
   });
   if(!queue.length) return;
@@ -4445,15 +4445,17 @@ function duplicateActivity(cityKey, actKey, actName, isCustom, origIdx, targetCi
     var parts = destCityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     // Lot 5B correctif : récupérer l'id UUID pour rename ultérieur sans ambiguïté.
-    (function(_capIdx, _capCk, _capName){
+    (function(_capIdx, _capCk, _capName, _legacyKey){
       sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:newName,added_by_label:who}).select('id').single().then(function(_r){
         if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); return; }
         if(_r&&_r.data&&_r.data.id && S.customActs[_capCk] && S.customActs[_capCk][_capIdx]){
           S.customActs[_capCk][_capIdx]._sid = _r.data.id;
           save();
+          // Correctif P0 : migration immédiate legacy → stable, locale + serveur.
+          _migrateToStableKeyAfterSync(_capCk, _legacyKey, _r.data.id);
         }
       });
-    })(newIdx, destCityKey, newName);
+    })(newIdx, destCityKey, newName, newActKey);
     if(window._customDetails[newActKey]){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:newActKey, data:window._customDetails[newActKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
     }
@@ -4523,6 +4525,11 @@ function _createActivityCore(cityKey, val, opts){
   if(opts.meta) actObj._userMeta = true;
   if(opts.detailKey) actObj._detailKey = opts.detailKey;
   S.customActs[cityKey].push(actObj);
+  // Correctif P0 identité stable : tant que l'INSERT Supabase n'a pas retourné le _sid,
+  // on écrit temporairement sous la clé legacy par index (seule option disponible à cet
+  // instant). Dès que le _sid est connu (quelques centaines de ms plus tard), toutes les
+  // données déjà écrites sous cette clé temporaire sont migrées vers la clé stable
+  // "<cityKey>_sid_<uuid>" — localement et côté serveur si déjà synchronisé.
   var actKey = cityKey+'_c'+newIdx;
   // Lot 6 : si un détail statique est fourni (suggestion depuis pool statique), le copier
   // dans _customDetails sous la nouvelle clé pour que la fiche custom soit immédiatement riche.
@@ -4560,15 +4567,17 @@ function _createActivityCore(cityKey, val, opts){
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
     // Lot 5B correctif : récupérer l'id UUID retourné par Supabase pour permettre
     // un rename ultérieur sans ambiguïté (même si deux activités portent le même nom).
-    (function(_captureIdx){
+    (function(_captureIdx, _legacyActKey){
       sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).select('id').single().then(function(_r){
         if(_r&&_r.error){ console.error("[PlaniTrip] sync error:",_r.error); return; }
         if(_r&&_r.data&&_r.data.id && S.customActs[cityKey] && S.customActs[cityKey][_captureIdx]){
           S.customActs[cityKey][_captureIdx]._sid = _r.data.id;
           save();
+          // Correctif P0 : migration immédiate legacy → stable, locale + serveur.
+          _migrateToStableKeyAfterSync(cityKey, _legacyActKey, _r.data.id);
         }
       });
-    })(newIdx);
+    })(newIdx, actKey);
     if(opts.date){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     }
@@ -4579,6 +4588,43 @@ function _createActivityCore(cityKey, val, opts){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:actKey,data:window._customDetails[actKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
     }
   }
+}
+// Migre toutes les données locales + serveur écrites sous une clé legacy temporaire
+// ("<cityKey>_c<idx>") vers la clé stable ("<cityKey>_sid_<uuid>") une fois le _sid connu.
+// Appelée juste après confirmation de l'INSERT Supabase dans _createActivityCore() et
+// restoreActivity() — c'est la seule fenêtre où une donnée a pu être écrite sous la clé
+// temporaire avant que l'identité stable soit disponible.
+function _migrateToStableKeyAfterSync(cityKey, legacyActKey, sid){
+  var stableKey = getCustomActivityKeyFromSid(cityKey, sid, -1);
+  if(stableKey===legacyActKey) return;
+  var migratedLocally = _migrateActivityKeyIfNeeded(stableKey, legacyActKey);
+  if(migratedLocally){ S.customDetails = window._customDetails; save(); renderContent(); }
+  if(!sb || !CURRENT_TRIP) return;
+  var tid = CURRENT_TRIP.id;
+  var now = new Date().toISOString();
+  // Fiche détaillée : si une ligne existe déjà sous la clé legacy côté serveur, la recopier
+  // sous la clé stable puis supprimer l'ancienne — jamais l'inverse (pas de perte de données).
+  if(window._customDetails && window._customDetails[stableKey]){
+    sb.from('activity_details').upsert({trip_id:tid,detail_key:stableKey,data:window._customDetails[stableKey],updated_at:now},{onConflict:'trip_id,detail_key'}).then(function(_r){
+      if(_r&&_r.error){ console.error('[PlaniTrip] migration detail stable:',_r.error); return; }
+      sb.from('activity_details').delete().eq('trip_id',tid).eq('detail_key',legacyActKey).then(function(_r2){ if(_r2&&_r2.error) console.error('[PlaniTrip] migration cleanup legacy detail:',_r2.error); });
+    });
+  }
+  // Favori : idem, migrer puis nettoyer l'ancienne ligne.
+  if(S.favorites && S.favorites[stableKey]){
+    var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+    sb.from('favorites').select('id',{count:'exact',head:true}).eq('trip_id',tid).eq('key',legacyActKey).then(function(_rc){
+      if(_rc && _rc.count){
+        sb.from('favorites').insert({trip_id:tid,key:stableKey,country_id:cityKey.split('_')[0],added_by_label:who}).then(function(){
+          sb.from('favorites').delete().eq('trip_id',tid).eq('key',legacyActKey).then(function(_r3){ if(_r3&&_r3.error) console.error('[PlaniTrip] migration cleanup legacy fav:',_r3.error); });
+        });
+      }
+    });
+  }
+  // Blobs globaux (__planitrip__actCategory, actDate, etc.) : déjà réécrits entièrement à
+  // chaque upsert (S.actCategory / S.actDate complets), donc la clé stable qui vient d'être
+  // migrée localement sera incluse au prochain upsert normal de ces blobs — pas d'action
+  // serveur immédiate nécessaire ici pour ne pas dupliquer les upserts déjà en vol.
 }
 function addActivity(cityKey) {
   const inp = document.getElementById('newact_'+cityKey);
@@ -5687,18 +5733,34 @@ Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnee
     var info = aiRes.data;
     if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); _lastAiError='Aucune activité renvoyée'; return false; }
     if(!S.customActs[ck]) S.customActs[ck]=[];
+    var _createdIdxByName = [];
     info.activities.forEach(function(a){
       var idx = S.customActs[ck].length;
       S.customActs[ck].push({n:a.n, m:a.m||'', tags:a.tags||['must'], ai:true});
+      // Correctif P0 : clé temporaire legacy tant que le _sid n'est pas connu (insert
+      // groupé ci-dessous, sans capture d'id jusqu'ici — corrigé pour migrer ensuite).
       if(a.lat && a.lng) COORDS[ck+'_c'+idx] = [a.lat, a.lng, a.n];
+      _createdIdxByName.push({idx:idx, name:a.n});
     });
     save();
     renderContent();
     if(sb && CURRENT_TRIP){
       var whoAi=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
       try{
-        await Promise.all(info.activities.map(function(a){
-          return sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi});
+        // Correctif P0 : capturer l'id retourné par chaque insert pour attribuer un _sid
+        // à chaque activité créée, puis migrer immédiatement legacy → stable (comme
+        // _createActivityCore). Auparavant ces activités restaient durablement sans
+        // identité stable — c'était le chemin de création le plus exposé au bug de mélange.
+        await Promise.all(info.activities.map(function(a, aIdx){
+          return sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:countryId,city:cityName,name:a.n,tip:a.m||null,added_by_label:whoAi}).select('id').single().then(function(_r){
+            if(_r&&_r.error){ console.error('[PlaniTrip] suggestActivitiesWithAI insert:', _r.error); return; }
+            var created = _createdIdxByName[aIdx];
+            if(_r&&_r.data&&_r.data.id && created && S.customActs[ck] && S.customActs[ck][created.idx]){
+              S.customActs[ck][created.idx]._sid = _r.data.id;
+              save();
+              _migrateToStableKeyAfterSync(ck, ck+'_c'+created.idx, _r.data.id);
+            }
+          });
         }));
       }catch(syncErr){ console.error('[PlaniTrip] suggestActivitiesWithAI: échec sync serveur', syncErr); }
     }
@@ -5734,10 +5796,11 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
     if(!S.trash) S.trash={};
     if(!S.trash[cityKey]) S.trash[cityKey]=[];
     if(isCustom) {
-      var totalBefore = (S.customActs[cityKey]||[]).length;
-      // Lot 6 : snapshot AVANT splice et réindexation — capture l'état complet de l'activité
-      // sous son actKey courant, avant que les maps soient décalées.
-      var _deletedActKey = cityKey+'_c'+index;
+      var actObjToDelete = (S.customActs[cityKey]||[])[index];
+      // Correctif P0 identité stable : la clé de l'activité supprimée est calculée via le
+      // helper (stable si _sid existe, legacy sinon) — c'est SA clé, indépendamment des
+      // autres activités de la ville.
+      var _deletedActKey = getCustomActivityKey(cityKey, actObjToDelete, index);
       var _trashState = {};
       if(S.actDate && S.actDate[_deletedActKey] !== undefined) _trashState.actDate = S.actDate[_deletedActKey];
       if(S.actMoment && S.actMoment[_deletedActKey] !== undefined) _trashState.actMoment = S.actMoment[_deletedActKey];
@@ -5751,23 +5814,26 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
       if(COORDS[_deletedActKey]) _trashState.coords = COORDS[_deletedActKey].slice();
       var act = (S.customActs[cityKey]||[]).splice(index,1)[0];
       if(act){ act._wasCustom=true; act._trashState=_trashState; S.trash[cityKey].push(act); }
-      // Réindexer tous les états liés pour éviter qu'une activité suivante n'hérite de l'état
-      // de celle qu'on vient de supprimer. Inclut toutes les maps indexées par actKey (Lot 5A).
+      // Correctif P0 : plus de réindexation en masse des activités suivantes. Avec l'identité
+      // stable (_sid), les autres activités de la ville gardent leur propre clé quelle que
+      // soit leur nouvelle position dans le tableau après le splice — rien à décaler.
+      // On nettoie uniquement les maps sous la clé de l'activité SUPPRIMÉE elle-même.
       if(!window._customDetails) window._customDetails={};
       if(!S.actMoment) S.actMoment={};
       if(!S.actTimeStart) S.actTimeStart={};
       if(!S.actTimeEnd) S.actTimeEnd={};
       if(!S.actTime) S.actTime={};
       if(!S.actCategory) S.actCategory={};
-      var maps = [S.done, S.favorites, S.actDate, S.actMoment, S.actTimeStart, S.actTimeEnd, S.actTime, S.actCategory, window._customDetails];
-      for(var ni=index+1; ni<totalBefore; ni++){
-        var oldKey = cityKey+'_c'+ni, newKey = cityKey+'_c'+(ni-1);
-        maps.forEach(function(m){
-          if(m.hasOwnProperty(oldKey)){ m[newKey]=m[oldKey]; delete m[oldKey]; }
-          else { delete m[newKey]; }
-        });
-        if(COORDS[oldKey]){ COORDS[newKey]=COORDS[oldKey]; delete COORDS[oldKey]; } else { delete COORDS[newKey]; }
-      }
+      delete S.done[_deletedActKey];
+      delete S.favorites[_deletedActKey];
+      delete S.actDate[_deletedActKey];
+      delete S.actMoment[_deletedActKey];
+      delete S.actTimeStart[_deletedActKey];
+      delete S.actTimeEnd[_deletedActKey];
+      delete S.actTime[_deletedActKey];
+      delete S.actCategory[_deletedActKey];
+      delete window._customDetails[_deletedActKey];
+      delete COORDS[_deletedActKey];
       S.customDetails = window._customDetails;
       // Suppression serveur : sinon loadCitiesActivities() (serveur autoritaire) re-synchronise
       // cette activité au prochain chargement et elle "revient" après actualisation.
@@ -5775,81 +5841,39 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
       if(sb && CURRENT_TRIP && act){
         var cpParts = cityKey.split('_');
         var cpCountryId = cpParts[0], cpCityName = cpParts.slice(1).join('_');
-        // Suppression de l'activité dans la table activities (fire-and-forget, pas de conflit de clé)
-        sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',cpCountryId).eq('city',cpCityName).eq('name',act.n).then(function(r){
-          if(r&&r.error){ console.error('[PlaniTrip] delete activity:', r.error); }
+        // Correctif P0 : suppression ciblée par _sid (UUID) quand disponible — plus fiable
+        // qu'un match par nom, et cohérent avec le pattern déjà en place pour le renommage
+        // (voir saveCustomActDetail, champ 'name'). Repli sur le match par nom sinon.
+        if(act._sid){
+          sb.from('activities').delete().eq('id',act._sid).eq('trip_id',CURRENT_TRIP.id).then(function(r){
+            if(r&&r.error){ console.error('[PlaniTrip] delete activity by sid:', r.error); }
+          });
+        } else {
+          sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',cpCountryId).eq('city',cpCityName).eq('name',act.n).then(function(r){
+            if(r&&r.error){ console.error('[PlaniTrip] delete activity:', r.error); }
+          });
+        }
+        // Correctif P0 : plus de migration multi-phases (snapshot → delete plage → recréer).
+        // Seule la ligne activity_details / favorites de l'activité SUPPRIMÉE doit disparaître
+        // — les autres activités gardent leur propre clé stable, jamais touchée ici.
+        sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_deletedActKey).then(function(r){
+          if(r&&r.error) console.error('[PlaniTrip] delete detail row:', r.error);
         });
-        // ── Lot 5A — Migration Supabase ordonnée (stratégie snapshot → delete plage → recréer) ──
-        // Les blobs __planitrip__ (maps globales) n'ont pas de collision entre eux : Promise.all OK.
-        // Les fiches individuelles (detail_key = city_cN) et les favoris doivent être traités
-        // en deux phases séquentielles (await) pour éviter toute race condition :
-        //   Phase 1 : DELETE toute la plage impactée côté serveur (toutes les clés cN concernées).
-        //   Phase 2 : UPSERT/INSERT l'état final (snapshot local déjà réindexé).
-        // Ainsi aucun DELETE de Phase 1 ne peut effacer un UPSERT de Phase 2.
-        (async function _migrateAfterDelete(){
-          var _tid = CURRENT_TRIP.id;
-          var _now = new Date().toISOString();
-          var _who = (CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-
-          // ── Étape 1 : blobs globaux (parallel, pas de collision entre eux) ─────────────────────
-          await Promise.all([
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_now},{onConflict:'trip_id,detail_key'}),
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_now},{onConflict:'trip_id,detail_key'}),
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_now},{onConflict:'trip_id,detail_key'}),
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'}),
-            sb.from('activity_details').upsert({trip_id:_tid,detail_key:'__planitrip__done',         data:S.done,         updated_at:_now},{onConflict:'trip_id,detail_key'})
-          ]).catch(function(e){ console.error('[PlaniTrip] blobs reindex:', e); });
-
-          // ── Snapshot local : état final après réindexation locale déjà effectuée ────────────────
-          // Fiches finales : toutes les clés de la plage [index, totalBefore-1[ (déjà réindexées).
-          var _fichesFinales = [];
-          for(var _si = index; _si < totalBefore-1; _si++){
-            var _sk = cityKey+'_c'+_si;
-            var _fd = window._customDetails[_sk];
-            if(_fd) _fichesFinales.push({key:_sk, data:_fd});
-          }
-          // Favoris finaux : clés de la plage qui sont favorites dans l'état local réindexé.
-          var _favsFinales = [];
-          for(var _fsi = index; _fsi < totalBefore-1; _fsi++){
-            var _fsk = cityKey+'_c'+_fsi;
-            if(S.favorites[_fsk]) _favsFinales.push({key:_fsk, country_id:_fsk.split('_')[0]});
-          }
-
-          // ── Étape 2A : DELETE toute la plage impactée dans activity_details ──────────────────────
-          // Plage complète : city_c<index> → city_c<totalBefore-1>.
-          // On supprime d'abord TOUTES les clés (anciennes et nouvelles) pour repartir propre,
-          // puis on recrée uniquement l'état final. Aucun UPSERT de Phase 3 ne sera précédé
-          // d'un DELETE concurrent : la Phase 2 est entièrement terminée avant la Phase 3.
-          var _plageKeys = [];
-          for(var _pi = index; _pi < totalBefore; _pi++) _plageKeys.push(cityKey+'_c'+_pi);
-
-          await sb.from('activity_details')
-            .delete()
-            .eq('trip_id', _tid)
-            .in('detail_key', _plageKeys);
-
-          // ── Étape 2B : DELETE toute la plage dans favorites ──────────────────────────────────────
-          await sb.from('favorites')
-            .delete()
-            .eq('trip_id', _tid)
-            .in('key', _plageKeys);
-
-          // ── Étape 3A : UPSERT fiches finales (plage côté serveur est vide, aucun risque) ────────
-          if(_fichesFinales.length){
-            await Promise.all(_fichesFinales.map(function(f){
-              return sb.from('activity_details').upsert({trip_id:_tid,detail_key:f.key,data:f.data,updated_at:_now},{onConflict:'trip_id,detail_key'});
-            })).catch(function(e){ console.error('[PlaniTrip] fiches reindex upsert:', e); });
-          }
-
-          // ── Étape 3B : INSERT favoris finaux ────────────────────────────────────────────────────
-          if(_favsFinales.length){
-            await Promise.all(_favsFinales.map(function(f){
-              return sb.from('favorites').insert({trip_id:_tid,key:f.key,country_id:f.country_id,added_by_label:_who});
-            })).catch(function(e){ console.error('[PlaniTrip] favs reindex insert:', e); });
-          }
-        })().catch(function(e){ console.error('[PlaniTrip] _migrateAfterDelete:', e); });
+        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_deletedActKey).then(function(r){
+          if(r&&r.error) console.error('[PlaniTrip] delete favorite row:', r.error);
+        });
+        // Blobs globaux : réécrits en entier avec l'état local déjà nettoyé (clé supprimée
+        // ci-dessus) — pas de risque de collision, un simple upsert suffit pour chacun.
+        var _now = new Date().toISOString();
+        Promise.all([
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_now},{onConflict:'trip_id,detail_key'}),
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_now},{onConflict:'trip_id,detail_key'}),
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_now},{onConflict:'trip_id,detail_key'}),
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'}),
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',         data:S.done,         updated_at:_now},{onConflict:'trip_id,detail_key'})
+        ]).catch(function(e){ console.error('[PlaniTrip] blobs update after delete:', e); });
       }
     } else {
       if(!S.deletedActs) S.deletedActs={};
@@ -5913,15 +5937,17 @@ function restoreActivity(cityKey, trashIndex) {
       var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||item.addedBy||'';
       var _now2 = new Date().toISOString();
       // Recréer la ligne activities + récupérer le nouvel UUID
-      (function(_capIdx){
+      (function(_capIdx, _legacyKey){
         sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:rpCountryId,city:rpCityName,name:item.n,tip:item.m||null,added_by_label:who}).select('id').single().then(function(r){
           if(r&&r.error){ console.error('[PlaniTrip] restore activity:', r.error); return; }
           if(r&&r.data&&r.data.id && S.customActs[cityKey] && S.customActs[cityKey][_capIdx]){
             S.customActs[cityKey][_capIdx]._sid = r.data.id;
             save();
+            // Correctif P0 : migration immédiate legacy → stable, locale + serveur.
+            _migrateToStableKeyAfterSync(cityKey, _legacyKey, r.data.id);
           }
         });
-      })(newIdx);
+      })(newIdx, newActKey);
       // Restaurer la fiche détaillée
       if(_ts.customDetails){
         sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:newActKey,data:_ts.customDetails,updated_at:_now2},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore detail:',r.error); });
@@ -6605,7 +6631,10 @@ function renderCityPanelContentBody(c, city){
       } else {
         var ca=custs[origIdx];
         if(!ca) return null;
-        var ck2=ck+'_c'+origIdx;
+        // Correctif P0 identité stable : dès qu'un _sid existe, la clé de rendu (et donc
+        // data-act-key, propagé à toutes les actions carte) est stable entre appareils —
+        // elle ne dépend plus de la position dans le tableau.
+        var ck2=getCustomActivityKey(ck, ca, origIdx);
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         if(activeDay!=='Tous' && cDateVal!==activeDay) return null;
         var caCat = getActCategory(ck2, ca.n, ca.m);
@@ -6714,7 +6743,7 @@ function renderCityPanelContentBody(c, city){
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
     city.acts.forEach(function(a,i){ if(!S.deletedActs[ck+'_'+i]){ getActCategory(ck+'_'+i,a.n,a.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); } });
-    (S.customActs[ck]||[]).forEach(function(ca,i){ getActCategory(ck+'_c'+i,ca.n,ca.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); });
+    (S.customActs[ck]||[]).forEach(function(ca,i){ getActCategory(getCustomActivityKey(ck,ca,i),ca.n,ca.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); });
     var catKeys = Object.keys(presentCats);
     var categoryFilterHTML = '';
     if(catKeys.length){
@@ -6804,7 +6833,7 @@ function renderCityDetailScreen(){
   const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
   const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
   const cityDone=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i]&&S.done[ck+'_'+i];}).length
-    +(S.customActs[ck]||[]).filter(function(_,i){return S.done[ck+'_c'+i];}).length;
+    +(S.customActs[ck]||[]).filter(function(ca,i){return S.done[getCustomActivityKey(ck,ca,i)];}).length;
   const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
 
   const stayLine = fmtCityStayLine(ck);
@@ -6866,7 +6895,7 @@ function renderItinerary(c, embedded){
   },0);
   const doneActs=c.cities.reduce((s,city)=>{
     const baseDone=city.acts.filter((_,i)=>!S.deletedActs[c.id+'_'+city.city+'_'+i]&&S.done[c.id+'_'+city.city+'_'+i]).length;
-    const customDone=(S.customActs[c.id+'_'+city.city]||[]).filter((_,i)=>S.done[c.id+'_'+city.city+'_c'+i]).length;
+    const customDone=(S.customActs[c.id+'_'+city.city]||[]).filter((ca,i)=>S.done[getCustomActivityKey(c.id+'_'+city.city,ca,i)]).length;
     return s+baseDone+customDone;
   },0);
 
@@ -6878,7 +6907,7 @@ function renderItinerary(c, embedded){
     const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
     const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
     const cityDone=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i]&&S.done[ck+'_'+i];}).length
-      +(S.customActs[ck]||[]).filter(function(_,i){return S.done[ck+'_c'+i];}).length;
+      +(S.customActs[ck]||[]).filter(function(ca,i){return S.done[getCustomActivityKey(ck,ca,i)];}).length;
     const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
 
     const accomList = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
@@ -7163,7 +7192,7 @@ function getCityActivitiesForToday(c, city, todayStr){
     var oi = parseInt(slot.slice(1));
     var a = isBase ? city.acts[oi] : (S.customActs[ck]||[])[oi];
     if(!a) return;
-    var actKey = isBase ? (ck+'_'+oi) : (ck+'_c'+oi);
+    var actKey = isBase ? (ck+'_'+oi) : getCustomActivityKey(ck, a, oi);
     var date = getActivityDate(actKey, c.id, city.city, idx, nonDeleted.length);
     if(date===todayStr){
       results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:city.city, ck:ck});
@@ -7707,7 +7736,7 @@ function renderCountryDetailShell(c, innerHtml){
   },0);
   var doneActs = c.cities.reduce(function(s,city){
     var baseDone = city.acts.filter(function(_,i){return !S.deletedActs[c.id+'_'+city.city+'_'+i] && S.done[c.id+'_'+city.city+'_'+i];}).length;
-    var customDone = (S.customActs[c.id+'_'+city.city]||[]).filter(function(_,i){return S.done[c.id+'_'+city.city+'_c'+i];}).length;
+    var customDone = (S.customActs[c.id+'_'+city.city]||[]).filter(function(ca,i){return S.done[getCustomActivityKey(c.id+'_'+city.city,ca,i)];}).length;
     return s+baseDone+customDone;
   },0);
   var subTabs = [
@@ -9785,7 +9814,7 @@ function _buildSearchIndex(){
       });
       (S.customActs[ck]||[]).forEach(function(ca,i){
         items.push({
-          k:ck+'_c'+i, countryId:c.id, flag:c.flag, country:c.name, city:city.city,
+          k:getCustomActivityKey(ck,ca,i), countryId:c.id, flag:c.flag, country:c.name, city:city.city,
           name:ca.n, meta:'', tags:[]
         });
       });
@@ -12045,10 +12074,94 @@ async function loadCollaborators() {
   else console.error('[PlaniTrip] erreur chargement collaborateurs:', error);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// IDENTITÉ STABLE DES ACTIVITÉS CUSTOM (correctif P0 collaboratif)
+// ─────────────────────────────────────────────────────────────────────────
+// Problème corrigé : une activité custom était identifiée par sa position dans
+// S.customActs[cityKey] (clé "<cityKey>_c<index>"). Deux appareils pouvaient
+// charger les activités dans un ordre différent (aucun ORDER BY explicite côté
+// Supabase), et toute suppression/insertion pouvait décaler ces index — les
+// données annexes (type de lieu, catégorie, date, favori, etc.) se retrouvaient
+// alors attachées à la mauvaise activité.
+//
+// Correction : dès qu'une activité custom possède un identifiant serveur stable
+// (_sid = activities.id, un uuid), toutes les structures d'état l'utilisent
+// comme clé au lieu de l'index local : "<cityKey>_sid_<uuid>".
+// L'ancienne clé "<cityKey>_c<index>" reste lue en repli (compatibilité legacy)
+// mais n'est plus jamais utilisée en écriture dès qu'un _sid existe.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Construit la clé d'identité d'une activité custom. Utiliser PARTOUT où une
+// clé d'état est nécessaire pour une activité custom (jamais reconstruire
+// "cityKey+'_c'+idx" à la main ailleurs que dans ce helper et son repli legacy).
+function getCustomActivityKey(cityKey, activity, fallbackIndex){
+  if(activity && activity._sid) return cityKey+'_sid_'+activity._sid;
+  return cityKey+'_c'+fallbackIndex; // legacy — uniquement si pas encore synchronisé
+}
+// Variante quand seul le _sid est connu (sans l'objet activité complet).
+function getCustomActivityKeyFromSid(cityKey, sid, fallbackIndex){
+  if(sid) return cityKey+'_sid_'+sid;
+  return cityKey+'_c'+fallbackIndex;
+}
+// Détecte si une clé d'activité est déjà au format stable (post-migration).
+function isStableActivityKey(actKey){
+  return typeof actKey==='string' && actKey.indexOf('_sid_')>-1;
+}
+// Liste des structures d'état indexées par actKey pour une activité custom.
+// Centralisée ici pour que la migration (legacy → stable) touche systématiquement
+// les mêmes maps, sans en oublier une au fil des évolutions futures.
+function _customActKeyedMaps(){
+  if(!window._customDetails) window._customDetails={};
+  if(!S.actMoment) S.actMoment={};
+  if(!S.actTimeStart) S.actTimeStart={};
+  if(!S.actTimeEnd) S.actTimeEnd={};
+  if(!S.actTime) S.actTime={};
+  if(!S.actCategory) S.actCategory={};
+  if(!S.actDay) S.actDay={};
+  if(!S.actDate) S.actDate={};
+  if(!S.done) S.done={};
+  if(!S.favorites) S.favorites={};
+  return {
+    customDetails: window._customDetails,
+    actMoment: S.actMoment, actTimeStart: S.actTimeStart, actTimeEnd: S.actTimeEnd,
+    actTime: S.actTime, actCategory: S.actCategory, actDay: S.actDay, actDate: S.actDate,
+    done: S.done, favorites: S.favorites, coords: COORDS
+  };
+}
+// Migration à la volée d'une seule activité : si sa clé stable n'a encore aucune
+// donnée mais qu'une clé legacy plausible (même ville, même index de chargement)
+// en a, copie les données vers la clé stable. Ne supprime JAMAIS la clé legacy
+// (conservée pour compatibilité et traçabilité — voir §11/§12 du correctif).
+// N'écrase jamais une donnée déjà présente sous la clé stable (pas de régression
+// si la migration a déjà eu lieu sur un autre appareil).
+function _migrateActivityKeyIfNeeded(stableKey, legacyKey){
+  if(stableKey===legacyKey) return false;
+  var maps = _customActKeyedMaps();
+  var migrated = false;
+  Object.keys(maps).forEach(function(mapName){
+    var m = maps[mapName];
+    if(!m || typeof m!=='object') return;
+    var hasLegacy = m.hasOwnProperty(legacyKey);
+    var hasStable = m.hasOwnProperty(stableKey);
+    if(hasLegacy && !hasStable){
+      m[stableKey] = m[legacyKey];
+      migrated = true;
+    }
+  });
+  if(migrated) S.customDetails = window._customDetails;
+  return migrated;
+}
+
 async function loadCitiesActivities(){
   if(!sb || !CURRENT_TRIP) return;
+  // Accumule les migrations legacy → stable effectuées pendant ce chargement, pour les
+  // persister côté serveur une seule fois à la fin (voir bloc après la boucle villes).
+  var _pendingKeyMigrations = [];
   var {data:citiesData} = await sb.from('cities').select('*').eq('trip_id',CURRENT_TRIP.id);
-  var {data:actsData} = await sb.from('activities').select('*').eq('trip_id',CURRENT_TRIP.id);
+  // Tri déterministe (garde-fou complémentaire — l'identité stable _sid reste la
+  // vraie correction, ce tri limite seulement l'instabilité résiduelle pour les
+  // activités jamais encore migrées, ex: avant leur premier chargement).
+  var {data:actsData} = await sb.from('activities').select('*').eq('trip_id',CURRENT_TRIP.id).order('created_at',{ascending:true}).order('id',{ascending:true});
   // Villes : serveur autoritaire par pays, garder les villes locales non encore synchro,
   // en excluant celles marquées comme supprimées via tombstone (voir markDeletedTombstone) —
   // sinon une suppression non encore persistée dans le gros blob localStorage pourrait ressusciter.
@@ -12078,14 +12191,61 @@ async function loadCitiesActivities(){
   });
   var allActCityKeys = Object.keys(serverActsMap).concat(Object.keys(S.customActs||{}));
   allActCityKeys.filter(function(v,i,a){return a.indexOf(v)===i;}).forEach(function(ck){
+    // Snapshot de l'ordre local AVANT reconstruction : c'est la seule piste "legacy" disponible
+    // pour une éventuelle migration best-effort (voir _migrateActivityKeyIfNeeded plus bas).
+    // Elle peut être fausse (ordre déjà divergent d'un appareil à l'autre) — la migration ne fait
+    // jamais rien de destructif, elle ne fait que copier une donnée si la clé stable est vide.
+    var preReloadLocal = S.customActs[ck] || [];
     var sList = serverActsMap[ck]||[];
     var sNames = sList.map(function(a){return a.n;});
     var local  = (S.customActs[ck]||[]).filter(function(a){
       return a.custom && sNames.indexOf(a.n)===-1 && deletedActTombstones.indexOf(ck+'||'+a.n)===-1;
     });
     S.customActs[ck] = sList.concat(local);
+    // Migration best-effort legacy → stable : uniquement pour les activités qui ont désormais
+    // un _sid ET qui occupaient la même position dans l'ancien tableau local pré-reconstruction
+    // (seul signal disponible — voir §12 du correctif : ne jamais deviner au-delà de ce signal).
+    S.customActs[ck].forEach(function(act, idx){
+      if(!act || !act._sid) return;
+      var stableKey = getCustomActivityKey(ck, act, idx);
+      var legacyCandidate = preReloadLocal[idx];
+      // Le nom doit correspondre : sinon la position a manifestement changé et toute tentative
+      // de migration serait une devinette non fiable — on l'évite explicitement (§12).
+      if(legacyCandidate && legacyCandidate.n===act.n){
+        if(_migrateActivityKeyIfNeeded(stableKey, ck+'_c'+idx)){
+          _pendingKeyMigrations.push({stableKey:stableKey});
+        }
+      }
+    });
   });
   save();
+  // Persistance serveur des migrations effectuées ci-dessus : les blobs globaux (déjà en
+  // mémoire avec les clés migrées) sont ré-upsertés une seule fois pour tout le voyage, et
+  // chaque fiche détaillée individuelle migrée est recopiée sous sa clé stable côté serveur.
+  // Sans ce bloc, la migration resterait locale à cet appareil tant qu'aucune autre action
+  // utilisateur ne force naturellement un upsert de ces mêmes blobs.
+  if(_pendingKeyMigrations.length && sb && CURRENT_TRIP){
+    var _mtid = CURRENT_TRIP.id;
+    var _mnow = new Date().toISOString();
+    Promise.all([
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:S.actDay,       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:S.done,         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
+    ]).catch(function(e){ console.error('[PlaniTrip] migration blobs upsert:', e); });
+    // Fiches individuelles : upsert sous la clé stable uniquement (jamais de delete de la
+    // légacy ici — cette migration est best-effort et purement locale à la lecture, on laisse
+    // la légacy en place tant qu'aucune écriture explicite n'a confirmé la nouvelle clé).
+    _pendingKeyMigrations.forEach(function(m){
+      if(window._customDetails && window._customDetails[m.stableKey]){
+        sb.from('activity_details').upsert({trip_id:_mtid,detail_key:m.stableKey,data:window._customDetails[m.stableKey],updated_at:_mnow},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] migration detail upsert:',_r.error); });
+      }
+    });
+  }
 }
 
 async function loadBudgetEntries(){
@@ -14639,7 +14799,7 @@ async function _impAddToCurrentTrip() {
     };
 
     var existingActs = S.customActs[cityKey] || [];
-    var actDup = existingActs.some(function(ea, idx){ return _impActIsDup(ea.n, cityKey+'_c'+idx); });
+    var actDup = existingActs.some(function(ea, idx){ return _impActIsDup(ea.n, getCustomActivityKey(cityKey, ea, idx)); });
 
     if (!actDup && cityExists && cityExists.acts) {
       actDup = cityExists.acts.some(function(ea, idx){
