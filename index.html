@@ -3028,46 +3028,61 @@ function extractOpenAIText(data){
   return texts.join('\n');
 }
 
-// ── Adapter OpenAI (B2) — Responses API (POST /v1/responses), recommandée par
-// OpenAI pour toute nouvelle intégration. Même logique métier que l'adapter
-// Anthropic : le prompt embarque déjà l'instruction JSON, aucun schema formel
-// n'est fourni par les fonctions métier actuelles donc pas de Structured
-// Outputs natif ici (text.format/json_schema) — différé à B4. Web search via
-// l'outil {type:'web_search'} (nom actuel recommandé, web_search_preview est
-// l'ancien nom legacy).
+// ── Adapter OpenAI (B2, corrigé) — passe désormais par l'Edge Function
+// Supabase `openai-proxy` au lieu d'appeler api.openai.com directement depuis
+// le navigateur. La clé personnelle de l'utilisateur (BYOK) est envoyée dans
+// le corps de la requête à la fonction, uniquement pour cet appel en cours —
+// jamais stockée côté serveur, jamais loggée, jamais renvoyée dans une erreur.
+// La fonction exige une session Supabase utilisateur authentifiée (rejette
+// tout accès anonyme) ; elle ne contient aucun prompt métier ni logique
+// PlaniTrip — payload minimal relayé tel quel vers OpenAI Responses API.
+// Important (limite honnête) : la clé transite par le stockage local du
+// navigateur (planitrip_ai_config) avant cet appel — ce proxy sécurise le
+// TRANSIT et empêche l'exposition directe depuis le code client vers OpenAI,
+// mais ne rend pas un secret stocké côté client invulnérable à un XSS.
 async function _aiCallOpenAI(key, options){
   var model = (AI_MODELS.openai && AI_MODELS.openai[options.model || 'auto']) || AI_MODELS.openai.auto;
-  var body = { model: model, input: options.prompt };
-  if(options.webSearch) body.tools = [{ type:'web_search' }];
-  if(options.system) body.instructions = options.system;
-  if(options.maxTokens) body.max_output_tokens = Math.max(options.maxTokens, 16); // évite un output tronqué avant même le texte final
+  if(!sb) return _aiError('network_error', 'Connexion au service indisponible.');
 
-  var resp;
+  var payload = { apiKey: key, model: model, input: options.prompt };
+  if(options.webSearch) payload.tools = [{ type:'web_search' }];
+  if(options.system) payload.instructions = options.system;
+  if(options.maxTokens) payload.max_output_tokens = Math.max(options.maxTokens, 16); // évite un output tronqué avant même le texte final
+
+  var invokeRes;
   try{
-    resp = await fetch('https://api.openai.com/v1/responses', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-      body: JSON.stringify(body)
-    });
+    invokeRes = await sb.functions.invoke('openai-proxy', { body: payload });
   }catch(e){
-    return _aiError('network_error', 'Impossible de contacter OpenAI.');
+    return _aiError('network_error', 'Impossible de contacter le service IA.');
   }
 
-  if(!resp.ok){
-    var errBody = ''; try{ errBody = await resp.text(); }catch(e){}
-    var errDetail = ''; var errCode = '';
-    try{ var ej = JSON.parse(errBody); errDetail = (ej.error && ej.error.message) || ''; errCode = (ej.error && ej.error.code) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
+  if(invokeRes.error){
+    var status = (invokeRes.error.context && invokeRes.error.context.status) || 0;
+    var errBody = null;
+    try{
+      if(invokeRes.error.context && typeof invokeRes.error.context.json === 'function'){
+        errBody = await invokeRes.error.context.json();
+      }
+    }catch(e){}
+    // errBody.error peut être soit un objet OpenAI {message,code} (relayé tel
+    // quel par le proxy), soit une chaîne (nos propres erreurs de garde-fou
+    // dans la fonction : unauthorized, paramètres manquants, proxy_error).
+    var errDetail = '', errCode = '';
+    if(errBody && errBody.error){
+      if(typeof errBody.error === 'object'){ errDetail = errBody.error.message || ''; errCode = errBody.error.code || ''; }
+      else { errDetail = String(errBody.error); }
+    }
     var code = 'invalid_response';
-    if(resp.status === 401) code = 'invalid_key';
+    if(status === 401 && errDetail === 'unauthorized') code = 'network_error'; // session Supabase expirée, pas la clé OpenAI
+    else if(status === 401) code = 'invalid_key';
     else if(errCode === 'insufficient_quota') code = 'quota_exceeded';
-    else if(resp.status === 429) code = 'rate_limited';
-    else if(resp.status === 404 || errCode === 'model_not_found') code = 'model_unavailable';
-    else if(resp.status === 500 || resp.status === 503) code = 'provider_unavailable';
-    return _aiError(code, errDetail || ('Erreur '+resp.status));
+    else if(status === 429) code = 'rate_limited';
+    else if(status === 404 || errCode === 'model_not_found') code = 'model_unavailable';
+    else if(status === 500 || status === 503 || !status) code = 'provider_unavailable';
+    return _aiError(code, errDetail || ('Erreur '+(status||'réseau')));
   }
 
-  var data;
-  try{ data = await resp.json(); }catch(e){ return _aiError('invalid_response', 'Réponse illisible.'); }
+  var data = invokeRes.data;
   var text = extractOpenAIText(data);
   if(!text) return _aiError('invalid_response', 'Réponse vide.');
 
@@ -10543,7 +10558,7 @@ function renderMyAccountScreen(){
     +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
-    +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
+    +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé API personnelle Anthropic ou OpenAI, PlaniTrip peut générer et enrichir certaines informations (infos pratiques, activités, programme). Ta clé n\'est jamais partagée avec les autres voyageurs et n\'est pas enregistrée côté serveur.</div>'
     +(aiHasActiveKey() ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
     +'<button onclick="requirePin(function(){ openApiModal(); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
     +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN de sécurité défini' : 'Aucun PIN défini — protège l\'accès à ta clé API')+'</div>'
@@ -14382,31 +14397,14 @@ function showPostCreateModal(trip){
   document.getElementById('postCreateModalBody').innerHTML = body;
   document.getElementById('postCreateModal').classList.add('open');
 }
-// Étape intermédiaire du workflow IA : demande la clé API sans quitter la modale, puis
-// enchaîne directement sur la génération une fois enregistrée.
-function showPostCreateAiKeyStep(){
-  var optsEl = document.getElementById('postCreateOptions');
-  optsEl.innerHTML = '<div class="info-card">'
-    +'<div class="ic-header" style="color:var(--accent)">'+svgIcon('sparkles',18)+' Clé API requise</div>'
-    +'<div class="status-sub" style="margin-bottom:12px;line-height:1.5">Colle ta clé API Anthropic personnelle pour générer le voyage automatiquement (infos pratiques, checklist, budget, conseils). Elle reste privée sur cet appareil.</div>'
-    +'<input class="modal-field api-key-field" type="password" id="postCreateApiKeyInput" placeholder="sk-ant-api03-…" style="font-family:monospace;font-size:12px;width:100%;box-sizing:border-box;margin-bottom:10px">'
-    +'<div id="postCreateAiKeyError" class="auth-error" style="display:none;margin-bottom:10px"></div>'
-    +'<button class="modal-cta" style="width:100%" onclick="submitPostCreateAiKey()">Valider et générer</button>'
-    +'<div onclick="showPostCreateModal()" style="text-align:center;margin-top:10px;font-size:12.5px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Retour</div>'
-    +'</div>';
-  setTimeout(function(){ var i=document.getElementById('postCreateApiKeyInput'); if(i) i.focus(); }, 100);
-}
-function submitPostCreateAiKey(){
-  var val = (document.getElementById('postCreateApiKeyInput').value||'').trim();
-  if(!val){
-    var errEl = document.getElementById('postCreateAiKeyError');
-    errEl.textContent = 'Merci de coller ta clé API.';
-    errEl.style.display = 'block';
-    return;
-  }
-  setAIKey('anthropic', val); // Lot B1 : écrit planitrip_ai_config (device-level) uniquement
-  showPostCreatePersonaStep();
-}
+// Correctif B2 : showPostCreateAiKeyStep()/submitPostCreateAiKey() supprimées.
+// Ces deux fonctions étaient déjà du code mort (aucun appelant depuis le
+// refactor A1.3, qui a retiré leur seul point d'entrée) et forçaient un
+// placeholder Anthropic-only ("sk-ant-api03-…"). Le flow post-création ne
+// demande plus de clé directement : la configuration provider (Anthropic ou
+// OpenAI) se fait exclusivement via le sélecteur unique de Réglages
+// (openApiModal), conformément à la consigne "ne pas créer un second système
+// de configuration".
 // Questionnaire persona (3 questions), pour orienter la future generation du Programme
 // (villes/activites). La saison n'est pas redemandee : deduite des dates deja saisies.
 var _personaAnswers = {pace:'', interests:[], budget:'', withWho:'', reducedMobility:false, dietary:false};
