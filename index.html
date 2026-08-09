@@ -1855,6 +1855,13 @@ function save(){
         if(S[field]) localStorage.setItem(k, S[field]);
         else localStorage.removeItem(k);
       });
+      // activeDay : objet JSON — clé séparée légère (iOS memory pressure safety)
+      try{
+        var _adVal = S.activeDay && Object.keys(S.activeDay).length
+          ? JSON.stringify(S.activeDay) : null;
+        if(_adVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_activeDay', _adVal);
+        else localStorage.removeItem(CURRENT_STORAGE_KEY+'_activeDay');
+      }catch(_e){}
     }
   }catch(e){}
 }
@@ -4287,7 +4294,20 @@ function removeDay(ck) {
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
-function setActiveDay(ck, day) { S.activeDay[ck]=day; save(); renderContent(); }
+function setActiveDay(ck, day){
+  if(!S.activeDay) S.activeDay={};
+  if(day === 'Tous') delete S.activeDay[ck]; else S.activeDay[ck] = day;
+  save();
+  // Écriture immédiate de la clé séparée légère (iOS safety)
+  try{
+    var _adVal = Object.keys(S.activeDay).length ? JSON.stringify(S.activeDay) : null;
+    if(CURRENT_STORAGE_KEY){
+      if(_adVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_activeDay', _adVal);
+      else localStorage.removeItem(CURRENT_STORAGE_KEY+'_activeDay');
+    }
+  }catch(_e){}
+  renderContent();
+}
 function assignDay(actKey, ck, day) {
   S.actDay[actKey]=day;
   save();
@@ -4338,7 +4358,21 @@ function renderDayTabs(ck) {
   const counts = countActivitiesByDate(ck);
   const nonEmptyDates = dates.filter(function(iso){ return (counts[iso]||0)>0; });
   if(!nonEmptyDates.length) return '';
-  const active = S.activeDay[ck]||'Tous';
+  // Validation : si le filtre mémorisé n'est plus dans les jours disponibles, fallback Tous
+  var _rawActive = S.activeDay && S.activeDay[ck] ? S.activeDay[ck] : 'Tous';
+  var active = (_rawActive === 'Tous' || nonEmptyDates.indexOf(_rawActive) !== -1)
+    ? _rawActive : 'Tous';
+  if(active === 'Tous' && _rawActive !== 'Tous'){
+    // Nettoyage silencieux du filtre devenu invalide
+    delete S.activeDay[ck];
+    try{
+      var _adClean = Object.keys(S.activeDay).length ? JSON.stringify(S.activeDay) : null;
+      if(CURRENT_STORAGE_KEY){
+        if(_adClean) localStorage.setItem(CURRENT_STORAGE_KEY+'_activeDay', _adClean);
+        else localStorage.removeItem(CURRENT_STORAGE_KEY+'_activeDay');
+      }
+    }catch(_e){}
+  }
   let html = '<div class="cf-chips">';
   html += '<button class="cf-day-chip'+(active==='Tous'?' active':'')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')"><span class="cf-day-num" style="font-size:12px;font-weight:600">Tout</span></button>';
   nonEmptyDates.forEach(function(iso){
@@ -12668,6 +12702,17 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     if(_savedArchCitiesCountry !== null) S.archivedCitiesCountry = _savedArchCitiesCountry || undefined;
     var _savedArchActivitiesCity = localStorage.getItem(namespacedKey+'_archivedActivitiesCity');
     if(_savedArchActivitiesCity !== null) S.archivedActivitiesCity = _savedArchActivitiesCity || undefined;
+  }catch(e){}
+  // activeDay : restauration depuis la clé séparée (survit aux truncations blob iOS)
+  try{
+    var _savedActiveDay = localStorage.getItem(namespacedKey+'_activeDay');
+    if(_savedActiveDay){
+      var _parsedActiveDay = JSON.parse(_savedActiveDay);
+      if(_parsedActiveDay && typeof _parsedActiveDay === 'object'){
+        if(!S.activeDay) S.activeDay = {};
+        Object.assign(S.activeDay, _parsedActiveDay);
+      }
+    }
   }catch(e){}
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- clé IA active=', aiHasActiveKey());
   rebuildCountriesFromState();
