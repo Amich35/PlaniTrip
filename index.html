@@ -1892,7 +1892,9 @@ function exportActivityRecoverySnapshot() {
       actDay:       JSON.parse(JSON.stringify(S.actDay        || {})),
       done:         JSON.parse(JSON.stringify(S.done          || {})),
       favorites:    JSON.parse(JSON.stringify(S.favorites     || {})),
-      coords:       JSON.parse(JSON.stringify(COORDS          || {}))
+      coords:       JSON.parse(JSON.stringify(COORDS          || {})),
+      cityNames:    JSON.parse(JSON.stringify(S.cityNames     || {})),
+      actNames:     JSON.parse(JSON.stringify(S.actNames      || {}))
     };
     var json = JSON.stringify(snapshot, null, 2);
     var blob = new Blob([json], {type: 'application/json'});
@@ -7439,7 +7441,7 @@ function renderToday(){
   } else if(ts.elapsedDays<0){
     heroSubText = 'Départ dans '+Math.abs(ts.elapsedDays)+' jour'+(Math.abs(ts.elapsedDays)>1?'s':'');
   } else {
-    heroSubText = (ts.currentCity?ts.currentCity.city+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    heroSubText = (ts.currentCity?_cityDisplayName(c?c.id+'_'+ts.currentCity.city:'',ts.currentCity)+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
   }
   var heroClickable = !!c;
   var heroHref = heroClickable ? ' onclick="openCountryDetail(\''+jsStrEsc(c.id)+'\',\'guide\')" style="margin-bottom:12px;cursor:pointer"' : ' style="margin-bottom:12px"';
@@ -7973,8 +7975,8 @@ function renderCountriesScreen(){
   var cardsHTML = list.map(function(c){
     var status = getCountryStatus(c.id);
     var citiesPreview = c.cities.length<=2
-      ? c.cities.map(function(ci){return ci.city;}).join(', ')
-      : c.cities.slice(0,2).map(function(ci){return ci.city;}).join(', ')+' +'+(c.cities.length-2);
+      ? c.cities.map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')
+      : c.cities.slice(0,2).map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
       +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'guide\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
@@ -8534,7 +8536,7 @@ function setBudgetSubTab(t){ S.budgetSubTab=t; S.budgetCountryView=null; save();
 function renderExpenseFormModal(){
   var countryOptions = COUNTRIES.map(function(c){return '<option value="'+c.id+'"'+(S.expCountry===c.id?' selected':'')+'>'+c.flag+' '+c.name+'</option>';}).join('');
   var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
-  var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'+escHtml(ci.city)+'</option>';}).join('');
+  var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'  +escHtml(_cityDisplayName(selCountry.id+'_'+ci.city,ci))+'</option>';}).join('');
   var selCity = selCountry.cities.find(function(ci){return ci.city===S.expCity;});
   var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
   var personOptions = getExpensePersonOptions();
@@ -10704,28 +10706,47 @@ function startEditCity(ck, currentName) {
   if(inp){ inp.focus(); inp.select(); }
 }
 
-function confirmEditCity(ck) {
+async function confirmEditCity(ck) {
   var inp = document.getElementById('edit-city-'+ck);
   if(!inp) return;
   var newName = stripHtml(inp.value.trim());
   if(!newName) return;
+  // P0.5 : Supabase confirme avant mise à jour locale (donnée partagée entre voyageurs)
+  if(sb && CURRENT_TRIP){
+    // Désactiver le bouton ✓ pendant l'envoi
+    var _btn = inp.parentNode && inp.parentNode.querySelector('button');
+    if(_btn){ _btn.disabled = true; _btn.textContent = '…'; }
+    try{
+      var r = await sb.from('activity_details').upsert(
+        {trip_id:CURRENT_TRIP.id, detail_key:'__alias__city__'+ck, data:{name:newName}, updated_at:new Date().toISOString()},
+        {onConflict:'trip_id,detail_key'}
+      );
+      if(r && r.error) throw r.error;
+    } catch(e){
+      console.error('[PlaniTrip] alias city upsert:', e);
+      // Rétablir le bouton et laisser le champ ouvert
+      if(_btn){ _btn.disabled = false; _btn.textContent = '✓'; }
+      var _errDiv = inp.parentNode && inp.parentNode.querySelector('.rename-err');
+      if(!_errDiv && inp.parentNode){
+        _errDiv = document.createElement('div');
+        _errDiv.className = 'rename-err';
+        _errDiv.style.cssText = 'font-size:11px;color:var(--red);margin-top:4px;width:100%';
+        inp.parentNode.appendChild(_errDiv);
+      }
+      if(_errDiv) _errDiv.textContent = 'Erreur de sauvegarde — réessaie';
+      return;
+    }
+  }
+  // Supabase OK (ou hors-ligne) : mettre à jour localement
   if(!S.cityNames) S.cityNames={};
   S.cityNames[ck] = newName;
   save();
-  // Clé séparée légère (iOS safety)
   try{
     if(CURRENT_STORAGE_KEY){
       localStorage.setItem(CURRENT_STORAGE_KEY+'_cityNames', JSON.stringify(S.cityNames));
     }
   }catch(_e){}
   renderContent();
-  // Alias partagé : tous les voyageurs voient le nouveau nom après reload
-  if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert(
-      {trip_id:CURRENT_TRIP.id, detail_key:'__alias__city__'+ck, data:{name:newName}, updated_at:new Date().toISOString()},
-      {onConflict:'trip_id,detail_key'}
-    ).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] alias city upsert:', r.error); });
-  }
 }
 // Retourne le nom affiché d'une ville : override local si défini, sinon city.city.
 // NE JAMAIS utiliser pour construire ck ou interroger Supabase — uniquement pour l'affichage.
