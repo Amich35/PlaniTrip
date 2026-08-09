@@ -14589,7 +14589,8 @@ async function _impAddToCurrentTrip() {
 
   // Activités : logique identique au mode création (déjà testée), + résolution
   // du nom canonique de la ville existante (jamais la valeur brute importée) et
-  // dédoublonnage simple (même ville + même nom normalisé).
+  // dédoublonnage par nom normalisé + date explicite (S.actDate) quand elle existe,
+  // sur les activités custom ET built-in (city.acts) de la ville.
   for (var ai=0; ai<savedActs.length; ai++) {
     var act = savedActs[ai];
     if (!act.name || !act.city || !act.country) continue;
@@ -14601,11 +14602,31 @@ async function _impAddToCurrentTrip() {
       try { await _createCityFromModal(realC3.id, act.city, '', '', '', true); } catch(e) {}
     }
     var cityKey = realC3.id+'_'+canonicalCityName3;
+    var importedDate = act.date || '';
+
+    // Critère de doublon : même nom normalisé + même date si les deux sont
+    // exploitables ; même nom + aucune date exploitable des deux côtés = doublon
+    // évident ; une activité datée et une non datée ne sont jamais fusionnées.
+    var _impActIsDup = function(name, existingKey) {
+      if (_impNorm(name) !== _impNorm(act.name)) return false;
+      var existingDate = (S.actDate && S.actDate[existingKey]) || '';
+      if (importedDate && existingDate) return importedDate === existingDate;
+      if (!importedDate && !existingDate) return true;
+      return false;
+    };
+
     var existingActs = S.customActs[cityKey] || [];
-    // Dédoublonnage simple sans fuzzy matching : même ville + même nom normalisé
-    // suffit à écarter le cas courant (réimport du même fichier).
-    var actDupSimple = existingActs.some(function(ea){ return _impNorm(ea.n)===_impNorm(act.name); });
-    if (actDupSimple) continue;
+    var actDup = existingActs.some(function(ea, idx){ return _impActIsDup(ea.n, cityKey+'_c'+idx); });
+
+    if (!actDup && cityExists && cityExists.acts) {
+      actDup = cityExists.acts.some(function(ea, idx){
+        var baseKey = cityKey+'_'+idx;
+        if (S.deletedActs && S.deletedActs[baseKey]) return false; // activité de base supprimée : plus un doublon
+        return _impActIsDup(ea.n, baseKey);
+      });
+    }
+
+    if (actDup) continue;
     try {
       _createActivityCore(cityKey, act.name, {
         skipAiEnrichment: true,
@@ -14615,6 +14636,7 @@ async function _impAddToCurrentTrip() {
       });
     } catch(e) { injectionErrors.push('Activité '+act.name+' : '+e.message); }
   }
+
 
   // Logements : logique identique au mode création (déjà testée), + résolution
   // du nom canonique de la ville existante et dédoublonnage (même ville + même nom normalisé).
