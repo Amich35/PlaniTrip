@@ -1914,36 +1914,27 @@ function _isCustomStableKey(k){
 // Guard updated_at : si le serveur a une version plus récente (cas de concurrence),
 // on fait un merge silencieux champ par champ — la valeur serveur gagne pour les
 // champs non présents dans le patch courant.
-function _syncActivityState(actKey, tripId){  if(!sb || !tripId) return;
-  var now = new Date().toISOString();
-  var stateKey = actKey + '__state';
-  // Construire l'objet state courant pour cette activité uniquement
-  var patch = {};
-  if(S.actDate     && S.actDate[actKey]     !== undefined) patch.date      = S.actDate[actKey];
-  if(S.actMoment   && S.actMoment[actKey]   !== undefined) patch.moment    = S.actMoment[actKey];
-  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) patch.timeStart = S.actTimeStart[actKey];
-  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) patch.timeEnd   = S.actTimeEnd[actKey];
-  if(S.actCategory && S.actCategory[actKey] !== undefined) patch.category  = S.actCategory[actKey];
-  if(S.done        && S.done[actKey]        !== undefined) patch.done      = S.done[actKey];
-  if(!Object.keys(patch).length) return;
-  // Lire la version serveur, merger les champs absents du patch, puis upsert
+function _syncActivityState(actKey, tripId){
+  if(!sb || !tripId) return;
+  // Construire l'état COMPLET de cette activité depuis S.
+  // On écrit tous les champs connus d'un coup — pas de select préalable,
+  // ce qui évitait des lost-updates en cascade quand plusieurs champs sont
+  // sauvegardés dans le même save (ex: savePlanningModal appelle setActivityDate
+  // + setActMoment + setActTimeRange : trois _syncActivityState concurrents
+  // lisaient tous le même état serveur avant que l'un d'eux ait écrit).
+  // La source de vérité est S (état local complet et cohérent après save()).
+  var state = {};
+  if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
+  if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
+  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) state.timeStart = S.actTimeStart[actKey];
+  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) state.timeEnd   = S.actTimeEnd[actKey];
+  if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
+  if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
+  if(!Object.keys(state).length) return;
   sb.from('activity_details')
-    .select('data,updated_at')
-    .eq('trip_id', tripId)
-    .eq('detail_key', stateKey)
-    .maybeSingle()
-    .then(function(res){
-      var merged = {};
-      if(res && res.data && res.data.data && typeof res.data.data === 'object'){
-        Object.assign(merged, res.data.data);
-      }
-      // Le patch courant (valeur locale) prend la main sur ce qui existait
-      Object.assign(merged, patch);
-      sb.from('activity_details')
-        .upsert({trip_id:tripId, detail_key:stateKey, data:merged, updated_at:now},
-                {onConflict:'trip_id,detail_key'})
-        .then(function(r){ if(r&&r.error) console.error('[PlaniTrip] _syncActivityState:', r.error); });
-    });
+    .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
+            {onConflict:'trip_id,detail_key'})
+    .then(function(r){ if(r&&r.error) console.error('[PlaniTrip] _syncActivityState:', r.error); });
 }
 // ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
 
