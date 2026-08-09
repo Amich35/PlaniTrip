@@ -2873,7 +2873,7 @@ function openDetail(actKey, actName, cityKey) {
 // recommandé change. Seul 'anthropic.auto' est utilisé en B1.
 var AI_MODELS = {
   anthropic: { auto: 'claude-sonnet-4-6' },
-  openai:    { auto: 'gpt-5' },        // réservé B2 — non appelé tant que implemented=false
+  openai:    { auto: 'gpt-5.6' },       // B2 — vérifié doc officielle OpenAI (Responses API) au moment de l'implémentation
   gemini:    { auto: 'gemini-2.5-flash' } // réservé B3 — non appelé tant que implemented=false
 };
 
@@ -2881,7 +2881,7 @@ var AI_MODELS = {
 // en `if(provider==='openai')` dans le reste du code métier.
 var AI_PROVIDERS = {
   anthropic:   { label:'Anthropic',      supportsWebSearch:true, supportsStructuredOutput:false, implemented:true  },
-  openai:      { label:'OpenAI',         supportsWebSearch:true, supportsStructuredOutput:true,  implemented:false },
+  openai:      { label:'OpenAI',         supportsWebSearch:true, supportsStructuredOutput:true,  implemented:true  },
   gemini:      { label:'Google Gemini',  supportsWebSearch:true, supportsStructuredOutput:true,  implemented:false }
 };
 
@@ -2956,6 +2956,7 @@ async function aiRequest(options){
   }
   try{
     if(provider === 'anthropic') return await _aiCallAnthropic(key, options);
+    if(provider === 'openai') return await _aiCallOpenAI(key, options);
     return _aiError('provider_unavailable', providerDef.label+' n\'est pas encore implémenté.');
   }catch(e){
     return _aiError('network_error', (e && e.message) || 'Erreur réseau.');
@@ -3010,6 +3011,72 @@ async function _aiCallAnthropic(key, options){
   // n'exploite les citations web_search d'Anthropic (elle ne fait que parser
   // le JSON final), donc sources:[] reste fidèle au comportement existant.
   return _aiOk(text, parsedData, 'anthropic', model, []);
+}
+
+// Extrait le texte final d'une réponse Responses API OpenAI (peut contenir des
+// items de type 'reasoning' ou 'web_search_call' en plus du message final).
+function extractOpenAIText(data){
+  if(!data || !data.output || !data.output.length) return '';
+  var texts = [];
+  data.output.forEach(function(item){
+    if(item.type === 'message' && item.content){
+      item.content.forEach(function(c){
+        if(c.type === 'output_text' && c.text) texts.push(c.text);
+      });
+    }
+  });
+  return texts.join('\n');
+}
+
+// ── Adapter OpenAI (B2) — Responses API (POST /v1/responses), recommandée par
+// OpenAI pour toute nouvelle intégration. Même logique métier que l'adapter
+// Anthropic : le prompt embarque déjà l'instruction JSON, aucun schema formel
+// n'est fourni par les fonctions métier actuelles donc pas de Structured
+// Outputs natif ici (text.format/json_schema) — différé à B4. Web search via
+// l'outil {type:'web_search'} (nom actuel recommandé, web_search_preview est
+// l'ancien nom legacy).
+async function _aiCallOpenAI(key, options){
+  var model = (AI_MODELS.openai && AI_MODELS.openai[options.model || 'auto']) || AI_MODELS.openai.auto;
+  var body = { model: model, input: options.prompt };
+  if(options.webSearch) body.tools = [{ type:'web_search' }];
+  if(options.system) body.instructions = options.system;
+  if(options.maxTokens) body.max_output_tokens = Math.max(options.maxTokens, 16); // évite un output tronqué avant même le texte final
+
+  var resp;
+  try{
+    resp = await fetch('https://api.openai.com/v1/responses', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body: JSON.stringify(body)
+    });
+  }catch(e){
+    return _aiError('network_error', 'Impossible de contacter OpenAI.');
+  }
+
+  if(!resp.ok){
+    var errBody = ''; try{ errBody = await resp.text(); }catch(e){}
+    var errDetail = ''; var errCode = '';
+    try{ var ej = JSON.parse(errBody); errDetail = (ej.error && ej.error.message) || ''; errCode = (ej.error && ej.error.code) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
+    var code = 'invalid_response';
+    if(resp.status === 401) code = 'invalid_key';
+    else if(errCode === 'insufficient_quota') code = 'quota_exceeded';
+    else if(resp.status === 429) code = 'rate_limited';
+    else if(resp.status === 404 || errCode === 'model_not_found') code = 'model_unavailable';
+    else if(resp.status === 500 || resp.status === 503) code = 'provider_unavailable';
+    return _aiError(code, errDetail || ('Erreur '+resp.status));
+  }
+
+  var data;
+  try{ data = await resp.json(); }catch(e){ return _aiError('invalid_response', 'Réponse illisible.'); }
+  var text = extractOpenAIText(data);
+  if(!text) return _aiError('invalid_response', 'Réponse vide.');
+
+  var parsedData = null;
+  if(options.output === 'json'){
+    try{ parsedData = deepSanitize(parseAiJson(text)); }
+    catch(e){ return _aiError('invalid_response', 'JSON invalide dans la réponse.'); }
+  }
+  return _aiOk(text, parsedData, 'openai', model, []);
 }
 
 // Traduit un code d'erreur normalisé en message UX — jamais de JSON brut
@@ -4446,12 +4513,50 @@ function saveAddActivityModal(){
   _createActivityCore(_addActivityModalCk, val, {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal});
 }
 
+// ── B2 : sélecteur de fournisseur minimal dans la modale Réglages (les
+// providers non implémentés — Gemini en B2 — n'apparaissent pas comme chip
+// sélectionnable ; la finition complète de cette UI est prévue en B4).
+var _apiModalSelectedProvider = 'anthropic';
+var _apiModalKeyEdited = false; // évite d'écraser une clé existante si l'utilisateur n'a rien retapé
+function openApiModal(){
+  var cfg = getAIConfig();
+  _apiModalSelectedProvider = cfg.provider || 'anthropic';
+  _apiModalKeyEdited = false;
+  _renderApiModalChips();
+  _renderApiModalKeyField();
+  document.getElementById('apiModal').classList.add('open');
+}
+function _renderApiModalChips(){
+  var wrap = document.getElementById('apiModalProviderChips');
+  if(!wrap) return;
+  var implementedProviders = Object.keys(AI_PROVIDERS).filter(function(p){ return AI_PROVIDERS[p].implemented; });
+  wrap.innerHTML = implementedProviders.map(function(p){
+    var active = p === _apiModalSelectedProvider;
+    return '<span onclick="_apiModalSelectProvider(\''+p+'\')" style="padding:8px 14px;border-radius:16px;font-size:12.5px;font-weight:600;cursor:pointer;background:'+(active?'var(--accent)':'var(--sand-deep)')+';color:'+(active?'#fff':'var(--ink-muted)')+'">'+AI_PROVIDERS[p].label+'</span>';
+  }).join('');
+}
+function _renderApiModalKeyField(){
+  var cfg = getAIConfig();
+  var input = document.getElementById('apiKeyModal');
+  var titleEl = document.querySelector('#apiModal .modal-title');
+  if(titleEl) titleEl.textContent = 'Clé API '+(AI_PROVIDERS[_apiModalSelectedProvider]||{}).label;
+  if(input){
+    input.value = (cfg.keys && cfg.keys[_apiModalSelectedProvider]) || '';
+    input.placeholder = _apiModalSelectedProvider === 'openai' ? 'sk-…' : 'sk-ant-api03-…';
+  }
+}
+function _apiModalSelectProvider(provider){
+  _apiModalSelectedProvider = provider;
+  _apiModalKeyEdited = false;
+  _renderApiModalChips();
+  _renderApiModalKeyField();
+}
 function saveApiKeyFromSettingsModal(){
   var val = document.getElementById('apiKeyModal').value;
-  setAIKey('anthropic', val); // Lot B1 : écrit planitrip_ai_config (device-level) uniquement
+  setAIKey(_apiModalSelectedProvider, val); // B2 : écrit planitrip_ai_config pour le provider sélectionné
   document.getElementById('apiModal').classList.remove('open');
   renderContent();
-  if(!val || !CURRENT_TRIP) return;
+  if(!val || !CURRENT_TRIP || _apiModalSelectedProvider !== 'anthropic') return;
   var toPrepare = COUNTRIES.filter(function(c){ return !c._aiGenerated || !c.cities || !c.cities.length; });
   if(!toPrepare.length) return;
   showConfirm(
@@ -10440,7 +10545,7 @@ function renderMyAccountScreen(){
     +'<div class="info-card"><div class="ic-header"><span data-icon="settings" data-icon-size="16"></span> Réglages avancés</div>'
     +'<div class="status-sub" style="margin-bottom:10px;line-height:1.5">L\'app fonctionne très bien sans clé API — tu remplis chaque pays à la main. Avec une clé Anthropic personnelle, un bouton "Auto-remplir avec l\'IA" apparaît sur chaque pays pour gagner du temps. Ta clé reste privée sur cet appareil, jamais partagée avec les autres voyageurs.</div>'
     +(aiHasActiveKey() ? '<div style="font-size:12px;color:var(--green-muted)">✓ Clé API configurée</div>' : '<div style="font-size:12px;color:var(--ink-muted)">Clé API non configurée</div>')
-    +'<button onclick="requirePin(function(){ document.getElementById(\'apiModal\').classList.add(\'open\'); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
+    +'<button onclick="requirePin(function(){ openApiModal(); })" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="settings" data-icon-size="14"></span> Modifier (PIN requis)</button>'
     +'<div style="font-size:12px;color:var(--ink-muted);margin-top:12px">'+(S.pin ? '✓ PIN de sécurité défini' : 'Aucun PIN défini — protège l\'accès à ta clé API')+'</div>'
     +'<button onclick="changePinFlowApi()" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:var(--sand);font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="lock" data-icon-size="14"></span> '+(S.pin?'Changer mon PIN':'Créer un PIN')+'</button>'
     +(S.pin?'<button onclick="removePinFlowApi()" style="margin-top:8px;width:100%;padding:10px;border-radius:var(--r12);border:var(--border);background:transparent;font-size:13px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:var(--red-muted);display:flex;align-items:center;justify-content:center;gap:6px;"><span data-icon="unlock" data-icon-size="14"></span> Supprimer mon PIN</button>':'')
@@ -14990,9 +15095,10 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 <div class="share-modal" id="apiModal">
   <div class="share-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" style="font-size:18px">Clé API Anthropic</div>
-    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:16px;line-height:1.5">Stockée uniquement sur cet appareil. Jamais partagée.</div>
-    <input class="modal-field api-key-field" type="password" id="apiKeyModal" placeholder="sk-ant-api03-…" style="font-family:monospace;font-size:12px"/>
+    <div class="modal-title" style="font-size:18px">Fournisseur IA</div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5">Ta clé reste stockée uniquement sur cet appareil. Jamais partagée.</div>
+    <div id="apiModalProviderChips" style="display:flex;gap:8px;margin-bottom:14px;"></div>
+    <input class="modal-field api-key-field" type="password" id="apiKeyModal" placeholder="sk-…" style="font-family:monospace;font-size:12px" oninput="_apiModalKeyEdited=true"/>
     <button class="modal-cta" onclick="saveApiKeyFromSettingsModal()">Enregistrer</button>
     <button class="modal-cancel-btn" onclick="document.getElementById('apiModal').classList.remove('open')">Annuler</button>
   </div>
