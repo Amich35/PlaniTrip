@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:empty-day2';
+var APP_BUILD = '2026-08-09·sha:p08a-1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6451,6 +6451,8 @@ function setActTimeRange(actKey, start, end, freeText, opts){
 var _planningModalActKey = '';
 var _planningModalMoment = '';
 function openPlanningModal(actKey, name, meta){
+  var _pErr = document.getElementById('planningModalErr');
+  if(_pErr){ _pErr.textContent=''; _pErr.style.display='none'; }
   _planningModalActKey = actKey;
   var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
   var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
@@ -6498,6 +6500,23 @@ function clearPlanningTime(){
   document.getElementById('planningModalTimeStart').value = '';
   document.getElementById('planningModalTimeEnd').value = '';
 }
+// P0.8-A : sync awaité des blobs planning pour les activités built-in.
+// Regroupe en un seul Promise.all les upserts de date/moment/horaires
+// qui étaient auparavant fire-and-forget dans chaque setter individuel.
+// N'est appelé que si !_isCustomStableKey(actKey) — les _sid_ passent par _syncActivityState.
+async function _syncPlanningBlobs(actKey, tripId){
+  if(!sb || !tripId) return;
+  var now = new Date().toISOString();
+  var upserts = [];
+  if(S.actDate)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actDate',     data:S.actDate,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+  if(S.actMoment)    upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actMoment',   data:S.actMoment,   updated_at:now},{onConflict:'trip_id,detail_key'}));
+  if(S.actTimeStart) upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:now},{onConflict:'trip_id,detail_key'}));
+  if(S.actTimeEnd)   upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeEnd',  data:S.actTimeEnd,  updated_at:now},{onConflict:'trip_id,detail_key'}));
+  if(S.actTime)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTime',     data:S.actTime,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+  var results = await Promise.all(upserts);
+  var err = results.find(function(r){ return r && r.error; });
+  if(err){ console.error('[PlaniTrip] _syncPlanningBlobs:', err.error); throw err.error; }
+}
 async function savePlanningModal(){
   var dateEl = document.getElementById('planningModalDate');
   var dateVal = dateEl ? dateEl.value : '';
@@ -6512,25 +6531,30 @@ async function savePlanningModal(){
   }
   var actKey = _planningModalActKey;
   var isStable = _isCustomStableKey(actKey);
-  // P0.3 — batch local sans sync intermédiaire
-  var noSync = isStable ? {sync:false} : undefined;
-  var btn = isStable ? document.getElementById('planningModalSaveBtn') : null;
+  // P0.3/P0.8-A — batch local sans sync intermédiaire dans tous les cas
+  var btn = document.getElementById('planningModalSaveBtn');
   // 1. Désactiver le bouton avant toute mutation
   if(btn){ btn.disabled = true; btn.textContent = '…'; }
-  // 2. Mutations locales (0 upsert Supabase pour les clés stables)
-  if(dateEl) setActivityDate(actKey, dateVal, noSync);
-  setActMoment(actKey, finalMoment, noSync);
-  setActTimeRange(actKey, startVal, endVal, '', noSync);
-  // 3. Pour les clés stables : await le sync AVANT de fermer la modale.
-  //    Si l'upsert échoue, la modale reste ouverte, le bouton est réactivé,
-  //    et les données locales sont conservées (S est déjà à jour).
-  if(isStable && sb && CURRENT_TRIP){
+  // 2. Mutations locales (0 upsert Supabase — {sync:false} pour tous les types)
+  if(dateEl) setActivityDate(actKey, dateVal, {sync:false});
+  setActMoment(actKey, finalMoment, {sync:false});
+  setActTimeRange(actKey, startVal, endVal, '', {sync:false});
+  // 3. Sync Supabase awaité — _syncActivityState pour _sid_, _syncPlanningBlobs pour built-in
+  if(sb && CURRENT_TRIP){
     try{
-      await _syncActivityState(actKey, CURRENT_TRIP.id);
+      if(isStable){
+        // P0.3 : une seule écriture granulaire par actKey
+        await _syncActivityState(actKey, CURRENT_TRIP.id);
+      } else {
+        // P0.8-A : blobs globaux en un seul Promise.all
+        await _syncPlanningBlobs(actKey, CURRENT_TRIP.id);
+      }
     } catch(e){
       console.error('[PlaniTrip] savePlanningModal sync failed:', e);
       if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
-      return; // modale reste ouverte — l'utilisateur peut réessayer
+      var _errEl = document.getElementById('planningModalErr');
+      if(_errEl){ _errEl.textContent = 'Erreur de sauvegarde — réessaie'; _errEl.style.display=''; }
+      return; // modale reste ouverte
     }
   }
   // 4. Succès confirmé : fermer et render
@@ -15980,7 +16004,8 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-handle"></div>
     <div class="modal-title">Planifier</div>
     <div id="planningModalBody"></div>
-    <button onclick="savePlanningModal()" style="display:block;margin:14px auto 0;padding:12px 32px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
+    <div id="planningModalErr" style="display:none;text-align:center;font-size:12px;color:var(--red);margin-top:8px"></div>
+    <button id="planningModalSaveBtn" onclick="savePlanningModal()" style="display:block;margin:14px auto 0;padding:12px 32px;border-radius:20px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Enregistrer</button>
     <div style="text-align:center;margin-top:10px"><span onclick="document.getElementById('planningModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
   </div>
 </div>
