@@ -1902,6 +1902,51 @@ function exportActivityRecoverySnapshot() {
   }
 }
 
+// ── PHASE S — GRANULAR ACTIVITY STATE SYNC ──────────────────────────────────
+// Retourne true si la clé d'activité est une clé stable (_sid_).
+// Les built-ins (jp_Osaka_0, etc.) et les legacy (_c0, _c1…) retournent false.
+function _isCustomStableKey(k){
+  return typeof k === 'string' && k.indexOf('_sid_') !== -1;
+}
+
+// Upsert granulaire d'une ligne <actKey>__state dans activity_details.
+// N'écrit QUE les champs de planning de cette activité, pas un blob global.
+// Guard updated_at : si le serveur a une version plus récente (cas de concurrence),
+// on fait un merge silencieux champ par champ — la valeur serveur gagne pour les
+// champs non présents dans le patch courant.
+function _syncActivityState(actKey, tripId){  if(!sb || !tripId) return;
+  var now = new Date().toISOString();
+  var stateKey = actKey + '__state';
+  // Construire l'objet state courant pour cette activité uniquement
+  var patch = {};
+  if(S.actDate     && S.actDate[actKey]     !== undefined) patch.date      = S.actDate[actKey];
+  if(S.actMoment   && S.actMoment[actKey]   !== undefined) patch.moment    = S.actMoment[actKey];
+  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) patch.timeStart = S.actTimeStart[actKey];
+  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) patch.timeEnd   = S.actTimeEnd[actKey];
+  if(S.actCategory && S.actCategory[actKey] !== undefined) patch.category  = S.actCategory[actKey];
+  if(S.done        && S.done[actKey]        !== undefined) patch.done      = S.done[actKey];
+  if(!Object.keys(patch).length) return;
+  // Lire la version serveur, merger les champs absents du patch, puis upsert
+  sb.from('activity_details')
+    .select('data,updated_at')
+    .eq('trip_id', tripId)
+    .eq('detail_key', stateKey)
+    .maybeSingle()
+    .then(function(res){
+      var merged = {};
+      if(res && res.data && res.data.data && typeof res.data.data === 'object'){
+        Object.assign(merged, res.data.data);
+      }
+      // Le patch courant (valeur locale) prend la main sur ce qui existait
+      Object.assign(merged, patch);
+      sb.from('activity_details')
+        .upsert({trip_id:tripId, detail_key:stateKey, data:merged, updated_at:now},
+                {onConflict:'trip_id,detail_key'})
+        .then(function(r){ if(r&&r.error) console.error('[PlaniTrip] _syncActivityState:', r.error); });
+    });
+}
+// ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
+
 // ── ACTIVITY DETAILS (pre-filled for Japan) ──────────────────
 const ACT_DETAILS = {
   'jp_Osaka_0': {
@@ -2350,7 +2395,11 @@ function toggleAct(k){
   // Lot 5A : synchroniser S.done vers Supabase pour que le statut "Fait" soit partagé
   // entre voyageurs et survive à un reload depuis le serveur.
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',data:S.done,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync done:',r.error); });
+    if(_isCustomStableKey(k)){
+      _syncActivityState(k, CURRENT_TRIP.id);
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',data:S.done,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync done:',r.error); });
+    }
   }
   renderContent();
   // Peak moment: animate the check if just completed
@@ -4591,7 +4640,11 @@ function _createActivityCore(cityKey, val, opts){
     // Correctif Lot 5A : synchroniser immédiatement vers Supabase (même comportement
     // qu'une catégorie choisie ensuite via le modal catégorie → toggleCategoryForAct).
     if(sb && CURRENT_TRIP){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync actCategory création:',_r.error); });
+      if(_isCustomStableKey(actKey)){
+        _syncActivityState(actKey, CURRENT_TRIP.id);
+      } else {
+        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync actCategory création:',_r.error); });
+      }
     }
   }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
@@ -6316,7 +6369,11 @@ function setActMoment(actKey, momentKey){
   S.actMoment[actKey] = momentKey;
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+    if(_isCustomStableKey(actKey)){
+      _syncActivityState(actKey, CURRENT_TRIP.id);
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+    }
   }
 }
 function setActSuggestedTime(actKey, val){
@@ -6340,9 +6397,13 @@ function setActTimeRange(actKey, start, end, freeText){
   S.actTime[actKey] = (start||end) ? '' : freeText;
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+    if(_isCustomStableKey(actKey)){
+      _syncActivityState(actKey, CURRENT_TRIP.id);
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+    }
   }
 }
 var _planningModalActKey = '';
@@ -6595,7 +6656,11 @@ function openCategoryPickerModal(actKey){
   document.getElementById('categoryModal').classList.add('open');
 }
 function syncActCategory(){
-  if(sb && CURRENT_TRIP){
+  if(!sb || !CURRENT_TRIP) return;
+  if(_isCustomStableKey(_categoryModalActKey)){
+    // Phase S : écriture granulaire — n'impacte que cette activité
+    _syncActivityState(_categoryModalActKey, CURRENT_TRIP.id);
+  } else {
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){
       if(r&&r.error) console.error('[PlaniTrip] sync actCategory:', r.error);
     });
@@ -7623,7 +7688,13 @@ function setActivityDate(actKey, dateVal){
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    if(_isCustomStableKey(actKey)){
+      // Phase S : écriture granulaire — n'impacte que cette activité
+      _syncActivityState(actKey, CURRENT_TRIP.id);
+    } else {
+      // Built-in ou legacy : blob global (comportement historique)
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
   }
 }
 
@@ -12280,15 +12351,22 @@ async function loadCitiesActivities(){
   if(_pendingKeyMigrations.length && sb && CURRENT_TRIP){
     var _mtid = CURRENT_TRIP.id;
     var _mnow = new Date().toISOString();
+    // Phase S : filtrer les clés _sid_ des blobs globaux — elles ont leur propre
+    // ligne __state et ne doivent plus polluer les blobs partagés.
+    var _blobOnly = function(map){
+      var out = {};
+      Object.keys(map||{}).forEach(function(k){ if(!_isCustomStableKey(k)) out[k]=map[k]; });
+      return out;
+    };
     Promise.all([
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:S.actDay,       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:S.done,         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDate',      data:_blobOnly(S.actDate),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actMoment',    data:_blobOnly(S.actMoment),    updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeStart', data:_blobOnly(S.actTimeStart), updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeEnd',   data:_blobOnly(S.actTimeEnd),   updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTime',      data:_blobOnly(S.actTime),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actCategory',  data:_blobOnly(S.actCategory),  updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:_blobOnly(S.actDay),       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:_blobOnly(S.done),         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
     ]).catch(function(e){ console.error('[PlaniTrip] migration blobs upsert:', e); });
     // Fiches individuelles : upsert sous la clé stable uniquement (jamais de delete de la
     // légacy ici — cette migration est best-effort et purement locale à la lecture, on laisse
@@ -12444,6 +12522,20 @@ async function loadActivityDetails(){
     } else {
       window._customDetails[row.detail_key] = row.data;
     }
+  });
+  // Phase S — post-pass : lire les __state granulaires et les injecter dans S
+  // Ces clés arrivent dans _customDetails via le else-branch ci-dessus.
+  // On les injecte ICI, après les blobs globaux, pour qu'ils soient prioritaires.
+  Object.keys(window._customDetails).forEach(function(dk){    if(dk.slice(-7) !== '__state') return;
+    var state = window._customDetails[dk];
+    if(!state || typeof state !== 'object') return;
+    var actKey = dk.slice(0, -7); // strip '__state'
+    if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
+    if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
+    if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
+    if(state.timeEnd   !== undefined){ if(!S.actTimeEnd)   S.actTimeEnd={};   S.actTimeEnd[actKey]   = state.timeEnd; }
+    if(state.category  !== undefined){ if(!S.actCategory)  S.actCategory={};  S.actCategory[actKey]  = state.category; }
+    if(state.done      !== undefined){ if(!S.done)         S.done={};         S.done[actKey]         = state.done; }
   });
   S.customDetails = window._customDetails;
   save();
