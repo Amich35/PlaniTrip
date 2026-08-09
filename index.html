@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:rename-fix';
+var APP_BUILD = '2026-08-09·sha:empty-day';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -4370,15 +4370,12 @@ function countActivitiesByDate(ck){
 function renderDayTabs(ck) {
   const dates = getCityDateList(ck);
   if(!dates.length) return '';
-  const counts = countActivitiesByDate(ck);
-  const nonEmptyDates = dates.filter(function(iso){ return (counts[iso]||0)>0; });
-  if(!nonEmptyDates.length) return '';
-  // Validation : si le filtre mémorisé n'est plus dans les jours disponibles, fallback Tous
+  // Toutes les dates du séjour — pas seulement celles avec activités
   var _rawActive = S.activeDay && S.activeDay[ck] ? S.activeDay[ck] : 'Tous';
-  var active = (_rawActive === 'Tous' || nonEmptyDates.indexOf(_rawActive) !== -1)
+  var active = (_rawActive === 'Tous' || dates.indexOf(_rawActive) !== -1)
     ? _rawActive : 'Tous';
   if(active === 'Tous' && _rawActive !== 'Tous'){
-    // Nettoyage silencieux du filtre devenu invalide
+    // Nettoyage silencieux du filtre devenu invalide (date hors séjour)
     delete S.activeDay[ck];
     try{
       var _adClean = Object.keys(S.activeDay).length ? JSON.stringify(S.activeDay) : null;
@@ -4390,7 +4387,7 @@ function renderDayTabs(ck) {
   }
   let html = '<div class="cf-chips">';
   html += '<button class="cf-day-chip'+(active==='Tous'?' active':'')+'" onclick="setActiveDay(\''+jsStrEsc(ck)+'\',\'Tous\')"><span class="cf-day-num" style="font-size:12px;font-weight:600">Tout</span></button>';
-  nonEmptyDates.forEach(function(iso){
+  dates.forEach(function(iso){
     var d = new Date(iso+'T00:00:00');
     var dayNum = d.toLocaleDateString('fr-FR',{day:'numeric'});
     var weekday = d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','');
@@ -6946,7 +6943,15 @@ function renderCityPanelContentBody(c, city){
       filterBarHTML = '<div class="city-filters-sticky"><div class="cf-filter-card">'+rowsHTML+'</div></div>';
     }
 
-    return filterBarHTML+'<div class="cf-act-list">'+baseActsHTML+'</div>'+addForm;
+    var _activeDay = S.activeDay && S.activeDay[ck] ? S.activeDay[ck] : 'Tous';
+    var _emptyDayHTML = '';
+    if(_activeDay !== 'Tous' && !baseActsHTML.trim()){
+      _emptyDayHTML = '<div style="text-align:center;padding:48px 24px 32px;color:var(--ink-muted)">'
+        +'<div style="font-size:15px;font-weight:500;margin-bottom:16px">Aucune activité prévue ce jour</div>'
+        +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'
+        +'</div>';
+    }
+    return filterBarHTML+'<div class="cf-act-list">'+(_emptyDayHTML||baseActsHTML)+'</div>'+(_emptyDayHTML?'':addForm);
 }
 
 function setCityCategory(ck, cat){
