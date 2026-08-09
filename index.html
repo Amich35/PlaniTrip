@@ -1862,11 +1862,13 @@ function save(){
 function exportActivityRecoverySnapshot() {
   try {
     var tripId = (CURRENT_TRIP && CURRENT_TRIP.id) || null;
-    var userId = (CURRENT_USER && CURRENT_USER.email) || null;
+    var userUuid  = (CURRENT_USER && CURRENT_USER.id)    || null;
+    var userLabel  = (CURRENT_USER && PROFILES_MAP && PROFILES_MAP[CURRENT_USER.email]) || 'unknown';
     var snapshot = {
       tripId:       tripId,
       exportedAt:   new Date().toISOString(),
-      userId:       userId,
+      userUuid:     userUuid,
+      userLabel:    userLabel,
       customActs:   JSON.parse(JSON.stringify(S.customActs    || {})),
       customDetails:JSON.parse(JSON.stringify(window._customDetails || {})),
       actDate:      JSON.parse(JSON.stringify(S.actDate       || {})),
@@ -1885,13 +1887,13 @@ function exportActivityRecoverySnapshot() {
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
     a.href   = url;
-    var safeUser = (userId || 'unknown').replace(/[^a-z0-9]/gi, '_');
+    var safeUser = (userLabel || userUuid || 'unknown').replace(/[^a-z0-9]/gi, '_');
     a.download = 'planitrip_recovery_' + safeUser + '_'
                + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
     document.body.appendChild(a);
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
-    console.log('[PlaniTrip Recovery] Snapshot exporté — userId:', userId, 'tripId:', tripId);
+    console.log('[PlaniTrip Recovery] Snapshot exporté — userUuid:', userUuid, 'userLabel:', userLabel, 'tripId:', tripId);
     return snapshot;
   } catch(e) {
     console.error('[PlaniTrip Recovery] Erreur export:', e);
