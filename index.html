@@ -14117,18 +14117,25 @@ function _showImportPreview() {
   if (warnCount) html += '<div style="margin-top:6px;font-size:12px;color:#C47B2B;font-weight:600">'+svgIcon('alert-circle',12)+' '+warnCount+' élément'+(warnCount>1?'s':'')+' à vérifier</div>';
   html += '</div>';
 
-  // Voyage
-  html += '<div class="imp-section">';
-  html += '<div class="imp-section-title">Voyage</div>';
-  html += '<div class="imp-card">';
-  html += '<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Nom du voyage <span style="font-weight:400">(optionnel)</span></div>';
-  html += '<input class="imp-field" id="imp-trip-name" value="'+escHtml(p.trip.name||'')+'" placeholder="Auto-généré à partir des pays">';
-  html += '<div style="display:flex;gap:8px;">';
-  html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="imp-field" id="imp-trip-start" value="'+escHtml(p.trip.start||'')+'" placeholder="AAAA-MM-JJ" style="margin-bottom:0"></div>';
-  html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Retour</div><input class="imp-field" id="imp-trip-end" value="'+escHtml(p.trip.end||'')+'" placeholder="AAAA-MM-JJ" style="margin-bottom:0"></div>';
-  html += '</div>';
-  html += '</div>';
-  html += '</div>';
+  // Voyage (masqué en mode addToTrip : pas de nom/dates à définir, on enrichit
+  // le voyage courant qui a déjà ces informations)
+  if (_IMP.mode !== 'addToTrip') {
+    html += '<div class="imp-section">';
+    html += '<div class="imp-section-title">Voyage</div>';
+    html += '<div class="imp-card">';
+    html += '<div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Nom du voyage <span style="font-weight:400">(optionnel)</span></div>';
+    html += '<input class="imp-field" id="imp-trip-name" value="'+escHtml(p.trip.name||'')+'" placeholder="Auto-généré à partir des pays">';
+    html += '<div style="display:flex;gap:8px;">';
+    html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="imp-field" id="imp-trip-start" value="'+escHtml(p.trip.start||'')+'" placeholder="AAAA-MM-JJ" style="margin-bottom:0"></div>';
+    html += '<div style="flex:1"><div style="font-size:12px;color:var(--ink-subtle);margin-bottom:4px">Retour</div><input class="imp-field" id="imp-trip-end" value="'+escHtml(p.trip.end||'')+'" placeholder="AAAA-MM-JJ" style="margin-bottom:0"></div>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+  } else {
+    html += '<div class="imp-section">';
+    html += '<div style="font-size:12.5px;color:var(--ink-subtle);background:var(--card-alt,rgba(0,0,0,0.03));padding:10px 12px;border-radius:12px">'+svgIcon('alert-circle',12)+' Ces éléments seront ajoutés à <strong>'+escHtml(CURRENT_TRIP?CURRENT_TRIP.name:'ce voyage')+'</strong>.</div>';
+    html += '</div>';
+  }
 
   // Pays
   html += '<div class="imp-section">';
@@ -14191,8 +14198,13 @@ function _showImportPreview() {
   }
 
   html += '<div id="imp-create-error" class="auth-error" style="display:none;margin-bottom:10px;"></div>';
-  html += '<button class="imp-create-btn" id="imp-create-btn" onclick="_impCreateTrip()">'+svgIcon('check',16)+' Créer ce voyage</button>';
-  html += '<button style="width:100%;margin-top:8px;padding:12px;border-radius:14px;font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;" onclick="closeImportTripModal()">Annuler — créer manuellement</button>';
+  if (_IMP.mode === 'addToTrip') {
+    html += '<button class="imp-create-btn" id="imp-create-btn" onclick="_impAddToCurrentTrip()">'+svgIcon('check',16)+' Ajouter à ce voyage</button>';
+    html += '<button style="width:100%;margin-top:8px;padding:12px;border-radius:14px;font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;" onclick="closeImportTripModal()">Annuler</button>';
+  } else {
+    html += '<button class="imp-create-btn" id="imp-create-btn" onclick="_impCreateTrip()">'+svgIcon('check',16)+' Créer ce voyage</button>';
+    html += '<button style="width:100%;margin-top:8px;padding:12px;border-radius:14px;font-size:13px;border:none;background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;" onclick="closeImportTripModal()">Annuler — créer manuellement</button>';
+  }
   html += '</div>';
 
   body.innerHTML = html;
