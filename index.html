@@ -9254,6 +9254,11 @@ function renderManageTripScreen(){
     +'<button onclick="saveManageTripName()" class="ef-btn" style="width:100%;text-align:center">Enregistrer</button>'
     +'</div>'
     +'<div class="info-card" style="padding:14px 16px;margin-top:12px">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px">'+svgIcon('file-text',15)+' Importer des données</div>'
+    +'<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">Ajoute des pays, villes, activités ou logements à ce voyage depuis un document (CSV, TXT, MD, XLSX, DOCX, PDF).</div>'
+    +'<button onclick="openImportIntoCurrentTripFlow()" class="ef-btn" style="width:100%;text-align:center">Importer depuis un document</button>'
+    +'</div>'
+    +'<div class="info-card" style="padding:14px 16px;margin-top:12px">'
     +'<div style="font-size:13px;color:var(--ink-muted);margin-bottom:10px">Supprimer définitivement ce voyage et toutes ses données (pays, villes, activités, budget, documents, fil, carnet) pour tous les voyageurs. Cette action est irréversible.</div>'
     +'<button onclick="confirmDeleteCurrentTrip()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Supprimer ce voyage</button>'
     +'</div>'
@@ -13003,6 +13008,12 @@ async function openImportTripFlow() {
   await loadCountryList();
   document.getElementById('ct-import-file-input').value = '';
   document.getElementById('ct-import-file-input').click();
+}
+
+// ── Ouvrir le flow d'import en mode "ajout au voyage courant" (Mode B) ──────
+async function openImportIntoCurrentTripFlow() {
+  _IMP.mode = 'addToTrip';
+  await openImportTripFlow();
 }
 
 function closeImportTripModal() {
