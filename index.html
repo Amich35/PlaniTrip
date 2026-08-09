@@ -12994,6 +12994,7 @@ var _IMP = {
   filename: '',
   parsed: null,
   creating: false,
+  mode: 'create', // 'create' (nouveau voyage) ou 'addToTrip' (enrichir CURRENT_TRIP)
   uiState: { openAccordions: {}, editing: {} }
 };
 
@@ -13007,7 +13008,7 @@ async function openImportTripFlow() {
 function closeImportTripModal() {
   document.getElementById('importTripModal').classList.remove('open');
   _impIdCounter = 1;
-  _IMP = { raw: '', filename: '', parsed: null, creating: false, uiState: { openAccordions: {}, editing: {} } };
+  _IMP = { raw: '', filename: '', parsed: null, creating: false, mode: 'create', uiState: { openAccordions: {}, editing: {} } };
 }
 
 // ── Gestionnaire sélection fichier ──────────────────────────────────────────
