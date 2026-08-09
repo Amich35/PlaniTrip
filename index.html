@@ -2706,7 +2706,7 @@ function openDetail(actKey, actName, cityKey) {
     }
     var _displayedName = _actDisplayName(actKey, actName);
     _dtEl.innerHTML = escHtml(_displayedName)
-      +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey||'')+'\','+_custIdxDT+',\''+jsStrEsc(_displayedName)+'\')" style="margin-left:8px;background:none;border:none;cursor:pointer;color:var(--ink-muted);vertical-align:middle;padding:2px;line-height:1;opacity:0.55">'+svgIcon('pencil',13)+'</button>';
+      +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey||'')+'\','+_custIdxDT+',\''+jsStrEsc(_displayedName)+'\')" style="margin-left:10px;background:rgba(29,29,31,0.07);border:none;border-radius:8px;cursor:pointer;color:var(--accent);vertical-align:middle;padding:6px 8px;line-height:1;display:inline-flex;align-items:center;min-width:36px;min-height:36px;justify-content:center">\'+svgIcon(\'pencil\',16)+\'</button>';
   }
   document.getElementById('detailSub').textContent = d.address || '';
   document.getElementById('detailSub').style.display = d.address ? '' : 'none';
@@ -10712,14 +10712,20 @@ function confirmEditCity(ck) {
   if(!S.cityNames) S.cityNames={};
   S.cityNames[ck] = newName;
   save();
-  // Écriture immédiate de la clé séparée légère (iOS safety)
+  // Clé séparée légère (iOS safety)
   try{
     if(CURRENT_STORAGE_KEY){
-      var _cn2 = JSON.stringify(S.cityNames);
-      localStorage.setItem(CURRENT_STORAGE_KEY+'_cityNames', _cn2);
+      localStorage.setItem(CURRENT_STORAGE_KEY+'_cityNames', JSON.stringify(S.cityNames));
     }
   }catch(_e){}
   renderContent();
+  // Alias partagé : tous les voyageurs voient le nouveau nom après reload
+  if(sb && CURRENT_TRIP){
+    sb.from('activity_details').upsert(
+      {trip_id:CURRENT_TRIP.id, detail_key:'__alias__city__'+ck, data:{name:newName}, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,detail_key'}
+    ).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] alias city upsert:', r.error); });
+  }
 }
 // Retourne le nom affiché d'une ville : override local si défini, sinon city.city.
 // NE JAMAIS utiliser pour construire ck ou interroger Supabase — uniquement pour l'affichage.
@@ -10762,25 +10768,45 @@ function confirmEditActTitle(actKey, cityKey, custIdx){
   if(!inp) return;
   var val = stripHtml(inp.value.trim());
   if(!val) return;
-  var _isCustom = custIdx >= 0 && cityKey &&
-    (actKey.indexOf('_sid_') !== -1 || actKey.slice((cityKey||'').length+1).indexOf('c') === 0);
-  if(_isCustom){
-    // Activité custom : mécanisme robuste _sid (actKey inchangé, UPDATE Supabase ciblé)
-    saveCustomActDetail(actKey, cityKey, custIdx, 'name', val);
-  } else {
-    // Activité built-in : override local uniquement (S.actNames[actKey])
+  // Routing robuste sans dépendance à custIdx (qui peut être -1 si customActs pas encore chargés)
+  var _hasSid = actKey.indexOf('_sid_') !== -1;
+  var _isLegacyCustom = !_hasSid && custIdx >= 0 && cityKey &&
+    actKey.slice((cityKey||'').length+1).indexOf('c') === 0;
+
+  if(_hasSid){
+    // Activité custom _sid_ : UPDATE Supabase ciblé par UUID — pas besoin de custIdx
+    var _sidForRename = actKey.slice(actKey.indexOf('_sid_') + 5);
     if(!S.actNames) S.actNames = {};
     S.actNames[actKey] = val;
     save();
-    // Mettre à jour le titre immédiatement sans rerender complet
-    var _dtEl = document.getElementById('detailTitle');
-    if(_dtEl){
-      var _oldHtml = _dtEl.innerHTML;
-      var _btn = _dtEl.querySelector('#detail-rename-btn');
-      _dtEl.textContent = val;
-      if(_btn) _dtEl.appendChild(_btn);
+    // Optimistic local update
+    var _acts = S.customActs[cityKey] || [];
+    for(var _ri=0; _ri<_acts.length; _ri++){
+      if(_acts[_ri]._sid === _sidForRename){ _acts[_ri].n = val; break; }
     }
     renderContent();
+    if(sb && CURRENT_TRIP){
+      sb.from('activities').update({name:val}).eq('id',_sidForRename).eq('trip_id',CURRENT_TRIP.id)
+        .then(function(r){ if(r&&r.error) console.error('[PlaniTrip] rename act sid:', r.error); });
+    }
+  } else if(_isLegacyCustom){
+    // Activité custom legacy _cN : via saveCustomActDetail (UPDATE par nom ou UUID si disponible)
+    saveCustomActDetail(actKey, cityKey, custIdx, 'name', val);
+    if(!S.actNames) S.actNames = {};
+    S.actNames[actKey] = val;
+    save();
+  } else {
+    // Activité built-in : alias partagé via activity_details + S.actNames local
+    if(!S.actNames) S.actNames = {};
+    S.actNames[actKey] = val;
+    save();
+    renderContent();
+    if(sb && CURRENT_TRIP){
+      sb.from('activity_details').upsert(
+        {trip_id:CURRENT_TRIP.id, detail_key:'__alias__act__'+actKey, data:{name:val}, updated_at:new Date().toISOString()},
+        {onConflict:'trip_id,detail_key'}
+      ).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] alias act upsert:', r.error); });
+    }
   }
 }
 
@@ -12651,16 +12677,28 @@ async function loadActivityDetails(){
   // Phase S — post-pass : lire les __state granulaires et les injecter dans S
   // Ces clés arrivent dans _customDetails via le else-branch ci-dessus.
   // On les injecte ICI, après les blobs globaux, pour qu'ils soient prioritaires.
-  Object.keys(window._customDetails).forEach(function(dk){    if(dk.slice(-7) !== '__state') return;
+  Object.keys(window._customDetails).forEach(function(dk){
     var state = window._customDetails[dk];
     if(!state || typeof state !== 'object') return;
-    var actKey = dk.slice(0, -7); // strip '__state'
-    if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
-    if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
-    if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
-    if(state.timeEnd   !== undefined){ if(!S.actTimeEnd)   S.actTimeEnd={};   S.actTimeEnd[actKey]   = state.timeEnd; }
-    if(state.category  !== undefined){ if(!S.actCategory)  S.actCategory={};  S.actCategory[actKey]  = state.category; }
-    if(state.done      !== undefined){ if(!S.done)         S.done={};         S.done[actKey]         = state.done; }
+    if(dk.slice(-7) === '__state'){
+      var actKey = dk.slice(0, -7); // strip '__state'
+      if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
+      if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
+      if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
+      if(state.timeEnd   !== undefined){ if(!S.actTimeEnd)   S.actTimeEnd={};   S.actTimeEnd[actKey]   = state.timeEnd; }
+      if(state.category  !== undefined){ if(!S.actCategory)  S.actCategory={};  S.actCategory[actKey]  = state.category; }
+      if(state.done      !== undefined){ if(!S.done)         S.done={};         S.done[actKey]         = state.done; }
+    } else if(dk.indexOf('__alias__act__') === 0 && state.name){
+      // Alias de nom d'activité partagé (built-in ou custom) — Supabase autoritaire
+      var _aliasActKey = dk.slice('__alias__act__'.length);
+      if(!S.actNames) S.actNames = {};
+      S.actNames[_aliasActKey] = state.name;
+    } else if(dk.indexOf('__alias__city__') === 0 && state.name){
+      // Alias de nom de ville partagé — Supabase autoritaire
+      var _aliasCk = dk.slice('__alias__city__'.length);
+      if(!S.cityNames) S.cityNames = {};
+      S.cityNames[_aliasCk] = state.name;
+    }
   });
   S.customDetails = window._customDetails;
   save();
