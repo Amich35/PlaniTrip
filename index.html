@@ -2861,6 +2861,174 @@ function openDetail(actKey, actName, cityKey) {
 
   modal.classList.add('open');
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// LOT B1 — AI CORE MULTI-PROVIDER
+// Couche centrale : la logique métier appelle aiRequest(), jamais un provider
+// directement. Anthropic est le seul adapter implémenté en B1 (reproduit
+// exactement le comportement existant) ; OpenAI et Gemini sont déclarés dans
+// le registry mais non implémentés (provider_unavailable si sélectionnés).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Table centrale des modèles — un seul endroit à modifier si un modèle
+// recommandé change. Seul 'anthropic.auto' est utilisé en B1.
+var AI_MODELS = {
+  anthropic: { auto: 'claude-sonnet-4-6' },
+  openai:    { auto: 'gpt-5' },        // réservé B2 — non appelé tant que implemented=false
+  gemini:    { auto: 'gemini-2.5-flash' } // réservé B3 — non appelé tant que implemented=false
+};
+
+// ── Registry des fournisseurs — capacités déclarées ici, jamais dispersées
+// en `if(provider==='openai')` dans le reste du code métier.
+var AI_PROVIDERS = {
+  anthropic:   { label:'Anthropic',      supportsWebSearch:true, supportsStructuredOutput:false, implemented:true  },
+  openai:      { label:'OpenAI',         supportsWebSearch:true, supportsStructuredOutput:true,  implemented:false },
+  gemini:      { label:'Google Gemini',  supportsWebSearch:true, supportsStructuredOutput:true,  implemented:false }
+};
+
+// ── Configuration IA — stockage AU NIVEAU APPAREIL (localStorage dédié),
+// volontairement DÉCOUPLÉ du blob d'état par voyage (S, sauvegardé via save()
+// sous CURRENT_STORAGE_KEY qui est scopé par trip.id). Avant ce Lot B1, la clé
+// vivait dans S.apiKey — donc scopée par voyage, ce qui n'était pas idéal.
+// getAIConfig() migre S.apiKey vers cette config une seule fois, sans jamais
+// le supprimer (compatibilité ascendante, section 6 du cahier des charges).
+// Jamais envoyée à Supabase, jamais partagée entre collaborateurs d'un voyage.
+var _AI_CONFIG_LS_KEY = 'planitrip_ai_config';
+function _aiDefaultConfig(){
+  return { provider:'anthropic', keys:{anthropic:'',openai:'',gemini:''}, models:{anthropic:'auto',openai:'auto',gemini:'auto'} };
+}
+function getAIConfig(){
+  var raw = null;
+  try{ raw = localStorage.getItem(_AI_CONFIG_LS_KEY); }catch(e){}
+  if(raw){
+    try{ var parsed = JSON.parse(raw); if(parsed && parsed.keys) return parsed; }catch(e){}
+  }
+  // Migration non destructive depuis l'ancien S.apiKey (trip-scoped)
+  if(S.apiKey){
+    var migrated = _aiDefaultConfig();
+    migrated.keys.anthropic = S.apiKey;
+    try{ localStorage.setItem(_AI_CONFIG_LS_KEY, JSON.stringify(migrated)); }catch(e){}
+    return migrated;
+  }
+  return _aiDefaultConfig();
+}
+function setAIConfig(config){
+  try{ localStorage.setItem(_AI_CONFIG_LS_KEY, JSON.stringify(config)); }catch(e){}
+}
+// Écrit une clé pour un provider donné sans perturber les autres clés déjà
+// enregistrées (section 20 : changer de fournisseur ne doit pas effacer le
+// reste). Miroir vers S.apiKey conservé pour compatibilité avec les gates UI
+// existants (S.apiKey ? ... : ...) — aucun changement visuel en B1.
+function setAIKey(provider, key){
+  var cfg = getAIConfig();
+  if(!cfg.keys) cfg.keys = {anthropic:'',openai:'',gemini:''};
+  cfg.keys[provider] = key;
+  cfg.provider = provider;
+  setAIConfig(cfg);
+  if(provider === 'anthropic'){ S.apiKey = key; save(); }
+}
+function aiHasActiveKey(){
+  var cfg = getAIConfig();
+  return !!(cfg.keys && cfg.keys[cfg.provider]);
+}
+
+function _aiError(code, message){
+  return { ok:false, error:{ code:code, message:message } };
+}
+function _aiOk(text, data, provider, model, sources){
+  return { ok:true, text:text, data:(data===undefined?null:data), provider:provider, model:model, sources:sources||[] };
+}
+
+// ── API centrale — point d'entrée unique pour toute génération IA métier.
+// options: {task, prompt, system, output:'text'|'json', schema, webSearch, maxTokens, model}
+async function aiRequest(options){
+  options = options || {};
+  var config = getAIConfig();
+  var provider = config.provider || 'anthropic';
+  var providerDef = AI_PROVIDERS[provider];
+  if(!providerDef) return _aiError('provider_unavailable', 'Fournisseur IA inconnu.');
+  var key = (config.keys && config.keys[provider]) || '';
+  if(!key) return _aiError('missing_key', 'Aucune clé API configurée pour '+providerDef.label+'.');
+  if(!providerDef.implemented) return _aiError('provider_unavailable', providerDef.label+' n\'est pas encore disponible dans cette version de PlaniTrip.');
+  if(options.webSearch && !providerDef.supportsWebSearch){
+    return _aiError('web_search_unavailable', 'La recherche web n\'est pas disponible pour ce fournisseur.');
+  }
+  try{
+    if(provider === 'anthropic') return await _aiCallAnthropic(key, options);
+    return _aiError('provider_unavailable', providerDef.label+' n\'est pas encore implémenté.');
+  }catch(e){
+    return _aiError('network_error', (e && e.message) || 'Erreur réseau.');
+  }
+}
+
+// ── Adapter Anthropic (B1) — reproduit exactement le comportement existant :
+// même endpoint, mêmes headers, même outil web_search, même modèle par défaut.
+async function _aiCallAnthropic(key, options){
+  var model = (AI_MODELS.anthropic && AI_MODELS.anthropic[options.model || 'auto']) || AI_MODELS.anthropic.auto;
+  var body = {
+    model: model,
+    max_tokens: options.maxTokens || 1200,
+    messages: [{ role:'user', content: options.prompt }]
+  };
+  if(options.webSearch) body.tools = [{ type:'web_search_20250305', name:'web_search' }];
+  if(options.system) body.system = options.system;
+
+  var resp;
+  try{
+    resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify(body)
+    });
+  }catch(e){
+    return _aiError('network_error', 'Impossible de contacter Anthropic.');
+  }
+
+  if(!resp.ok){
+    var errBody = ''; try{ errBody = await resp.text(); }catch(e){}
+    var errDetail = ''; try{ var ej = JSON.parse(errBody); errDetail = (ej.error && ej.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
+    var code = 'invalid_response';
+    if(resp.status === 401) code = 'invalid_key';
+    else if(resp.status === 429) code = 'rate_limited';
+    else if(resp.status === 503 || resp.status === 529) code = 'provider_unavailable';
+    else if(resp.status === 400 && /credit|quota/i.test(errDetail)) code = 'quota_exceeded';
+    return _aiError(code, errDetail || ('Erreur '+resp.status));
+  }
+
+  var data;
+  try{ data = await resp.json(); }catch(e){ return _aiError('invalid_response', 'Réponse illisible.'); }
+  var text = extractAiText(data);
+  if(!text) return _aiError('invalid_response', 'Réponse vide.');
+
+  var parsedData = null;
+  if(options.output === 'json'){
+    try{ parsedData = deepSanitize(parseAiJson(text)); }
+    catch(e){ return _aiError('invalid_response', 'JSON invalide dans la réponse.'); }
+  }
+  // Normalisation des sources : différée — aucune fonction métier actuelle
+  // n'exploite les citations web_search d'Anthropic (elle ne fait que parser
+  // le JSON final), donc sources:[] reste fidèle au comportement existant.
+  return _aiOk(text, parsedData, 'anthropic', model, []);
+}
+
+// Traduit un code d'erreur normalisé en message UX — jamais de JSON brut
+// fournisseur affiché à l'utilisateur (section 17 du cahier des charges).
+function aiErrorMessage(errObj){
+  if(!errObj) return 'Erreur inconnue.';
+  var providerLabel = (AI_PROVIDERS[getAIConfig().provider] || {}).label || 'IA';
+  var map = {
+    missing_key: 'Aucune clé API configurée.',
+    invalid_key: 'Ta clé '+providerLabel+' semble invalide.',
+    quota_exceeded: 'Quota '+providerLabel+' dépassé.',
+    rate_limited: 'Trop de requêtes '+providerLabel+' — réessaie dans un instant.',
+    provider_unavailable: 'Le service '+providerLabel+' est momentanément indisponible.',
+    model_unavailable: 'Ce modèle n\'est pas disponible.',
+    web_search_unavailable: 'La recherche web n\'est pas disponible pour ce fournisseur.',
+    invalid_response: 'Réponse inattendue du fournisseur IA.',
+    network_error: 'Impossible de contacter le service IA. Vérifie ta connexion.'
+  };
+  return map[errObj.code] || (errObj.message || 'Erreur IA.');
+}
+
 // Extracts the final text from an Anthropic API response that may include
 // web_search tool-use blocks alongside text blocks (when web_search is enabled).
 function extractAiText(data){
@@ -2875,7 +3043,7 @@ function parseAiJson(text){
 }
 
 async function fetchActivityDetailAI(cityKey, actName, detailKey, customIdx){
-  if(!S.apiKey){
+  if(!aiHasActiveKey()){
     if(customIdx!==undefined && customIdx!==null && S.customActs[cityKey] && S.customActs[cityKey][customIdx]){
       var actNoKey = S.customActs[cityKey][customIdx];
       if(actNoKey.m === 'Chargement des infos…') actNoKey.m = '';
@@ -2888,26 +3056,17 @@ async function fetchActivityDetailAI(cityKey, actName, detailKey, customIdx){
   var countryName = country ? country.name : '';
   var cityName = cityKey ? cityKey.slice((country?country.id+'_':'').length) : '';
   try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1200,
-        tools:[{type:'web_search_20250305', name:'web_search'}],
-        messages:[{role:'user', content:
-`Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables, a jour et immediatement exploitables — pas un texte marketing. Privilegie les sources officielles (site officiel du lieu, offices de tourisme). Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
+    // Lot B1 : migré vers le core aiRequest() — même prompt, même schéma JSON,
+    // même comportement qu'avant. Le fournisseur (Anthropic en B1) est un
+    // détail d'infrastructure géré par le core, plus par cette fonction.
+    var prompt = `Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables, a jour et immediatement exploitables — pas un texte marketing. Privilegie les sources officielles (site officiel du lieu, offices de tourisme). Ne deduis jamais une information absente : si une donnee ne peut etre verifiee, retourne "Inconnu" plutot que de l'inventer. Respecte strictement le schema JSON fourni, toutes les cles doivent etre presentes.
 
 Cherche sur le web des informations actuelles pour le lieu/activite "${actName}" a ${cityName} (${countryName}) : horaires d'ouverture, tarifs d'entree actuels, et localisation exacte. Puis reponds avec UNIQUEMENT un JSON a la toute fin de ta reponse, sans markdown:
 {"m":"description courte 1 phrase","tag":"categorie courte","tags":["photo","food","temple","must","nature"],"emoji":"1 emoji","history":"2-3 phrases histoire/contexte","hours":"horaires actuels trouves sur le web","costs":["cout 1 actuel","cout 2"],"tips":["conseil 1","conseil 2"],"address":"adresse precise trouvee sur le web","lat":0.0,"lng":0.0,"duration":"duree de visite conseillee, ex: 1h30","best_time":"meilleur moment pour visiter, ex: tot le matin pour eviter l'affluence","website":"site officiel si disponible sinon Inconnu","maps_url":"lien Google Maps si trouvable sinon Inconnu","booking_required":"Oui, Non ou Recommande"}
-lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi photo, food, temple, must, nature.`
-        }]
-      })
-    });
-    const data = await resp.json();
-    const text = extractAiText(data);
-    if(!text) throw new Error('empty');
-    const info = deepSanitize(parseAiJson(text));
+lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi photo, food, temple, must, nature.`;
+    var aiRes = await aiRequest({ task:'activity_detail', prompt:prompt, output:'json', webSearch:true, maxTokens:1200 });
+    if(!aiRes.ok) throw new Error(aiErrorMessage(aiRes.error));
+    var info = aiRes.data;
     if(!window._customDetails) window._customDetails={};
     window._customDetails[detailKey] = {
       emoji: info.emoji||'📍', tag: info.tag||'', history: info.history||'', m: info.m||'',
@@ -2943,7 +3102,7 @@ lat/lng = coordonnees GPS aussi precises que possible. tags = choisir parmi phot
       save(); renderContent();
     }
     var statusEl = document.getElementById('detailAiStatus');
-    if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — vérifie ta clé API.</div>';
+    if(statusEl) statusEl.innerHTML = '<div class="detail-text">Échec de la génération — '+escHtml((e&&e.message)||'vérifie ta clé API.')+'</div>';
   }
 }
 // Détection native (sans IA) d'un lieu fermé maintenant, à partir du texte horaires libre.
@@ -4286,8 +4445,8 @@ function saveAddActivityModal(){
 }
 
 function saveApiKeyFromSettingsModal(){
-  S.apiKey = document.getElementById('apiKeyModal').value;
-  save();
+  var val = document.getElementById('apiKeyModal').value;
+  setAIKey('anthropic', val); // Lot B1 : écrit S.apiKey (compat) + planitrip_ai_config (device-level)
   document.getElementById('apiModal').classList.remove('open');
   renderContent();
   if(!S.apiKey || !CURRENT_TRIP) return;
@@ -4305,33 +4464,15 @@ function saveApiKeyFromSettingsModal(){
 }
 async function autofillCountryWithAI(countryId){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c || !S.apiKey) return;
+  if(!c || !aiHasActiveKey()) return;
   var badge=document.getElementById('guide-autofill-status');
   if(badge) badge.textContent='Génération en cours…';
   try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:700,
-        tools:[{type:'web_search_20250305', name:'web_search'}],
-        messages:[{role:'user', content:
-`Tu es le Travel Data Engine de PlaniTrip. Produis des donnees structurees, fiables, a jour. Sois ultra-concis. Ne deduis jamais une information absente.\n\nSources (par ordre de confiance) :\n- Securite / alertes : diplomatie.gouv.fr, sites gouvernementaux officiels\n- Visa : ambassade de France dans le pays, ministere des affaires etrangeres francais\n- Conseils pratiques : Wikivoyage, Lonely Planet\n\nCherche sur le web les informations actuelles pour \"${c.name}\" (voyageur francais). Reponds UNIQUEMENT avec un JSON a la toute fin, sans markdown :\n{\"visa\":\"6 mots MAX — ex: \'Libre ≤90j\' ou \'VOA — 30 USD\' ou \'e-Visa requis — 30 USD\' ou \'Visa consulat obligatoire\'\",\"alerts\":[{\"t\":\"alerte factuelle 10 mots max\",\"url\":\"\"}],\"tips\":[{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"}],\"checklist\":[{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"}]}\nalerts = 1 a 3 alertes actuelles (risques, meteo extreme, evenement majeur) — tableau vide si rien de notable, n\'invente rien. Cat tips : Incontournable, Transport, Santé, Argent, Restauration, Hébergement, Culture, Sécurité, Bon plan, Autre. Cat checklist : Santé, Équipement, Documents, Argent, Vêtements, Transport, Autre. Urgences fournies par table statique, ne pas generer.`
-        }]
-      })
-    });
-    if(!resp.ok){
-      var errBody = await resp.text();
-      console.error('[PlaniTrip] autofillCountryWithAI: HTTP '+resp.status, errBody);
-      var errDetail = '';
-      try{ var errJson = JSON.parse(errBody); errDetail = (errJson.error && errJson.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
-      throw new Error('Erreur '+resp.status+' (infos pratiques)'+(errDetail?' — '+errDetail:''));
-    }
-    const data = await resp.json();
-    const text = extractAiText(data);
-    if(!text) throw new Error('Réponse vide (infos pratiques)');
-    const info = deepSanitize(parseAiJson(text));
+    // Lot B1 : migré vers le core aiRequest() — même prompt, même schéma JSON.
+    var prompt = `Tu es le Travel Data Engine de PlaniTrip. Produis des donnees structurees, fiables, a jour. Sois ultra-concis. Ne deduis jamais une information absente.\n\nSources (par ordre de confiance) :\n- Securite / alertes : diplomatie.gouv.fr, sites gouvernementaux officiels\n- Visa : ambassade de France dans le pays, ministere des affaires etrangeres francais\n- Conseils pratiques : Wikivoyage, Lonely Planet\n\nCherche sur le web les informations actuelles pour \"${c.name}\" (voyageur francais). Reponds UNIQUEMENT avec un JSON a la toute fin, sans markdown :\n{\"visa\":\"6 mots MAX — ex: \'Libre ≤90j\' ou \'VOA — 30 USD\' ou \'e-Visa requis — 30 USD\' ou \'Visa consulat obligatoire\'\",\"alerts\":[{\"t\":\"alerte factuelle 10 mots max\",\"url\":\"\"}],\"tips\":[{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"},{\"t\":\"conseil 8 mots max\",\"cat\":\"categorie\"}],\"checklist\":[{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"},{\"t\":\"item 6 mots max\",\"cat\":\"categorie\"}]}\nalerts = 1 a 3 alertes actuelles (risques, meteo extreme, evenement majeur) — tableau vide si rien de notable, n\'invente rien. Cat tips : Incontournable, Transport, Santé, Argent, Restauration, Hébergement, Culture, Sécurité, Bon plan, Autre. Cat checklist : Santé, Équipement, Documents, Argent, Vêtements, Transport, Autre. Urgences fournies par table statique, ne pas generer.`;
+    var aiRes = await aiRequest({ task:'country_info', prompt:prompt, output:'json', webSearch:true, maxTokens:700 });
+    if(!aiRes.ok) throw new Error(aiErrorMessage(aiRes.error)+' (infos pratiques)');
+    var info = aiRes.data;
     // Filet de sécurité : tronque sur mot entier. currency/rate/lang/budget_daily/timezone/phrases
     // ne sont jamais écrasés — seuls les champs dynamiques sont mis à jour.
     function trunc(s, maxLen){
@@ -4371,7 +4512,7 @@ async function autofillCountryWithAI(countryId){
     if(badge) badge.textContent='';
     renderContent();
   }catch(e){
-    if(badge) badge.textContent="Échec de la génération — vérifie ta clé API.";
+    if(badge) badge.textContent="Échec — "+((e&&e.message)||'vérifie ta clé API.');
     throw e;
   }
 }
@@ -5218,44 +5359,22 @@ var _lastAiError = '';
 async function suggestActivitiesWithAI(countryId, cityName){
   _lastAiError='';
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c || !S.apiKey) return false;
+  if(!c || !aiHasActiveKey()) return false;
   var ck = countryId+'_'+cityName;
   try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1600,
-        tools:[{type:'web_search_20250305', name:'web_search'}],
-        messages:[{role:'user', content:
-`Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables et immediatement exploitables — pas un texte marketing. Ne deduis jamais une information absente ; si une coordonnee GPS est incertaine, ne l'inclus pas plutot que de l'inventer.
+    // Lot B1 : migré vers le core aiRequest() — même prompt, même schéma JSON.
+    var prompt = `Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de produire des donnees structurees, fiables et immediatement exploitables — pas un texte marketing. Ne deduis jamais une information absente ; si une coordonnee GPS est incertaine, ne l'inclus pas plutot que de l'inventer.
 
 ${personaPromptContext()}Cherche sur le web les activites/lieux incontournables actuels pour la ville de "${cityName}" (${c.name}), en priorite sur Wikivoyage, Lonely Planet et sites officiels de tourisme. Puis suggere les 5 meilleurs et reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
 {"activities":[{"n":"nom du lieu","m":"description courte 1 phrase incluant si pertinent la duree de visite et le prix","tags":["photo"],"lat":0.0,"lng":0.0}]}
-Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnees GPS precises du lieu.`
-        }]
-      })
-    });
-    if(!resp.ok){
-      var errBody = await resp.text();
-      console.error('[PlaniTrip] suggestActivitiesWithAI: HTTP '+resp.status, errBody);
-      var errDetail = '';
-      try{ var errJson = JSON.parse(errBody); errDetail = (errJson.error && errJson.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
-      _lastAiError = 'Erreur '+resp.status+' (activités)'+(errDetail?' — '+errDetail:'');
+Les tags possibles sont: photo, food, temple, must, nature. lat/lng = coordonnees GPS precises du lieu.`;
+    var aiRes = await aiRequest({ task:'suggest_activities', prompt:prompt, output:'json', webSearch:true, maxTokens:1600 });
+    if(!aiRes.ok){
+      console.error('[PlaniTrip] suggestActivitiesWithAI:', aiRes.error);
+      _lastAiError = aiErrorMessage(aiRes.error)+' (activités)';
       return false;
     }
-    const data = await resp.json();
-    const text = extractAiText(data);
-    if(!text){ console.error('[PlaniTrip] suggestActivitiesWithAI: réponse IA vide', data); _lastAiError='Réponse vide (activités)'; return false; }
-    var info;
-    try{
-      info = deepSanitize(parseAiJson(text));
-    }catch(parseErr){
-      console.error('[PlaniTrip] suggestActivitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
-      _lastAiError='JSON invalide (activités)';
-      return false;
-    }
+    var info = aiRes.data;
     if(!info.activities || !info.activities.length){ console.error('[PlaniTrip] suggestActivitiesWithAI: aucune activité dans la réponse', info); _lastAiError='Aucune activité renvoyée'; return false; }
     if(!S.customActs[ck]) S.customActs[ck]=[];
     info.activities.forEach(function(a){
@@ -14178,8 +14297,7 @@ function submitPostCreateAiKey(){
     errEl.style.display = 'block';
     return;
   }
-  S.apiKey = val;
-  save();
+  setAIKey('anthropic', val); // Lot B1 : écrit S.apiKey (compat) + planitrip_ai_config (device-level)
   showPostCreatePersonaStep();
 }
 // Questionnaire persona (3 questions), pour orienter la future generation du Programme
@@ -14292,43 +14410,21 @@ function closePostCreateModal(){
 async function suggestCitiesWithAI(countryId){
   _lastAiError='';
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c || !S.apiKey || !c.days || c.days<1) return null;
+  if(!c || !aiHasActiveKey() || !c.days || c.days<1) return null;
   try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':(S.apiKey||''),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1800,
-        tools:[{type:'web_search_20250305', name:'web_search'}],
-        messages:[{role:'user', content:
-`Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de proposer un itineraire de villes realiste et geographiquement coherent (pas de zigzags inutiles), pas un texte marketing.
+    // Lot B1 : migré vers le core aiRequest() — même prompt, même schéma JSON.
+    var prompt = `Tu es le Travel Data Engine de PlaniTrip. Ton objectif est de proposer un itineraire de villes realiste et geographiquement coherent (pas de zigzags inutiles), pas un texte marketing.
 
 ${personaPromptContext()}Le voyageur dispose exactement de ${c.days} jour(s) au total pour visiter "${c.name}". Propose une liste de villes/etapes a visiter, dans l'ordre de visite recommande (itineraire logique, en boucle ou en ligne, evite les allers-retours inutiles), en t'appuyant en priorite sur Wikivoyage, Lonely Planet et offices de tourisme officiels. Adapte le nombre de villes a la duree : environ 1 ville pour 2 a 4 jours (jamais moins d'1 jour par ville, jamais plus de 6 jours d'affilee dans la meme ville sauf si le pays est petit). Reponds avec UNIQUEMENT un JSON a la toute fin, sans markdown:
 {"cities":[{"name":"nom de la ville (orthographe usuelle francaise)","days":2}]}
-La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de ville qui n'existe pas.`
-        }]
-      })
-    });
-    if(!resp.ok){
-      var errBody = await resp.text();
-      console.error('[PlaniTrip] suggestCitiesWithAI: HTTP '+resp.status, errBody);
-      var errDetail = '';
-      try{ var errJson = JSON.parse(errBody); errDetail = (errJson.error && errJson.error.message) || ''; }catch(pe){ errDetail = errBody.slice(0,150); }
-      _lastAiError = 'Erreur '+resp.status+' (villes)'+(errDetail?' — '+errDetail:'');
+La somme des "days" DOIT etre exactement egale a ${c.days}. N'invente pas de ville qui n'existe pas.`;
+    var aiRes = await aiRequest({ task:'suggest_cities', prompt:prompt, output:'json', webSearch:true, maxTokens:1800 });
+    if(!aiRes.ok){
+      console.error('[PlaniTrip] suggestCitiesWithAI:', aiRes.error);
+      _lastAiError = aiErrorMessage(aiRes.error)+' (villes)';
       return null;
     }
-    const data = await resp.json();
-    const text = extractAiText(data);
-    if(!text){ console.error('[PlaniTrip] suggestCitiesWithAI: réponse IA vide', data); _lastAiError='Réponse vide (villes)'; return null; }
-    var info;
-    try{
-      info = deepSanitize(parseAiJson(text));
-    }catch(parseErr){
-      console.error('[PlaniTrip] suggestCitiesWithAI: JSON invalide (réponse tronquée ?)', parseErr, text);
-      _lastAiError='JSON invalide (villes)';
-      return null;
-    }
+    var info = aiRes.data;
     if(!info.cities || !info.cities.length){ console.error('[PlaniTrip] suggestCitiesWithAI: aucune ville dans la réponse', info); _lastAiError='Aucune ville renvoyée'; return null; }
     // Garde-fou : si la somme ne correspond pas exactement (arrondi IA), on réajuste la dernière ville
     var sum = info.cities.reduce(function(s,ci){ return s+(parseInt(ci.days,10)||0); }, 0);
