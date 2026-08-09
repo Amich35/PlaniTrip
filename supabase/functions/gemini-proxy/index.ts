@@ -9,6 +9,8 @@
 // openai-proxy, pour une cohérence de sécurité entre tous les fournisseurs IA.
 // Aucun prompt métier ni logique PlaniTrip ici : payload minimal, whitelisté,
 // relayé vers Gemini. N'accepte que POST (+ OPTIONS pour le préflight CORS).
+// B4 : support optionnel des Structured Outputs (responseSchema) — protocole
+// générique Gemini, pas de logique métier PlaniTrip.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -106,12 +108,26 @@ Deno.serve(async (req) => {
         geminiBody.systemInstruction = { parts: [{ text: raw.systemInstruction }] };
       }
     }
+
+    const generationConfig: Record<string, unknown> = {};
     if (raw.max_output_tokens !== undefined) {
       const n = Number(raw.max_output_tokens);
       if (!Number.isFinite(n) || n <= 0) {
         return jsonResponse({ error: "invalid_max_output_tokens" }, 400);
       }
-      geminiBody.generationConfig = { maxOutputTokens: Math.floor(n) };
+      generationConfig.maxOutputTokens = Math.floor(n);
+    }
+    // B4 : Structured Outputs — responseSchema/responseMimeType. Protocole
+    // générique Gemini, pas de logique métier PlaniTrip.
+    if (raw.schema !== undefined) {
+      if (typeof raw.schema !== "object" || raw.schema === null || Array.isArray(raw.schema)) {
+        return jsonResponse({ error: "invalid_schema" }, 400);
+      }
+      generationConfig.responseMimeType = "application/json";
+      generationConfig.responseSchema = raw.schema;
+    }
+    if (Object.keys(generationConfig).length > 0) {
+      geminiBody.generationConfig = generationConfig;
     }
 
     // 3. Relais vers Gemini. La clé n'est utilisée que pour cet appel réseau —
