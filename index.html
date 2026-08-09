@@ -1859,6 +1859,47 @@ function save(){
   }catch(e){}
 }
 
+function exportActivityRecoverySnapshot() {
+  try {
+    var tripId = (CURRENT_TRIP && CURRENT_TRIP.id) || null;
+    var userId = (CURRENT_USER && CURRENT_USER.email) || null;
+    var snapshot = {
+      tripId:       tripId,
+      exportedAt:   new Date().toISOString(),
+      userId:       userId,
+      customActs:   JSON.parse(JSON.stringify(S.customActs    || {})),
+      customDetails:JSON.parse(JSON.stringify(window._customDetails || {})),
+      actDate:      JSON.parse(JSON.stringify(S.actDate       || {})),
+      actCategory:  JSON.parse(JSON.stringify(S.actCategory   || {})),
+      actMoment:    JSON.parse(JSON.stringify(S.actMoment     || {})),
+      actTime:      JSON.parse(JSON.stringify(S.actTime       || {})),
+      actTimeStart: JSON.parse(JSON.stringify(S.actTimeStart  || {})),
+      actTimeEnd:   JSON.parse(JSON.stringify(S.actTimeEnd    || {})),
+      actDay:       JSON.parse(JSON.stringify(S.actDay        || {})),
+      done:         JSON.parse(JSON.stringify(S.done          || {})),
+      favorites:    JSON.parse(JSON.stringify(S.favorites     || {})),
+      coords:       JSON.parse(JSON.stringify(COORDS          || {}))
+    };
+    var json = JSON.stringify(snapshot, null, 2);
+    var blob = new Blob([json], {type: 'application/json'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href   = url;
+    var safeUser = (userId || 'unknown').replace(/[^a-z0-9]/gi, '_');
+    a.download = 'planitrip_recovery_' + safeUser + '_'
+               + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+    console.log('[PlaniTrip Recovery] Snapshot exporté — userId:', userId, 'tripId:', tripId);
+    return snapshot;
+  } catch(e) {
+    console.error('[PlaniTrip Recovery] Erreur export:', e);
+    alert('Erreur lors de l\'export du snapshot. Voir console.');
+    return null;
+  }
+}
+
 // ── ACTIVITY DETAILS (pre-filled for Japan) ──────────────────
 const ACT_DETAILS = {
   'jp_Osaka_0': {
@@ -9309,6 +9350,11 @@ function renderManageTripScreen(){
     +'<div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px">'+svgIcon('file-text',15)+' Importer des données</div>'
     +'<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">Ajoute des pays, villes, activités ou logements à ce voyage depuis un document (CSV, TXT, MD, XLSX, DOCX, PDF).</div>'
     +'<button onclick="openImportIntoCurrentTripFlow()" class="ef-btn" style="width:100%;text-align:center">Importer depuis un document</button>'
+    +'</div>'
+    +'<div class="info-card" style="padding:14px 16px;margin-top:12px">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px">'+svgIcon('download',15)+' Export diagnostic</div>'
+    +'<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">Exporte un snapshot JSON non-sensible de tes données locales pour la récupération de données.</div>'
+    +'<button onclick="exportActivityRecoverySnapshot()" class="ef-btn" style="width:100%;text-align:center">Exporter snapshot diagnostic</button>'
     +'</div>'
     +'<div class="info-card" style="padding:14px 16px;margin-top:12px">'
     +'<div style="font-size:13px;color:var(--ink-muted);margin-bottom:10px">Supprimer définitivement ce voyage et toutes ses données (pays, villes, activités, budget, documents, fil, carnet) pour tous les voyageurs. Cette action est irréversible.</div>'
