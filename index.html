@@ -9402,6 +9402,11 @@ function renderMore(){
     +(isTripOwner()?'<div class="more-row" onclick="showManageTripScreen()"><span class="more-row-icon" data-icon="settings" data-icon-size="19"></span><span class="more-row-label">Gérer le voyage</span><span class="more-row-chevron">›</span></div>':'')
     +'<div class="more-row" onclick="backToTripSelector()"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
+    +'<div class="info-card" style="padding:14px 16px;margin-top:4px">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Diagnostic</div>'
+    +'<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">Exporte tes données locales (activités, dates, catégories…) pour la récupération de données. Aucune donnée sensible incluse.</div>'
+    +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
+    +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">Version 2026-07-16-deletecity-fix-v2</div>'
     +'</div>';
