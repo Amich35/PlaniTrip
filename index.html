@@ -1855,12 +1855,17 @@ function save(){
         if(S[field]) localStorage.setItem(k, S[field]);
         else localStorage.removeItem(k);
       });
-      // activeDay : objet JSON — clé séparée légère (iOS memory pressure safety)
+      // activeDay, cityNames, actNames : objets JSON — clés séparées légères (iOS safety)
       try{
-        var _adVal = S.activeDay && Object.keys(S.activeDay).length
-          ? JSON.stringify(S.activeDay) : null;
+        var _adVal = S.activeDay && Object.keys(S.activeDay).length ? JSON.stringify(S.activeDay) : null;
         if(_adVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_activeDay', _adVal);
         else localStorage.removeItem(CURRENT_STORAGE_KEY+'_activeDay');
+        var _cnVal = S.cityNames && Object.keys(S.cityNames).length ? JSON.stringify(S.cityNames) : null;
+        if(_cnVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_cityNames', _cnVal);
+        else localStorage.removeItem(CURRENT_STORAGE_KEY+'_cityNames');
+        var _anVal = S.actNames && Object.keys(S.actNames).length ? JSON.stringify(S.actNames) : null;
+        if(_anVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_actNames', _anVal);
+        else localStorage.removeItem(CURRENT_STORAGE_KEY+'_actNames');
       }catch(_e){}
     }
   }catch(e){}
@@ -2686,24 +2691,22 @@ function openDetail(actKey, actName, cityKey) {
   });
   document.getElementById('detailTag').textContent = d.tag || '';
   document.getElementById('detailTag').style.display = d.tag ? '' : 'none';
-  // Titre : texte + crayon inline pour les activités custom (identité _sid protégée)
+  // Titre + crayon pour toutes les activités.
+  // Le nom affiché passe par _actDisplayName pour refléter les overrides locaux (S.actNames).
+  // startEditActTitle route selon le type : custom _sid_ → saveCustomActDetail ; sinon → S.actNames.
   var _dtEl = document.getElementById('detailTitle');
   if(_dtEl){
     var _idxPartDT = cityKey ? actKey.slice(cityKey.length+1) : '';
-    var _isCustomDT = _idxPartDT.indexOf('c')===0 || _idxPartDT.indexOf('sid')===0;
-    var _custIdxDT = (_idxPartDT.indexOf('c')===0) ? parseInt(_idxPartDT.slice(1)) : -1;
-    // Recalculate custIdx for sid_ keys
+    var _custIdxDT = -1;
+    if(_idxPartDT.indexOf('c')===0) _custIdxDT = parseInt(_idxPartDT.slice(1));
     if(_idxPartDT.indexOf('sid')===0 && cityKey){
       var _sidVal = _idxPartDT.replace('sid_','');
       var _acts2 = S.customActs[cityKey]||[];
       for(var _di=0;_di<_acts2.length;_di++){ if(_acts2[_di]._sid===_sidVal){ _custIdxDT=_di; break; } }
     }
-    if(_isCustomDT && cityKey && _custIdxDT>=0){
-      _dtEl.innerHTML = escHtml(actName)
-        +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey)+'\','+_custIdxDT+',\''+jsStrEsc(actName)+'\')" style="margin-left:8px;background:none;border:none;cursor:pointer;color:var(--ink-muted);vertical-align:middle;padding:2px;line-height:1;opacity:0.55">'+svgIcon('pencil',13)+'</button>';
-    } else {
-      _dtEl.textContent = actName;
-    }
+    var _displayedName = _actDisplayName(actKey, actName);
+    _dtEl.innerHTML = escHtml(_displayedName)
+      +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey||'')+'\','+_custIdxDT+',\''+jsStrEsc(_displayedName)+'\')" style="margin-left:8px;background:none;border:none;cursor:pointer;color:var(--ink-muted);vertical-align:middle;padding:2px;line-height:1;opacity:0.55">'+svgIcon('pencil',13)+'</button>';
   }
   document.getElementById('detailSub').textContent = d.address || '';
   document.getElementById('detailSub').style.display = d.address ? '' : 'none';
@@ -6784,11 +6787,11 @@ function renderCityPanelContentBody(c, city){
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(a.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(a.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
-          +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(a.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
+          +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+a.n+'</div>'
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(_actDisplayName(k,a.n))+'</div>'
           +(actPlaceType?'<div class="act-meta">'+escHtml(actPlaceType)+'</div>':'')
           +'<div class="act-footer">'
           +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done)
@@ -6819,11 +6822,11 @@ function renderCityPanelContentBody(c, city){
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(ca.n)+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(ca.n)+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
-          +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(ca.n)+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
+          +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(ca.n)+'</div>'
+          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(_actDisplayName(ck2,ca.n))+'</div>'
           +(caPlaceType?'<div class="act-meta">'+escHtml(caPlaceType)+'</div>':'')
           +'<div class="act-footer">'
           +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone)
@@ -9995,13 +9998,13 @@ function _buildSearchIndex(){
         if(S.deletedActs[ck+'_'+i]) return;
         items.push({
           k:ck+'_'+i, countryId:c.id, flag:c.flag, country:c.name, city:_cityDisplayName(ck,city),
-          name:a.n, meta:a.m||'', tags:a.tags||[]
+          name:_actDisplayName(ck+'_'+i, a.n), meta:a.m||'', tags:a.tags||[]
         });
       });
       (S.customActs[ck]||[]).forEach(function(ca,i){
         items.push({
           k:getCustomActivityKey(ck,ca,i), countryId:c.id, flag:c.flag, country:c.name, city:_cityDisplayName(ck,city),
-          name:ca.n, meta:'', tags:[]
+          name:_actDisplayName(getCustomActivityKey(ck,ca,i), ca.n), meta:'', tags:[]
         });
       });
     });
@@ -10708,12 +10711,25 @@ function confirmEditCity(ck) {
   if(!newName) return;
   if(!S.cityNames) S.cityNames={};
   S.cityNames[ck] = newName;
-  save(); renderContent();
+  save();
+  // Écriture immédiate de la clé séparée légère (iOS safety)
+  try{
+    if(CURRENT_STORAGE_KEY){
+      var _cn2 = JSON.stringify(S.cityNames);
+      localStorage.setItem(CURRENT_STORAGE_KEY+'_cityNames', _cn2);
+    }
+  }catch(_e){}
+  renderContent();
 }
 // Retourne le nom affiché d'une ville : override local si défini, sinon city.city.
 // NE JAMAIS utiliser pour construire ck ou interroger Supabase — uniquement pour l'affichage.
 function _cityDisplayName(ck, city){
   return (S.cityNames && S.cityNames[ck]) ? S.cityNames[ck] : city.city;
+}
+// Retourne le nom affiché d'une activité : override local (S.actNames) si défini, sinon rawName.
+// NE JAMAIS utiliser pour construire actKey — uniquement pour l'affichage.
+function _actDisplayName(actKey, rawName){
+  return (S.actNames && S.actNames[actKey]) ? S.actNames[actKey] : (rawName || '');
 }
 
 function startEditAct(actKey, currentName) {
@@ -10746,7 +10762,26 @@ function confirmEditActTitle(actKey, cityKey, custIdx){
   if(!inp) return;
   var val = stripHtml(inp.value.trim());
   if(!val) return;
-  saveCustomActDetail(actKey, cityKey, custIdx, 'name', val);
+  var _isCustom = custIdx >= 0 && cityKey &&
+    (actKey.indexOf('_sid_') !== -1 || actKey.slice((cityKey||'').length+1).indexOf('c') === 0);
+  if(_isCustom){
+    // Activité custom : mécanisme robuste _sid (actKey inchangé, UPDATE Supabase ciblé)
+    saveCustomActDetail(actKey, cityKey, custIdx, 'name', val);
+  } else {
+    // Activité built-in : override local uniquement (S.actNames[actKey])
+    if(!S.actNames) S.actNames = {};
+    S.actNames[actKey] = val;
+    save();
+    // Mettre à jour le titre immédiatement sans rerender complet
+    var _dtEl = document.getElementById('detailTitle');
+    if(_dtEl){
+      var _oldHtml = _dtEl.innerHTML;
+      var _btn = _dtEl.querySelector('#detail-rename-btn');
+      _dtEl.textContent = val;
+      if(_btn) _dtEl.appendChild(_btn);
+    }
+    renderContent();
+  }
 }
 
 function confirmEditAct(actKey) {
@@ -12750,7 +12785,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     var _savedArchActivitiesCity = localStorage.getItem(namespacedKey+'_archivedActivitiesCity');
     if(_savedArchActivitiesCity !== null) S.archivedActivitiesCity = _savedArchActivitiesCity || undefined;
   }catch(e){}
-  // activeDay : restauration depuis la clé séparée (survit aux truncations blob iOS)
+  // activeDay, cityNames, actNames : restauration depuis clés séparées (survit aux truncations iOS)
   try{
     var _savedActiveDay = localStorage.getItem(namespacedKey+'_activeDay');
     if(_savedActiveDay){
@@ -12758,6 +12793,26 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
       if(_parsedActiveDay && typeof _parsedActiveDay === 'object'){
         if(!S.activeDay) S.activeDay = {};
         Object.assign(S.activeDay, _parsedActiveDay);
+      }
+    }
+  }catch(e){}
+  try{
+    var _savedCityNames = localStorage.getItem(namespacedKey+'_cityNames');
+    if(_savedCityNames){
+      var _parsedCityNames = JSON.parse(_savedCityNames);
+      if(_parsedCityNames && typeof _parsedCityNames === 'object'){
+        if(!S.cityNames) S.cityNames = {};
+        Object.assign(S.cityNames, _parsedCityNames);
+      }
+    }
+  }catch(e){}
+  try{
+    var _savedActNames = localStorage.getItem(namespacedKey+'_actNames');
+    if(_savedActNames){
+      var _parsedActNames = JSON.parse(_savedActNames);
+      if(_parsedActNames && typeof _parsedActNames === 'object'){
+        if(!S.actNames) S.actNames = {};
+        Object.assign(S.actNames, _parsedActNames);
       }
     }
   }catch(e){}
