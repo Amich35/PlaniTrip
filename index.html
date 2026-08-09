@@ -10004,9 +10004,9 @@ function deleteCityPermanently(trashId){
   showConfirm('Supprimer définitivement '+t.cityName+' ? Cette action est irréversible.', function(){
     var idx = S.cityTrash.findIndex(function(tt){return tt.id===trashId;});
     if(idx>-1) S.cityTrash.splice(idx,1);
-    save();
-    renderContent();
+    var countryId = t.countryId;
     syncCityTrash();
+    openCountryDetail(countryId, 'lieux');
   }, 'Supprimer définitivement');
 }
 function getCityOrder(countryId) {
@@ -14587,17 +14587,25 @@ async function _impAddToCurrentTrip() {
     } catch(e) { injectionErrors.push('Ville '+cityItem.city+' : '+e.message); }
   }
 
-  // Activités : logique identique au mode création (déjà testée).
+  // Activités : logique identique au mode création (déjà testée), + résolution
+  // du nom canonique de la ville existante (jamais la valeur brute importée) et
+  // dédoublonnage simple (même ville + même nom normalisé).
   for (var ai=0; ai<savedActs.length; ai++) {
     var act = savedActs[ai];
     if (!act.name || !act.city || !act.country) continue;
     var realC3 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(act.country); });
     if (!realC3) { injectionErrors.push('Activité '+act.name+' : pays introuvable dans le voyage'); continue; }
-    var cityKey = realC3.id+'_'+act.city;
     var cityExists = realC3.cities && realC3.cities.find(function(ci3){ return _impNorm(ci3.city)===_impNorm(act.city); });
+    var canonicalCityName3 = cityExists ? cityExists.city : act.city;
     if (!cityExists) {
       try { await _createCityFromModal(realC3.id, act.city, '', '', '', true); } catch(e) {}
     }
+    var cityKey = realC3.id+'_'+canonicalCityName3;
+    var existingActs = S.customActs[cityKey] || [];
+    // Dédoublonnage simple sans fuzzy matching : même ville + même nom normalisé
+    // suffit à écarter le cas courant (réimport du même fichier).
+    var actDupSimple = existingActs.some(function(ea){ return _impNorm(ea.n)===_impNorm(act.name); });
+    if (actDupSimple) continue;
     try {
       _createActivityCore(cityKey, act.name, {
         skipAiEnrichment: true,
@@ -14608,15 +14616,20 @@ async function _impAddToCurrentTrip() {
     } catch(e) { injectionErrors.push('Activité '+act.name+' : '+e.message); }
   }
 
-  // Logements : logique identique au mode création (déjà testée).
+  // Logements : logique identique au mode création (déjà testée), + résolution
+  // du nom canonique de la ville existante et dédoublonnage (même ville + même nom normalisé).
   for (var hi=0; hi<savedAccoms.length; hi++) {
     var accom = savedAccoms[hi];
     if (!accom.name || !accom.city || !accom.country) continue;
     var realC4 = COUNTRIES.find(function(co){ return _impNorm(co.name)===_impNorm(accom.country); });
     if (!realC4) { injectionErrors.push('Logement '+accom.name+' : pays introuvable dans le voyage'); continue; }
-    var ck4 = realC4.id+'_'+accom.city;
+    var cityExists4 = realC4.cities && realC4.cities.find(function(ci4){ return _impNorm(ci4.city)===_impNorm(accom.city); });
+    var canonicalCityName4 = cityExists4 ? cityExists4.city : accom.city;
+    var ck4 = realC4.id+'_'+canonicalCityName4;
     if (!S.accom) S.accom = {};
     if (!Array.isArray(S.accom[ck4])) S.accom[ck4] = [];
+    var accomDup = S.accom[ck4].some(function(ea){ return _impNorm(ea.name)===_impNorm(accom.name); });
+    if (accomDup) continue;
     var newAccom = {
       id: 'imp_'+Date.now()+'_'+hi,
       name: accom.name, link: accom.link||'',
