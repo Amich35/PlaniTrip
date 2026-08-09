@@ -6,6 +6,8 @@
 // une clé anon) — aucun accès anonyme à ce proxy.
 // Aucun prompt métier ni logique PlaniTrip ici : payload minimal, whitelisté,
 // relayé vers OpenAI. N'accepte que POST (+ OPTIONS pour le préflight CORS).
+// B4 : support optionnel des Structured Outputs (text.format/json_schema) —
+// construction du format OpenAI générique, pas de logique métier PlaniTrip.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -101,6 +103,21 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "invalid_max_output_tokens" }, 400);
       }
       openaiBody.max_output_tokens = Math.floor(n);
+    }
+    // B4 : Structured Outputs — construit le format OpenAI générique
+    // text.format/json_schema à partir d'un schema JSON fourni par le client.
+    // Reste un protocole générique OpenAI (pas de logique métier PlaniTrip) :
+    // le proxy sait "comment parler à OpenAI", jamais "ce que PlaniTrip veut dire".
+    if (raw.schema !== undefined) {
+      if (typeof raw.schema !== "object" || raw.schema === null || Array.isArray(raw.schema)) {
+        return jsonResponse({ error: "invalid_schema" }, 400);
+      }
+      const schemaName = typeof raw.schemaName === "string" && raw.schemaName
+        ? raw.schemaName.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 64)
+        : "planitrip_response";
+      openaiBody.text = {
+        format: { type: "json_schema", name: schemaName, schema: raw.schema, strict: true },
+      };
     }
 
     // 3. Relais vers OpenAI. La clé n'est utilisée que pour cet appel réseau —
