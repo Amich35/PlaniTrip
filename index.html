@@ -1133,7 +1133,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-console.log('[PlaniTrip] Version chargée : 2026-07-16-deletecity-fix-v2');
+var APP_BUILD = '2026-08-09·sha:2a59198';
+console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
 let LAST_HANDLED_USER_ID = null;
@@ -9546,7 +9547,7 @@ function renderMore(){
     +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
     +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
-    +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">Version 2026-08-09 · <span id=\'app-sha\' style=\'font-size:9px;opacity:0.6\'>sha:8339387</span></div>'
+    +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">\'+APP_BUILD+\'</div>'
     +'</div>';
 }
 
