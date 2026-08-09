@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:empty-day';
+var APP_BUILD = '2026-08-09·sha:empty-day2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6946,10 +6946,21 @@ function renderCityPanelContentBody(c, city){
     var _activeDay = S.activeDay && S.activeDay[ck] ? S.activeDay[ck] : 'Tous';
     var _emptyDayHTML = '';
     if(_activeDay !== 'Tous' && !baseActsHTML.trim()){
-      _emptyDayHTML = '<div style="text-align:center;padding:48px 24px 32px;color:var(--ink-muted)">'
-        +'<div style="font-size:15px;font-weight:500;margin-bottom:16px">Aucune activité prévue ce jour</div>'
-        +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'
-        +'</div>';
+      // Distinguer : jour vraiment vide vs activités masquées par filtre catégorie
+      var _dayCounts = countActivitiesByDate(ck);
+      var _dayHasActs = (_dayCounts[_activeDay]||0) > 0;
+      if(!_dayHasActs){
+        // Aucune activité réellement affectée à cette date
+        _emptyDayHTML = '<div style="text-align:center;padding:48px 24px 32px;color:var(--ink-muted)">'
+          +'<div style="font-size:15px;font-weight:500;margin-bottom:16px">Aucune activité prévue ce jour</div>'
+          +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'
+          +'</div>';
+      } else {
+        // Activités existent ce jour mais masquées par filtre catégorie
+        _emptyDayHTML = '<div style="text-align:center;padding:48px 24px 32px;color:var(--ink-muted)">'
+          +'<div style="font-size:15px;font-weight:500">Aucune activité dans cette catégorie</div>'
+          +'</div>';
+      }
     }
     return filterBarHTML+'<div class="cf-act-list">'+(_emptyDayHTML||baseActsHTML)+'</div>'+(_emptyDayHTML?'':addForm);
 }
