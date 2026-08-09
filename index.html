@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p08a-1';
+var APP_BUILD = '2026-08-09·sha:p08a-1b';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6540,22 +6540,26 @@ async function savePlanningModal(){
   setActMoment(actKey, finalMoment, {sync:false});
   setActTimeRange(actKey, startVal, endVal, '', {sync:false});
   // 3. Sync Supabase awaité — _syncActivityState pour _sid_, _syncPlanningBlobs pour built-in
-  if(sb && CURRENT_TRIP){
-    try{
-      if(isStable){
-        // P0.3 : une seule écriture granulaire par actKey
-        await _syncActivityState(actKey, CURRENT_TRIP.id);
-      } else {
-        // P0.8-A : blobs globaux en un seul Promise.all
-        await _syncPlanningBlobs(actKey, CURRENT_TRIP.id);
-      }
-    } catch(e){
-      console.error('[PlaniTrip] savePlanningModal sync failed:', e);
-      if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
-      var _errEl = document.getElementById('planningModalErr');
-      if(_errEl){ _errEl.textContent = 'Erreur de sauvegarde — réessaie'; _errEl.style.display=''; }
-      return; // modale reste ouverte
+  if(!sb || !CURRENT_TRIP){
+    if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
+    var _noConnEl = document.getElementById('planningModalErr');
+    if(_noConnEl){ _noConnEl.textContent = 'Connexion requise pour enregistrer cette modification'; _noConnEl.style.display=''; }
+    return;
+  }
+  try{
+    if(isStable){
+      // P0.3 : une seule écriture granulaire par actKey
+      await _syncActivityState(actKey, CURRENT_TRIP.id);
+    } else {
+      // P0.8-A : 5 upserts blobs regroupés dans 1 Promise.all awaité
+      await _syncPlanningBlobs(actKey, CURRENT_TRIP.id);
     }
+  } catch(e){
+    console.error('[PlaniTrip] savePlanningModal sync failed:', e);
+    if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
+    var _errEl = document.getElementById('planningModalErr');
+    if(_errEl){ _errEl.textContent = 'Erreur de sauvegarde — réessaie'; _errEl.style.display=''; }
+    return; // modale reste ouverte
   }
   // 4. Succès confirmé : fermer et render
   if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
