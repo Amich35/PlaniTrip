@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:f0dceaf';
+var APP_BUILD = '2026-08-09·sha:3f1de91';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10785,50 +10785,92 @@ function startEditActTitle(actKey, cityKey, custIdx, currentName){
   var inp = document.getElementById('detail-rename-input');
   if(inp){ inp.focus(); inp.select(); }
 }
-function confirmEditActTitle(actKey, cityKey, custIdx){
+async function confirmEditActTitle(actKey, cityKey, custIdx){
   var inp = document.getElementById('detail-rename-input');
   if(!inp) return;
   var val = stripHtml(inp.value.trim());
   if(!val) return;
-  // Routing robuste sans dépendance à custIdx (qui peut être -1 si customActs pas encore chargés)
+
   var _hasSid = actKey.indexOf('_sid_') !== -1;
   var _isLegacyCustom = !_hasSid && custIdx >= 0 && cityKey &&
     actKey.slice((cityKey||'').length+1).indexOf('c') === 0;
 
+  // Helper : désactiver ✓ pendant la sync Supabase
+  function _setBtnPending(pending){
+    var _wrap = document.getElementById('detailTitle');
+    var _b = _wrap && _wrap.querySelector('button');
+    if(!_b) return;
+    _b.disabled = pending;
+    _b.textContent = pending ? '…' : '✓';
+  }
+  function _showRenameErr(msg){
+    var _wrap = document.getElementById('detailTitle');
+    if(!_wrap) return;
+    var _e = _wrap.querySelector('.rename-err');
+    if(!_e){ _e = document.createElement('div'); _e.className='rename-err';
+      _e.style.cssText='font-size:11px;color:var(--red);margin-top:4px;width:100%';
+      _wrap.appendChild(_e); }
+    _e.textContent = msg;
+  }
+
   if(_hasSid){
-    // Activité custom _sid_ : UPDATE Supabase ciblé par UUID — pas besoin de custIdx
+    // Activité custom _sid_ : UPDATE Supabase ciblé par UUID, bloquant avant mise à jour locale
     var _sidForRename = actKey.slice(actKey.indexOf('_sid_') + 5);
+    if(sb && CURRENT_TRIP){
+      _setBtnPending(true);
+      try{
+        var r = await sb.from('activities').update({name:val})
+          .eq('id',_sidForRename).eq('trip_id',CURRENT_TRIP.id);
+        if(r && r.error) throw r.error;
+      } catch(e){
+        console.error('[PlaniTrip] rename act sid:', e);
+        _setBtnPending(false);
+        _showRenameErr('Erreur de sauvegarde — réessaie');
+        return;
+      }
+    }
+    // Supabase OK : mise à jour locale
     if(!S.actNames) S.actNames = {};
     S.actNames[actKey] = val;
-    save();
-    // Optimistic local update
     var _acts = S.customActs[cityKey] || [];
     for(var _ri=0; _ri<_acts.length; _ri++){
       if(_acts[_ri]._sid === _sidForRename){ _acts[_ri].n = val; break; }
     }
+    save();
     renderContent();
-    if(sb && CURRENT_TRIP){
-      sb.from('activities').update({name:val}).eq('id',_sidForRename).eq('trip_id',CURRENT_TRIP.id)
-        .then(function(r){ if(r&&r.error) console.error('[PlaniTrip] rename act sid:', r.error); });
-    }
+
   } else if(_isLegacyCustom){
-    // Activité custom legacy _cN : via saveCustomActDetail (UPDATE par nom ou UUID si disponible)
+    // Activité custom legacy _cN (sans _sid) : saveCustomActDetail gère son propre sync
+    // optimistic — ne pas bloquer ici (refactorisation différée au chantier migration legacy)
     saveCustomActDetail(actKey, cityKey, custIdx, 'name', val);
     if(!S.actNames) S.actNames = {};
     S.actNames[actKey] = val;
     save();
+    renderContent();
+
   } else {
-    // Activité built-in : alias partagé via activity_details + S.actNames local
+    // Activité built-in : alias partagé via activity_details, bloquant avant mise à jour locale
+    if(sb && CURRENT_TRIP){
+      _setBtnPending(true);
+      try{
+        var r2 = await sb.from('activity_details').upsert(
+          {trip_id:CURRENT_TRIP.id, detail_key:'__alias__act__'+actKey,
+           data:{name:val}, updated_at:new Date().toISOString()},
+          {onConflict:'trip_id,detail_key'}
+        );
+        if(r2 && r2.error) throw r2.error;
+      } catch(e2){
+        console.error('[PlaniTrip] alias act upsert:', e2);
+        _setBtnPending(false);
+        _showRenameErr('Erreur de sauvegarde — réessaie');
+        return;
+      }
+    }
+    // Supabase OK : mise à jour locale
     if(!S.actNames) S.actNames = {};
     S.actNames[actKey] = val;
     save();
     renderContent();
-    if(sb && CURRENT_TRIP){
-      sb.from('activity_details').upsert(
-        {trip_id:CURRENT_TRIP.id, detail_key:'__alias__act__'+actKey, data:{name:val}, updated_at:new Date().toISOString()},
-        {onConflict:'trip_id,detail_key'}
-      ).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] alias act upsert:', r.error); });
-    }
   }
 }
 
