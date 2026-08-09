@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p09';
+var APP_BUILD = '2026-08-09·sha:p09b';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -4642,7 +4642,7 @@ function confirmMoveToCity(targetCityKey){
   deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName, {skipConfirm:true});
 }
 
-function _createActivityCore(cityKey, val, opts){
+async function _createActivityCore(cityKey, val, opts){
   val = stripHtml(val.trim());
   if(!val) return;
   opts = opts || {};
@@ -4655,11 +4655,9 @@ function _createActivityCore(cityKey, val, opts){
   if(opts.meta) actObj._userMeta = true;
   if(opts.detailKey) actObj._detailKey = opts.detailKey;
   S.customActs[cityKey].push(actObj);
-  // Correctif P0 identité stable : tant que l'INSERT Supabase n'a pas retourné le _sid,
-  // on écrit temporairement sous la clé legacy par index (seule option disponible à cet
-  // instant). Dès que le _sid est connu (quelques centaines de ms plus tard), toutes les
-  // données déjà écrites sous cette clé temporaire sont migrées vers la clé stable
-  // "<cityKey>_sid_<uuid>" — localement et côté serveur si déjà synchronisé.
+  // P0.9 : _cN est une identité locale TRANSITOIRE uniquement.
+  // Aucune écriture Supabase ne doit utiliser cette clé pour le planning/catégorie.
+  // Toute persistance attend l'UUID stable retourni par l'INSERT.
   var actKey = cityKey+'_c'+newIdx;
   // Lot 6 : si un détail statique est fourni (suggestion depuis pool statique), le copier
   // dans _customDetails sous la nouvelle clé pour que la fiche custom soit immédiatement riche.
@@ -4672,26 +4670,17 @@ function _createActivityCore(cityKey, val, opts){
     var _id = opts.initialDetails;
     if(_id.lat && _id.lng && !COORDS[actKey]) COORDS[actKey] = [_id.lat, _id.lng, val];
   }
+  // P0.9 : mutation locale uniquement — PAS d'upsert Supabase sous _cN.
   if(opts.categories && opts.categories.length){
     if(!S.actCategory) S.actCategory={};
     S.actCategory[actKey]=opts.categories.slice();
-    // Correctif Lot 5A : synchroniser immédiatement vers Supabase (même comportement
-    // qu'une catégorie choisie ensuite via le modal catégorie → toggleCategoryForAct).
-    // À la création, actKey est toujours _cN (le _sid n'est pas encore connu).
-    // _isCustomStableKey est donc toujours false ici — on écrit le blob global.
-    if(sb && CURRENT_TRIP){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync actCategory création:',_r.error); });
-    }
+    // Pas de sync ici : l'UUID n'est pas encore connu. La sync se fera sous _sid_ après INSERT.
   }
   if(opts.date){ if(!S.actDate) S.actDate={}; S.actDate[actKey]=opts.date; }
-  // Lot 5A : heure de création via setActTimeRange + setActMoment (setters synchronisés Supabase)
-  // au lieu de l'écriture directe dans S.actTime (legacy). S.actTime reste un fallback pour
-  // les anciens textes approximatifs, mais une nouvelle activité avec heure structurée doit
-  // passer par actTimeStart dès la création.
+  // P0.9 : {sync:false} — aucune écriture Supabase sous _cN pour les horaires/moment.
   if(opts.time){
-    // À la création actKey est _cN (jamais stable) — pas de {sync:false} nécessaire.
-    setActTimeRange(actKey, opts.time, opts.timeEnd||'', '');
-    setActMoment(actKey, getDayPeriod(opts.time));
+    setActTimeRange(actKey, opts.time, opts.timeEnd||'', '', {sync:false});
+    setActMoment(actKey, getDayPeriod(opts.time), {sync:false});
   }
   save();
   renderContent();
@@ -4701,27 +4690,39 @@ function _createActivityCore(cityKey, val, opts){
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-    // Lot 5B correctif : récupérer l'id UUID retourné par Supabase pour permettre
-    // un rename ultérieur sans ambiguïté (même si deux activités portent le même nom).
-    (function(_captureIdx, _legacyActKey){
-      sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who}).select('id').single().then(function(_r){
-        if(_r&&_r.error){ console.error("[PlaniTrip] sync error:",_r.error); return; }
-        if(_r&&_r.data&&_r.data.id && S.customActs[cityKey] && S.customActs[cityKey][_captureIdx]){
-          S.customActs[cityKey][_captureIdx]._sid = _r.data.id;
-          save();
-          // Correctif P0 : migration immédiate legacy → stable, locale + serveur.
-          _migrateToStableKeyAfterSync(cityKey, _legacyActKey, _r.data.id);
+    // P0.9 : INSERT awaitié — l'UUID est disponible immédiatement après, sans race condition.
+    var _insertResult = await sb.from('activities')
+      .insert({trip_id:CURRENT_TRIP.id,country_id:parts[0],city:parts.slice(1).join('_'),name:val,added_by_label:who})
+      .select('id').single();
+    if(_insertResult && _insertResult.error){
+      console.error('[PlaniTrip] _createActivityCore INSERT error:', _insertResult.error);
+      // Erreur INSERT : l'activité reste locale (_cN), pas de persistance Supabase.
+      // Pas de rollback local — l'utilisateur voit l'activité et peut réessayer.
+    } else if(_insertResult && _insertResult.data && _insertResult.data.id){
+      var _sid = _insertResult.data.id;
+      var _legacyActKey = actKey;
+      var _stableKey = cityKey+'_sid_'+_sid;
+      // Affecter le _sid à l'objet activité
+      if(S.customActs[cityKey] && S.customActs[cityKey][newIdx]){
+        S.customActs[cityKey][newIdx]._sid = _sid;
+      }
+      // Migration locale _cN → _sid_ via le mécanisme existant
+      _migrateActivityKeyIfNeeded(_stableKey, _legacyActKey);
+      S.customDetails = window._customDetails;
+      save();
+      // Sync Supabase UNIQUEMENT sous la clé stable _sid_
+      // _syncActivityState couvre : date, moment, timeStart, timeEnd, category, done
+      try{
+        await _syncActivityState(_stableKey, CURRENT_TRIP.id);
+      } catch(e){
+        console.error('[PlaniTrip] _createActivityCore sync state:', e);
+      }
+      // Fiche détaillée statique : migrer sous la clé stable si présente
+      if(opts.initialDetails && Object.keys(opts.initialDetails).length){
+        if(window._customDetails && window._customDetails[_stableKey]){
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_stableKey,data:window._customDetails[_stableKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
         }
-      });
-    })(newIdx, actKey);
-    if(opts.date){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    }
-    // Lot 6 correctif : upsert de la fiche détaillée si elle provient d'une suggestion statique.
-    // Rend la fiche persistante pour les autres voyageurs / autres appareils sans dépendance
-    // au cache local. Aucun appel IA — les données viennent de opts.initialDetails déjà copié.
-    if(opts.initialDetails && Object.keys(opts.initialDetails).length && window._customDetails && window._customDetails[actKey]){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:actKey,data:window._customDetails[actKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
+      }
     }
   }
 }
