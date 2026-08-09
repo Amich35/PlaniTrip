@@ -2706,7 +2706,7 @@ function openDetail(actKey, actName, cityKey) {
     }
     var _displayedName = _actDisplayName(actKey, actName);
     _dtEl.innerHTML = escHtml(_displayedName)
-      +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey||'')+'\','+_custIdxDT+',\''+jsStrEsc(_displayedName)+'\')" style="margin-left:10px;background:rgba(29,29,31,0.07);border:none;border-radius:8px;cursor:pointer;color:var(--accent);vertical-align:middle;padding:6px 8px;line-height:1;display:inline-flex;align-items:center;min-width:36px;min-height:36px;justify-content:center">\'+svgIcon(\'pencil\',16)+\'</button>';
+      +'<button id="detail-rename-btn" onclick="event.stopPropagation();startEditActTitle(\''+jsStrEsc(actKey)+'\',\''+jsStrEsc(cityKey||'')+'\','+_custIdxDT+',\''+jsStrEsc(_displayedName)+'\')" style="margin-left:10px;background:rgba(29,29,31,0.07);border:none;border-radius:8px;cursor:pointer;color:var(--accent);vertical-align:middle;padding:6px 8px;line-height:1;display:inline-flex;align-items:center;min-width:36px;min-height:36px;justify-content:center"><span data-icon=\"pencil\" data-icon-size=\"16\" style=\"pointer-events:none\"></span></button>';
   }
   document.getElementById('detailSub').textContent = d.address || '';
   document.getElementById('detailSub').style.display = d.address ? '' : 'none';
@@ -9544,7 +9544,7 @@ function renderMore(){
     +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
     +'</div>'
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
-    +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">Version 2026-07-16-deletecity-fix-v2</div>'
+    +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">Version 2026-08-09 · <span id=\'app-sha\' style=\'font-size:9px;opacity:0.6\'>sha:1d2e998</span></div>'
     +'</div>';
 }
 
@@ -12474,7 +12474,10 @@ async function loadCitiesActivities(){
     var sList = serverActsMap[ck]||[];
     var sNames = sList.map(function(a){return a.n;});
     var local  = (S.customActs[ck]||[]).filter(function(a){
-      return a.custom && sNames.indexOf(a.n)===-1 && deletedActTombstones.indexOf(ck+'||'+a.n)===-1;
+      // _sid présent localement + absent du serveur = supprimée côté serveur par un autre appareil.
+      // Ne jamais la ressusciter. Pas de _sid = jamais synchro → conserver le comportement legacy.
+      return a.custom && sNames.indexOf(a.n)===-1 && deletedActTombstones.indexOf(ck+'||'+a.n)===-1
+        && !a._sid;
     });
     S.customActs[ck] = sList.concat(local);
     // Migration best-effort legacy → stable : uniquement pour les activités qui ont désormais
