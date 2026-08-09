@@ -2731,12 +2731,14 @@ function openDetail(actKey, actName, cityKey) {
     var ckForPlanning = (cityKey||actKey.replace(/_c?\d+$/,''));
     var dateVal = getRenderedActivityDate(actKey, ckForPlanning);
     if(!dateVal) return {label:'Calendrier', hasInfo:false};
-    var dayShort = formatDayShort(dateVal);
     var timeVal = formatTimeRange(actKey);
     var mk = getActMoment(actKey, actName, actMeta);
     var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
-    var suffix = timeVal ? timeVal : (mo ? mo.label : 'Horaire non d\u00e9fini');
-    return {label:dayShort+' \u00b7 '+suffix, hasInfo:true};
+    // Dans la fiche : afficher uniquement l'horaire ou le moment (pas la date — déjà
+    // visible dans la capsule temporelle de la carte et dans les chips de filtre).
+    if(timeVal) return {label:timeVal, hasInfo:true};
+    if(mo) return {label:mo.label, hasInfo:true};
+    return {label:'Horaire non d\u00e9fini', hasInfo:true};
   }
   function refreshActionButtons(){
     var dateBtn = document.getElementById('detailDateBtn');
@@ -2744,24 +2746,13 @@ function openDetail(actKey, actName, cityKey) {
     var doneBtn = document.getElementById('detailDoneBtn');
     var isDone = !!S.done[actKey];
     var planning = formatDetailPlanningLabel();
-    // Hiérarchie visuelle dans le bouton Calendrier : même logique que timeCapsuleHTML.
-    // Le label peut être "12 SAM · 08h30" ou "12 SAM · Matin" etc.
-    // On décompose uniquement si le label contient un séparateur · et une heure (HH:MM ou HHhMM).
+    // Le label est désormais uniquement l'horaire (ex: "08h30-09h") ou le moment
+    // (ex: "Matin") — plus de date préfixée. Affichage direct, accent si info présente.
     var _planningInner = (function(){
       var lbl = planning.label;
-      var sepIdx = lbl.indexOf(' · ');
-      if(sepIdx < 0) return escHtml(lbl);
-      var leftPart = lbl.slice(0, sepIdx);
-      var rightPart = lbl.slice(sepIdx + 3);
-      // Détecter si la partie droite est une heure précise (format HHhMM ou HH:MM)
-      var isHour = /^\d{1,2}[h:]\d{2}/.test(rightPart) || /^\d{1,2}h$/.test(rightPart);
-      var _sDate2 = 'color:#6E6E73;font-weight:500';
-      var _sSep2  = 'color:rgba(110,110,115,0.45);margin:0 1px';
-      var _sHour2 = 'color:var(--accent);font-weight:600';
-      if(isHour){
-        return '<span style="'+_sDate2+'">'+escHtml(leftPart)+'</span>'
-          +'<span style="'+_sSep2+'"> · </span>'
-          +'<span style="'+_sHour2+'">'+escHtml(rightPart)+'</span>';
+      var isHour = /^\d{1,2}[h:]/.test(lbl);
+      if(planning.hasInfo && isHour){
+        return '<span style="color:var(--accent);font-weight:600">'+escHtml(lbl)+'</span>';
       }
       return escHtml(lbl);
     })();
@@ -2795,8 +2786,8 @@ function openDetail(actKey, actName, cityKey) {
   let html = '';
 
   // Lot 5B : champ "Nom" en haut de la fiche, uniquement pour les activités custom éditables.
-  // Les activités de base statiques (ACT_DETAILS) n'exposent pas de champ de renommage.
-  if(_isEditable && _isCustom){
+  // // Nom toujours éditable inline pour les activités custom — saveCustomActDetail('name') est sécurisé par _sid.
+  if(_isCustom){
     var _nameVal = escHtml(S.customActs[cityKey] && S.customActs[cityKey][_custIdx] ? (S.customActs[cityKey][_custIdx].n||actName) : actName);
     html += '<div class="detail-section" style="padding-bottom:0">'
       +'<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;margin-bottom:6px">Nom</div>'
@@ -2840,7 +2831,7 @@ function openDetail(actKey, actName, cityKey) {
   // Infos pratiques (quickInfo)
   if(_isEditable){
     var _qFields = [
-      {key:'duration',        icon:'history',      label:'Dur\u00e9e de visite',    placeholder:'ex\u00a0: 1h30'},
+      {key:'duration',        icon:'history',      label:'Dur\u00e9e conseill\u00e9e', placeholder:'ex\u00a0: 1h30'},
       {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: t\u00f4t le matin'},
       {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'},
       {key:'address',         icon:'map-pin',      label:'Adresse',           placeholder:'Adresse pr\u00e9cise', full:true},
@@ -3431,7 +3422,7 @@ function isPlaceClosedNow(hoursText){
 function buildQuickInfoHTML(d){
   var quickItems = [];
   if(d.hours) quickItems.push({icon:'sun', label:'Ouvert', value:d.hours});
-  if(d.duration) quickItems.push({icon:'history', label:'Durée', value:d.duration});
+  if(d.duration) quickItems.push({icon:'history', label:'Durée conseillée', value:d.duration});
   if(d.bookingRequired) quickItems.push({icon:'check-square', label:'Réservation', value:d.bookingRequired});
   if(d.bestTime) quickItems.push({icon:'sparkles', label:'Idéal', value:d.bestTime});
   var isClosedNow = isPlaceClosedNow(d.hours);
@@ -6581,6 +6572,16 @@ function formatDayShort(iso){
   var weekday = d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','').toUpperCase();
   return dayNum+' '+weekday;
 }
+function formatDayLong(iso){
+  if(!iso) return '';
+  var d = new Date(iso+'T00:00:00');
+  var weekday = d.toLocaleDateString('fr-FR',{weekday:'short'}); // "sam."
+  var dayNum  = d.toLocaleDateString('fr-FR',{day:'numeric'});   // "12"
+  var month   = d.toLocaleDateString('fr-FR',{month:'short'});   // "sept."
+  // Capitalise la première lettre du jour : "sam." → "Sam."
+  weekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  return weekday+' '+dayNum+' '+month;
+}
 // Capsule de temporalité affichée sur chaque carte activité (Lot 2). Purement présentationnelle :
 // toute la logique métier (dérivation heure→moment, valeur de la date) vient de fonctions déjà
 // fiabilisées au Lot 1 (getActMoment, formatTimeRange) et de l'existant (getActivityDate/S.actDate).
@@ -6634,17 +6635,17 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
     }
     hasInfo = true;
   } else {
-    // Vue Tout — préfixer par la date courte pour situer dans le séjour.
-    var dayShort = formatDayShort(dateVal);
+    // Vue Tout — préfixer par la date longue pour situer dans le séjour.
+    var dayLong = formatDayLong(dateVal);
     if(timeVal){
-      // 12 SAM · 08h30 — date et heure tous deux gris/secondaires
-      innerHTML = (dayShort?_d(dayShort)+_sep():'')+_h(timeVal);
+      // Sam. 12 sept. · 08h30
+      innerHTML = (dayLong?_d(dayLong)+_sep():'')+_h(timeVal);
     } else if(mo){
-      // 12 SAM · Matin — tout neutre/secondaire (pas d'heure précise)
-      innerHTML = (dayShort?_d(dayShort)+_sep()+_m(mo.label):_m(mo.label));
+      // Sam. 12 sept. · Matin
+      innerHTML = (dayLong?_d(dayLong)+_sep()+_m(mo.label):_m(mo.label));
     } else {
       // Date seule
-      innerHTML = dayShort ? _d(dayShort) : _m('Horaire non défini');
+      innerHTML = dayLong ? _d(dayLong) : _m('Horaire non défini');
     }
     hasInfo = true;
   }
