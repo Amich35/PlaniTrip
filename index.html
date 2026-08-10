@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:decouple-accom';
+var APP_BUILD = '2026-08-10·sha:citydates-canonical';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5424,14 +5424,16 @@ function getCountryDateRange(c){
 }
 function cityStayRange(ck){
   var start=null, end=null;
-  var accomList = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
-  accomList.forEach(function(a){
-    if(a.start && (!start || a.start<start)) start=a.start;
-    if(a.end && (!end || a.end>end)) end=a.end;
-  });
+  // Source canonique : dates du séjour ville (P0.8-A/2 garantit leur persistance Supabase)
+  var cd = S.cityDates && S.cityDates[ck];
+  if(cd && cd.start && cd.end){ start=cd.start; end=cd.end; }
+  // Compatibilité legacy : logements uniquement si cityDates absent/incomplet
   if(!start || !end){
-    var cd = S.cityDates && S.cityDates[ck];
-    if(cd && cd.start && cd.end){ start=cd.start; end=cd.end; }
+    var accomList = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
+    accomList.forEach(function(a){
+      if(a.start && (!start || a.start<start)) start=a.start;
+      if(a.end && (!end || a.end>end)) end=a.end;
+    });
   }
   return (start && end) ? {start:start, end:end} : null;
 }
