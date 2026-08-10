@@ -12838,6 +12838,7 @@ function _customActKeyedMaps(){
 // si la migration a déjà eu lieu sur un autre appareil).
 function _migrateActivityKeyIfNeeded(stableKey, legacyKey){
   if(stableKey===legacyKey) return false;
+  console.log('[CAT-P4-MIG] CHECK', new Date().toISOString(), 'legacyKey:', legacyKey, 'stableKey:', stableKey);
   var maps = _customActKeyedMaps();
   var migrated = false;
   Object.keys(maps).forEach(function(mapName){
@@ -12846,10 +12847,13 @@ function _migrateActivityKeyIfNeeded(stableKey, legacyKey){
     var hasLegacy = m.hasOwnProperty(legacyKey);
     var hasStable = m.hasOwnProperty(stableKey);
     if(hasLegacy && !hasStable){
-      m[stableKey] = m[legacyKey];
+      var _legacyVal = m[legacyKey];
+      m[stableKey] = _legacyVal;
+      console.log('[CAT-P4-MIG] COPY', new Date().toISOString(), 'mapName:', mapName, 'legacyKey:', legacyKey, 'stableKey:', stableKey, 'legacyValue:', JSON.stringify(_legacyVal), 'stableAfter:', JSON.stringify(m[stableKey]));
       migrated = true;
     }
   });
+  console.log('[CAT-P4-MIG] RESULT', new Date().toISOString(), 'legacyKey:', legacyKey, 'stableKey:', stableKey, 'migrated:', migrated);
   if(migrated) S.customDetails = window._customDetails;
   return migrated;
 }
@@ -12918,8 +12922,10 @@ async function loadCitiesActivities(){
       // Le nom doit correspondre : sinon la position a manifestement changé et toute tentative
       // de migration serait une devinette non fiable — on l'évite explicitement (§12).
       if(legacyCandidate && legacyCandidate.n===act.n){
-        if(_migrateActivityKeyIfNeeded(stableKey, ck+'_c'+idx)){
-          _pendingKeyMigrations.push({stableKey:stableKey});
+        var _legacyKeyForLog = ck+'_c'+idx;
+        if(_migrateActivityKeyIfNeeded(stableKey, _legacyKeyForLog)){
+          console.log('[CAT-P4-MIG] PENDING ADD', new Date().toISOString(), 'legacyKey:', _legacyKeyForLog, 'stableKey:', stableKey);
+          _pendingKeyMigrations.push({stableKey:stableKey, legacyKey:_legacyKeyForLog});
         }
       }
     });
@@ -12930,6 +12936,10 @@ async function loadCitiesActivities(){
   // chaque fiche détaillée individuelle migrée est recopiée sous sa clé stable côté serveur.
   // Sans ce bloc, la migration resterait locale à cet appareil tant qu'aucune autre action
   // utilisateur ne force naturellement un upsert de ces mêmes blobs.
+  window._catP4PendingMigs = _pendingKeyMigrations;
+  _pendingKeyMigrations.forEach(function(mig){
+    console.log('[CAT-P4-MIG] AFTER CITIES', new Date().toISOString(), 'legacyKey:', mig.legacyKey, 'stableKey:', mig.stableKey, 'legacyCategory:', JSON.stringify((S.actCategory||{})[mig.legacyKey]), 'stableCategory:', JSON.stringify((S.actCategory||{})[mig.stableKey]));
+  });
   console.log('[CAT-P4] MIGRATION CHECK', new Date().toISOString(), 'pendingCount:', _pendingKeyMigrations.length, 'pendingStableKeys:', JSON.stringify(_pendingKeyMigrations.map(function(m){return m.stableKey;})), 'jp_Osaka_0:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']), 'categoryKeysCount:', Object.keys(S.actCategory||{}).length);
   if(_pendingKeyMigrations.length && sb && CURRENT_TRIP){
     var _mtid = CURRENT_TRIP.id;
@@ -13142,6 +13152,13 @@ async function loadActivityDetails(){
     }
   });
   if(!Object.prototype.hasOwnProperty.call(window._customDetails||{}, 'jp_Osaka_0__state')){ console.log('[CAT-P4] STATE jp_Osaka_0', new Date().toISOString(), 'stateFound: false', 'category: n/a'); }
+  (window._catP4PendingMigs||[]).forEach(function(mig){
+    var stateKey = mig.stableKey+'__state';
+    var stateFound = Object.prototype.hasOwnProperty.call(window._customDetails||{}, stateKey);
+    var stateData = stateFound ? (window._customDetails[stateKey]||{}) : null;
+    console.log('[CAT-P4-MIG] STATE', new Date().toISOString(), 'stableKey:', mig.stableKey, 'stateFound:', stateFound, 'stateData:', JSON.stringify(stateData ? {date:stateData.date,moment:stateData.moment,timeStart:stateData.timeStart,timeEnd:stateData.timeEnd,category:stateData.category,done:stateData.done} : null));
+    console.log('[CAT-P4-MIG] AFTER DETAILS', new Date().toISOString(), 'legacyKey:', mig.legacyKey, 'stableKey:', mig.stableKey, 'legacyCategory:', JSON.stringify((S.actCategory||{})[mig.legacyKey]), 'stableCategory:', JSON.stringify((S.actCategory||{})[mig.stableKey]), 'stateCategory:', JSON.stringify(stateData ? stateData.category : undefined));
+  });
   S.customDetails = window._customDetails;
   save();
   console.log('[CAT-P4] LOAD-DETAILS END', new Date().toISOString(), 'jp_Osaka_0 finalValue:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
