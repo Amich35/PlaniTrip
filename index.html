@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:citydates-canonical';
+var APP_BUILD = '2026-08-10·sha:city-dates-menu';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5915,6 +5915,34 @@ function saveDatesModal(){
   closeGuideItemModal();
 }
 // ── Modale Dates du séjour (par ville) ──
+function openCityDotsMenu(ck, cityLabel, query){
+  // Supprime un éventuel menu déjà ouvert
+  var prev = document.getElementById('_cityDotsMenu');
+  if(prev){ prev.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = '_cityDotsMenu';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.18)';
+  overlay.onclick = function(){ overlay.remove(); };
+  var menu = document.createElement('div');
+  menu.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:22px 22px 0 0;padding:8px 0 32px;max-width:420px;margin:0 auto;box-shadow:0 -4px 32px rgba(0,0,0,0.14)';
+  menu.onclick = function(e){ e.stopPropagation(); };
+  // Handle
+  menu.innerHTML = '<div style="width:36px;height:4px;background:rgba(0,0,0,0.12);border-radius:2px;margin:10px auto 14px"></div>';
+  // Option 1 : Modifier les dates
+  var btnDates = document.createElement('button');
+  btnDates.textContent = 'Modifier les dates';
+  btnDates.style.cssText = 'display:block;width:100%;padding:15px 24px;border:none;background:none;text-align:left;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#1D1D1F;cursor:pointer;border-bottom:1px solid rgba(0,0,0,0.07)';
+  btnDates.onclick = function(){ overlay.remove(); openCityDatesModal(ck, cityLabel); };
+  menu.appendChild(btnDates);
+  // Option 2 : Changer la photo
+  var btnPhoto = document.createElement('button');
+  btnPhoto.textContent = 'Changer la photo';
+  btnPhoto.style.cssText = 'display:block;width:100%;padding:15px 24px;border:none;background:none;text-align:left;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#1D1D1F;cursor:pointer';
+  btnPhoto.onclick = function(){ overlay.remove(); openPhotoPicker(query); };
+  menu.appendChild(btnPhoto);
+  overlay.appendChild(menu);
+  document.body.appendChild(overlay);
+}
 var _cityDatesModalCk=null;
 function openCityDatesModal(ck, cityLabel){
   _cityDatesModalCk=ck;
@@ -7268,7 +7296,7 @@ function renderCityDetailScreen(){
     +'<div class="info-card" style="padding:0;overflow:hidden">'
     +'<div class="country-detail-header" style="position:relative;background-image:linear-gradient('+(coverColors[c.id]||'rgba(0,0,0,0.15),rgba(0,0,0,0.35)')+');border-radius:0;overflow:hidden" data-img-query="'+escHtml(query)+'">'
     +'<button class="cdh-back" onclick="closeCityDetail()"><span data-icon="arrow-left" data-icon-size="18"></span></button>'
-    +'<button onclick="event.stopPropagation();openPhotoPicker(\''+jsStrEsc(query)+'\')" style="position:absolute;bottom:14px;right:14px;z-index:2;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
+    +'<button onclick="event.stopPropagation();openCityDotsMenu(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(_cityDisplayName(ck,city))+'\',\''+jsStrEsc(query)+'\')" style="position:absolute;bottom:14px;right:14px;z-index:2;width:36px;height:36px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><span data-icon="ellipsis" data-icon-size="18"></span></button>'
     +'<div class="cdh-content"><div class="cdh-name" id="cdh-name-'+escHtml(ck)+'">'+escHtml(_cityDisplayName(ck,city))+'<button onclick="event.stopPropagation();startEditCity(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(_cityDisplayName(ck,city))+'\')" style="margin-left:7px;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.7);vertical-align:middle;padding:2px;line-height:1">'+svgIcon('pencil',13)+'</button></div>'
     +'<div class="cdh-tagline">'+taglineTxt+'</div>'
     +renderTravelerAvatarStack(ck)
