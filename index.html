@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:city-dates-menu';
+var APP_BUILD = '2026-08-10·sha:cta-reset';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5963,6 +5963,7 @@ function openCityDatesModal(ck, cityLabel){
     var _ctaBtn = _btnRow.querySelector('.modal-cta');
     if(_cancelBtn) _cancelBtn.style.cssText='flex:1;padding:13px;min-height:44px;border-radius:var(--r16);font-size:14px;font-weight:600;border:var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
     if(_ctaBtn) _ctaBtn.style.cssText='flex:1;padding:13px;min-height:44px;border-radius:var(--r16);font-size:14px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 8px rgba(28,24,20,0.2);margin-bottom:0;';
+    if(_ctaBtn){ _ctaBtn.disabled = false; _ctaBtn.textContent = 'Enregistrer'; }
   }
 }
 async function saveCityDatesModal(){
