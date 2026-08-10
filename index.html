@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:cta-reset';
+var APP_BUILD = '2026-08-10·sha:p08a-4';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6980,35 +6980,83 @@ function openCategoryPickerModal(actKey){
     +(current.length?'<div style="text-align:center;margin-top:10px"><span onclick="clearCategoriesForAct()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Tout retirer</span></div>':'');
   document.getElementById('categoryModal').classList.add('open');
 }
-function syncActCategory(){
-  if(!sb || !CURRENT_TRIP) return;
-  if(_isCustomStableKey(_categoryModalActKey)){
-    // Phase S : écriture granulaire — n'impacte que cette activité
-    _syncActivityState(_categoryModalActKey, CURRENT_TRIP.id);
+// P0.8-A/4 : flag anti-clics concurrents sur le picker catégorie
+var _catSyncInFlight = false;
+
+// syncActCategory est maintenant async et reçoit l'actKey explicitement
+// pour éviter toute dépendance à _categoryModalActKey après un await.
+async function syncActCategory(actKey){
+  if(!sb || !CURRENT_TRIP) throw new Error('offline');
+  if(_isCustomStableKey(actKey)){
+    // _sid_ : écriture granulaire via __state
+    await _syncActivityState(actKey, CURRENT_TRIP.id);
   } else {
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){
-      if(r&&r.error) console.error('[PlaniTrip] sync actCategory:', r.error);
-    });
+    // built-in / legacy : blob global (architecture actuelle conservée)
+    var r = await sb.from('activity_details').upsert(
+      {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actCategory', data:S.actCategory, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,detail_key'}
+    );
+    if(r && r.error) throw r.error;
   }
 }
-function toggleCategoryForAct(catKey){
+async function toggleCategoryForAct(catKey){
+  if(_catSyncInFlight) return; // garde-fou clics concurrents
   if(!S.actCategory) S.actCategory={};
-  var current = getActCategory(_categoryModalActKey, '', '').slice();
+  // Capturer actKey avant tout await
+  var actKey = _categoryModalActKey;
+  // Snapshot pour rollback — copie du tableau
+  var prev = Array.isArray(S.actCategory[actKey]) ? S.actCategory[actKey].slice() : [];
+  // Mutation optimistic
+  var current = prev.slice();
   var idx = current.indexOf(catKey);
   if(idx>-1) current.splice(idx,1); else current.push(catKey);
-  S.actCategory[_categoryModalActKey] = current;
+  S.actCategory[actKey] = current;
   save();
-  openCategoryPickerModal(_categoryModalActKey);
+  openCategoryPickerModal(actKey);
   renderContent();
-  syncActCategory();
+  // Await sync — rollback si erreur
+  _catSyncInFlight = true;
+  try{
+    await syncActCategory(actKey);
+  } catch(e){
+    console.error('[PlaniTrip] toggleCategoryForAct sync error:', e);
+    // Rollback local
+    S.actCategory[actKey] = prev;
+    save();
+    renderContent();
+    // Rafraîchir le picker seulement s'il est encore ouvert sur cette activité
+    if(_categoryModalActKey === actKey && document.getElementById('categoryModal').classList.contains('open')){
+      openCategoryPickerModal(actKey);
+    }
+    alert('Erreur de synchronisation — catégorie non enregistrée. Vérifie ta connexion.');
+  } finally {
+    _catSyncInFlight = false;
+  }
 }
-function clearCategoriesForAct(){
+async function clearCategoriesForAct(){
+  if(_catSyncInFlight) return;
   if(!S.actCategory) S.actCategory={};
-  S.actCategory[_categoryModalActKey] = [];
+  var actKey = _categoryModalActKey;
+  var prev = Array.isArray(S.actCategory[actKey]) ? S.actCategory[actKey].slice() : [];
+  S.actCategory[actKey] = [];
   save();
-  openCategoryPickerModal(_categoryModalActKey);
+  openCategoryPickerModal(actKey);
   renderContent();
-  syncActCategory();
+  _catSyncInFlight = true;
+  try{
+    await syncActCategory(actKey);
+  } catch(e){
+    console.error('[PlaniTrip] clearCategoriesForAct sync error:', e);
+    S.actCategory[actKey] = prev;
+    save();
+    renderContent();
+    if(_categoryModalActKey === actKey && document.getElementById('categoryModal').classList.contains('open')){
+      openCategoryPickerModal(actKey);
+    }
+    alert('Erreur de synchronisation — catégorie non enregistrée. Vérifie ta connexion.');
+  } finally {
+    _catSyncInFlight = false;
+  }
 }
 
 function renderCityPanelContentBody(c, city){
