@@ -6992,10 +6992,13 @@ async function syncActCategory(actKey){
     await _syncActivityState(actKey, CURRENT_TRIP.id);
   } else {
     // built-in / legacy : blob global (architecture actuelle conservée)
+    var _w1WriteId = (typeof window._catLastWriteId !== 'undefined') ? window._catLastWriteId : ('cat-w1-' + Date.now());
+    console.log('[CAT-P4] W1 BEFORE', new Date().toISOString(), 'writeId:', _w1WriteId, 'actKey:', actKey, 'currentValueForActKey:', JSON.stringify((S.actCategory||{})[actKey]), 'payloadHasActKey:', Object.prototype.hasOwnProperty.call(S.actCategory||{}, actKey), 'payloadJpOsaka0:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']), 'payloadKeysCount:', Object.keys(S.actCategory||{}).length);
     var r = await sb.from('activity_details').upsert(
       {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actCategory', data:S.actCategory, updated_at:new Date().toISOString()},
       {onConflict:'trip_id,detail_key'}
     );
+    console.log('[CAT-P4] W1 AFTER', new Date().toISOString(), 'writeId:', _w1WriteId, 'actKey:', actKey, 'error:', (r&&r.error)?JSON.stringify(r.error):'none');
     if(r && r.error) throw r.error;
   }
 }
@@ -7014,6 +7017,9 @@ async function toggleCategoryForAct(catKey){
   var idx = current.indexOf(catKey);
   if(idx>-1) current.splice(idx,1); else current.push(catKey);
   S.actCategory[actKey] = current;
+  var _catWriteId = 'cat-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
+  console.log('[CAT-P4] TOGGLE LOCAL', new Date().toISOString(), 'writeId:', _catWriteId, 'actKey:', actKey, 'catKey:', catKey, 'hadExplicit:', hadExplicit, 'before:', JSON.stringify(prevExplicit), 'after:', JSON.stringify(S.actCategory[actKey]), 'jp_Osaka_0:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
+  window._catLastWriteId = _catWriteId;
   save();
   openCategoryPickerModal(actKey);
   renderContent();
@@ -12850,6 +12856,7 @@ function _migrateActivityKeyIfNeeded(stableKey, legacyKey){
 
 async function loadCitiesActivities(){
   if(!sb || !CURRENT_TRIP) return;
+  console.log('[CAT-P4] LOAD-CITIES START', new Date().toISOString(), 'jp_Osaka_0:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']), 'categoryKeysCount:', Object.keys(S.actCategory||{}).length);
   // Accumule les migrations legacy → stable effectuées pendant ce chargement, pour les
   // persister côté serveur une seule fois à la fin (voir bloc après la boucle villes).
   var _pendingKeyMigrations = [];
@@ -12923,6 +12930,7 @@ async function loadCitiesActivities(){
   // chaque fiche détaillée individuelle migrée est recopiée sous sa clé stable côté serveur.
   // Sans ce bloc, la migration resterait locale à cet appareil tant qu'aucune autre action
   // utilisateur ne force naturellement un upsert de ces mêmes blobs.
+  console.log('[CAT-P4] MIGRATION CHECK', new Date().toISOString(), 'pendingCount:', _pendingKeyMigrations.length, 'pendingStableKeys:', JSON.stringify(_pendingKeyMigrations.map(function(m){return m.stableKey;})), 'jp_Osaka_0:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']), 'categoryKeysCount:', Object.keys(S.actCategory||{}).length);
   if(_pendingKeyMigrations.length && sb && CURRENT_TRIP){
     var _mtid = CURRENT_TRIP.id;
     var _mnow = new Date().toISOString();
@@ -12933,16 +12941,19 @@ async function loadCitiesActivities(){
       Object.keys(map||{}).forEach(function(k){ if(!_isCustomStableKey(k)) out[k]=map[k]; });
       return out;
     };
+    var _w6WriteId = 'cat-w6-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
+    var _w6CatPayload = _blobOnly(S.actCategory);
+    console.log('[CAT-P4] W6 BEFORE', new Date().toISOString(), 'writeId:', _w6WriteId, 'pendingCount:', _pendingKeyMigrations.length, 'jp_Osaka_0 local:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']), 'payloadHasJpOsaka0:', Object.prototype.hasOwnProperty.call(_w6CatPayload,'jp_Osaka_0'), 'payloadJpOsaka0:', JSON.stringify(_w6CatPayload['jp_Osaka_0']), 'payloadKeysCount:', Object.keys(_w6CatPayload).length);
     Promise.all([
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDate',      data:_blobOnly(S.actDate),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actMoment',    data:_blobOnly(S.actMoment),    updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeStart', data:_blobOnly(S.actTimeStart), updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeEnd',   data:_blobOnly(S.actTimeEnd),   updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTime',      data:_blobOnly(S.actTime),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actCategory',  data:_blobOnly(S.actCategory),  updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actCategory',  data:_w6CatPayload,             updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:_blobOnly(S.actDay),       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:_blobOnly(S.done),         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
-    ]).catch(function(e){ console.error('[PlaniTrip] migration blobs upsert:', e); });
+    ]).then(function(){ console.log('[CAT-P4] W6 AFTER', new Date().toISOString(), 'writeId:', _w6WriteId, 'result: success'); }).catch(function(e){ console.error('[CAT-P4] W6 AFTER', new Date().toISOString(), 'writeId:', _w6WriteId, 'error:', e); console.error('[PlaniTrip] migration blobs upsert:', e); });
     // Fiches individuelles : upsert sous la clé stable uniquement (jamais de delete de la
     // légacy ici — cette migration est best-effort et purement locale à la lecture, on laisse
     // la légacy en place tant qu'aucune écriture explicite n'a confirmé la nouvelle clé).
@@ -13046,6 +13057,7 @@ async function loadCountrySettings(){
 }
 async function loadActivityDetails(){
   if(!sb || !CURRENT_TRIP) return;
+  console.log('[CAT-P4] LOAD-DETAILS START', new Date().toISOString(), 'jp_Osaka_0 beforeServerLoad:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
   var {data} = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
   if(!window._customDetails) window._customDetails={};
   // Dédoublonnage défensif par detail_key (garde la ligne la plus récente),
@@ -13061,7 +13073,11 @@ async function loadActivityDetails(){
     if(row.detail_key === '__planitrip__actDate'){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
     } else if(row.detail_key === '__planitrip__actCategory'){
-      if(row.data && typeof row.data === 'object'){ S.actCategory = row.data; }
+      if(row.data && typeof row.data === 'object'){
+        console.log('[CAT-P4] LOAD-BLOB', new Date().toISOString(), 'serverHasJpOsaka0:', Object.prototype.hasOwnProperty.call(row.data,'jp_Osaka_0'), 'serverJpOsaka0:', JSON.stringify(row.data['jp_Osaka_0']), 'serverKeysCount:', Object.keys(row.data).length, 'localBefore:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
+        S.actCategory = row.data;
+        console.log('[CAT-P4] LOAD-BLOB APPLIED', new Date().toISOString(), 'jp_Osaka_0 after:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
+      }
     } else if(row.detail_key === '__planitrip__actMoment'){
       if(row.data && typeof row.data === 'object'){ S.actMoment = row.data; }
     } else if(row.detail_key === '__planitrip__actTime'){
@@ -13106,6 +13122,7 @@ async function loadActivityDetails(){
     if(!state || typeof state !== 'object') return;
     if(dk.slice(-7) === '__state'){
       var actKey = dk.slice(0, -7); // strip '__state'
+      if(actKey === 'jp_Osaka_0'){ console.log('[CAT-P4] STATE jp_Osaka_0', new Date().toISOString(), 'stateFound: true', 'category:', JSON.stringify(state.category)); }
       if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
       if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
       if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
@@ -13124,8 +13141,10 @@ async function loadActivityDetails(){
       S.cityNames[_aliasCk] = state.name;
     }
   });
+  if(!Object.prototype.hasOwnProperty.call(window._customDetails||{}, 'jp_Osaka_0__state')){ console.log('[CAT-P4] STATE jp_Osaka_0', new Date().toISOString(), 'stateFound: false', 'category: n/a'); }
   S.customDetails = window._customDetails;
   save();
+  console.log('[CAT-P4] LOAD-DETAILS END', new Date().toISOString(), 'jp_Osaka_0 finalValue:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
 }
 async function loadAccommodations(){
   if(!sb || !CURRENT_TRIP) return;
