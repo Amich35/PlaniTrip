@@ -3690,6 +3690,51 @@ if(!S.accom) S.accom={};
 if(!S.actDate) S.actDate={};
 if(!S.cityDates) S.cityDates={};
 
+// P0.8-A/3B helpers purs — sans mutation de S, sans appel Supabase.
+
+// Reproduit exactement la sémantique de cityStayRange(ck) mais depuis
+// une liste candidate (nextAccomList) au lieu de S.accom[ck].
+// Même fallback S.cityDates[ck] que cityStayRange.
+function _stayRangeCandidate(ck, list){
+  var start=null, end=null;
+  (list||[]).forEach(function(a){
+    if(a.start && (!start || a.start<start)) start=a.start;
+    if(a.end   && (!end   || a.end  >end  )) end=a.end;
+  });
+  if(!start || !end){
+    var cd = S.cityDates && S.cityDates[ck];
+    if(cd && cd.start && cd.end){ start=cd.start; end=cd.end; }
+  }
+  return (start && end) ? {start:start, end:end} : null;
+}
+// Reproduit le calcul de shiftActivityDatesForCity mais en version pure :
+// travaille sur une copie de S.actDate, ne mute pas S, n'appelle pas Supabase.
+// Retourne la nouvelle map actDate si des clés ont changé, sinon null.
+function _computeShiftedActDates(ck, oldRange, newRange){
+  if(!S.actDate) return null;
+  var parts = ck.split('_');
+  var c = COUNTRIES.find(function(co){ return co.id===parts[0]; });
+  var city = c && c.cities.find(function(ci){ return ci.city===parts.slice(1).join('_'); });
+  if(!city) return null;
+  var oldStartMs = new Date(oldRange.start+'T00:00:00').getTime();
+  var oldEndMs   = new Date(oldRange.end  +'T00:00:00').getTime();
+  var newStartMs = new Date(newRange.start+'T00:00:00').getTime();
+  var newEndMs   = new Date(newRange.end  +'T00:00:00').getTime();
+  var oldSpan = oldEndMs - oldStartMs;
+  var keys = [];
+  for(var i=0; i<city.acts.length; i++) keys.push(ck+'_'+i);
+  (S.customActs[ck]||[]).forEach(function(ca,i){ keys.push(getCustomActivityKey(ck,ca,i)); });
+  var nextActDate = Object.assign({}, S.actDate);
+  var changed = false;
+  keys.forEach(function(k){
+    var d = S.actDate[k]; if(!d) return;
+    var dMs = new Date(d+'T00:00:00').getTime();
+    var ratio = oldSpan>0 ? Math.min(1,Math.max(0,(dMs-oldStartMs)/oldSpan)) : 0;
+    var newDate = toLocalISODate(new Date(newStartMs + ratio*(newEndMs-newStartMs)));
+    if(newDate !== d){ nextActDate[k] = newDate; changed = true; }
+  });
+  return changed ? nextActDate : null;
+}
 async function saveAccom(ck) {
   const name    = document.getElementById('am_name')?.value||'';
   const link    = document.getElementById('am_link')?.value||'';
