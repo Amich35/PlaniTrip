@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:p08a-3C';
+var APP_BUILD = '2026-08-10·sha:decouple-accom';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3762,14 +3762,6 @@ async function saveAccom(ck) {
     var nextAccomList = idx>-1
       ? currentList.map(function(e,i){ return i===idx ? entry : e; })
       : currentList.concat([entry]);
-    // Plages avant/après — même sémantique (accom + fallback cityDates)
-    var oldRange  = cityStayRange(ck);
-    var nextRange = _stayRangeCandidate(ck, nextAccomList);
-    // Décalage dates activités — calcul pur, sans muter S
-    var nextActDate = null;
-    if(oldRange && nextRange && (oldRange.start!==nextRange.start || oldRange.end!==nextRange.end)){
-      nextActDate = _computeShiftedActDates(ck, oldRange, nextRange);
-    }
     // Guard connexion
     if(!sb || !CURRENT_TRIP){
       alert('Connexion requise pour enregistrer le logement.');
@@ -3777,7 +3769,7 @@ async function saveAccom(ck) {
     }
     var _btn = document.querySelector('#accomModal .modal-cta');
     if(_btn){ _btn.disabled=true; _btn.textContent='…'; }
-    // 1. Await accommodation
+    // Await accommodation — S.actDate non modifié (règle métier : logements ≠ planning)
     try{
       var countryId = ck.split('_')[0];
       var _r = await sb.from('accommodations').upsert(
@@ -3792,25 +3784,8 @@ async function saveAccom(ck) {
       alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
       return;
     }
-    // 2. Await actDate si décalage détecté
-    if(nextActDate !== null){
-      try{
-        var _r2 = await sb.from('activity_details').upsert(
-          {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actDate', data:nextActDate, updated_at:new Date().toISOString()},
-          {onConflict:'trip_id,detail_key'}
-        );
-        if(_r2 && _r2.error) throw _r2.error;
-      } catch(e2){
-        console.error('[PlaniTrip] saveAccom actDate upsert:', e2);
-        var _btn3 = document.querySelector('#accomModal .modal-cta');
-        if(_btn3){ _btn3.disabled=false; _btn3.textContent='Enregistrer'; }
-        alert("Le logement a été sauvegardé mais les dates d'activités n'ont pas pu être synchronisées — réessaie.");
-        return;
-      }
-    }
-    // Commit local uniquement après succès des deux écritures
+    // Commit local après succès Supabase
     S.accom[ck] = nextAccomList;
-    if(nextActDate !== null) S.actDate = nextActDate;
     save();
     renderContent();
     document.getElementById('accomModal').classList.remove('open');
@@ -3902,14 +3877,6 @@ function deleteAccomEntry(ck, id){
     // État candidat — ne mute pas S.accom[ck]
     var currentList = S.accom[ck];
     var nextAccomList = currentList.filter(function(e){ return e.id!==id; });
-    // Plages avant/après — même sémantique que 3B (accom + fallback cityDates)
-    var oldRange  = cityStayRange(ck);
-    var nextRange = _stayRangeCandidate(ck, nextAccomList);
-    // Décalage dates activités — calcul pur, sans muter S
-    var nextActDate = null;
-    if(oldRange && nextRange && (oldRange.start!==nextRange.start || oldRange.end!==nextRange.end)){
-      nextActDate = _computeShiftedActDates(ck, oldRange, nextRange);
-    }
     // Guard connexion
     if(!sb || !CURRENT_TRIP){
       alert('Connexion requise pour supprimer ce logement.');
@@ -3928,23 +3895,8 @@ function deleteAccomEntry(ck, id){
       alert("Erreur — le logement n'a pas pu être supprimé. Vérifie ta connexion et réessaie.");
       return; // S.accom inchangé
     }
-    // 2. Await actDate si décalage nécessaire
-    if(nextActDate !== null){
-      try{
-        var _r2 = await sb.from('activity_details').upsert(
-          {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actDate', data:nextActDate, updated_at:new Date().toISOString()},
-          {onConflict:'trip_id,detail_key'}
-        );
-        if(_r2 && _r2.error) throw _r2.error;
-      } catch(e2){
-        console.error('[PlaniTrip] deleteAccomEntry actDate upsert:', e2);
-        alert("Le logement a été supprimé mais les dates d'activités n'ont pas pu être synchronisées — réessaie.");
-        return; // pas de commit local
-      }
-    }
-    // Commit local uniquement après succès des écritures nécessaires
+    // Commit local après succès Supabase — S.actDate non modifié (règle métier : logements ≠ planning)
     S.accom[ck] = nextAccomList;
-    if(nextActDate !== null) S.actDate = nextActDate;
     save();
     renderContent();
   }, 'Supprimer');
