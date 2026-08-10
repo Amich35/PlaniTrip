@@ -12952,15 +12952,13 @@ async function loadCitiesActivities(){
       return out;
     };
     var _w6WriteId = 'cat-w6-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
-    var _w6CatPayload = _blobOnly(S.actCategory);
-    console.log('[CAT-P4] W6 BEFORE', new Date().toISOString(), 'writeId:', _w6WriteId, 'pendingCount:', _pendingKeyMigrations.length, 'jp_Osaka_0 local:', JSON.stringify((S.actCategory||{})['jp_Osaka_0']), 'payloadHasJpOsaka0:', Object.prototype.hasOwnProperty.call(_w6CatPayload,'jp_Osaka_0'), 'payloadJpOsaka0:', JSON.stringify(_w6CatPayload['jp_Osaka_0']), 'payloadKeysCount:', Object.keys(_w6CatPayload).length);
+    console.log('[CAT-P4] W6 BEFORE', new Date().toISOString(), 'writeId:', _w6WriteId, 'pendingCount:', _pendingKeyMigrations.length, 'jp_Osaka_0 local (NOT written to DB):', JSON.stringify((S.actCategory||{})['jp_Osaka_0']));
     Promise.all([
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDate',      data:_blobOnly(S.actDate),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actMoment',    data:_blobOnly(S.actMoment),    updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeStart', data:_blobOnly(S.actTimeStart), updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeEnd',   data:_blobOnly(S.actTimeEnd),   updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTime',      data:_blobOnly(S.actTime),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actCategory',  data:_w6CatPayload,             updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:_blobOnly(S.actDay),       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
       sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:_blobOnly(S.done),         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
     ]).then(function(){ console.log('[CAT-P4] W6 AFTER', new Date().toISOString(), 'writeId:', _w6WriteId, 'result: success'); }).catch(function(e){ console.error('[CAT-P4] W6 AFTER', new Date().toISOString(), 'writeId:', _w6WriteId, 'error:', e); console.error('[PlaniTrip] migration blobs upsert:', e); });
