@@ -13127,11 +13127,13 @@ async function loadActivityDetails(){
   // Phase S — post-pass : lire les __state granulaires et les injecter dans S
   // Ces clés arrivent dans _customDetails via le else-branch ci-dessus.
   // On les injecte ICI, après les blobs globaux, pour qu'ils soient prioritaires.
+  var _catP4SeenStates = {}; // diagnostic uniquement — jamais sauvegardé ni envoyé à Supabase
   Object.keys(window._customDetails).forEach(function(dk){
     var state = window._customDetails[dk];
     if(!state || typeof state !== 'object') return;
     if(dk.slice(-7) === '__state'){
       var actKey = dk.slice(0, -7); // strip '__state'
+      _catP4SeenStates[actKey] = state; // capture diagnostic
       if(actKey === 'jp_Osaka_0'){ console.log('[CAT-P4] STATE jp_Osaka_0', new Date().toISOString(), 'stateFound: true', 'category:', JSON.stringify(state.category)); }
       if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
       if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
@@ -13151,12 +13153,11 @@ async function loadActivityDetails(){
       S.cityNames[_aliasCk] = state.name;
     }
   });
-  if(!Object.prototype.hasOwnProperty.call(window._customDetails||{}, 'jp_Osaka_0__state')){ console.log('[CAT-P4] STATE jp_Osaka_0', new Date().toISOString(), 'stateFound: false', 'category: n/a'); }
+  if(!Object.prototype.hasOwnProperty.call(_catP4SeenStates, 'jp_Osaka_0')){ console.log('[CAT-P4] STATE jp_Osaka_0', new Date().toISOString(), 'stateFound: false', 'category: n/a'); }
   (window._catP4PendingMigs||[]).forEach(function(mig){
-    var stateKey = mig.stableKey+'__state';
-    var stateFound = Object.prototype.hasOwnProperty.call(window._customDetails||{}, stateKey);
-    var stateData = stateFound ? (window._customDetails[stateKey]||{}) : null;
-    console.log('[CAT-P4-MIG] STATE', new Date().toISOString(), 'stableKey:', mig.stableKey, 'stateFound:', stateFound, 'stateData:', JSON.stringify(stateData ? {date:stateData.date,moment:stateData.moment,timeStart:stateData.timeStart,timeEnd:stateData.timeEnd,category:stateData.category,done:stateData.done} : null));
+    var stateFound = Object.prototype.hasOwnProperty.call(_catP4SeenStates, mig.stableKey);
+    var stateData = stateFound ? _catP4SeenStates[mig.stableKey] : null;
+    console.log('[CAT-P4-MIG] STATE', new Date().toISOString(), 'legacyKey:', mig.legacyKey, 'stableKey:', mig.stableKey, 'stateFound:', stateFound, 'stateData:', JSON.stringify(stateData ? {date:stateData.date,moment:stateData.moment,timeStart:stateData.timeStart,timeEnd:stateData.timeEnd,category:stateData.category,done:stateData.done} : null));
     console.log('[CAT-P4-MIG] AFTER DETAILS', new Date().toISOString(), 'legacyKey:', mig.legacyKey, 'stableKey:', mig.stableKey, 'legacyCategory:', JSON.stringify((S.actCategory||{})[mig.legacyKey]), 'stableCategory:', JSON.stringify((S.actCategory||{})[mig.stableKey]), 'stateCategory:', JSON.stringify(stateData ? stateData.category : undefined));
   });
   S.customDetails = window._customDetails;
