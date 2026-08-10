@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:p08a-4';
+var APP_BUILD = '2026-08-10·sha:p08a-4b';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -7004,10 +7004,15 @@ async function toggleCategoryForAct(catKey){
   if(!S.actCategory) S.actCategory={};
   // Capturer actKey avant tout await
   var actKey = _categoryModalActKey;
-  // Snapshot pour rollback — copie du tableau
-  var prev = Array.isArray(S.actCategory[actKey]) ? S.actCategory[actKey].slice() : [];
-  // Mutation optimistic
-  var current = prev.slice();
+  // Capturer l'actKey de l'activité pour nom/meta (pour getActCategory)
+  var _actEl = document.querySelector('[data-act-key="'+actKey+'"]');
+  var _actName = _actEl ? (_actEl.getAttribute('data-act-name')||'') : '';
+  var _actMeta = _actEl ? (_actEl.getAttribute('data-act-meta')||'') : '';
+  // Snapshot rollback : distinguer fallback implicite vs override explicite
+  var hadExplicit = Object.prototype.hasOwnProperty.call(S.actCategory||{}, actKey);
+  var prevExplicit = hadExplicit ? S.actCategory[actKey].slice() : null;
+  // Base du toggle : ce que l'UI affiche réellement (peut inclure catégorie devinée)
+  var current = getActCategory(actKey, _actName, _actMeta).slice();
   var idx = current.indexOf(catKey);
   if(idx>-1) current.splice(idx,1); else current.push(catKey);
   S.actCategory[actKey] = current;
@@ -7020,11 +7025,11 @@ async function toggleCategoryForAct(catKey){
     await syncActCategory(actKey);
   } catch(e){
     console.error('[PlaniTrip] toggleCategoryForAct sync error:', e);
-    // Rollback local
-    S.actCategory[actKey] = prev;
+    // Rollback exact : restaurer l'état précédent sans créer d'override implicite
+    if(hadExplicit){ S.actCategory[actKey] = prevExplicit; }
+    else { delete S.actCategory[actKey]; }
     save();
     renderContent();
-    // Rafraîchir le picker seulement s'il est encore ouvert sur cette activité
     if(_categoryModalActKey === actKey && document.getElementById('categoryModal').classList.contains('open')){
       openCategoryPickerModal(actKey);
     }
@@ -7037,7 +7042,9 @@ async function clearCategoriesForAct(){
   if(_catSyncInFlight) return;
   if(!S.actCategory) S.actCategory={};
   var actKey = _categoryModalActKey;
-  var prev = Array.isArray(S.actCategory[actKey]) ? S.actCategory[actKey].slice() : [];
+  // Snapshot rollback exact
+  var hadExplicit = Object.prototype.hasOwnProperty.call(S.actCategory||{}, actKey);
+  var prevExplicit = hadExplicit ? S.actCategory[actKey].slice() : null;
   S.actCategory[actKey] = [];
   save();
   openCategoryPickerModal(actKey);
@@ -7047,7 +7054,8 @@ async function clearCategoriesForAct(){
     await syncActCategory(actKey);
   } catch(e){
     console.error('[PlaniTrip] clearCategoriesForAct sync error:', e);
-    S.actCategory[actKey] = prev;
+    if(hadExplicit){ S.actCategory[actKey] = prevExplicit; }
+    else { delete S.actCategory[actKey]; }
     save();
     renderContent();
     if(_categoryModalActKey === actKey && document.getElementById('categoryModal').classList.contains('open')){
