@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p08a-3A';
+var APP_BUILD = '2026-08-09·sha:accom-avatar';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -7203,7 +7203,7 @@ function renderTravelerAvatarStack(ck){
   accomList.forEach(function(a){
     (Array.isArray(a.sharedBy)?a.sharedBy:[]).forEach(function(email){ if(people.indexOf(email)===-1) people.push(email); });
   });
-  if(people.length<2) return '';
+  if(people.length<1) return '';
   var colors=['#2D6A4F','#4D96FF','#F4A261','#E76F51','#95D5B2'];
   var shown=people.slice(0,4);
   var extra=people.length-shown.length;
