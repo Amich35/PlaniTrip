@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p08a-2';
+var APP_BUILD = '2026-08-09·sha:p08a-3A';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3949,20 +3949,44 @@ function openAccomTravelersModal(ck, id){
   _guideModalSaveFn = saveAccomTravelersModal;
   document.getElementById('guideItemModal').classList.add('open');
 }
-function saveAccomTravelersModal(){
+async function saveAccomTravelersModal(){
+  var ck = _accomTravelersCk;
   var checked = Array.from(document.querySelectorAll('.am-traveler-cb:checked')).map(function(el){return el.value;});
-  var list = Array.isArray(S.accom[_accomTravelersCk]) ? S.accom[_accomTravelersCk] : [];
-  var idx = list.findIndex(function(e){return e.id===_accomTravelersId;});
-  if(idx>-1){
-    list[idx].sharedBy = checked;
-    save();
-    if(sb && CURRENT_TRIP){
-      var countryId = _accomTravelersCk.split('_')[0];
-      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:_accomTravelersCk, country_id:countryId, data:list, updated_at:new Date().toISOString()},{onConflict:'trip_id,city_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    }
+  var currentList = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
+  var idx = currentList.findIndex(function(e){return e.id===_accomTravelersId;});
+  if(idx === -1){ closeGuideItemModal(); renderContent(); return; }
+  // Guard connexion — pas de faux succès hors ligne
+  if(!sb || !CURRENT_TRIP){
+    alert('Connexion requise pour enregistrer les voyageurs.');
+    return;
   }
-  closeGuideItemModal();
+  // État candidat — S.accom[ck] pas encore muté
+  var nextList = currentList.map(function(item, i){
+    if(i !== idx) return item;
+    return Object.assign({}, item, {sharedBy: checked.slice()});
+  });
+  // Désactiver le bouton pendant la sync
+  var _btn = document.querySelector('#guideItemModal .modal-cta');
+  if(_btn){ _btn.disabled = true; _btn.textContent = '…'; }
+  // Await Supabase — commit local uniquement après confirmation serveur
+  try{
+    var countryId = ck.split('_')[0];
+    var _r = await sb.from('accommodations').upsert(
+      {trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:nextList, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,city_key'}
+    );
+    if(_r && _r.error) throw _r.error;
+  } catch(e){
+    console.error('[PlaniTrip] saveAccomTravelersModal sync error:', e);
+    if(_btn){ _btn.disabled = false; _btn.textContent = 'Enregistrer'; }
+    alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
+    return; // S.accom[ck] inchangé, modal reste ouverte
+  }
+  // Supabase confirmé : commit local, save, render, fermeture
+  S.accom[ck] = nextList;
+  save();
   renderContent();
+  closeGuideItemModal();
 }
 
 function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
