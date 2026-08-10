@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:accom-avatar';
+var APP_BUILD = '2026-08-09·sha:p08a-3B';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3690,7 +3690,7 @@ if(!S.accom) S.accom={};
 if(!S.actDate) S.actDate={};
 if(!S.cityDates) S.cityDates={};
 
-function saveAccom(ck) {
+async function saveAccom(ck) {
   const name    = document.getElementById('am_name')?.value||'';
   const link    = document.getElementById('am_link')?.value||'';
   const start   = document.getElementById('am_start')?.value||'';
@@ -3703,25 +3703,72 @@ function saveAccom(ck) {
   if(!Array.isArray(S.accom[ck])) S.accom[ck]=[];
   var thisId = _accomModalId||('a'+Date.now()+Math.floor(Math.random()*1000));
 
-  // Sauvegarde effective — inchangée, seulement extraite pour pouvoir être
-  // appelée soit directement (aucun chevauchement), soit après confirmation
-  // explicite de l'utilisateur ("Continuer quand même").
-  function doCommit(){
-    var oldRange = cityStayRange(ck);
-    var entry = {id:thisId, name, link, start, end, nights, checkin, checkout, note, status};
-    var idx = S.accom[ck].findIndex(function(e){return e.id===entry.id;});
-    if(idx>-1) S.accom[ck][idx]=entry; else S.accom[ck].push(entry);
-    var newRange = cityStayRange(ck);
-    if(oldRange && newRange && (oldRange.start!==newRange.start || oldRange.end!==newRange.end)){
-      shiftActivityDatesForCity(ck, oldRange, newRange);
+  // P0.8-A/3B : doCommit async — Supabase awaité avant tout commit local.
+  async function doCommit(){
+    // État candidat — ne mute pas S.accom[ck]
+    var currentList = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
+    var existing = currentList.find(function(e){ return e.id===thisId; });
+    // Object.assign préserve sharedBy et toute propriété non éditée (fix bug pré-existant)
+    var entry = Object.assign({}, existing||{}, {
+      id:thisId, name:name, link:link, start:start, end:end,
+      nights:nights, checkin:checkin, checkout:checkout, note:note, status:status
+    });
+    var idx = currentList.findIndex(function(e){ return e.id===thisId; });
+    var nextAccomList = idx>-1
+      ? currentList.map(function(e,i){ return i===idx ? entry : e; })
+      : currentList.concat([entry]);
+    // Plages avant/après — même sémantique (accom + fallback cityDates)
+    var oldRange  = cityStayRange(ck);
+    var nextRange = _stayRangeCandidate(ck, nextAccomList);
+    // Décalage dates activités — calcul pur, sans muter S
+    var nextActDate = null;
+    if(oldRange && nextRange && (oldRange.start!==nextRange.start || oldRange.end!==nextRange.end)){
+      nextActDate = _computeShiftedActDates(ck, oldRange, nextRange);
     }
-    save();
-    if(sb && CURRENT_TRIP){
+    // Guard connexion
+    if(!sb || !CURRENT_TRIP){
+      alert('Connexion requise pour enregistrer le logement.');
+      return;
+    }
+    var _btn = document.querySelector('#accomModal .modal-cta');
+    if(_btn){ _btn.disabled=true; _btn.textContent='…'; }
+    // 1. Await accommodation
+    try{
       var countryId = ck.split('_')[0];
-      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+      var _r = await sb.from('accommodations').upsert(
+        {trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:nextAccomList, updated_at:new Date().toISOString()},
+        {onConflict:'trip_id,city_key'}
+      );
+      if(_r && _r.error) throw _r.error;
+    } catch(e){
+      console.error('[PlaniTrip] saveAccom accommodation upsert:', e);
+      var _btn2 = document.querySelector('#accomModal .modal-cta');
+      if(_btn2){ _btn2.disabled=false; _btn2.textContent='Enregistrer'; }
+      alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
+      return;
     }
-    document.getElementById('accomModal').classList.remove('open');
+    // 2. Await actDate si décalage détecté
+    if(nextActDate !== null){
+      try{
+        var _r2 = await sb.from('activity_details').upsert(
+          {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actDate', data:nextActDate, updated_at:new Date().toISOString()},
+          {onConflict:'trip_id,detail_key'}
+        );
+        if(_r2 && _r2.error) throw _r2.error;
+      } catch(e2){
+        console.error('[PlaniTrip] saveAccom actDate upsert:', e2);
+        var _btn3 = document.querySelector('#accomModal .modal-cta');
+        if(_btn3){ _btn3.disabled=false; _btn3.textContent='Enregistrer'; }
+        alert("Le logement a été sauvegardé mais les dates d'activités n'ont pas pu être synchronisées — réessaie.");
+        return;
+      }
+    }
+    // Commit local uniquement après succès des deux écritures
+    S.accom[ck] = nextAccomList;
+    if(nextActDate !== null) S.actDate = nextActDate;
+    save();
     renderContent();
+    document.getElementById('accomModal').classList.remove('open');
   }
 
   // Chevauchement avec un autre logement de la même ville — désormais
