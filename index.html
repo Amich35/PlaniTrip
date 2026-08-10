@@ -1133,7 +1133,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-09·sha:p08a-3B';
+var APP_BUILD = '2026-08-10·sha:p08a-3C';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3897,20 +3897,56 @@ function shiftActivityDatesForCity(ck, oldRange, newRange){
   }
 }
 function deleteAccomEntry(ck, id){
-  showConfirm('Supprimer ce logement ?', function(){
+  showConfirm('Supprimer ce logement ?', async function(){
     if(!Array.isArray(S.accom[ck])) return;
-    var oldRange = cityStayRange(ck);
-    S.accom[ck] = S.accom[ck].filter(function(e){return e.id!==id;});
-    var newRange = cityStayRange(ck);
-    if(oldRange && newRange && (oldRange.start!==newRange.start || oldRange.end!==newRange.end)){
-      shiftActivityDatesForCity(ck, oldRange, newRange);
+    // État candidat — ne mute pas S.accom[ck]
+    var currentList = S.accom[ck];
+    var nextAccomList = currentList.filter(function(e){ return e.id!==id; });
+    // Plages avant/après — même sémantique que 3B (accom + fallback cityDates)
+    var oldRange  = cityStayRange(ck);
+    var nextRange = _stayRangeCandidate(ck, nextAccomList);
+    // Décalage dates activités — calcul pur, sans muter S
+    var nextActDate = null;
+    if(oldRange && nextRange && (oldRange.start!==nextRange.start || oldRange.end!==nextRange.end)){
+      nextActDate = _computeShiftedActDates(ck, oldRange, nextRange);
     }
+    // Guard connexion
+    if(!sb || !CURRENT_TRIP){
+      alert('Connexion requise pour supprimer ce logement.');
+      return;
+    }
+    // 1. Await accommodation — upsert du tableau filtré (pas de DELETE SQL)
+    try{
+      var countryId = ck.split('_')[0];
+      var _r = await sb.from('accommodations').upsert(
+        {trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:nextAccomList, updated_at:new Date().toISOString()},
+        {onConflict:'trip_id,city_key'}
+      );
+      if(_r && _r.error) throw _r.error;
+    } catch(e){
+      console.error('[PlaniTrip] deleteAccomEntry accommodation upsert:', e);
+      alert("Erreur — le logement n'a pas pu être supprimé. Vérifie ta connexion et réessaie.");
+      return; // S.accom inchangé
+    }
+    // 2. Await actDate si décalage nécessaire
+    if(nextActDate !== null){
+      try{
+        var _r2 = await sb.from('activity_details').upsert(
+          {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actDate', data:nextActDate, updated_at:new Date().toISOString()},
+          {onConflict:'trip_id,detail_key'}
+        );
+        if(_r2 && _r2.error) throw _r2.error;
+      } catch(e2){
+        console.error('[PlaniTrip] deleteAccomEntry actDate upsert:', e2);
+        alert("Le logement a été supprimé mais les dates d'activités n'ont pas pu être synchronisées — réessaie.");
+        return; // pas de commit local
+      }
+    }
+    // Commit local uniquement après succès des écritures nécessaires
+    S.accom[ck] = nextAccomList;
+    if(nextActDate !== null) S.actDate = nextActDate;
     save();
     renderContent();
-    if(sb && CURRENT_TRIP){
-      var countryId = ck.split('_')[0];
-      sb.from('accommodations').upsert({trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:S.accom[ck], updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    }
   }, 'Supprimer');
 }
 
