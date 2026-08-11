@@ -10627,7 +10627,7 @@ function restoreCity(trashId){
   S.cityTrash.splice(idx,1);
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder(t.countryId); syncDeletedCities(); syncCityTrash();
+  syncDeletedActs(); syncCityOrder(t.countryId); syncDeletedCities(); removeCityTrashEntry(t); syncCityTrash();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -10649,7 +10649,7 @@ function deleteCityPermanently(trashId){
     var idx = S.cityTrash.findIndex(function(tt){return tt.id===trashId;});
     if(idx>-1) S.cityTrash.splice(idx,1);
     var countryId = t.countryId;
-    syncCityTrash();
+    removeCityTrashEntry(t); syncCityTrash();
     openCountryDetail(countryId, 'lieux');
   }, 'Supprimer définitivement');
 }
@@ -10717,13 +10717,22 @@ function syncDeletedCities(){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedCities',data:S.deletedCities,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
+function _cityTrashDetailKey(t){
+  if(!t) return '';
+  return '__planitrip__cityTrash__'+encodeURIComponent(t.countryId||'')+'__'+encodeURIComponent(t.cityName||'');
+}
+function syncCityTrashEntry(t){
+  if(!sb || !CURRENT_TRIP || !t) return Promise.resolve(null);
+  return sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_cityTrashDetailKey(t),data:t,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync city trash entry:',_r.error); return _r; });
+}
+function removeCityTrashEntry(t){
+  if(!sb || !CURRENT_TRIP || !t) return Promise.resolve(null);
+  return sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_cityTrashDetailKey(t)).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] remove city trash entry:',_r.error); return _r; });
+}
 function syncCityTrash(){
-  // S.cityTrash n'était jusque-là stocké que localement (gros blob) : une suppression de ville
-  // pouvait "réussir" (ville bien cachée) tout en perdant l'entrée de corbeille correspondante
-  // si l'écriture locale était interrompue (iOS). Synchronisé comme deletedActs/deletedCities.
-  if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityTrash',data:S.cityTrash,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-  }
+  // P0.8-C : une ligne par ville archivée. Le blob historique reste en lecture uniquement.
+  if(sb && CURRENT_TRIP){ return Promise.all((S.cityTrash||[]).map(function(t){ return syncCityTrashEntry(t); })); }
+  return Promise.resolve([]);
 }
 function syncDeletedCountryIds(){
   if(sb && CURRENT_TRIP){
@@ -13174,6 +13183,7 @@ async function loadActivityDetails(){
     }
   });
   var _detailFieldRows = [];
+  var _cityTrashRows = [];
   Object.values(latest).forEach(function(row){
     // Champs granulaires P0.8-A/5A : collectés puis appliqués APRÈS les fiches legacy,
     // pour être autoritaires indépendamment de l'ordre des rows Supabase.
@@ -13213,6 +13223,8 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
     } else if(row.detail_key === '__planitrip__deletedCities'){
       if(row.data && typeof row.data === 'object'){ S.deletedCities = row.data; }
+    } else if(row.detail_key.indexOf('__planitrip__cityTrash__')===0){
+      if(row.data && typeof row.data === 'object'){ _cityTrashRows.push(row.data); }
     } else if(row.detail_key === '__planitrip__cityTrash'){
       if(row.data && Array.isArray(row.data)){ S.cityTrash = row.data; }
     } else if(row.detail_key === '__planitrip__deletedCountryIds'){
@@ -13231,6 +13243,12 @@ async function loadActivityDetails(){
       }
     }
   });
+  // P0.8-C : dès que des lignes granulaires existent, elles deviennent autoritaires.
+  if(_cityTrashRows.length){
+    var _ctByKey = {};
+    _cityTrashRows.forEach(function(t){ if(t && t.countryId && t.cityName) _ctByKey[t.countryId+'||'+t.cityName]=t; });
+    S.cityTrash = Object.values(_ctByKey);
+  }
   // P0.8-A/5A : overlay granulaire après les fiches complètes legacy.
   _detailFieldRows.forEach(function(row){
     var _dfMarker = '__detail__';
