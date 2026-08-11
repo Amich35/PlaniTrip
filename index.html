@@ -3609,6 +3609,9 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
       if(_dtElOff && _dtElOff.textContent === _oldName) _dtElOff.textContent = val;
     }
     return;
+  var _dp5WriteId = 'detail-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
+  var _dp5Before = d[field];
+  console.log('[DETAIL-P5] START', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'isStableKey:', _isCustomStableKey(actKey), 'beforeFieldValue:', JSON.stringify(_dp5Before), 'newValue:', JSON.stringify(val));
   } else if(field === 'm'){
     d.m = val;
     // Sync dans S.customActs pour l'affichage dans la carte activité
@@ -3644,10 +3647,17 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
       if(_llMatch){ COORDS[actKey] = [parseFloat(_llMatch[1]), parseFloat(_llMatch[2]), actKey]; }
     }
   }
+  var _dp5AfterLog = {};
+  _dp5AfterLog.afterFieldValue = JSON.stringify(d[field]);
+  _dp5AfterLog.detailKeysCount = Object.keys(d).length;
+  if(field === 'm') _dp5AfterLog.customActMeta = JSON.stringify(S.customActs[cityKey] && S.customActs[cityKey][custIdx] ? S.customActs[cityKey][custIdx].m : undefined);
+  if(field === 'mapsUrl') _dp5AfterLog.coordsChanged = !!(val && val.indexOf('google.com/maps') > -1 && val.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/));
+  console.log('[DETAIL-P5] LOCAL', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, _dp5AfterLog);
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'payloadFieldValue:', JSON.stringify(d[field]), 'payloadKeys:', JSON.stringify(Object.keys(d)));
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); } else { console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); } });
   }
   refreshDetailHeaderLive(actKey);
   renderContent();
@@ -13095,6 +13105,10 @@ async function loadActivityDetails(){
       }
     } else {
       window._customDetails[row.detail_key] = row.data;
+      if(_isCustomStableKey(row.detail_key) && row.data && typeof row.data === 'object'){
+        var _dp5d = row.data;
+        console.log('[DETAIL-P5] LOAD', new Date().toISOString(), 'actKey:', row.detail_key, 'fields:', JSON.stringify(Object.keys(_dp5d)), 'm:', JSON.stringify(_dp5d.m), 'tips:', JSON.stringify(_dp5d.tips), 'history:', JSON.stringify(typeof _dp5d.history === 'string' ? _dp5d.history.slice(0,80) : _dp5d.history), 'hours:', JSON.stringify(_dp5d.hours), 'duration:', JSON.stringify(_dp5d.duration), 'bestTime:', JSON.stringify(_dp5d.bestTime), 'bookingRequired:', JSON.stringify(_dp5d.bookingRequired), 'website:', JSON.stringify(_dp5d.website), 'address:', JSON.stringify(_dp5d.address), 'tag:', JSON.stringify(_dp5d.tag), 'costs:', JSON.stringify(_dp5d.costs), 'mapsUrl:', JSON.stringify(_dp5d.mapsUrl));
+      }
     }
   });
   // Phase S — post-pass : lire les __state granulaires et les injecter dans S
