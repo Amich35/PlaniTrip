@@ -3519,6 +3519,13 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
   var d = window._customDetails[actKey];
   val = (val||'').trim();
+  var _dp5ScopedField = ['m','tips','history','hours','duration','bestTime','bookingRequired','website','address','tag','costs','mapsUrl'].indexOf(field) !== -1;
+  var _dp5WriteId, _dp5Before;
+  if(_dp5ScopedField){
+    _dp5WriteId = 'detail-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
+    _dp5Before = d[field];
+    console.log('[DETAIL-P5] START', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'isStableKey:', _isCustomStableKey(actKey), 'beforeFieldValue:', JSON.stringify(_dp5Before), 'newValue:', JSON.stringify(val));
+  }
   if(field === '_reload'){
     // Marque la fiche comme validée → repasse en lecture seule (IA ou manuel) au prochain openDetail()
     d._userValidated = true;
@@ -3609,9 +3616,6 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
       if(_dtElOff && _dtElOff.textContent === _oldName) _dtElOff.textContent = val;
     }
     return;
-  var _dp5WriteId = 'detail-' + Date.now() + '-' + Math.random().toString(36).slice(2,7);
-  var _dp5Before = d[field];
-  console.log('[DETAIL-P5] START', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'isStableKey:', _isCustomStableKey(actKey), 'beforeFieldValue:', JSON.stringify(_dp5Before), 'newValue:', JSON.stringify(val));
   } else if(field === 'm'){
     d.m = val;
     // Sync dans S.customActs pour l'affichage dans la carte activité
@@ -3647,17 +3651,19 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
       if(_llMatch){ COORDS[actKey] = [parseFloat(_llMatch[1]), parseFloat(_llMatch[2]), actKey]; }
     }
   }
-  var _dp5AfterLog = {};
-  _dp5AfterLog.afterFieldValue = JSON.stringify(d[field]);
-  _dp5AfterLog.detailKeysCount = Object.keys(d).length;
-  if(field === 'm') _dp5AfterLog.customActMeta = JSON.stringify(S.customActs[cityKey] && S.customActs[cityKey][custIdx] ? S.customActs[cityKey][custIdx].m : undefined);
-  if(field === 'mapsUrl') _dp5AfterLog.coordsChanged = !!(val && val.indexOf('google.com/maps') > -1 && val.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/));
-  console.log('[DETAIL-P5] LOCAL', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, _dp5AfterLog);
+  if(_dp5ScopedField){
+    var _dp5AfterLog = {};
+    _dp5AfterLog.afterFieldValue = JSON.stringify(d[field]);
+    _dp5AfterLog.detailKeysCount = Object.keys(d).length;
+    if(field === 'm') _dp5AfterLog.customActMeta = JSON.stringify(S.customActs[cityKey] && S.customActs[cityKey][custIdx] ? S.customActs[cityKey][custIdx].m : undefined);
+    if(field === 'mapsUrl') _dp5AfterLog.coordsChanged = !!(val && val.indexOf('google.com/maps') > -1 && val.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/));
+    console.log('[DETAIL-P5] LOCAL', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, _dp5AfterLog);
+  }
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
-    console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'payloadFieldValue:', JSON.stringify(d[field]), 'payloadKeys:', JSON.stringify(Object.keys(d)));
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); } else { console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); } });
+    if(_dp5ScopedField) console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'payloadFieldValue:', JSON.stringify(d[field]), 'payloadKeys:', JSON.stringify(Object.keys(d)));
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); if(_dp5ScopedField) console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); } else { if(_dp5ScopedField) console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); } });
   }
   refreshDetailHeaderLive(actKey);
   renderContent();
