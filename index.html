@@ -4658,7 +4658,12 @@ async function geocodePinForActivity(actKey, actName, cityKey){
       S.customDetails = window._customDetails;
       save();
       if(sb && CURRENT_TRIP){
-        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+        if(!_isTransientLegacyCustomKey(actKey)){
+          // La paire lat/lng est atomique : jamais de latitude d'un write + longitude d'un autre.
+          _syncDetailField(actKey, '_geo', {lat:lat,lng:lng}, CURRENT_TRIP.id).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail geo:',_r.error); });
+        } else {
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+        }
       }
       renderContent();
     } else {
@@ -13176,7 +13181,12 @@ async function loadActivityDetails(){
     if(!window._customDetails[_dfActKey] || typeof window._customDetails[_dfActKey] !== 'object') window._customDetails[_dfActKey] = {};
     var _dfData = row.data;
     var _dfValue = (_dfData && typeof _dfData === 'object' && Object.prototype.hasOwnProperty.call(_dfData,'value')) ? _dfData.value : _dfData;
-    window._customDetails[_dfActKey][_dfField] = _dfValue;
+    if(_dfField === '_geo' && _dfValue && typeof _dfValue === 'object'){
+      window._customDetails[_dfActKey].lat = _dfValue.lat;
+      window._customDetails[_dfActKey].lng = _dfValue.lng;
+    } else {
+      window._customDetails[_dfActKey][_dfField] = _dfValue;
+    }
     if(_dfField === 'tag') window._customDetails[_dfActKey]._userTag = true;
     if(_dfField === 'm' && _isCustomStableKey(_dfActKey)){
       var _sidPos = _dfActKey.lastIndexOf('_sid_');
