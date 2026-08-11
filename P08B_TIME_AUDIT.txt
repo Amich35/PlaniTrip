@@ -1,0 +1,635 @@
+=== timing functions ===
+1924-  return typeof k === 'string' && k.indexOf('_sid_') !== -1;
+1925-}
+1926-
+1927-// Upsert granulaire d'une ligne <actKey>__state dans activity_details.
+1928-// N'écrit QUE les champs de planning de cette activité, pas un blob global.
+1929-// Guard updated_at : si le serveur a une version plus récente (cas de concurrence),
+1930-// on fait un merge silencieux champ par champ — la valeur serveur gagne pour les
+1931-// champs non présents dans le patch courant.
+1932:async function _syncActivityState(actKey, tripId){
+1933-  if(!sb || !tripId) return;
+1934-  // Snapshot COMPLET depuis S — une seule écriture atomique.
+1935-  // Pas de select préalable : S est la source de vérité après save().
+1936-  // Les callers composites (savePlanningModal) doivent appeler les setters
+1937-  // avec {sync:false} puis awaiter UN seul _syncActivityState final.
+1938-  var state = {};
+1939-  if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
+1940-  if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
+1941-  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) state.timeStart = S.actTimeStart[actKey];
+1942-  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) state.timeEnd   = S.actTimeEnd[actKey];
+1943-  if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
+1944-  if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
+1945-  if(!Object.keys(state).length) return;
+1946-  var r = await sb.from('activity_details')
+1947-    .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
+1948-            {onConflict:'trip_id,detail_key'});
+1949-  if(r && r.error){
+1950-    console.error('[PlaniTrip] _syncActivityState:', r.error);
+1951-    throw r.error; // permet au caller de détecter l'échec et de ne pas annoncer un succès
+1952-  }
+1953-  return r;
+1954-}
+1955-// ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
+1956-
+1957-// ── ACTIVITY DETAILS (pre-filled for Japan) ──────────────────
+1958-const ACT_DETAILS = {
+1959-  'jp_Osaka_0': {
+1960-    emoji:'🏮', tag:'Quartier incontournable',
+--
+6693-//   SINON SI un moment a été choisi manuellement (S.actMoment) -> ce moment est conservé
+6694-//   SINON -> ''  (aucun horaire du tout)
+6695-function getActMoment(actKey, name, meta){
+6696-  var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6697-  if(start) return getDayPeriod(start);
+6698-  if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
+6699-  return '';
+6700-}
+6701:function setActMoment(actKey, momentKey, opts){
+6702-  if(!S.actMoment) S.actMoment={};
+6703-  S.actMoment[actKey] = momentKey;
+6704-  save();
+6705-  if(opts && opts.sync === false) return;
+6706-  if(sb && CURRENT_TRIP){
+6707-    if(_isCustomStableKey(actKey)){
+6708-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6709-    } else {
+6710-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+6711-    }
+6712-  }
+6713-}
+6714-function setActSuggestedTime(actKey, val){
+6715-  if(!S.actTime) S.actTime={};
+6716-  S.actTime[actKey] = (val||'').trim();
+6717-  save();
+6718-  if(sb && CURRENT_TRIP){
+6719-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6720-  }
+6721-}
+6722-// Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
+6723-// pour les horaires approximatifs type "Avant 7h" que la plage ne peut pas exprimer.
+6724:function setActTimeRange(actKey, start, end, freeText, opts){
+6725-  if(!S.actTimeStart) S.actTimeStart={};
+6726-  if(!S.actTimeEnd) S.actTimeEnd={};
+6727-  if(!S.actTime) S.actTime={};
+6728-  start = (start||'').trim(); end = (end||'').trim(); freeText = (freeText||'').trim();
+6729-  S.actTimeStart[actKey] = start;
+6730-  S.actTimeEnd[actKey] = end;
+6731-  // Le texte libre n'est utilisé que si aucune plage structurée n'est renseignée
+6732-  S.actTime[actKey] = (start||end) ? '' : freeText;
+6733-  save();
+6734-  if(opts && opts.sync === false) return;
+6735-  if(sb && CURRENT_TRIP){
+6736-    if(_isCustomStableKey(actKey)){
+6737-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6738-    } else {
+6739-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
+6740-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
+6741-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6742-    }
+6743-  }
+6744-}
+6745-var _planningModalActKey = '';
+6746-var _planningModalMoment = '';
+6747-function openPlanningModal(actKey, name, meta){
+6748-  var _pErr = document.getElementById('planningModalErr');
+6749-  if(_pErr){ _pErr.textContent=''; _pErr.style.display='none'; }
+6750-  _planningModalActKey = actKey;
+6751-  var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6752-  var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+--
+6793-function clearPlanningTime(){
+6794-  document.getElementById('planningModalTimeStart').value = '';
+6795-  document.getElementById('planningModalTimeEnd').value = '';
+6796-}
+6797-// P0.8-A : sync awaité des blobs planning pour les activités built-in.
+6798-// Regroupe en un seul Promise.all les upserts de date/moment/horaires
+6799-// qui étaient auparavant fire-and-forget dans chaque setter individuel.
+6800-// N'est appelé que si !_isCustomStableKey(actKey) — les _sid_ passent par _syncActivityState.
+6801:async function _syncPlanningBlobs(actKey, tripId){
+6802-  if(!sb || !tripId) return;
+6803-  var now = new Date().toISOString();
+6804-  var upserts = [];
+6805-  if(S.actDate)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actDate',     data:S.actDate,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+6806-  if(S.actMoment)    upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actMoment',   data:S.actMoment,   updated_at:now},{onConflict:'trip_id,detail_key'}));
+6807-  if(S.actTimeStart) upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:now},{onConflict:'trip_id,detail_key'}));
+6808-  if(S.actTimeEnd)   upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeEnd',  data:S.actTimeEnd,  updated_at:now},{onConflict:'trip_id,detail_key'}));
+6809-  if(S.actTime)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTime',     data:S.actTime,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+6810-  var results = await Promise.all(upserts);
+6811-  var err = results.find(function(r){ return r && r.error; });
+6812-  if(err){ console.error('[PlaniTrip] _syncPlanningBlobs:', err.error); throw err.error; }
+6813-}
+6814:async function savePlanningModal(){
+6815-  var dateEl = document.getElementById('planningModalDate');
+6816-  var dateVal = dateEl ? dateEl.value : '';
+6817-  var startVal = document.getElementById('planningModalTimeStart').value;
+6818-  var endVal = document.getElementById('planningModalTimeEnd').value;
+6819-  var finalMoment = startVal ? getDayPeriod(startVal) : _planningModalMoment;
+6820-  // Garde-fou : heure de fin sans heure de début ignorée
+6821-  if(endVal && !startVal){
+6822-    endVal = '';
+6823-    var endEl = document.getElementById('planningModalTimeEnd');
+6824-    if(endEl){ endEl.value = ''; endEl.style.borderColor = 'var(--red-muted)'; setTimeout(function(){ endEl.style.borderColor=''; }, 1200); }
+6825-  }
+6826-  var actKey = _planningModalActKey;
+6827-  var isStable = _isCustomStableKey(actKey);
+6828-  // P0.3/P0.8-A — batch local sans sync intermédiaire dans tous les cas
+6829-  var btn = document.getElementById('planningModalSaveBtn');
+6830-  // 1. Désactiver le bouton avant toute mutation
+6831-  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+6832-  // 2. Mutations locales (0 upsert Supabase — {sync:false} pour tous les types)
+6833-  if(dateEl) setActivityDate(actKey, dateVal, {sync:false});
+6834-  setActMoment(actKey, finalMoment, {sync:false});
+6835-  setActTimeRange(actKey, startVal, endVal, '', {sync:false});
+6836-  // 3. Sync Supabase awaité — _syncActivityState pour _sid_, _syncPlanningBlobs pour built-in
+6837-  if(!sb || !CURRENT_TRIP){
+6838-    if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
+6839-    var _noConnEl = document.getElementById('planningModalErr');
+6840-    if(_noConnEl){ _noConnEl.textContent = 'Connexion requise pour enregistrer cette modification'; _noConnEl.style.display=''; }
+6841-    return;
+6842-  }
+=== timing assignments ===
+1936-  // Les callers composites (savePlanningModal) doivent appeler les setters
+1937-  // avec {sync:false} puis awaiter UN seul _syncActivityState final.
+1938-  var state = {};
+1939-  if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
+1940:  if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
+1941:  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) state.timeStart = S.actTimeStart[actKey];
+1942:  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) state.timeEnd   = S.actTimeEnd[actKey];
+1943-  if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
+1944-  if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
+1945-  if(!Object.keys(state).length) return;
+1946-  var r = await sb.from('activity_details')
+1947-    .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
+1948-            {onConflict:'trip_id,detail_key'});
+1949-  if(r && r.error){
+1950-    console.error('[PlaniTrip] _syncActivityState:', r.error);
+--
+4898-        if(!S.actTimeStart) S.actTimeStart={};
+4899-        if(!S.actTimeEnd)   S.actTimeEnd={};
+4900-        if(!S.actMoment)    S.actMoment={};
+4901-        if(!S.actTime)      S.actTime={};
+4902:        S.actTimeStart[_stableKey] = _pendingState.timeStart;
+4903:        S.actTimeEnd[_stableKey]   = _pendingState.timeEnd;
+4904:        S.actMoment[_stableKey]    = _pendingState.moment;
+4905:        S.actTime[_stableKey]      = '';
+4906-      }
+4907-      if(_pendingState.hasCategories){
+4908-        if(!S.actCategory) S.actCategory={};
+4909-        S.actCategory[_stableKey] = _pendingState.categories.slice();
+4910-      }
+4911-      // initialDetails + COORDS : copie explicite depuis opts, jamais depuis _cN
+4912-      if(_pendingState.hasInitialDetails){
+4913-        if(!window._customDetails) window._customDetails={};
+--
+6232-      // autres activités de la ville.
+6233-      var _deletedActKey = getCustomActivityKey(cityKey, actObjToDelete, index);
+6234-      var _trashState = {};
+6235-      if(S.actDate && S.actDate[_deletedActKey] !== undefined) _trashState.actDate = S.actDate[_deletedActKey];
+6236:      if(S.actMoment && S.actMoment[_deletedActKey] !== undefined) _trashState.actMoment = S.actMoment[_deletedActKey];
+6237:      if(S.actTimeStart && S.actTimeStart[_deletedActKey] !== undefined) _trashState.actTimeStart = S.actTimeStart[_deletedActKey];
+6238:      if(S.actTimeEnd && S.actTimeEnd[_deletedActKey] !== undefined) _trashState.actTimeEnd = S.actTimeEnd[_deletedActKey];
+6239:      if(S.actTime && S.actTime[_deletedActKey] !== undefined) _trashState.actTime = S.actTime[_deletedActKey];
+6240-      if(S.actCategory && S.actCategory[_deletedActKey] !== undefined) _trashState.actCategory = Array.isArray(S.actCategory[_deletedActKey]) ? S.actCategory[_deletedActKey].slice() : S.actCategory[_deletedActKey];
+6241-      if(S.done && S.done[_deletedActKey]) _trashState.done = true;
+6242-      if(S.favorites && S.favorites[_deletedActKey]) _trashState.favorite = true;
+6243-      if(window._customDetails && window._customDetails[_deletedActKey]) _trashState.customDetails = JSON.parse(JSON.stringify(window._customDetails[_deletedActKey]));
+6244-      if(COORDS[_deletedActKey]) _trashState.coords = COORDS[_deletedActKey].slice();
+6245-      var act = (S.customActs[cityKey]||[]).splice(index,1)[0];
+6246-      if(act){ act._wasCustom=true; act._trashState=_trashState; S.trash[cityKey].push(act); }
+6247-      // Correctif P0 : plus de réindexation en masse des activités suivantes. Avec l'identité
+--
+6256-      if(!S.actCategory) S.actCategory={};
+6257-      delete S.done[_deletedActKey];
+6258-      delete S.favorites[_deletedActKey];
+6259-      delete S.actDate[_deletedActKey];
+6260:      delete S.actMoment[_deletedActKey];
+6261:      delete S.actTimeStart[_deletedActKey];
+6262:      delete S.actTimeEnd[_deletedActKey];
+6263:      delete S.actTime[_deletedActKey];
+6264-      delete S.actCategory[_deletedActKey];
+6265-      delete window._customDetails[_deletedActKey];
+6266-      delete COORDS[_deletedActKey];
+6267-      S.customDetails = window._customDetails;
+6268-      // Suppression serveur : sinon loadCitiesActivities() (serveur autoritaire) re-synchronise
+6269-      // cette activité au prochain chargement et elle "revient" après actualisation.
+6270-      if(act) markDeletedTombstone('activities', cityKey+'||'+act.n);
+6271-      if(sb && CURRENT_TRIP && act){
+--
+6345-    if(!S.actCategory) S.actCategory={};
+6346-    if(!S.done) S.done={};
+6347-    if(!S.favorites) S.favorites={};
+6348-    if(_ts.actDate !== undefined) S.actDate[newActKey] = _ts.actDate; else delete S.actDate[newActKey];
+6349:    if(_ts.actMoment !== undefined) S.actMoment[newActKey] = _ts.actMoment; else delete S.actMoment[newActKey];
+6350:    if(_ts.actTimeStart !== undefined) S.actTimeStart[newActKey] = _ts.actTimeStart; else delete S.actTimeStart[newActKey];
+6351:    if(_ts.actTimeEnd !== undefined) S.actTimeEnd[newActKey] = _ts.actTimeEnd; else delete S.actTimeEnd[newActKey];
+6352:    if(_ts.actTime !== undefined) S.actTime[newActKey] = _ts.actTime; else delete S.actTime[newActKey];
+6353-    if(_ts.actCategory !== undefined) S.actCategory[newActKey] = _ts.actCategory; else delete S.actCategory[newActKey];
+6354-    if(_ts.done) S.done[newActKey] = true; else delete S.done[newActKey];
+6355-    if(_ts.favorite) S.favorites[newActKey] = true; else delete S.favorites[newActKey];
+6356-    if(_ts.customDetails){
+6357-      if(!window._customDetails) window._customDetails={};
+6358-      window._customDetails[newActKey] = _ts.customDetails;
+6359-      S.customDetails = window._customDetails;
+6360-    }
+--
+6692-//   SI une heure de début existe -> moment = getDayPeriod(startTime)  (l'heure prime toujours)
+6693-//   SINON SI un moment a été choisi manuellement (S.actMoment) -> ce moment est conservé
+6694-//   SINON -> ''  (aucun horaire du tout)
+6695-function getActMoment(actKey, name, meta){
+6696:  var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6697-  if(start) return getDayPeriod(start);
+6698:  if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
+6699-  return '';
+6700-}
+6701-function setActMoment(actKey, momentKey, opts){
+6702-  if(!S.actMoment) S.actMoment={};
+6703:  S.actMoment[actKey] = momentKey;
+6704-  save();
+6705-  if(opts && opts.sync === false) return;
+6706-  if(sb && CURRENT_TRIP){
+6707-    if(_isCustomStableKey(actKey)){
+6708-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6709-    } else {
+6710-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+6711-    }
+6712-  }
+6713-}
+6714-function setActSuggestedTime(actKey, val){
+6715-  if(!S.actTime) S.actTime={};
+6716:  S.actTime[actKey] = (val||'').trim();
+6717-  save();
+6718-  if(sb && CURRENT_TRIP){
+6719-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6720-  }
+6721-}
+6722-// Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
+6723-// pour les horaires approximatifs type "Avant 7h" que la plage ne peut pas exprimer.
+6724-function setActTimeRange(actKey, start, end, freeText, opts){
+6725-  if(!S.actTimeStart) S.actTimeStart={};
+6726-  if(!S.actTimeEnd) S.actTimeEnd={};
+6727-  if(!S.actTime) S.actTime={};
+6728-  start = (start||'').trim(); end = (end||'').trim(); freeText = (freeText||'').trim();
+6729:  S.actTimeStart[actKey] = start;
+6730:  S.actTimeEnd[actKey] = end;
+6731-  // Le texte libre n'est utilisé que si aucune plage structurée n'est renseignée
+6732:  S.actTime[actKey] = (start||end) ? '' : freeText;
+6733-  save();
+6734-  if(opts && opts.sync === false) return;
+6735-  if(sb && CURRENT_TRIP){
+6736-    if(_isCustomStableKey(actKey)){
+6737-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6738-    } else {
+6739-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
+6740-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
+--
+6747-function openPlanningModal(actKey, name, meta){
+6748-  var _pErr = document.getElementById('planningModalErr');
+6749-  if(_pErr){ _pErr.textContent=''; _pErr.style.display='none'; }
+6750-  _planningModalActKey = actKey;
+6751:  var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6752:  var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+6753-  // Moment actuel : dérivé de l'heure si elle existe, sinon le moment manuel déjà enregistré.
+6754-  // Pré-remplit le sélecteur avec l'état réel de l'activité à l'ouverture du modal.
+6755-  _planningModalMoment = getActMoment(actKey, name||'', meta||'');
+6756-  var segments = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
+6757-    var mo = ACTIVITY_MOMENTS[mk];
+6758-    var isActive = _planningModalMoment===mk;
+6759-    return '<div class="moment-seg'+(isActive?' active':'')+'" onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'">'+svgIcon(mo.icon,16)+'<span>'+mo.label+'</span></div>';
+6760-  }).join('');
+--
+6872-  openPlanningModal(el.getAttribute('data-act-key'), el.getAttribute('data-act-name'), el.getAttribute('data-act-meta'));
+6873-}
+6874-function planningPill(actKey, name, meta){
+6875-  var mk = getActMoment(actKey, name, meta);
+6876:  var timeVal = (S.actTime && S.actTime[actKey]) || '';
+6877-  if(!mk && !timeVal){
+6878-    return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:500;color:#6E6E73;background:rgba(29,29,31,0.06);padding:2px 9px;border-radius:20px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',9)+' Planifier</span>';
+6879-  }
+6880-  var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
+6881-  var label = timeVal || (mo?mo.label:'');
+6882-  return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.10);padding:2px 9px;border-radius:20px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,9):svgIcon('history',9))+' '+escHtml(label)+'</span>';
+6883-}
+6884-// Capsule horaire affichée en haut de chaque carte activité (sous le titre).
+--
+6888-// Le moment de la journée est dérivé automatiquement de l'heure de début (voir momentFromTime).
+6889-// La capsule n'affiche que l'heure (plage ou heure simple) — jamais le nom du moment en texte,
+6890-// pour éviter la redondance avec le header de section (MATIN/MIDI/...).
+6891-function formatTimeRange(actKey){
+6892:  var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6893:  var end = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+6894:  var legacy = (S.actTime && S.actTime[actKey]) || '';
+6895-  // Helper de formatage d'affichage uniquement — les valeurs stockées (HH:MM) restent inchangées.
+6896-  // Règle : masquer les minutes si elles valent exactement 00 (09:00 → 09h), sinon les conserver
+6897-  // (09:30 → 09h30). Le zéro devant les heures < 10 est conservé (09h, pas 9h).
+6898-  function _fmtTime(t){
+6899-    var m = /^(\d{2}):(\d{2})$/.exec(t);
+6900-    if(!m) return t.replace(':','h'); // fallback legacy
+6901-    return m[2] === '00' ? m[1]+'h' : m[1]+'h'+m[2];
+6902-  }
+--
+7231-      _flatItems.sort(function(a, b){
+7232-        var aDate = a.dateVal || '';
+7233-        var bDate = b.dateVal || '';
+7234-        if(aDate !== bDate) return aDate < bDate ? -1 : 1;
+7235:        var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+7236:        var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+7237-        if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7238-        if(aStart && !bStart) return -1;
+7239-        if(!aStart && bStart) return 1;
+7240-        var aMoment = _momentSortRank[a.moment||''] ?? 4;
+7241-        var bMoment = _momentSortRank[b.moment||''] ?? 4;
+7242-        if(aMoment !== bMoment) return aMoment - bMoment;
+7243-        return a._origIdx - b._origIdx; // égalité totale : ordre stable existant
+7244-      });
+--
+7255-      // moment (ex: 08:00 et 09:00, toutes deux "Matin") pouvaient apparaître dans le désordre —
+7256-      // c'était l'incohérence signalée dans ce lot.
+7257-      Object.keys(momentGroups).forEach(function(mk){
+7258-        momentGroups[mk].sort(function(a, b){
+7259:          var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+7260:          var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+7261-          if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7262-          if(aStart && !bStart) return -1;
+7263-          if(!aStart && bStart) return 1;
+7264-          return 0; // égalité (même heure, ou aucune heure des deux) : conserve l'ordre stable d'origine
+7265-        });
+7266-      });
+7267-      var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
+7268-      var momentOrder = ['morning','noon','afternoon','evening',''];
+--
+7811-  // ville sans respecter l'ordre chronologique réel de la journée.
+7812-  var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
+7813-  todayActs.forEach(function(a, idx){ a._origIdx = idx; });
+7814-  todayActs.sort(function(a, b){
+7815:    var aStart = (S.actTimeStart && S.actTimeStart[a.key]) || '';
+7816:    var bStart = (S.actTimeStart && S.actTimeStart[b.key]) || '';
+7817-    if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7818-    if(aStart && !bStart) return -1;
+7819-    if(!aStart && bStart) return 1;
+7820-    var aMoment = _momentSortRank[getActMoment(a.key, a.name, a.meta)] ?? 4;
+7821-    var bMoment = _momentSortRank[getActMoment(b.key, b.name, b.meta)] ?? 4;
+7822-    if(aMoment !== bMoment) return aMoment - bMoment;
+7823-    return a._origIdx - b._origIdx;
+7824-  });
+--
+13219-    if(!state || typeof state !== 'object') return;
+13220-    if(dk.slice(-7) === '__state'){
+13221-      var actKey = dk.slice(0, -7); // strip '__state'
+13222-      if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
+13223:      if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
+13224:      if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
+13225:      if(state.timeEnd   !== undefined){ if(!S.actTimeEnd)   S.actTimeEnd={};   S.actTimeEnd[actKey]   = state.timeEnd; }
+13226-      if(state.category  !== undefined){ if(!S.actCategory)  S.actCategory={};  S.actCategory[actKey]  = state.category; }
+13227-      if(state.done      !== undefined){ if(!S.done)         S.done={};         S.done[actKey]         = state.done; }
+13228-    } else if(dk.indexOf('__alias__act__') === 0 && state.name){
+13229-      // Alias de nom d'activité partagé (built-in ou custom) — Supabase autoritaire
+13230-      var _aliasActKey = dk.slice('__alias__act__'.length);
+13231-      if(!S.actNames) S.actNames = {};
+13232-      S.actNames[_aliasActKey] = state.name;
+13233-    } else if(dk.indexOf('__alias__city__') === 0 && state.name){
+=== timing blob loader ===
+1936-  // Les callers composites (savePlanningModal) doivent appeler les setters
+1937-  // avec {sync:false} puis awaiter UN seul _syncActivityState final.
+1938-  var state = {};
+1939-  if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
+1940:  if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
+1941:  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) state.timeStart = S.actTimeStart[actKey];
+1942:  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) state.timeEnd   = S.actTimeEnd[actKey];
+1943-  if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
+1944-  if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
+1945-  if(!Object.keys(state).length) return;
+1946-  var r = await sb.from('activity_details')
+1947-    .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
+1948-            {onConflict:'trip_id,detail_key'});
+1949-  if(r && r.error){
+1950-    console.error('[PlaniTrip] _syncActivityState:', r.error);
+--
+4950-  // au reload (le renderer cherche _sid_UUID, ne trouve rien dans les blobs _cN).
+4951-  if(migratedLocally){
+4952-    var _blobDefs = [
+4953-      {key:'__planitrip__actDate',      data:S.actDate},
+4954:      {key:'__planitrip__actMoment',    data:S.actMoment},
+4955:      {key:'__planitrip__actTimeStart', data:S.actTimeStart},
+4956:      {key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
+4957:      {key:'__planitrip__actTime',      data:S.actTime},
+4958-      {key:'__planitrip__actCategory',  data:S.actCategory},
+4959-      {key:'__planitrip__actDay',       data:S.actDay},
+4960-      {key:'__planitrip__done',         data:S.done},
+4961-    ];
+4962-    var _blobsToSync = _blobDefs.filter(function(b){ return b.data && b.data[stableKey] !== undefined; });
+4963-    if(_blobsToSync.length){
+4964-      try{
+4965-        var _results = await Promise.all(_blobsToSync.map(function(b){
+--
+6296-        // ci-dessus) — pas de risque de collision, un simple upsert suffit pour chacun.
+6297-        var _now = new Date().toISOString();
+6298-        Promise.all([
+6299-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6300:          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6301:          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6302:          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6303:          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6304-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6305-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',         data:S.done,         updated_at:_now},{onConflict:'trip_id,detail_key'})
+6306-        ]).catch(function(e){ console.error('[PlaniTrip] blobs update after delete:', e); });
+6307-      }
+6308-    } else {
+6309-      if(!S.deletedActs) S.deletedActs={};
+6310-      S.deletedActs[cityKey+'_'+index]=true;
+6311-      S.trash[cityKey].push({_builtinIndex:index, _cityKey:cityKey});
+--
+6384-      }
+6385-      // Restaurer les maps globales modifiées
+6386-      var _rUpserts = [
+6387-        {detail_key:'__planitrip__actDate',      data:S.actDate},
+6388:        {detail_key:'__planitrip__actMoment',    data:S.actMoment},
+6389:        {detail_key:'__planitrip__actTimeStart', data:S.actTimeStart},
+6390:        {detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
+6391:        {detail_key:'__planitrip__actTime',      data:S.actTime},
+6392-        {detail_key:'__planitrip__actCategory',  data:S.actCategory},
+6393-        {detail_key:'__planitrip__done',         data:S.done}
+6394-      ];
+6395-      _rUpserts.forEach(function(u){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:u.detail_key,data:u.data,updated_at:_now2},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore map '+u.detail_key+':',r.error); }); });
+6396-      // Restaurer le favori dans la table favorites
+6397-      if(_ts.favorite){
+6398-        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',newActKey).then(function(){
+6399-          sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:newActKey,country_id:rpCountryId,added_by_label:who}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore fav:',r.error); });
+--
+6706-  if(sb && CURRENT_TRIP){
+6707-    if(_isCustomStableKey(actKey)){
+6708-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6709-    } else {
+6710:      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+6711-    }
+6712-  }
+6713-}
+6714-function setActSuggestedTime(actKey, val){
+6715-  if(!S.actTime) S.actTime={};
+6716-  S.actTime[actKey] = (val||'').trim();
+6717-  save();
+6718-  if(sb && CURRENT_TRIP){
+6719:    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6720-  }
+6721-}
+6722-// Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
+6723-// pour les horaires approximatifs type "Avant 7h" que la plage ne peut pas exprimer.
+6724-function setActTimeRange(actKey, start, end, freeText, opts){
+6725-  if(!S.actTimeStart) S.actTimeStart={};
+6726-  if(!S.actTimeEnd) S.actTimeEnd={};
+6727-  if(!S.actTime) S.actTime={};
+--
+6735-  if(sb && CURRENT_TRIP){
+6736-    if(_isCustomStableKey(actKey)){
+6737-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6738-    } else {
+6739:      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
+6740:      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
+6741:      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6742-    }
+6743-  }
+6744-}
+6745-var _planningModalActKey = '';
+6746-var _planningModalMoment = '';
+6747-function openPlanningModal(actKey, name, meta){
+6748-  var _pErr = document.getElementById('planningModalErr');
+6749-  if(_pErr){ _pErr.textContent=''; _pErr.style.display='none'; }
+--
+6802-  if(!sb || !tripId) return;
+6803-  var now = new Date().toISOString();
+6804-  var upserts = [];
+6805-  if(S.actDate)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actDate',     data:S.actDate,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+6806:  if(S.actMoment)    upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actMoment',   data:S.actMoment,   updated_at:now},{onConflict:'trip_id,detail_key'}));
+6807:  if(S.actTimeStart) upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:now},{onConflict:'trip_id,detail_key'}));
+6808:  if(S.actTimeEnd)   upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeEnd',  data:S.actTimeEnd,  updated_at:now},{onConflict:'trip_id,detail_key'}));
+6809:  if(S.actTime)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTime',     data:S.actTime,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+6810-  var results = await Promise.all(upserts);
+6811-  var err = results.find(function(r){ return r && r.error; });
+6812-  if(err){ console.error('[PlaniTrip] _syncPlanningBlobs:', err.error); throw err.error; }
+6813-}
+6814-async function savePlanningModal(){
+6815-  var dateEl = document.getElementById('planningModalDate');
+6816-  var dateVal = dateEl ? dateEl.value : '';
+6817-  var startVal = document.getElementById('planningModalTimeStart').value;
+--
+12997-      return out;
+12998-    };
+12999-    Promise.all([
+13000-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDate',      data:_blobOnly(S.actDate),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+13001:      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actMoment',    data:_blobOnly(S.actMoment),    updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+13002:      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeStart', data:_blobOnly(S.actTimeStart), updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+13003:      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTimeEnd',   data:_blobOnly(S.actTimeEnd),   updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+13004:      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actTime',      data:_blobOnly(S.actTime),      updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+13005-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:_blobOnly(S.actDay),       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
+13006-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:_blobOnly(S.done),         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
+13007-    ]).catch(function(e){ console.error('[PlaniTrip] migration blobs upsert:', e); });
+13008-    // Fiches individuelles : upsert sous la clé stable uniquement (jamais de delete de la
+13009-    // légacy ici — cette migration est best-effort et purement locale à la lecture, on laisse
+13010-    // la légacy en place tant qu'aucune écriture explicite n'a confirmé la nouvelle clé).
+13011-    _pendingKeyMigrations.forEach(function(m){
+13012-      if(window._customDetails && window._customDetails[m.stableKey]){
+--
+13129-    if(row.detail_key === '__planitrip__actDate'){
+13130-      if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
+13131-    } else if(row.detail_key === '__planitrip__actCategory'){
+13132-      if(row.data && typeof row.data === 'object'){ S.actCategory = row.data; }
+13133:    } else if(row.detail_key === '__planitrip__actMoment'){
+13134-      if(row.data && typeof row.data === 'object'){ S.actMoment = row.data; }
+13135:    } else if(row.detail_key === '__planitrip__actTime'){
+13136-      if(row.data && typeof row.data === 'object'){ S.actTime = row.data; }
+13137-    } else if(row.detail_key === '__planitrip__done'){
+13138-      if(row.data && typeof row.data === 'object'){ S.done = row.data; }
+13139:    } else if(row.detail_key === '__planitrip__actTimeStart'){
+13140-      if(row.data && typeof row.data === 'object'){ S.actTimeStart = row.data; }
+13141:    } else if(row.detail_key === '__planitrip__actTimeEnd'){
+13142-      if(row.data && typeof row.data === 'object'){ S.actTimeEnd = row.data; }
+13143-    } else if(row.detail_key === '__planitrip__cityDates'){
+13144-      if(row.data && typeof row.data === 'object'){ S.cityDates = row.data; }
+13145-    } else if(row.detail_key === '__planitrip__actDay'){
+13146-      if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
+13147-    } else if(row.detail_key === '__planitrip__actOrder'){
+13148-      if(row.data && typeof row.data === 'object'){ S.order = row.data; }
+13149-    } else if(row.detail_key.indexOf('__planitrip__actOrder__')===0){
+--
+13219-    if(!state || typeof state !== 'object') return;
+13220-    if(dk.slice(-7) === '__state'){
+13221-      var actKey = dk.slice(0, -7); // strip '__state'
+13222-      if(state.date      !== undefined){ if(!S.actDate)      S.actDate={};      S.actDate[actKey]      = state.date; }
+13223:      if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
+13224:      if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
+13225:      if(state.timeEnd   !== undefined){ if(!S.actTimeEnd)   S.actTimeEnd={};   S.actTimeEnd[actKey]   = state.timeEnd; }
+13226-      if(state.category  !== undefined){ if(!S.actCategory)  S.actCategory={};  S.actCategory[actKey]  = state.category; }
+13227-      if(state.done      !== undefined){ if(!S.done)         S.done={};         S.done[actKey]         = state.done; }
+13228-    } else if(dk.indexOf('__alias__act__') === 0 && state.name){
+13229-      // Alias de nom d'activité partagé (built-in ou custom) — Supabase autoritaire
+13230-      var _aliasActKey = dk.slice('__alias__act__'.length);
+13231-      if(!S.actNames) S.actNames = {};
+13232-      S.actNames[_aliasActKey] = state.name;
+13233-    } else if(dk.indexOf('__alias__city__') === 0 && state.name){
+=== render sort ===
+7223-    // chaque carte portant déjà sa propre temporalité complète via timeCapsuleHTML (Lot 2).
+7224-    var baseActsHTML;
+7225-    if(activeDay==='Tous'){
+7226-      // Tri stable : date de rendu -> heure de début -> moment (repli) -> ordre existant en cas
+7227-      // d'égalité totale. N'utilise que des valeurs déjà produites ailleurs (getActivityDate,
+7228-      // S.actTimeStart, getActMoment) — aucune nouvelle logique temporelle n'est recréée ici.
+7229-      var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
+7230-      var _flatItems = baseActsItems.map(function(item, idx){ item._origIdx = idx; return item; });
+7231:      _flatItems.sort(function(a, b){
+7232-        var aDate = a.dateVal || '';
+7233-        var bDate = b.dateVal || '';
+7234-        if(aDate !== bDate) return aDate < bDate ? -1 : 1;
+7235-        var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+7236-        var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+7237-        if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7238-        if(aStart && !bStart) return -1;
+7239-        if(!aStart && bStart) return 1;
+7240-        var aMoment = _momentSortRank[a.moment||''] ?? 4;
+7241-        var bMoment = _momentSortRank[b.moment||''] ?? 4;
+7242-        if(aMoment !== bMoment) return aMoment - bMoment;
+7243-        return a._origIdx - b._origIdx; // égalité totale : ordre stable existant
+7244-      });
+7245-      baseActsHTML = _flatItems.map(function(it){ return it.html; }).join('');
+7246-    } else {
+7247-      // Vue Jour (comportement du Lot 1/2, inchangé) : regroupement par moment, tri intra-groupe,
+7248-      // groupes vides masqués.
+7249-      var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
+7250-      baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
+7251-      // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
+7252-      // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
+7253-      // sans heure gardent leur position relative issue de l'ordre existant (manuel ou par défaut),
+7254-      // placées après les activités horodatées. Sans ce tri, deux activités affectées au même
+7255-      // moment (ex: 08:00 et 09:00, toutes deux "Matin") pouvaient apparaître dans le désordre —
+7256-      // c'était l'incohérence signalée dans ce lot.
+7257-      Object.keys(momentGroups).forEach(function(mk){
+7258:        momentGroups[mk].sort(function(a, b){
+7259-          var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+7260-          var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+7261-          if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7262-          if(aStart && !bStart) return -1;
+7263-          if(!aStart && bStart) return 1;
+7264-          return 0; // égalité (même heure, ou aucune heure des deux) : conserve l'ordre stable d'origine
+7265-        });
+7266-      });
+7267-      var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
+7268-      var momentOrder = ['morning','noon','afternoon','evening',''];
+7269-      baseActsHTML = momentOrder.map(function(mk){
+7270-        var items = momentGroups[mk];
+7271-        if(!items.length) return '';
+7272-        if(mk && ACTIVITY_MOMENTS[mk]){
+7273-          var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)
+7274-            +'<span style="display:inline-block"><span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span>'
+7275-            +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin-top:4px"></div></span></div>';
+7276-          var rows = items.map(function(it){
+7277-            return it.html;
+7278-          }).join('');
+7279-          return '<div class="planning-group">'+header+rows+'</div>';
+7280-        } else {
+7281-          // Lot 3 §3 : libellé renommé "Horaire non défini" — l'activité a déjà une date connue
+7282-          // dans cette vue Jour, "Non planifié" était sémantiquement trompeur.
+7283-          var header2 = '<div class="planning-group-header planning-group-header--muted">Horaire non d\u00e9fini</div>';
+7284-          return header2+items.map(function(it){return it.html;}).join('');
+7285-        }
+7286-      }).join('');
+7287-    }
+7288-
