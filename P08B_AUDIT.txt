@@ -1,0 +1,175 @@
+=== S.order ===
+2278-  if(!S.trash) S.trash={};
+2279-  if(!S.cityTrash) S.cityTrash=[];
+2280-  if(!S.customRates) S.customRates={};
+2281:  if(!S.order) S.order={};
+2282-  if(!S.travelerBudgets) S.travelerBudgets={};
+2283-  if(!S.customDetails) S.customDetails={};
+2284-  if(!S.cityNames) S.cityNames={};
+--
+10453-}
+10454-function moveCountryInStrip(fromIdx, toIdx) {
+10455-  var order = getCountryOrder().slice();
+10456:  var tmp = order[fromIdx];
+10457:  order[fromIdx] = order[toIdx];
+10458:  order[toIdx] = tmp;
+10459-  S.countryOrder = order;
+10460-  save(); renderContent();
+10461-}
+--
+10676-  const order=getCityOrder(countryId).slice();
+10677-  const targetPos=currentPos+direction;
+10678-  if(targetPos<0||targetPos>=order.length) return;
+10679:  const tmp=order[currentPos];
+10680:  order[currentPos]=order[targetPos];
+10681:  order[targetPos]=tmp;
+10682-  S.cityOrder[countryId]=order;
+10683-  save();renderContent();
+10684-  syncCityOrder();
+10685-}
+10686-
+10687-// ── REORDER WITH ▲▼ BUTTONS ──────────────────────────────────
+10688:if(!S.order) S.order={};
+10689-if(!S.travelerBudgets) S.travelerBudgets={};
+10690-if(!S.customDetails) S.customDetails={};
+10691-if(!window._customDetails) window._customDetails=S.customDetails||{};
+10692-function syncActOrder(){
+10693-  if(sb && CURRENT_TRIP){
+10694:    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+10695-  }
+10696-}
+10697-function syncCityOrder(){
+--
+10723-  }
+10724-}
+10725-function getOrder(ck,totalBase,totalCustom){
+10726:  if(S.order[ck]&&S.order[ck].length===(totalBase+totalCustom))return S.order[ck];
+10727-  const base=Array.from({length:totalBase},function(_,i){return 'b'+i;});
+10728-  const custom=Array.from({length:totalCustom},function(_,i){return 'c'+i;});
+10729-  return base.concat(custom);
+--
+10740-  const tmp=newOrder[currentIndex];
+10741-  newOrder[currentIndex]=newOrder[targetIndex];
+10742-  newOrder[targetIndex]=tmp;
+10743:  S.order[ck]=newOrder;
+10744-  save();renderContent();
+10745-  syncActOrder();
+10746-}
+--
+10823-      if(!city) return;
+10824-      var totalBase=city.acts.length, totalCustom=(S.customActs[ck]||[]).length;
+10825-      var order=getOrder(ck,totalBase,totalCustom).slice();
+10826:      var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
+10827:      S.order[ck]=order;
+10828-      save(); renderContent();
+10829-      syncActOrder();
+10830-    }
+--
+10889-      var c=COUNTRIES.find(function(co){return co.id===country;});
+10890-      if(!c) return;
+10891-      var order=getCityOrder(country).slice();
+10892:      var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
+10893-      S.cityOrder[country]=order;
+10894-      save(); renderContent();
+10895-      syncCityOrder();
+--
+13145-    } else if(row.detail_key === '__planitrip__actDay'){
+13146-      if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
+13147-    } else if(row.detail_key === '__planitrip__actOrder'){
+13148:      if(row.data && typeof row.data === 'object'){ S.order = row.data; }
+13149-    } else if(row.detail_key === '__planitrip__cityOrder'){
+13150-      if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }
+13151-    } else if(row.detail_key === '__planitrip__deletedActs'){
+
+=== deletedCountryIds ===
+1801-      return parsed;
+1802-    }
+1803-  }catch(e){}
+1804:  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
+1805-}
+1806-function markDeletedTombstone(kind, id){
+1807-  // "Tombstone" : mémorise dans une clé localStorage minuscule et séparée qu'un élément a été
+--
+2262-  if(!S.actTimeStart) S.actTimeStart={};
+2263-  if(!S.actTimeEnd) S.actTimeEnd={};
+2264-  if(!S.customCountries) S.customCountries=[];
+2265:  if(!S.deletedCountryIds) S.deletedCountryIds=[];
+2266-  if(!S.deletedCities) S.deletedCities={};
+2267-  if(!S.countryEdits) S.countryEdits={};
+2268-  if(!S.addedCities) S.addedCities={};
+--
+2298-  });
+2299-  // Remove countries the user deleted/archived (built-in or custom)
+2300-  for(var _i=COUNTRIES.length-1;_i>=0;_i--){
+2301:    if(S.deletedCountryIds.indexOf(COUNTRIES[_i].id)>-1) COUNTRIES.splice(_i,1);
+2302-  }
+2303-  // Re-apply any manual edits made to built-in countries' Guide fields
+2304-  Object.keys(S.countryEdits||{}).forEach(function(cid){
+--
+10719-}
+10720-function syncDeletedCountryIds(){
+10721-  if(sb && CURRENT_TRIP){
+10722:    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedCountryIds',data:S.deletedCountryIds,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+10723-  }
+10724-}
+10725-function getOrder(ck,totalBase,totalCustom){
+--
+11319-    S.archivedCountryData[c.id] = JSON.parse(JSON.stringify(c));
+11320-    var i = COUNTRIES.findIndex(function(co){ return co.id===c.id; });
+11321-    COUNTRIES.splice(i,1);
+11322:    if(S.deletedCountryIds.indexOf(c.id)===-1) S.deletedCountryIds.push(c.id);
+11323-    if(S.countryOrder) S.countryOrder=[];
+11324-    S.country = COUNTRIES[0].id;
+11325-    save(); S.tab='countries'; renderContent();
+--
+11342-    if(S.archivedCountryData[k].name === countryName) entry = S.archivedCountryData[k];
+11343-  });
+11344-  if(entry){
+11345:    var idx = S.deletedCountryIds.indexOf(entry.id);
+11346:    if(idx!==-1) S.deletedCountryIds.splice(idx,1);
+11347-    delete S.archivedCountryData[entry.id];
+11348-    var builtIn = ['jp','kh','th','la','vn','id','ph'].indexOf(entry.id) !== -1;
+11349-    if(!builtIn){
+--
+12715-
+12716-  // Masquer les pays existants qui ne sont pas dans le trip
+12717-  COUNTRIES.forEach(c => {
+12718:    if (!tripCountries.includes(c.name) && S.deletedCountryIds.indexOf(c.id) === -1) {
+12719:      S.deletedCountryIds.push(c.id);
+12720-    }
+12721-  });
+12722-
+--
+12752-      var _liveCode = (currencyGuess.match(/\(([A-Z]+)\)/)||[,''])[1];
+12753-      if(_liveCode) _newCountriesForLiveRate.push({id:id, code:_liveCode});
+12754-    } else {
+12755:      const idx = S.deletedCountryIds.indexOf(exists.id);
+12756:      if (idx !== -1) S.deletedCountryIds.splice(idx, 1);
+12757-      // Rattrapage : compléter les champs restés vides (créés avant l'ajout du pré-remplissage)
+12758-      const builtInIds = ['jp','kh','th','la','vn','id','ph'];
+12759-      if (!builtInIds.includes(exists.id)) {
+--
+12779-    }
+12780-  });
+12781-
+12782:  var validCountryIds = COUNTRIES.filter(c => S.deletedCountryIds.indexOf(c.id) === -1).map(c => c.id);
+12783-  if(!S.country || validCountryIds.indexOf(S.country)===-1){
+12784-    S.country = validCountryIds[0] || S.country;
+12785-  }
+--
+13154-      if(row.data && typeof row.data === 'object'){ S.deletedCities = row.data; }
+13155-    } else if(row.detail_key === '__planitrip__cityTrash'){
+13156-      if(row.data && Array.isArray(row.data)){ S.cityTrash = row.data; }
+13157:    } else if(row.detail_key === '__planitrip__deletedCountryIds'){
+13158:      if(row.data && Array.isArray(row.data)){ S.deletedCountryIds = row.data; }
+13159-    } else if(row.detail_key.indexOf('__planitrip__travelerBudget_')===0){
+13160-      var cid = row.detail_key.slice('__planitrip__travelerBudget_'.length);
+13161-      if(row.data && typeof row.data === 'object'){
+--
+13412-
+13413-  if (COUNTRIES.length === 0) {
+13414-    console.warn('[PlaniTrip] Aucun pays visible, réinitialisation de sécurité.');
+13415:    S.deletedCountryIds = [];
+13416-    rebuildCountriesFromState();
+13417-    save();
+13418-  }
