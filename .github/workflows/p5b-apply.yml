@@ -1,0 +1,76 @@
+name: Apply P0.8-A 5B
+on:
+  push:
+    branches:
+      - gpt/p08a-p5b-hours-meta
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08a-p5b-hours-meta
+      - name: Patch index
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          def once(old,new,label):
+              global s
+              n=s.count(old)
+              if n!=1: raise SystemExit(f'{label}: expected 1 match, got {n}')
+              s=s.replace(old,new,1)
+
+          marker = "}\n// Sauvegarde un des 3 sous-champs des horaires d'ouverture (open/close/closedDays) puis\n"
+          helper = '''}\nfunction _recomputeDetailHoursText(d){\n  if(!d || typeof d !== 'object') return '';\n  var parts = [];\n  if(d.hoursOpen && d.hoursClose) parts.push(String(d.hoursOpen).replace(':','h')+'\\u2013'+String(d.hoursClose).replace(':','h'));\n  else if(d.hoursOpen) parts.push('Ouvre \\u00e0 '+String(d.hoursOpen).replace(':','h'));\n  else if(d.hoursClose) parts.push('Ferme \\u00e0 '+String(d.hoursClose).replace(':','h'));\n  if(d.hoursClosedDays) parts.push(d.hoursClosedDays);\n  return parts.join(' \\u00b7 ');\n}\n// Sauvegarde un des 3 sous-champs des horaires d'ouverture (open/close/closedDays) puis\n'''
+          once(marker,helper,'insert hours helper')
+
+          old_hours = '''  val = (val||'').trim();\n  if(subfield==='open') d.hoursOpen = val;\n  else if(subfield==='close') d.hoursClose = val;\n  else if(subfield==='closedDays') d.hoursClosedDays = val;\n  // Recalcule le texte affiché "hours" à partir des 3 sous-champs\n  var parts = [];\n  if(d.hoursOpen && d.hoursClose) parts.push(d.hoursOpen.replace(':','h')+'\\u2013'+d.hoursClose.replace(':','h'));\n  else if(d.hoursOpen) parts.push('Ouvre \\u00e0 '+d.hoursOpen.replace(':','h'));\n  else if(d.hoursClose) parts.push('Ferme \\u00e0 '+d.hoursClose.replace(':','h'));\n  if(d.hoursClosedDays) parts.push(d.hoursClosedDays);\n  d.hours = parts.join(' \\u00b7 ');\n'''
+          new_hours = '''  val = (val||'').trim();\n  var _hoursField = subfield==='open' ? 'hoursOpen' : (subfield==='close' ? 'hoursClose' : (subfield==='closedDays' ? 'hoursClosedDays' : null));\n  if(!_hoursField) return;\n  d[_hoursField] = val;\n  // "hours" est dérivé localement des sous-champs granulaires ; il n'est pas persisté\n  // séparément pour éviter une collision entre deux voyageurs modifiant open/close en parallèle.\n  d.hours = _recomputeDetailHoursText(d);\n'''
+          once(old_hours,new_hours,'replace hours calculation')
+
+          old_hours_write = '''  if(sb && CURRENT_TRIP){\n    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n  }\n  refreshDetailHeaderLive(actKey);\n}\nfunction saveCustomActDetail'''
+          new_hours_write = '''  if(sb && CURRENT_TRIP){\n    if(!_isTransientLegacyCustomKey(actKey)){\n      _syncDetailField(actKey, _hoursField, d[_hoursField], CURRENT_TRIP.id).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail hours:',_r.error); });\n    } else {\n      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n    }\n  }\n  refreshDetailHeaderLive(actKey);\n}\nfunction saveCustomActDetail'''
+          once(old_hours_write,new_hours_write,'replace hours writer')
+
+          old_reload = '''    if(sb && CURRENT_TRIP){\n      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n    }\n    return;\n  } else if(field === 'name'){'''
+          new_reload = '''    if(sb && CURRENT_TRIP){\n      if(!_isTransientLegacyCustomKey(actKey)){\n        Promise.all([\n          _syncDetailField(actKey, '_userValidated', true, CURRENT_TRIP.id),\n          _syncDetailField(actKey, '_editUnlocked', false, CURRENT_TRIP.id)\n        ]).then(function(_rs){ (_rs||[]).forEach(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail meta:',_r.error); }); });\n      } else {\n        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n      }\n    }\n    return;\n  } else if(field === 'name'){'''
+          once(old_reload,new_reload,'replace reload writer')
+
+          old_unlock = '''  if(sb && CURRENT_TRIP){\n    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n  }\n  openDetail(actKey, actName, cityKey);\n}\nfunction unlockCustomActDetailFromEl'''
+          new_unlock = '''  if(sb && CURRENT_TRIP){\n    if(!_isTransientLegacyCustomKey(actKey)){\n      _syncDetailField(actKey, '_editUnlocked', true, CURRENT_TRIP.id).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail meta:',_r.error); });\n    } else {\n      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n    }\n  }\n  openDetail(actKey, actName, cityKey);\n}\nfunction unlockCustomActDetailFromEl'''
+          once(old_unlock,new_unlock,'replace unlock writer')
+
+          phase = '''  // Phase S — post-pass : lire les __state granulaires et les injecter dans S\n'''
+          recompute = '''  // P0.8-A/5B : le résumé d'horaires est dérivé après overlay de TOUS les sous-champs.\n  // Ainsi open et close peuvent être modifiés en parallèle sans writer dérivé concurrent.\n  Object.keys(window._customDetails).forEach(function(_hk){\n    var _hd = window._customDetails[_hk];\n    if(!_hd || typeof _hd !== 'object') return;\n    if(Object.prototype.hasOwnProperty.call(_hd,'hoursOpen') || Object.prototype.hasOwnProperty.call(_hd,'hoursClose') || Object.prototype.hasOwnProperty.call(_hd,'hoursClosedDays')){\n      _hd.hours = _recomputeDetailHoursText(_hd);\n    }\n  });\n  // Phase S — post-pass : lire les __state granulaires et les injecter dans S\n'''
+          once(phase,recompute,'insert hours load recompute')
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate patch
+        run: |
+          git diff --check
+          test "$(grep -c "function _recomputeDetailHoursText" index.html)" -eq 1
+          test "$(grep -c "sync detail hours" index.html)" -eq 1
+          test "$(grep -c "P0.8-A/5B : le résumé" index.html)" -eq 1
+          python - <<'PY'
+          import re, pathlib, subprocess
+          html=pathlib.Path('index.html').read_text(encoding='utf-8')
+          n=0
+          for attrs,body in re.findall(r'<script\b([^>]*)>(.*?)</script>',html,flags=re.I|re.S):
+              if re.search(r'\bsrc\s*=',attrs,flags=re.I): continue
+              path=pathlib.Path(f'/tmp/inline-{n}.js'); path.write_text(body,encoding='utf-8')
+              subprocess.run(['node','--check',str(path)],check=True); n+=1
+          if not n: raise SystemExit('no inline scripts')
+          print('validated',n,'inline scripts')
+          PY
+      - name: Commit isolated patch
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(P0.8-A/5B): granularize hours and detail metadata"
+          git push origin HEAD:gpt/p08a-p5b-hours-meta
