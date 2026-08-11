@@ -1,0 +1,26 @@
+name: Audit country action UI
+on:
+  push:
+    branches: [gpt/ui-country-actions]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit country actions
+        run: |
+          {
+            echo '=== country swipe css ==='
+            grep -n -B6 -A12 -E 'country.*swipe|swipe.*country|swipe-delete-bg|swipe-del-btn' index.html || true
+            echo '=== country rendering / archive labels ==='
+            grep -n -B8 -A14 -E 'archiveCurrentCountry|Supprimer.*country|Supprimer.*pays|Archiver|Restaurer|deleteCountryPermanently|archived-countries|Corbeille' index.html || true
+          } > .github/_country_ui_audit.txt
+      - name: Commit audit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/_country_ui_audit.txt
+          git commit -m "chore: capture country action UI audit"
+          git push origin HEAD:gpt/ui-country-actions
