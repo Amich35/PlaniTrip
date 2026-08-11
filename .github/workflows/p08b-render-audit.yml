@@ -1,0 +1,27 @@
+name: P0.8-B render audit
+on:
+  push:
+    branches:
+      - gpt/p08b-audit
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit render/order
+        run: |
+          {
+            echo '=== getOrder callers ==='
+            grep -n -B8 -A20 "getOrder(" index.html || true
+            echo '=== moment/time sorts ==='
+            grep -n -B12 -A24 -E "momentOrder|sort\(|actTimeStart|actMoment" index.html | head -n 1200 || true
+          } > P08B_RENDER_AUDIT.txt
+      - name: Commit audit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add P08B_RENDER_AUDIT.txt
+          git commit -m "chore: capture P0.8-B render audit"
+          git push origin HEAD:gpt/p08b-audit
