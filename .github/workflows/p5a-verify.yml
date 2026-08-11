@@ -1,0 +1,38 @@
+name: Verify P0.8-A 5A
+on:
+  push:
+    branches:
+      - gpt/p08a-p5-detail-granular
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08a-p5-detail-granular
+      - name: Validate inline JavaScript syntax
+        run: |
+          python - <<'PY'
+          import re, pathlib, subprocess
+          html = pathlib.Path('index.html').read_text(encoding='utf-8')
+          scripts = []
+          for attrs, body in re.findall(r'<script\b([^>]*)>(.*?)</script>', html, flags=re.I|re.S):
+              if re.search(r'\bsrc\s*=', attrs, flags=re.I):
+                  continue
+              scripts.append(body)
+          if not scripts:
+              raise SystemExit('no inline scripts found')
+          for i, body in enumerate(scripts):
+              path = pathlib.Path(f'/tmp/planitrip-inline-{i}.js')
+              path.write_text(body, encoding='utf-8')
+              subprocess.run(['node','--check',str(path)], check=True)
+          print(f'validated {len(scripts)} inline scripts')
+          PY
+      - name: Validate P5A invariants
+        run: |
+          test "$(grep -c "function _syncDetailField" index.html)" -eq 1
+          test "$(grep -c "var _detailFieldRows = \[\]" index.html)" -eq 1
+          test "$(grep -c "DETAIL-P5] LOAD FIELD" index.html)" -eq 1
+          git diff --check HEAD^ HEAD || true
