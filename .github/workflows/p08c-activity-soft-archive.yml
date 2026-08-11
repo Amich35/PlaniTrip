@@ -1,0 +1,42 @@
+name: Apply activity soft archive
+on:
+  push:
+    branches:
+      - gpt/activity-soft-archive
+    paths:
+      - .github/workflows/p08c-activity-soft-archive.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/p08c_activity_soft_archive_patch.py
+      - run: git diff --check
+      - run: grep -q "async function archiveActivitySoft" index.html
+      - run: grep -q "function syncActivityTrashMarker" index.html
+      - run: grep -q "if(isActivityArchived(ck2)) return null;" index.html
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile, sys
+          s=Path('index.html').read_text(encoding='utf-8')
+          for m in re.finditer(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S):
+            body=m.group(1)
+            if not body.strip(): continue
+            f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8')
+            f.write(body); f.close()
+            r=subprocess.run(['node','--check',f.name],capture_output=True,text=True)
+            if r.returncode:
+              print(r.stderr); sys.exit(r.returncode)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/p08c-activity-soft-archive.yml .github/p08c_activity_soft_archive_patch.py
+          git add index.html
+          git commit -m "fix(P0.8-C): make activity archive non-destructive"
+          git push origin HEAD:gpt/activity-soft-archive
