@@ -1,0 +1,74 @@
+name: Apply P0.8-A 5C
+on:
+  push:
+    branches: [gpt/p08a-p5c-geo]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08a-p5c-geo
+      - name: Patch geocode writer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html'); s=p.read_text(encoding='utf-8')
+          start=s.index('async function geocodePinForActivity(')
+          end=s.index('// Rattrapage : géocode en arrière-plan', start)
+          block=s[start:end]
+          old="""      if(sb && CURRENT_TRIP){
+        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+      }
+"""
+          if block.count(old)!=1: raise SystemExit(f'geocode writer match count={block.count(old)}')
+          new="""      if(sb && CURRENT_TRIP){
+        if(!_isTransientLegacyCustomKey(actKey)){
+          // La paire lat/lng est atomique : jamais de latitude d'un write + longitude d'un autre.
+          _syncDetailField(actKey, '_geo', {lat:lat,lng:lng}, CURRENT_TRIP.id).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail geo:',_r.error); });
+        } else {
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+        }
+      }
+"""
+          block=block.replace(old,new,1)
+          s=s[:start]+block+s[end:]
+
+          old_overlay="""    window._customDetails[_dfActKey][_dfField] = _dfValue;
+    if(_dfField === 'tag') window._customDetails[_dfActKey]._userTag = true;
+"""
+          new_overlay="""    if(_dfField === '_geo' && _dfValue && typeof _dfValue === 'object'){
+      window._customDetails[_dfActKey].lat = _dfValue.lat;
+      window._customDetails[_dfActKey].lng = _dfValue.lng;
+    } else {
+      window._customDetails[_dfActKey][_dfField] = _dfValue;
+    }
+    if(_dfField === 'tag') window._customDetails[_dfActKey]._userTag = true;
+"""
+          if s.count(old_overlay)!=1: raise SystemExit(f'overlay match count={s.count(old_overlay)}')
+          s=s.replace(old_overlay,new_overlay,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate patch
+        run: |
+          git diff --check
+          test "$(grep -c "sync detail geo" index.html)" -eq 1
+          test "$(grep -c "_dfField === '_geo'" index.html)" -eq 1
+          python - <<'PY'
+          import re,pathlib,subprocess
+          h=pathlib.Path('index.html').read_text(encoding='utf-8'); n=0
+          for attrs,body in re.findall(r'<script\b([^>]*)>(.*?)</script>',h,flags=re.I|re.S):
+              if re.search(r'\bsrc\s*=',attrs,flags=re.I): continue
+              q=pathlib.Path(f'/tmp/i{n}.js'); q.write_text(body,encoding='utf-8'); subprocess.run(['node','--check',str(q)],check=True); n+=1
+          if not n: raise SystemExit('no inline scripts')
+          print('validated',n,'inline scripts')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(P0.8-A/5C): persist geocode atomically"
+          git push origin HEAD:gpt/p08a-p5c-geo
