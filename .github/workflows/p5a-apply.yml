@@ -1,0 +1,60 @@
+name: Apply P0.8-A 5A
+on:
+  push:
+    branches:
+      - gpt/p08a-p5-detail-granular
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08a-p5-detail-granular
+      - name: Patch index
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          def once(old, new, label):
+              global s
+              n = s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{label}: expected 1 match, got {n}')
+              s = s.replace(old, new, 1)
+
+          marker = "// Sauvegarde un des 3 sous-champs des horaires d'ouverture (open/close/closedDays) puis\n"
+          helper = '''// P0.8-A/5A — persistance granulaire des champs de fiche éditables.\n// La fiche complète historique reste un fallback de lecture : aucune migration/destruction.\n// Une ligne <actKey>__detail__<field> devient autoritaire uniquement pour le champ concerné.\nfunction _detailFieldRowKey(actKey, field){ return actKey+'__detail__'+field; }\nfunction _isTransientLegacyCustomKey(actKey){ return typeof actKey==='string' && /_c\\d+$/.test(actKey); }\nfunction _syncDetailField(actKey, field, value, tripId){\n  if(!sb || !tripId) return Promise.resolve(null);\n  return sb.from('activity_details').upsert(\n    {trip_id:tripId, detail_key:_detailFieldRowKey(actKey,field), data:{value:value}, updated_at:new Date().toISOString()},\n    {onConflict:'trip_id,detail_key'}\n  );\n}\n'''
+          once(marker, helper + marker, 'insert helpers')
+
+          old_write = '''  if(sb && CURRENT_TRIP){\n    if(_dp5ScopedField) console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'payloadFieldValue:', JSON.stringify(d[field]), 'payloadKeys:', JSON.stringify(Object.keys(d)));\n    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); if(_dp5ScopedField) console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); } else { if(_dp5ScopedField) console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); } });\n  }\n'''
+          new_write = '''  if(sb && CURRENT_TRIP){\n    // Les _cN restent sur le chemin legacy jusqu'à leur migration stable contrôlée.\n    // Pour built-in et _sid_, un blur n'écrit plus toute la fiche : il ne peut donc\n    // plus écraser les autres champs avec une snapshot locale obsolète.\n    if(_dp5ScopedField && !_isTransientLegacyCustomKey(actKey)){\n      console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'detailKey:', _detailFieldRowKey(actKey,field), 'payloadFieldValue:', JSON.stringify(d[field]));\n      _syncDetailField(actKey, field, d[field], CURRENT_TRIP.id).then(function(_r){\n        if(_r&&_r.error){ console.error('[PlaniTrip] sync detail field:',_r.error); console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); }\n        else { console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); }\n      });\n    } else {\n      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });\n    }\n  }\n'''
+          once(old_write, new_write, 'replace scoped writer')
+
+          old_loop = '''  Object.values(latest).forEach(function(row){\n    // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire\n'''
+          new_loop = '''  var _detailFieldRows = [];\n  Object.values(latest).forEach(function(row){\n    // Champs granulaires P0.8-A/5A : collectés puis appliqués APRÈS les fiches legacy,\n    // pour être autoritaires indépendamment de l'ordre des rows Supabase.\n    var _dfMarker = '__detail__';\n    var _dfPos = row.detail_key.lastIndexOf(_dfMarker);\n    if(_dfPos > 0){ _detailFieldRows.push(row); return; }\n    // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire\n'''
+          once(old_loop, new_loop, 'collect granular rows')
+
+          phase_marker = '''  });\n  // Phase S — post-pass : lire les __state granulaires et les injecter dans S\n'''
+          overlay = '''  });\n  // P0.8-A/5A : overlay granulaire après les fiches complètes legacy.\n  _detailFieldRows.forEach(function(row){\n    var _dfMarker = '__detail__';\n    var _dfPos = row.detail_key.lastIndexOf(_dfMarker);\n    if(_dfPos <= 0) return;\n    var _dfActKey = row.detail_key.slice(0,_dfPos);\n    var _dfField = row.detail_key.slice(_dfPos+_dfMarker.length);\n    if(!_dfActKey || !_dfField) return;\n    if(!window._customDetails[_dfActKey] || typeof window._customDetails[_dfActKey] !== 'object') window._customDetails[_dfActKey] = {};\n    var _dfData = row.data;\n    var _dfValue = (_dfData && typeof _dfData === 'object' && Object.prototype.hasOwnProperty.call(_dfData,'value')) ? _dfData.value : _dfData;\n    window._customDetails[_dfActKey][_dfField] = _dfValue;\n    if(_dfField === 'tag') window._customDetails[_dfActKey]._userTag = true;\n    if(_dfField === 'm' && _isCustomStableKey(_dfActKey)){\n      var _sidPos = _dfActKey.lastIndexOf('_sid_');\n      var _dfCityKey = _dfActKey.slice(0,_sidPos);\n      var _dfSid = _dfActKey.slice(_sidPos+5);\n      var _dfActs = (S.customActs && S.customActs[_dfCityKey]) || [];\n      for(var _dfi=0; _dfi<_dfActs.length; _dfi++){\n        if(_dfActs[_dfi] && _dfActs[_dfi]._sid === _dfSid && !_dfActs[_dfi]._userMeta){ _dfActs[_dfi].m = _dfValue; break; }\n      }\n    }\n    console.log('[DETAIL-P5] LOAD FIELD', new Date().toISOString(), 'actKey:', _dfActKey, 'field:', _dfField, 'value:', JSON.stringify(_dfValue));\n  });\n  // Phase S — post-pass : lire les __state granulaires et les injecter dans S\n'''
+          once(phase_marker, overlay, 'overlay granular rows')
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Validate patch
+        run: |
+          git diff --check
+          test "$(grep -c "function _syncDetailField" index.html)" -eq 1
+          test "$(grep -c "var _detailFieldRows = \[\]" index.html)" -eq 1
+          test "$(grep -c "DETAIL-P5] LOAD FIELD" index.html)" -eq 1
+          git diff --stat
+      - name: Commit isolated patch
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(P0.8-A/5A): persist detail fields granularly"
+          git push origin HEAD:gpt/p08a-p5-detail-granular
