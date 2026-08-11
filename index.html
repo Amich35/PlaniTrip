@@ -10575,7 +10575,7 @@ function deleteCity(countryId, cityName){
 
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder(); syncDeletedCities(); syncCityTrash();
+  syncDeletedActs(); syncCityOrder(countryId); syncDeletedCities(); syncCityTrash();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -10627,7 +10627,7 @@ function restoreCity(trashId){
   S.cityTrash.splice(idx,1);
   save();
   renderContent();
-  syncDeletedActs(); syncCityOrder(); syncDeletedCities(); syncCityTrash();
+  syncDeletedActs(); syncCityOrder(t.countryId); syncDeletedCities(); syncCityTrash();
   if(sb && CURRENT_TRIP){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
@@ -10689,7 +10689,7 @@ function moveCity(countryId,currentPos,direction){
   order[targetPos]=tmp;
   S.cityOrder[countryId]=order;
   save();renderContent();
-  syncCityOrder();
+  syncCityOrder(countryId);
 }
 
 // ── REORDER WITH ▲▼ BUTTONS ──────────────────────────────────
@@ -10702,9 +10702,9 @@ function syncActOrder(ck){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder__'+ck,data:(S.order[ck]||[]),updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync act order:",_r.error); });
   }
 }
-function syncCityOrder(){
-  if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+function syncCityOrder(countryId){
+  if(sb && CURRENT_TRIP && countryId){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder__'+countryId,data:(S.cityOrder[countryId]||[]),updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync city order:",_r.error); });
   }
 }
 function syncDeletedActs(){
@@ -10900,7 +10900,7 @@ function bindDragEvents() {
       var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
       S.cityOrder[country]=order;
       save(); renderContent();
-      syncCityOrder();
+      syncCityOrder(country);
     }
 
     handle.addEventListener('touchstart',function(e){startDrag(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
@@ -13206,6 +13206,9 @@ async function loadActivityDetails(){
       if(_orderCk && Array.isArray(row.data)){ S.order[_orderCk] = row.data; }
     } else if(row.detail_key === '__planitrip__cityOrder'){
       if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }
+    } else if(row.detail_key.indexOf('__planitrip__cityOrder__')===0){
+      var _cityOrderCountry = row.detail_key.slice('__planitrip__cityOrder__'.length);
+      if(_cityOrderCountry && Array.isArray(row.data)){ S.cityOrder[_cityOrderCountry] = row.data; }
     } else if(row.detail_key === '__planitrip__deletedActs'){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
     } else if(row.detail_key === '__planitrip__deletedCities'){
