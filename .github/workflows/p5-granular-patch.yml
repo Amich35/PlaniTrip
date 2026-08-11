@@ -1,0 +1,127 @@
+name: Apply isolated P5 granular patch
+on:
+  push:
+    branches: [gpt/p08a-p5-detail-granular]
+    paths: [.github/workflows/p5-granular-patch.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08a-p5-detail-granular
+      - name: Patch index.html with assertions
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          def once(old, new, label):
+              global s
+              n = s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{label}: expected 1 match, got {n}')
+              s = s.replace(old, new, 1)
+
+          marker = "// Sauvegarde un des 3 sous-champs des horaires d'ouverture (open/close/closedDays) puis\n"
+          helper = r'''// P0.8-A/5 — persistance granulaire des champs de fiche éditables.
+// La fiche complète historique reste un fallback de lecture : aucune migration/destruction.
+// Une ligne <actKey>__detail__<field> devient autoritaire uniquement pour le champ concerné.
+function _detailFieldRowKey(actKey, field){ return actKey+'__detail__'+field; }
+function _isTransientLegacyCustomKey(actKey){ return typeof actKey==='string' && /_c\d+$/.test(actKey); }
+function _syncDetailField(actKey, field, value, tripId){
+  if(!sb || !tripId) return Promise.resolve(null);
+  return sb.from('activity_details').upsert(
+    {trip_id:tripId, detail_key:_detailFieldRowKey(actKey,field), data:{value:value}, updated_at:new Date().toISOString()},
+    {onConflict:'trip_id,detail_key'}
+  );
+}
+'''
+          once(marker, helper + marker, 'insert detail-field helpers')
+
+          old_write = r'''  if(sb && CURRENT_TRIP){
+    if(_dp5ScopedField) console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'payloadFieldValue:', JSON.stringify(d[field]), 'payloadKeys:', JSON.stringify(Object.keys(d)));
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error){ console.error('[PlaniTrip] sync error:',_r.error); if(_dp5ScopedField) console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); } else { if(_dp5ScopedField) console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); } });
+  }
+'''
+          new_write = r'''  if(sb && CURRENT_TRIP){
+    // Les _cN restent sur le chemin legacy jusqu'à leur migration stable contrôlée.
+    // Pour built-in et _sid_, un blur n'écrit plus toute la fiche : il ne peut donc
+    // plus écraser les autres champs avec une snapshot locale obsolète.
+    if(_dp5ScopedField && !_isTransientLegacyCustomKey(actKey)){
+      console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'detailKey:', _detailFieldRowKey(actKey,field), 'payloadFieldValue:', JSON.stringify(d[field]));
+      _syncDetailField(actKey, field, d[field], CURRENT_TRIP.id).then(function(_r){
+        if(_r&&_r.error){ console.error('[PlaniTrip] sync detail field:',_r.error); console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); }
+        else { console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); }
+      });
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
+  }
+'''
+          once(old_write, new_write, 'replace saveCustomActDetail write')
+
+          old_loop = r'''  Object.values(latest).forEach(function(row){
+    // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
+'''
+          new_loop = r'''  var _detailFieldRows = [];
+  Object.values(latest).forEach(function(row){
+    // Champs granulaires P0.8-A/5 : collectés puis appliqués APRÈS les fiches legacy,
+    // pour être autoritaires indépendamment de l'ordre des rows Supabase.
+    var _dfMarker = '__detail__';
+    var _dfPos = row.detail_key.lastIndexOf(_dfMarker);
+    if(_dfPos > 0){ _detailFieldRows.push(row); return; }
+    // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
+'''
+          once(old_loop, new_loop, 'collect granular detail rows')
+
+          phase_marker = r'''  });
+  // Phase S — post-pass : lire les __state granulaires et les injecter dans S
+'''
+          overlay = r'''  });
+  // P0.8-A/5 : overlay granulaire après les fiches complètes legacy.
+  _detailFieldRows.forEach(function(row){
+    var _dfMarker = '__detail__';
+    var _dfPos = row.detail_key.lastIndexOf(_dfMarker);
+    if(_dfPos <= 0) return;
+    var _dfActKey = row.detail_key.slice(0,_dfPos);
+    var _dfField = row.detail_key.slice(_dfPos+_dfMarker.length);
+    if(!_dfActKey || !_dfField) return;
+    if(!window._customDetails[_dfActKey] || typeof window._customDetails[_dfActKey] !== 'object') window._customDetails[_dfActKey] = {};
+    var _dfData = row.data;
+    var _dfValue = (_dfData && typeof _dfData === 'object' && Object.prototype.hasOwnProperty.call(_dfData,'value')) ? _dfData.value : _dfData;
+    window._customDetails[_dfActKey][_dfField] = _dfValue;
+    if(_dfField === 'tag') window._customDetails[_dfActKey]._userTag = true;
+    // La description custom alimente aussi le résumé de carte, comme le writer historique.
+    if(_dfField === 'm' && _isCustomStableKey(_dfActKey)){
+      var _sidPos = _dfActKey.lastIndexOf('_sid_');
+      var _dfCityKey = _dfActKey.slice(0,_sidPos);
+      var _dfSid = _dfActKey.slice(_sidPos+5);
+      var _dfActs = (S.customActs && S.customActs[_dfCityKey]) || [];
+      for(var _dfi=0; _dfi<_dfActs.length; _dfi++){
+        if(_dfActs[_dfi] && _dfActs[_dfi]._sid === _dfSid && !_dfActs[_dfi]._userMeta){ _dfActs[_dfi].m = _dfValue; break; }
+      }
+    }
+    console.log('[DETAIL-P5] LOAD FIELD', new Date().toISOString(), 'actKey:', _dfActKey, 'field:', _dfField, 'value:', JSON.stringify(_dfValue));
+  });
+  // Phase S — post-pass : lire les __state granulaires et les injecter dans S
+'''
+          once(phase_marker, overlay, 'apply granular detail overlay')
+
+          p.write_text(s, encoding='utf-8')
+      - name: Guard expected patch only
+        run: |
+          git diff --check
+          grep -q "function _syncDetailField" index.html
+          grep -q "LOAD FIELD" index.html
+          grep -q "_detailFieldRows" index.html
+      - name: Commit patch and remove temporary workflow
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/p5-granular-patch.yml
+          git add index.html
+          git commit -m "fix(P0.8-A/5A): persist editable detail fields granularly"
+          git push origin HEAD:gpt/p08a-p5-detail-granular
