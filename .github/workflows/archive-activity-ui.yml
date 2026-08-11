@@ -1,0 +1,45 @@
+name: Apply activity archive UI
+on:
+  push:
+    branches: [gpt/archive-activity-ui]
+    paths: [.github/workflows/archive-activity-ui.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/archive-activity-ui
+      - name: Patch index
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html'); s=p.read_text(encoding='utf-8')
+          old_css='.swipe-del-btn{background:var(--red-muted);}'
+          new_css='.swipe-del-btn{background:#6F8378;}'
+          assert s.count(old_css)==1, s.count(old_css)
+          s=s.replace(old_css,new_css,1)
+          old_icon="'+svgIcon('trash-2',15)+'<span>Supprimer</span>"
+          new_icon="'+svgIcon('archive',15)+'<span>Archiver</span>"
+          count=s.count(old_icon)
+          assert count==2, count
+          s=s.replace(old_icon,new_icon)
+          old_confirm="showConfirm('Supprimer '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', _doDelete, 'Supprimer');"
+          new_confirm="showConfirm('Archiver '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', _doDelete, 'Archiver');"
+          assert s.count(old_confirm)==1, s.count(old_confirm)
+          s=s.replace(old_confirm,new_confirm,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Validate
+        run: |
+          git diff --check
+          test "$(grep -o '<span>Archiver</span>' index.html | wc -l)" -ge 2
+          grep -q "Archiver '+label" index.html
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(ui): align activity action with archive semantics"
+          git push origin HEAD:gpt/archive-activity-ui
