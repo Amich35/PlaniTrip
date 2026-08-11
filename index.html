@@ -3496,6 +3496,15 @@ function _syncDetailField(actKey, field, value, tripId){
     {onConflict:'trip_id,detail_key'}
   );
 }
+function _recomputeDetailHoursText(d){
+  if(!d || typeof d !== 'object') return '';
+  var parts = [];
+  if(d.hoursOpen && d.hoursClose) parts.push(String(d.hoursOpen).replace(':','h')+'\u2013'+String(d.hoursClose).replace(':','h'));
+  else if(d.hoursOpen) parts.push('Ouvre \u00e0 '+String(d.hoursOpen).replace(':','h'));
+  else if(d.hoursClose) parts.push('Ferme \u00e0 '+String(d.hoursClose).replace(':','h'));
+  if(d.hoursClosedDays) parts.push(d.hoursClosedDays);
+  return parts.join(' \u00b7 ');
+}
 // Sauvegarde un des 3 sous-champs des horaires d'ouverture (open/close/closedDays) puis
 // recalcule automatiquement d.hours (texte affiché, ex: "9h–17h · Fermé lundi") et d.duration
 // (ex: "8h" ou "1h30") à partir des heures — plus de saisie manuelle de ces deux champs.
@@ -3504,16 +3513,12 @@ function saveActDetailHours(actKey, cityKey, custIdx, subfield, val){
   if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
   var d = window._customDetails[actKey];
   val = (val||'').trim();
-  if(subfield==='open') d.hoursOpen = val;
-  else if(subfield==='close') d.hoursClose = val;
-  else if(subfield==='closedDays') d.hoursClosedDays = val;
-  // Recalcule le texte affiché "hours" à partir des 3 sous-champs
-  var parts = [];
-  if(d.hoursOpen && d.hoursClose) parts.push(d.hoursOpen.replace(':','h')+'\u2013'+d.hoursClose.replace(':','h'));
-  else if(d.hoursOpen) parts.push('Ouvre \u00e0 '+d.hoursOpen.replace(':','h'));
-  else if(d.hoursClose) parts.push('Ferme \u00e0 '+d.hoursClose.replace(':','h'));
-  if(d.hoursClosedDays) parts.push(d.hoursClosedDays);
-  d.hours = parts.join(' \u00b7 ');
+  var _hoursField = subfield==='open' ? 'hoursOpen' : (subfield==='close' ? 'hoursClose' : (subfield==='closedDays' ? 'hoursClosedDays' : null));
+  if(!_hoursField) return;
+  d[_hoursField] = val;
+  // "hours" est dérivé localement des sous-champs granulaires ; il n'est pas persisté
+  // séparément pour éviter une collision entre deux voyageurs modifiant open/close en parallèle.
+  d.hours = _recomputeDetailHoursText(d);
   // d.duration ne se calcule plus depuis l'amplitude d'ouverture du lieu (hoursClose-hoursOpen) —
   // ce n'était pas une "durée de visite" mais l'amplitude d'ouverture, un concept différent qui
   // contredisait le sens que lui donne l'IA (durée de visite conseillée, ex: "1h30"). Le champ
@@ -3522,7 +3527,11 @@ function saveActDetailHours(actKey, cityKey, custIdx, subfield, val){
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    if(!_isTransientLegacyCustomKey(actKey)){
+      _syncDetailField(actKey, _hoursField, d[_hoursField], CURRENT_TRIP.id).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail hours:',_r.error); });
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
   }
   refreshDetailHeaderLive(actKey);
 }
@@ -3545,7 +3554,14 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
     S.customDetails = window._customDetails;
     save();
     if(sb && CURRENT_TRIP){
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+      if(!_isTransientLegacyCustomKey(actKey)){
+        Promise.all([
+          _syncDetailField(actKey, '_userValidated', true, CURRENT_TRIP.id),
+          _syncDetailField(actKey, '_editUnlocked', false, CURRENT_TRIP.id)
+        ]).then(function(_rs){ (_rs||[]).forEach(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail meta:',_r.error); }); });
+      } else {
+        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+      }
     }
     return;
   } else if(field === 'name'){
@@ -3705,7 +3721,11 @@ function unlockCustomActDetail(actKey, cityKey, actName){
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    if(!_isTransientLegacyCustomKey(actKey)){
+      _syncDetailField(actKey, '_editUnlocked', true, CURRENT_TRIP.id).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync detail meta:',_r.error); });
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:window._customDetails[actKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    }
   }
   openDetail(actKey, actName, cityKey);
 }
@@ -13168,6 +13188,15 @@ async function loadActivityDetails(){
       }
     }
     console.log('[DETAIL-P5] LOAD FIELD', new Date().toISOString(), 'actKey:', _dfActKey, 'field:', _dfField, 'value:', JSON.stringify(_dfValue));
+  });
+  // P0.8-A/5B : le résumé d'horaires est dérivé après overlay de TOUS les sous-champs.
+  // Ainsi open et close peuvent être modifiés en parallèle sans writer dérivé concurrent.
+  Object.keys(window._customDetails).forEach(function(_hk){
+    var _hd = window._customDetails[_hk];
+    if(!_hd || typeof _hd !== 'object') return;
+    if(Object.prototype.hasOwnProperty.call(_hd,'hoursOpen') || Object.prototype.hasOwnProperty.call(_hd,'hoursClose') || Object.prototype.hasOwnProperty.call(_hd,'hoursClosedDays')){
+      _hd.hours = _recomputeDetailHoursText(_hd);
+    }
   });
   // Phase S — post-pass : lire les __state granulaires et les injecter dans S
   // Ces clés arrivent dans _customDetails via le else-branch ci-dessus.
