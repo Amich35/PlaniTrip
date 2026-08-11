@@ -6569,8 +6569,11 @@ function swipeMove(e, el){
     if(dx>=0){
       dxRaw = allowRight ? Math.min(90, dx) : 0;
     } else {
-      var base = _swipeState.wasOpen ? -160 : 0;
-      dxRaw = Math.min(0, Math.max(-160, base + dx));
+      var _swipeWrap = el.parentNode;
+      var _swipeDeleteBg = _swipeWrap ? _swipeWrap.querySelector('.swipe-delete-bg') : null;
+      var _swipeLeftMax = (_swipeDeleteBg && _swipeDeleteBg.offsetWidth) ? _swipeDeleteBg.offsetWidth : 160;
+      var base = _swipeState.wasOpen ? -_swipeLeftMax : 0;
+      dxRaw = Math.min(0, Math.max(-_swipeLeftMax, base + dx));
     }
     _swipeState.dx = dxRaw;
     el.style.transition = 'none';
@@ -6616,7 +6619,8 @@ function swipeEnd(e, el){
   }
   if(_swipeState.dragging){
     if(_swipeState.dx < -50){
-      el.style.transform = 'translateX(-160px)';
+      var _openWidth = (delBg && delBg.offsetWidth) ? delBg.offsetWidth : 160;
+      el.style.transform = 'translateX(-'+_openWidth+'px)';
       el.dataset.swipeOpen = '1';
       snapBg(true);
       e.preventDefault();
@@ -8371,7 +8375,7 @@ function renderCountriesScreen(){
       ? c.cities.map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')
       : c.cities.slice(0,2).map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
-    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg country-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:var(--red-muted);color:#fff;font-size:12px;font-weight:600" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'guide\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
@@ -11353,7 +11357,7 @@ function archiveCurrentCountry(countryId) {
   var c = countryId ? COUNTRIES.find(function(co){return co.id===countryId;}) : getC();
   if(!c) return;
   if(COUNTRIES.length <= 1){ alert("Impossible de supprimer le dernier pays."); return; }
-  showConfirm('Supprimer ' + c.name + ' ? Tu pourras le restaurer à tout moment depuis la Corbeille.', async function(){
+  showConfirm('Archiver ' + c.name + ' ? Tu pourras le restaurer à tout moment depuis la Corbeille.', async function(){
     if (typeof sb !== 'undefined' && sb && typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP) {
       try{
         var serverResult = await _setTripCountryArchived(c.name, true);
