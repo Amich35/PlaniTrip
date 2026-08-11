@@ -6307,8 +6307,10 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
       }
     } else {
       if(!S.deletedActs) S.deletedActs={};
-      S.deletedActs[cityKey+'_'+index]=true;
+      var _builtinDeletedKey = cityKey+'_'+index;
+      S.deletedActs[_builtinDeletedKey]=true;
       S.trash[cityKey].push({_builtinIndex:index, _cityKey:cityKey});
+      syncDeletedAct(_builtinDeletedKey,true);
     }
     save(); renderContent();
     syncDeletedActs();
@@ -6402,7 +6404,9 @@ function restoreActivity(cityKey, trashIndex) {
     }
   } else {
     // Restore built-in
-    if(S.deletedActs) delete S.deletedActs[item._cityKey+'_'+item._builtinIndex];
+    var _builtinRestoreKey = item._cityKey+'_'+item._builtinIndex;
+    if(S.deletedActs) delete S.deletedActs[_builtinRestoreKey];
+    syncDeletedAct(_builtinRestoreKey,false);
     save(); renderContent();
   }
   syncDeletedActs();
@@ -10707,10 +10711,17 @@ function syncCityOrder(countryId){
     sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder__'+countryId,data:(S.cityOrder[countryId]||[]),updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync city order:",_r.error); });
   }
 }
+function _deletedActDetailKey(actKey){ return '__planitrip__deletedAct__'+encodeURIComponent(actKey||''); }
+function syncDeletedAct(actKey, isDeleted){
+  if(!sb || !CURRENT_TRIP || !actKey) return Promise.resolve(null);
+  return sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_deletedActDetailKey(actKey),data:{actKey:actKey,deleted:!!isDeleted},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync deleted act:',_r.error); return _r; });
+}
 function syncDeletedActs(){
+  // P0.8-C : migration/compatibilité vers un marqueur par activité ; plus aucun full-blob write.
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedActs',data:S.deletedActs,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    return Promise.all(Object.keys(S.deletedActs||{}).filter(function(k){return !!S.deletedActs[k];}).map(function(k){ return syncDeletedAct(k,true); }));
   }
+  return Promise.resolve([]);
 }
 function syncDeletedCities(){
   if(sb && CURRENT_TRIP){
@@ -13184,6 +13195,7 @@ async function loadActivityDetails(){
   });
   var _detailFieldRows = [];
   var _cityTrashRows = [];
+  var _deletedActRows = [];
   Object.values(latest).forEach(function(row){
     // Champs granulaires P0.8-A/5A : collectés puis appliqués APRÈS les fiches legacy,
     // pour être autoritaires indépendamment de l'ordre des rows Supabase.
@@ -13219,6 +13231,8 @@ async function loadActivityDetails(){
     } else if(row.detail_key.indexOf('__planitrip__cityOrder__')===0){
       var _cityOrderCountry = row.detail_key.slice('__planitrip__cityOrder__'.length);
       if(_cityOrderCountry && Array.isArray(row.data)){ S.cityOrder[_cityOrderCountry] = row.data; }
+    } else if(row.detail_key.indexOf('__planitrip__deletedAct__')===0){
+      if(row.data && typeof row.data === 'object' && row.data.actKey){ _deletedActRows.push(row.data); }
     } else if(row.detail_key === '__planitrip__deletedActs'){
       if(row.data && typeof row.data === 'object'){ S.deletedActs = row.data; }
     } else if(row.detail_key === '__planitrip__deletedCities'){
@@ -13243,6 +13257,12 @@ async function loadActivityDetails(){
       }
     }
   });
+  // P0.8-C : les marqueurs granulaires deletedAct deviennent autoritaires dès qu'ils existent.
+  if(_deletedActRows.length){
+    var _da = {};
+    _deletedActRows.forEach(function(m){ if(m && m.actKey && m.deleted) _da[m.actKey]=true; });
+    S.deletedActs = _da;
+  }
   // P0.8-C : dès que des lignes granulaires existent, elles deviennent autoritaires.
   if(_cityTrashRows.length){
     var _ctByKey = {};
