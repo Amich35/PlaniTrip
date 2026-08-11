@@ -1,0 +1,29 @@
+name: P0.8-B audit
+on:
+  push:
+    branches: [gpt/p08b-audit]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08b-audit
+      - name: Inventory writers
+        run: |
+          {
+            echo '=== S.order ==='
+            grep -n -C 3 -E 'S\.order|__planitrip__order|order\[' index.html || true
+            echo
+            echo '=== deletedCountryIds ==='
+            grep -n -C 3 -E 'deletedCountryIds|__planitrip__deletedCountryIds' index.html || true
+          } > P08B_AUDIT.txt
+      - name: Commit audit result
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add P08B_AUDIT.txt
+          git commit -m "chore: capture P0.8-B audit inventory"
+          git push origin HEAD:gpt/p08b-audit
