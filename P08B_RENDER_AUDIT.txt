@@ -1,0 +1,1409 @@
+=== getOrder callers ===
+4512-  var countryId = parts[0];
+4513-  var cityName = parts.slice(1).join('_');
+4514-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+4515-  var city = c && c.cities.find(function(ci){return ci.city===cityName;});
+4516-  if(!city) return counts;
+4517-  var totalBase = city.acts.length;
+4518-  var customs = S.customActs[ck]||[];
+4519-  var totalCustom = customs.length;
+4520:  var order = getOrder(ck, totalBase, totalCustom);
+4521-  order.forEach(function(slot, slotIdx){
+4522-    var isBase = slot[0]==='b';
+4523-    var origIdx = parseInt(slot.slice(1));
+4524-    if(isBase && S.deletedActs[ck+'_'+origIdx]) return;
+4525-    if(!isBase && !customs[origIdx]) return;
+4526-    var k = isBase ? (ck+'_'+origIdx) : getCustomActivityKey(ck, customs[origIdx], origIdx);
+4527-    var d = getActivityDate(k, countryId, cityName, slotIdx, order.length);
+4528-    if(d) counts[d] = (counts[d]||0)+1;
+4529-  });
+4530-  return counts;
+4531-}
+4532-function renderDayTabs(ck) {
+4533-  const dates = getCityDateList(ck);
+4534-  if(!dates.length) return '';
+4535-  // Toutes les dates du séjour — pas seulement celles avec activités
+4536-  var _rawActive = S.activeDay && S.activeDay[ck] ? S.activeDay[ck] : 'Tous';
+4537-  var active = (_rawActive === 'Tous' || dates.indexOf(_rawActive) !== -1)
+4538-    ? _rawActive : 'Tous';
+4539-  if(active === 'Tous' && _rawActive !== 'Tous'){
+4540-    // Nettoyage silencieux du filtre devenu invalide (date hors séjour)
+--
+7133-    var momentBg = {morning:'#FBF1E8', noon:'#F2F7F4', afternoon:'#EDF3FC', evening:'#F1EFEA'};
+7134-    const ck=c.id+'_'+city.city;
+7135-    const customs=S.customActs[ck]||[];
+7136-    const activeDay = S.activeDay[ck]||'Tous';
+7137-    if(!S.activeCategory) S.activeCategory={};
+7138-    const activeCat = S.activeCategory[ck]||'Tous';
+7139-    const totalBase=city.acts.length;
+7140-    const totalCustomAll=(S.customActs[ck]||[]).length;
+7141:    const order=getOrder(ck,totalBase,totalCustomAll);
+7142-    const custs=S.customActs[ck]||[];
+7143-    const baseActsItems=order.map(function(slot,slotIdx){
+7144-      var isBase=slot[0]==='b';
+7145-      var origIdx=parseInt(slot.slice(1));
+7146-      if(isBase){
+7147-        if(S.deletedActs[ck+'_'+origIdx]) return null;
+7148-        var a=city.acts[origIdx];
+7149-        if(!a) return null;
+7150-        var k=ck+'_'+origIdx;
+7151-        var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
+7152-        if(activeDay!=='Tous' && actDateVal!==activeDay) return null;
+7153-        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m).indexOf(activeCat)===-1) return null;
+7154-        var done=!!S.done[k];
+7155-        var hasCoord=!!COORDS[k];
+7156-        var hasDetail=true;
+7157-        var actCat = getActCategory(k, a.n, a.m);
+7158-        var actMoment = getActMoment(k, a.n, a.m);
+7159-        // Type de lieu (ex: "Temple shinto") : priorité à l'édition locale de l'utilisateur
+7160-        // sur la fiche détaillée, repli sur la donnée statique — même logique que openDetail().
+7161-        var actPlaceType = (window._customDetails && window._customDetails[k] && window._customDetails[k].tag) || (ACT_DETAILS[k] && ACT_DETAILS[k].tag) || '';
+--
+7745-    }
+7746-  }
+7747-  return {elapsedDays:elapsedDays, currentCountry:currentCountry, dayInCountry:dayInCountry, nextTransport:nextTransport, currentCity:currentCity};
+7748-}
+7749-function getCityActivitiesForToday(c, city, todayStr){
+7750-  var ck = c.id+'_'+city.city;
+7751-  var totalBase = city.acts.length;
+7752-  var totalCustom = (S.customActs[ck]||[]).length;
+7753:  var order = getOrder(ck, totalBase, totalCustom);
+7754-  var nonDeleted = order.filter(function(slot){
+7755-    if(slot[0]==='b'){ var oi=parseInt(slot.slice(1)); return !S.deletedActs[ck+'_'+oi]; }
+7756-    return true;
+7757-  });
+7758-  var results=[];
+7759-  nonDeleted.forEach(function(slot, idx){
+7760-    var isBase = slot[0]==='b';
+7761-    var oi = parseInt(slot.slice(1));
+7762-    var a = isBase ? city.acts[oi] : (S.customActs[ck]||[])[oi];
+7763-    if(!a) return;
+7764-    var actKey = isBase ? (ck+'_'+oi) : getCustomActivityKey(ck, a, oi);
+7765-    var date = getActivityDate(actKey, c.id, city.city, idx, nonDeleted.length);
+7766-    if(date===todayStr){
+7767-      results.push({key:actKey, name:a.n, meta:a.m||'', done:!!S.done[actKey], city:_cityDisplayName(ck,city), ck:ck});
+7768-    }
+7769-  });
+7770-  return results;
+7771-}
+7772-function renderToday(){
+7773-  var ts = getTripStatus();
+--
+8064-  var cum=0;
+8065-  for(var i=0;i<orderedCities.length;i++){
+8066-    if(orderedCities[i].city===cityName) return cum;
+8067-    cum += parseInt((orderedCities[i].sub||'').match(/\d+/))||1;
+8068-  }
+8069-  return 0;
+8070-}
+8071-// Correctif Lot 4A §2 : retrouve la même date de rendu que la page Ville utilise pour une
+8072:// activité donnée, en reconstruisant le vrai index/total via getOrder() — le même algorithme
+8073-// qui construit l'ordre affiché dans renderCityPanelContentBody. Sans ça, appeler
+8074-// getActivityDate() avec des index fictifs (ex: 0,1) donne un fallback DIFFÉRENT de celui
+8075-// réellement affiché sur la carte/les chips, créant une contradiction entre la fiche détail
+8076-// et la page Ville pour toute activité sans S.actDate explicite.
+8077-// N'appelle getActivityDate() qu'UNE SEULE fois, sans réimplémenter l'algorithme de répartition.
+8078-function getRenderedActivityDate(actKey, cityKey){
+8079-  if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
+8080-  var ck = cityKey || actKey.replace(/_c?\d+$/,'');
+8081-  var countryId = ck.split('_')[0];
+8082-  var cityName = ck.slice(countryId.length+1);
+8083-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+8084-  if(!c) return null;
+8085-  var cityObj = c.cities.find(function(ci){return ci.city===cityName;});
+8086-  if(!cityObj) return null;
+8087-  var totalBase = cityObj.acts.length;
+8088-  var totalCustom = (S.customActs[ck]||[]).length;
+8089:  var order = getOrder(ck, totalBase, totalCustom);
+8090-  // Reconstruit le slot ('b0','c2',...) correspondant à cet actKey, exactement comme le fait
+8091-  // renderCityPanelContentBody lors de la construction des cartes.
+8092-  var idxPart = actKey.slice(ck.length+1);
+8093-  var isCustom = idxPart.indexOf('c')===0;
+8094-  var origIdx = isCustom ? parseInt(idxPart.slice(1)) : parseInt(idxPart);
+8095-  var slot = (isCustom?'c':'b')+origIdx;
+8096-  var slotIdx = order.indexOf(slot);
+8097-  if(slotIdx<0) slotIdx = 0; // repli prudent si jamais le slot n'est pas trouvé (activité supprimée entre-temps, etc.)
+8098-  return getActivityDate(actKey, countryId, cityName, slotIdx, order.length);
+8099-}
+8100-function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
+8101-  if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
+8102-  var ck = countryId+'_'+cityName;
+8103-  var ckStay = cityStayRange(ck);
+8104-  if(ckStay && ckStay.start){
+8105-    var dateList = getCityDateList(ck);
+8106-    if(dateList.length){
+8107-      var idx = totalActs>0 ? Math.floor(actIdx * dateList.length / totalActs) : 0;
+8108-      if(idx>=dateList.length) idx=dateList.length-1;
+8109-      if(idx<0) idx=0;
+--
+10717-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityTrash',data:S.cityTrash,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+10718-  }
+10719-}
+10720-function syncDeletedCountryIds(){
+10721-  if(sb && CURRENT_TRIP){
+10722-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__deletedCountryIds',data:S.deletedCountryIds,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+10723-  }
+10724-}
+10725:function getOrder(ck,totalBase,totalCustom){
+10726-  if(S.order[ck]&&S.order[ck].length===(totalBase+totalCustom))return S.order[ck];
+10727-  const base=Array.from({length:totalBase},function(_,i){return 'b'+i;});
+10728-  const custom=Array.from({length:totalCustom},function(_,i){return 'c'+i;});
+10729-  return base.concat(custom);
+10730-}
+10731-function moveActivity(ck,currentIndex,direction){
+10732-  const city=getC().cities.find(function(c){return getC().id+'_'+c.city===ck;});
+10733-  if(!city)return;
+10734-  const totalBase=city.acts.length;
+10735-  const totalCustom=(S.customActs[ck]||[]).length;
+10736:  const order=getOrder(ck,totalBase,totalCustom);
+10737-  const newOrder=order.slice();
+10738-  const targetIndex=currentIndex+direction;
+10739-  if(targetIndex<0||targetIndex>=newOrder.length)return;
+10740-  const tmp=newOrder[currentIndex];
+10741-  newOrder[currentIndex]=newOrder[targetIndex];
+10742-  newOrder[targetIndex]=tmp;
+10743-  S.order[ck]=newOrder;
+10744-  save();renderContent();
+10745-  syncActOrder();
+10746-}
+10747-// ── DRAG & DROP (touch + mouse) ──────────────────────────────
+10748-var _drag = { type:null, fromIdx:null, fromCk:null, fromCountry:null, el:null, ghost:null };
+10749-
+10750-function _makeDragGhost(el) {
+10751-  var g = el.cloneNode(true);
+10752-  g.style.cssText = 'position:fixed;top:-200px;left:0;width:'+el.offsetWidth+'px;opacity:0.85;pointer-events:none;z-index:9999;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
+10753-  document.body.appendChild(g);
+10754-  return g;
+10755-}
+10756-
+--
+10817-      if(!toHandle) return;
+10818-      var toIdx = parseInt(toHandle.getAttribute('data-drag-act'));
+10819-      var toCk = toHandle.getAttribute('data-drag-ck');
+10820-      if(toCk!==ck||toIdx===fromIdx) return;
+10821-      // Direct swap in order array
+10822-      var city = getC().cities.find(function(c){return getC().id+'_'+c.city===ck;});
+10823-      if(!city) return;
+10824-      var totalBase=city.acts.length, totalCustom=(S.customActs[ck]||[]).length;
+10825:      var order=getOrder(ck,totalBase,totalCustom).slice();
+10826-      var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
+10827-      S.order[ck]=order;
+10828-      save(); renderContent();
+10829-      syncActOrder();
+10830-    }
+10831-
+10832-    handle.addEventListener('touchstart',function(e){
+10833-      startDrag(e.touches[0].clientX,e.touches[0].clientY);
+10834-    },{passive:true});
+10835-    handle.addEventListener('touchmove',function(e){
+10836-      moveDrag(e.touches[0].clientX,e.touches[0].clientY);
+10837-    },{passive:true});
+10838-    handle.addEventListener('touchend',function(e){
+10839-      endDrag(e.changedTouches[0].clientX,e.changedTouches[0].clientY);
+10840-    });
+10841-    handle.addEventListener('mousedown',function(e){
+10842-      startDrag(e.clientX,e.clientY);
+10843-      function mm(e){moveDrag(e.clientX,e.clientY);}
+10844-      function mu(e){endDrag(e.clientX,e.clientY);document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);}
+10845-      document.addEventListener('mousemove',mm);
+=== moment/time sorts ===
+1877-    var tripId = (CURRENT_TRIP && CURRENT_TRIP.id) || null;
+1878-    var userUuid  = (CURRENT_USER && CURRENT_USER.id)    || null;
+1879-    var userLabel  = (CURRENT_USER && PROFILES_MAP && PROFILES_MAP[CURRENT_USER.email]) || 'unknown';
+1880-    var snapshot = {
+1881-      tripId:       tripId,
+1882-      exportedAt:   new Date().toISOString(),
+1883-      userUuid:     userUuid,
+1884-      userLabel:    userLabel,
+1885-      customActs:   JSON.parse(JSON.stringify(S.customActs    || {})),
+1886-      customDetails:JSON.parse(JSON.stringify(window._customDetails || {})),
+1887-      actDate:      JSON.parse(JSON.stringify(S.actDate       || {})),
+1888-      actCategory:  JSON.parse(JSON.stringify(S.actCategory   || {})),
+1889:      actMoment:    JSON.parse(JSON.stringify(S.actMoment     || {})),
+1890-      actTime:      JSON.parse(JSON.stringify(S.actTime       || {})),
+1891:      actTimeStart: JSON.parse(JSON.stringify(S.actTimeStart  || {})),
+1892-      actTimeEnd:   JSON.parse(JSON.stringify(S.actTimeEnd    || {})),
+1893-      actDay:       JSON.parse(JSON.stringify(S.actDay        || {})),
+1894-      done:         JSON.parse(JSON.stringify(S.done          || {})),
+1895-      favorites:    JSON.parse(JSON.stringify(S.favorites     || {})),
+1896-      coords:       JSON.parse(JSON.stringify(COORDS          || {})),
+1897-      cityNames:    JSON.parse(JSON.stringify(S.cityNames     || {})),
+1898-      actNames:     JSON.parse(JSON.stringify(S.actNames      || {}))
+1899-    };
+1900-    var json = JSON.stringify(snapshot, null, 2);
+1901-    var blob = new Blob([json], {type: 'application/json'});
+1902-    var url  = URL.createObjectURL(blob);
+1903-    var a    = document.createElement('a');
+1904-    a.href   = url;
+1905-    var safeUser = (userLabel || userUuid || 'unknown').replace(/[^a-z0-9]/gi, '_');
+1906-    a.download = 'planitrip_recovery_' + safeUser + '_'
+1907-               + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.json';
+1908-    document.body.appendChild(a);
+1909-    a.click();
+1910-    setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+1911-    console.log('[PlaniTrip Recovery] Snapshot exporté — userUuid:', userUuid, 'userLabel:', userLabel, 'tripId:', tripId);
+1912-    return snapshot;
+1913-  } catch(e) {
+1914-    console.error('[PlaniTrip Recovery] Erreur export:', e);
+1915-    alert('Erreur lors de l\'export du snapshot. Voir console.');
+--
+1928-// N'écrit QUE les champs de planning de cette activité, pas un blob global.
+1929-// Guard updated_at : si le serveur a une version plus récente (cas de concurrence),
+1930-// on fait un merge silencieux champ par champ — la valeur serveur gagne pour les
+1931-// champs non présents dans le patch courant.
+1932-async function _syncActivityState(actKey, tripId){
+1933-  if(!sb || !tripId) return;
+1934-  // Snapshot COMPLET depuis S — une seule écriture atomique.
+1935-  // Pas de select préalable : S est la source de vérité après save().
+1936-  // Les callers composites (savePlanningModal) doivent appeler les setters
+1937-  // avec {sync:false} puis awaiter UN seul _syncActivityState final.
+1938-  var state = {};
+1939-  if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
+1940:  if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
+1941:  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) state.timeStart = S.actTimeStart[actKey];
+1942-  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) state.timeEnd   = S.actTimeEnd[actKey];
+1943-  if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
+1944-  if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
+1945-  if(!Object.keys(state).length) return;
+1946-  var r = await sb.from('activity_details')
+1947-    .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
+1948-            {onConflict:'trip_id,detail_key'});
+1949-  if(r && r.error){
+1950-    console.error('[PlaniTrip] _syncActivityState:', r.error);
+1951-    throw r.error; // permet au caller de détecter l'échec et de ne pas annoncer un succès
+1952-  }
+1953-  return r;
+1954-}
+1955-// ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
+1956-
+1957-// ── ACTIVITY DETAILS (pre-filled for Japan) ──────────────────
+1958-const ACT_DETAILS = {
+1959-  'jp_Osaka_0': {
+1960-    emoji:'🏮', tag:'Quartier incontournable',
+1961-    history:'Dotonbori est le cœur vibrant d’Osaka, un canal transformé en rue piétonne emblématique depuis les années 1920. Le quartier tire son nom du promoteur Doton qui finança le canal en 1612. La nuit, les néons se reflètent sur l’eau pour un spectacle unique.',
+1962-    hours:'Ouvert 24h/24 · Ambiance maximale après 19h',
+1963-    costs:['Gratuit (balade)', 'Street food : 3–8€', 'Restaurants : 15–40€'],
+1964-    tips:['Photographier depuis le pont Ebisu-bashi pour le reflet parfait', 'Goûter le takoyaki (boulettes de poulpe) chez Kukuru', 'Éviter les week-ends pour moins de foule'],
+1965-    address:'Dotonbori, Chuo Ward, Osaka'
+--
+2248-
+2249-const S=loadState();
+2250-// Regroupe tous les garde-fous d'initialisation de S (certaines clés peuvent manquer
+2251-// sur un état persisté ancien, ou après le rechargement complet effectué par enterTrip()).
+2252-// Appelée au chargement initial ET après chaque Object.assign(S, freshState) dans enterTrip(),
+2253-// pour éviter qu'un champ manquant ne fasse planter l'app au premier usage (ex: S.cityTrash undefined).
+2254-function ensureStateDefaults(){
+2255-  if(!S.favorites) S.favorites={};
+2256-  if(!S.documents) S.documents={};
+2257-  if(!S.journal) S.journal=[];
+2258-  if(!S.activeCategory) S.activeCategory={};
+2259-  if(!S.actCategory) S.actCategory={};
+2260:  if(!S.actMoment) S.actMoment={};
+2261-  if(!S.actTime) S.actTime={};
+2262:  if(!S.actTimeStart) S.actTimeStart={};
+2263-  if(!S.actTimeEnd) S.actTimeEnd={};
+2264-  if(!S.customCountries) S.customCountries=[];
+2265-  if(!S.deletedCountryIds) S.deletedCountryIds=[];
+2266-  if(!S.deletedCities) S.deletedCities={};
+2267-  if(!S.countryEdits) S.countryEdits={};
+2268-  if(!S.addedCities) S.addedCities={};
+2269-  if(!S.accom) S.accom={};
+2270-  if(!S.actDate) S.actDate={};
+2271-  if(!S.cityDates) S.cityDates={};
+2272-  if(!S.customPhotos) S.customPhotos={};
+2273-  if(!S.days) S.days={};
+2274-  if(!S.actDay) S.actDay={};
+2275-  if(!S.activeDay) S.activeDay={};
+2276-  if(!S.customActs) S.customActs={};
+2277-  if(!S.deletedActs) S.deletedActs={};
+2278-  if(!S.trash) S.trash={};
+2279-  if(!S.cityTrash) S.cityTrash=[];
+2280-  if(!S.customRates) S.customRates={};
+2281-  if(!S.order) S.order={};
+2282-  if(!S.travelerBudgets) S.travelerBudgets={};
+2283-  if(!S.customDetails) S.customDetails={};
+2284-  if(!S.cityNames) S.cityNames={};
+2285-  if(!S.actNames) S.actNames={};
+2286-  if(!S.feedPosts) S.feedPosts=[];
+--
+2853-  var _inStyle2 = 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;border:1px solid rgba(29,29,31,0.12);border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink)';
+2854-
+2855-  // Infos pratiques (quickInfo)
+2856-  if(_isEditable){
+2857-    var _qFields = [
+2858-      {key:'duration',        icon:'history',      label:'Dur\u00e9e conseill\u00e9e', placeholder:'ex\u00a0: 1h30'},
+2859-      {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: t\u00f4t le matin'},
+2860-      {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'},
+2861-      {key:'address',         icon:'map-pin',      label:'Adresse',           placeholder:'Adresse pr\u00e9cise', full:true},
+2862-      {key:'tag',             icon:'landmark',     label:'Type de lieu',      placeholder:'ex\u00a0: Temple, Restaurant\u2026', full:true}
+2863-    ];
+2864-    // Horaires d'ouverture du LIEU uniquement (jamais le planning personnel — voir S.actDate /
+2865:    // S.actTimeStart / S.actMoment, gérés par le modal Planifier) : deux sélecteurs heure + un
+2866-    // petit champ texte optionnel pour les jours de fermeture (ex: "Fermé lundi"). d.hours (texte
+2867-    // affiché, ex: "9h–17h · Fermé lundi") est recalculé automatiquement à chaque changement.
+2868-    // d.duration (durée de visite conseillée) n'est PAS dérivée de ces horaires — c'est un champ
+2869-    // texte libre séparé (voir _qFields ci-dessus), avec la même sémantique qu'en mode IA.
+2870-    var _hOpenVal = escHtml(_dSaved.hoursOpen||'');
+2871-    var _hCloseVal = escHtml(_dSaved.hoursClose||'');
+2872-    var _hClosedDaysVal = escHtml(_dSaved.hoursClosedDays||'');
+2873-    var _hoursBody = '<div style="grid-column:1/-1"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon('sun',11)+' Horaires d\'ouverture (du lieu)</div>'
+2874-      +'<div style="display:flex;gap:8px;margin-bottom:8px">'
+2875-      +'<input type="time" value="'+_hOpenVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'open\',this.value)"/>'
+2876-      +'<input type="time" value="'+_hCloseVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'close\',this.value)"/>'
+2877-      +'</div>'
+2878-      +'<input type="text" placeholder="Jours de fermeture (optionnel), ex\u00a0: Ferm\u00e9 lundi" value="'+_hClosedDaysVal+'" style="'+_inStyle2+'" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'closedDays\',this.value)"/>'
+2879-      +'</div>';
+2880-    var _qBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">'+_hoursBody;
+2881-    _qFields.forEach(function(f){
+2882-      var _fval = escHtml(_dSaved[f.key]||'');
+2883-      _qBody += '<div'+(f.full?' style="grid-column:1/-1"':'')+'><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon(f.icon,11)+' '+f.label+'</div>'
+2884-        +'<input type="text" placeholder="'+f.placeholder+'" value="'+_fval+'" style="'+_inStyle2+'" onblur="saveCustomActDetail(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\''+f.key+'\',this.value)"/>'
+2885-        +'</div>';
+2886-    });
+2887-    _qBody += '</div>';
+2888-    html += _detailAccordion('Infos pratiques', _qBody, false);
+2889-  }
+--
+4748-        if(_r&&_r.data&&_r.data.id && S.customActs[_capCk] && S.customActs[_capCk][_capIdx]){
+4749-          S.customActs[_capCk][_capIdx]._sid = _r.data.id;
+4750-          save();
+4751-          // Correctif P0 : migration immédiate legacy → stable, locale + serveur.
+4752-          _migrateToStableKeyAfterSync(_capCk, _legacyKey, _r.data.id);
+4753-        }
+4754-      });
+4755-    })(newIdx, destCityKey, newName, newActKey);
+4756-    if(window._customDetails[newActKey]){
+4757-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:newActKey, data:window._customDetails[newActKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+4758-    }
+4759-    if(S.actCategory){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
+4760:    // Lot 5A : actMoment et actTime ne sont plus copiés — pas d'upsert nécessaire.
+4761-  }
+4762-}
+4763-
+4764-// Déplace une activité vers une autre ville : duplique dans la ville cible (fonction déjà
+4765-// testée), puis supprime l'originale (réutilise deleteActivity — logique de réindexation et
+4766-// de tombstone déjà éprouvée, on évite de la réécrire pour ne pas fragiliser la corbeille).
+4767-var _moveActivityCtx = null;
+4768-function openMoveToCityModal(actKey, actName, cityKey, isCustom, origIdx){
+4769-  _moveActivityCtx = {actKey:actKey, actName:actName, cityKey:cityKey, isCustom:isCustom, origIdx:origIdx};
+4770-  var body = '';
+4771-  COUNTRIES.forEach(function(country){
+4772-    var cities = (country.cities||[]).filter(function(ci){ return country.id+'_'+ci.city !== cityKey; });
+4773-    if(!cities.length) return;
+4774-    body += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-subtle);font-weight:600;margin:14px 4px 6px">'+escHtml(country.name)+'</div>';
+4775-    body += cities.map(function(ci){
+4776-      var targetKey = country.id+'_'+ci.city;
+4777-      return '<div onclick="confirmMoveToCity(\''+jsStrEsc(targetKey)+'\')" style="display:flex;align-items:center;gap:10px;padding:12px 4px;cursor:pointer;border-top:1px solid rgba(29,29,31,0.07)"><span style="width:20px;display:flex;justify-content:center;color:var(--ink-subtle)">'+svgIcon('map-pin',16)+'</span><span style="font-size:14px;font-weight:500">'+escHtml(ci.city)+'</span></div>';
+4778-    }).join('');
+4779-  });
+4780-  document.getElementById('moveToCityModalBody').innerHTML = body || '<div style="padding:20px;text-align:center;color:var(--ink-subtle);font-size:13px">Aucune autre ville disponible</div>';
+4781-  document.getElementById('moveToCityModal').classList.add('open');
+4782-}
+4783-function confirmMoveToCity(targetCityKey){
+4784-  var ctx = _moveActivityCtx;
+--
+4886-      if(S.customActs[cityKey] && S.customActs[cityKey][newIdx]){
+4887-        S.customActs[cityKey][newIdx]._sid = _sid;
+4888-      }
+4889-      // P0.9c : transfert explicite depuis _pendingState uniquement.
+4890-      // Ne jamais lire ce qui existe sous _cN — cela peut être un résidu historique
+4891-      // d'une ancienne activité ayant occupé le même index.
+4892-      // _migrateActivityKeyIfNeeded est intentionnellement absent de ce chemin.
+4893-      if(_pendingState.hasDate){
+4894-        if(!S.actDate) S.actDate={};
+4895-        S.actDate[_stableKey] = _pendingState.date;
+4896-      }
+4897-      if(_pendingState.hasTime){
+4898:        if(!S.actTimeStart) S.actTimeStart={};
+4899-        if(!S.actTimeEnd)   S.actTimeEnd={};
+4900:        if(!S.actMoment)    S.actMoment={};
+4901-        if(!S.actTime)      S.actTime={};
+4902:        S.actTimeStart[_stableKey] = _pendingState.timeStart;
+4903-        S.actTimeEnd[_stableKey]   = _pendingState.timeEnd;
+4904:        S.actMoment[_stableKey]    = _pendingState.moment;
+4905-        S.actTime[_stableKey]      = '';
+4906-      }
+4907-      if(_pendingState.hasCategories){
+4908-        if(!S.actCategory) S.actCategory={};
+4909-        S.actCategory[_stableKey] = _pendingState.categories.slice();
+4910-      }
+4911-      // initialDetails + COORDS : copie explicite depuis opts, jamais depuis _cN
+4912-      if(_pendingState.hasInitialDetails){
+4913-        if(!window._customDetails) window._customDetails={};
+4914-        window._customDetails[_stableKey] = Object.assign({}, _pendingState.initialDetails, {_editUnlocked:false, _userValidated:false, _aiGenerated:false});
+4915-        if(_pendingState.initialDetails.lat && _pendingState.initialDetails.lng){
+4916-          COORDS[_stableKey] = [_pendingState.initialDetails.lat, _pendingState.initialDetails.lng, val];
+4917-        }
+4918-      }
+4919-      S.customDetails = window._customDetails;
+4920-      save();
+4921-      // Sync Supabase sous la clé stable uniquement
+4922-      // _syncActivityState couvre : date, moment, timeStart, timeEnd, category, done
+4923-      try{
+4924-        await _syncActivityState(_stableKey, CURRENT_TRIP.id);
+4925-      } catch(e){
+4926-        console.error('[PlaniTrip] _createActivityCore sync state:', e);
+4927-      }
+4928-      // Fiche détaillée statique sous la clé stable
+--
+4942-  if(stableKey===legacyActKey) return;
+4943-  var migratedLocally = _migrateActivityKeyIfNeeded(stableKey, legacyActKey);
+4944-  if(migratedLocally){ S.customDetails = window._customDetails; save(); renderContent(); }
+4945-  if(!sb || !CURRENT_TRIP) return;
+4946-  var tid = CURRENT_TRIP.id;
+4947-  var now = new Date().toISOString();
+4948-  // P0.9 — Blobs globaux : ré-upsert awaité des blobs qui contiennent la clé stable.
+4949-  // Sans ce bloc, les blobs Supabase gardaient la clé _cN et les données disparaissaient
+4950-  // au reload (le renderer cherche _sid_UUID, ne trouve rien dans les blobs _cN).
+4951-  if(migratedLocally){
+4952-    var _blobDefs = [
+4953-      {key:'__planitrip__actDate',      data:S.actDate},
+4954:      {key:'__planitrip__actMoment',    data:S.actMoment},
+4955:      {key:'__planitrip__actTimeStart', data:S.actTimeStart},
+4956-      {key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
+4957-      {key:'__planitrip__actTime',      data:S.actTime},
+4958-      {key:'__planitrip__actCategory',  data:S.actCategory},
+4959-      {key:'__planitrip__actDay',       data:S.actDay},
+4960-      {key:'__planitrip__done',         data:S.done},
+4961-    ];
+4962-    var _blobsToSync = _blobDefs.filter(function(b){ return b.data && b.data[stableKey] !== undefined; });
+4963-    if(_blobsToSync.length){
+4964-      try{
+4965-        var _results = await Promise.all(_blobsToSync.map(function(b){
+4966-          return sb.from('activity_details').upsert({trip_id:tid,detail_key:b.key,data:b.data,updated_at:now},{onConflict:'trip_id,detail_key'});
+4967-        }));
+4968-        _results.forEach(function(r,i){ if(r&&r.error) console.error('[PlaniTrip] migrate blob '+_blobsToSync[i].key+':', r.error); });
+4969-      } catch(e){ console.error('[PlaniTrip] _migrateToStableKeyAfterSync blobs:', e); }
+4970-    }
+4971-  }
+4972-  // Fiche détaillée : si une ligne existe déjà sous la clé legacy côté serveur, la recopier
+4973-  // sous la clé stable puis supprimer l'ancienne — jamais l'inverse (pas de perte de données).
+4974-  if(window._customDetails && window._customDetails[stableKey]){
+4975-    sb.from('activity_details').upsert({trip_id:tid,detail_key:stableKey,data:window._customDetails[stableKey],updated_at:now},{onConflict:'trip_id,detail_key'}).then(function(_r){
+4976-      if(_r&&_r.error){ console.error('[PlaniTrip] migration detail stable:',_r.error); return; }
+4977-      sb.from('activity_details').delete().eq('trip_id',tid).eq('detail_key',legacyActKey).then(function(_r2){ if(_r2&&_r2.error) console.error('[PlaniTrip] migration cleanup legacy detail:',_r2.error); });
+4978-    });
+4979-  }
+--
+6224-  var _skipConfirm = opts && opts.skipConfirm;
+6225-  function _doDelete(){
+6226-    if(!S.trash) S.trash={};
+6227-    if(!S.trash[cityKey]) S.trash[cityKey]=[];
+6228-    if(isCustom) {
+6229-      var actObjToDelete = (S.customActs[cityKey]||[])[index];
+6230-      // Correctif P0 identité stable : la clé de l'activité supprimée est calculée via le
+6231-      // helper (stable si _sid existe, legacy sinon) — c'est SA clé, indépendamment des
+6232-      // autres activités de la ville.
+6233-      var _deletedActKey = getCustomActivityKey(cityKey, actObjToDelete, index);
+6234-      var _trashState = {};
+6235-      if(S.actDate && S.actDate[_deletedActKey] !== undefined) _trashState.actDate = S.actDate[_deletedActKey];
+6236:      if(S.actMoment && S.actMoment[_deletedActKey] !== undefined) _trashState.actMoment = S.actMoment[_deletedActKey];
+6237:      if(S.actTimeStart && S.actTimeStart[_deletedActKey] !== undefined) _trashState.actTimeStart = S.actTimeStart[_deletedActKey];
+6238-      if(S.actTimeEnd && S.actTimeEnd[_deletedActKey] !== undefined) _trashState.actTimeEnd = S.actTimeEnd[_deletedActKey];
+6239-      if(S.actTime && S.actTime[_deletedActKey] !== undefined) _trashState.actTime = S.actTime[_deletedActKey];
+6240-      if(S.actCategory && S.actCategory[_deletedActKey] !== undefined) _trashState.actCategory = Array.isArray(S.actCategory[_deletedActKey]) ? S.actCategory[_deletedActKey].slice() : S.actCategory[_deletedActKey];
+6241-      if(S.done && S.done[_deletedActKey]) _trashState.done = true;
+6242-      if(S.favorites && S.favorites[_deletedActKey]) _trashState.favorite = true;
+6243-      if(window._customDetails && window._customDetails[_deletedActKey]) _trashState.customDetails = JSON.parse(JSON.stringify(window._customDetails[_deletedActKey]));
+6244-      if(COORDS[_deletedActKey]) _trashState.coords = COORDS[_deletedActKey].slice();
+6245-      var act = (S.customActs[cityKey]||[]).splice(index,1)[0];
+6246-      if(act){ act._wasCustom=true; act._trashState=_trashState; S.trash[cityKey].push(act); }
+6247-      // Correctif P0 : plus de réindexation en masse des activités suivantes. Avec l'identité
+6248-      // stable (_sid), les autres activités de la ville gardent leur propre clé quelle que
+6249-      // soit leur nouvelle position dans le tableau après le splice — rien à décaler.
+6250-      // On nettoie uniquement les maps sous la clé de l'activité SUPPRIMÉE elle-même.
+6251-      if(!window._customDetails) window._customDetails={};
+6252:      if(!S.actMoment) S.actMoment={};
+6253:      if(!S.actTimeStart) S.actTimeStart={};
+6254-      if(!S.actTimeEnd) S.actTimeEnd={};
+6255-      if(!S.actTime) S.actTime={};
+6256-      if(!S.actCategory) S.actCategory={};
+6257-      delete S.done[_deletedActKey];
+6258-      delete S.favorites[_deletedActKey];
+6259-      delete S.actDate[_deletedActKey];
+6260:      delete S.actMoment[_deletedActKey];
+6261:      delete S.actTimeStart[_deletedActKey];
+6262-      delete S.actTimeEnd[_deletedActKey];
+6263-      delete S.actTime[_deletedActKey];
+6264-      delete S.actCategory[_deletedActKey];
+6265-      delete window._customDetails[_deletedActKey];
+6266-      delete COORDS[_deletedActKey];
+6267-      S.customDetails = window._customDetails;
+6268-      // Suppression serveur : sinon loadCitiesActivities() (serveur autoritaire) re-synchronise
+6269-      // cette activité au prochain chargement et elle "revient" après actualisation.
+6270-      if(act) markDeletedTombstone('activities', cityKey+'||'+act.n);
+6271-      if(sb && CURRENT_TRIP && act){
+6272-        var cpParts = cityKey.split('_');
+6273-        var cpCountryId = cpParts[0], cpCityName = cpParts.slice(1).join('_');
+6274-        // Correctif P0 : suppression ciblée par _sid (UUID) quand disponible — plus fiable
+6275-        // qu'un match par nom, et cohérent avec le pattern déjà en place pour le renommage
+6276-        // (voir saveCustomActDetail, champ 'name'). Repli sur le match par nom sinon.
+6277-        if(act._sid){
+6278-          sb.from('activities').delete().eq('id',act._sid).eq('trip_id',CURRENT_TRIP.id).then(function(r){
+6279-            if(r&&r.error){ console.error('[PlaniTrip] delete activity by sid:', r.error); }
+6280-          });
+6281-        } else {
+6282-          sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('country_id',cpCountryId).eq('city',cpCityName).eq('name',act.n).then(function(r){
+6283-            if(r&&r.error){ console.error('[PlaniTrip] delete activity:', r.error); }
+6284-          });
+6285-        }
+--
+6288-        // — les autres activités gardent leur propre clé stable, jamais touchée ici.
+6289-        sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_deletedActKey).then(function(r){
+6290-          if(r&&r.error) console.error('[PlaniTrip] delete detail row:', r.error);
+6291-        });
+6292-        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_deletedActKey).then(function(r){
+6293-          if(r&&r.error) console.error('[PlaniTrip] delete favorite row:', r.error);
+6294-        });
+6295-        // Blobs globaux : réécrits en entier avec l'état local déjà nettoyé (clé supprimée
+6296-        // ci-dessus) — pas de risque de collision, un simple upsert suffit pour chacun.
+6297-        var _now = new Date().toISOString();
+6298-        Promise.all([
+6299-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',      data:S.actDate,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6300:          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',    data:S.actMoment,    updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6301:          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6302-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6303-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6304-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'}),
+6305-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',         data:S.done,         updated_at:_now},{onConflict:'trip_id,detail_key'})
+6306-        ]).catch(function(e){ console.error('[PlaniTrip] blobs update after delete:', e); });
+6307-      }
+6308-    } else {
+6309-      if(!S.deletedActs) S.deletedActs={};
+6310-      S.deletedActs[cityKey+'_'+index]=true;
+6311-      S.trash[cityKey].push({_builtinIndex:index, _cityKey:cityKey});
+6312-    }
+6313-    save(); renderContent();
+6314-    syncDeletedActs();
+6315-  }
+6316-  if(_skipConfirm){ _doDelete(); } else { showConfirm('Supprimer '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', _doDelete, 'Supprimer'); }
+6317-}
+6318-if(!S.deletedActs) S.deletedActs={};
+6319-if(!S.trash) S.trash={};
+6320-if(!S.cityTrash) S.cityTrash=[];
+6321-if(!S.customRates) S.customRates={};
+6322-
+6323-function restoreActivity(cityKey, trashIndex) {
+6324-  if(!S.trash||!S.trash[cityKey]) return;
+6325-  const item = S.trash[cityKey].splice(trashIndex,1)[0];
+--
+6329-    // Lot 6 : restauration complète depuis le snapshot _trashState.
+6330-    // L'actKey sera différent (activité repoussée en fin de liste).
+6331-    var _ts = item._trashState || {};
+6332-    delete item._wasCustom;
+6333-    delete item._trashState;
+6334-    // L'ancien _sid correspond à la ligne Supabase supprimée — ne pas réutiliser.
+6335-    delete item._sid;
+6336-    S.customActs[cityKey].push(item);
+6337-    var newIdx = S.customActs[cityKey].length - 1;
+6338-    var newActKey = cityKey+'_c'+newIdx;
+6339-    // Restaurer chaque map sous le nouveau actKey
+6340-    if(!S.actDate) S.actDate={};
+6341:    if(!S.actMoment) S.actMoment={};
+6342:    if(!S.actTimeStart) S.actTimeStart={};
+6343-    if(!S.actTimeEnd) S.actTimeEnd={};
+6344-    if(!S.actTime) S.actTime={};
+6345-    if(!S.actCategory) S.actCategory={};
+6346-    if(!S.done) S.done={};
+6347-    if(!S.favorites) S.favorites={};
+6348-    if(_ts.actDate !== undefined) S.actDate[newActKey] = _ts.actDate; else delete S.actDate[newActKey];
+6349:    if(_ts.actMoment !== undefined) S.actMoment[newActKey] = _ts.actMoment; else delete S.actMoment[newActKey];
+6350:    if(_ts.actTimeStart !== undefined) S.actTimeStart[newActKey] = _ts.actTimeStart; else delete S.actTimeStart[newActKey];
+6351-    if(_ts.actTimeEnd !== undefined) S.actTimeEnd[newActKey] = _ts.actTimeEnd; else delete S.actTimeEnd[newActKey];
+6352-    if(_ts.actTime !== undefined) S.actTime[newActKey] = _ts.actTime; else delete S.actTime[newActKey];
+6353-    if(_ts.actCategory !== undefined) S.actCategory[newActKey] = _ts.actCategory; else delete S.actCategory[newActKey];
+6354-    if(_ts.done) S.done[newActKey] = true; else delete S.done[newActKey];
+6355-    if(_ts.favorite) S.favorites[newActKey] = true; else delete S.favorites[newActKey];
+6356-    if(_ts.customDetails){
+6357-      if(!window._customDetails) window._customDetails={};
+6358-      window._customDetails[newActKey] = _ts.customDetails;
+6359-      S.customDetails = window._customDetails;
+6360-    }
+6361-    if(_ts.coords) COORDS[newActKey] = _ts.coords.slice();
+6362-    unmarkDeletedTombstone('activities', cityKey+'||'+item.n);
+6363-    save(); renderContent();
+6364-    if(sb && CURRENT_TRIP){
+6365-      var rpParts = cityKey.split('_');
+6366-      var rpCountryId = rpParts[0], rpCityName = rpParts.slice(1).join('_');
+6367-      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||item.addedBy||'';
+6368-      var _now2 = new Date().toISOString();
+6369-      // Recréer la ligne activities + récupérer le nouvel UUID
+6370-      (function(_capIdx, _legacyKey){
+6371-        sb.from('activities').insert({trip_id:CURRENT_TRIP.id,country_id:rpCountryId,city:rpCityName,name:item.n,tip:item.m||null,added_by_label:who}).select('id').single().then(function(r){
+6372-          if(r&&r.error){ console.error('[PlaniTrip] restore activity:', r.error); return; }
+6373-          if(r&&r.data&&r.data.id && S.customActs[cityKey] && S.customActs[cityKey][_capIdx]){
+6374-            S.customActs[cityKey][_capIdx]._sid = r.data.id;
+--
+6376-            // Correctif P0 : migration immédiate legacy → stable, locale + serveur.
+6377-            _migrateToStableKeyAfterSync(cityKey, _legacyKey, r.data.id);
+6378-          }
+6379-        });
+6380-      })(newIdx, newActKey);
+6381-      // Restaurer la fiche détaillée
+6382-      if(_ts.customDetails){
+6383-        sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:newActKey,data:_ts.customDetails,updated_at:_now2},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore detail:',r.error); });
+6384-      }
+6385-      // Restaurer les maps globales modifiées
+6386-      var _rUpserts = [
+6387-        {detail_key:'__planitrip__actDate',      data:S.actDate},
+6388:        {detail_key:'__planitrip__actMoment',    data:S.actMoment},
+6389:        {detail_key:'__planitrip__actTimeStart', data:S.actTimeStart},
+6390-        {detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
+6391-        {detail_key:'__planitrip__actTime',      data:S.actTime},
+6392-        {detail_key:'__planitrip__actCategory',  data:S.actCategory},
+6393-        {detail_key:'__planitrip__done',         data:S.done}
+6394-      ];
+6395-      _rUpserts.forEach(function(u){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:u.detail_key,data:u.data,updated_at:_now2},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore map '+u.detail_key+':',r.error); }); });
+6396-      // Restaurer le favori dans la table favorites
+6397-      if(_ts.favorite){
+6398-        sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',newActKey).then(function(){
+6399-          sb.from('favorites').insert({trip_id:CURRENT_TRIP.id,key:newActKey,country_id:rpCountryId,added_by_label:who}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] restore fav:',r.error); });
+6400-        });
+6401-      }
+6402-    }
+6403-  } else {
+6404-    // Restore built-in
+6405-    if(S.deletedActs) delete S.deletedActs[item._cityKey+'_'+item._builtinIndex];
+6406-    save(); renderContent();
+6407-  }
+6408-  syncDeletedActs();
+6409-}
+6410-function deleteActivityPermanently(cityKey, trashIndex){
+6411-  if(!S.trash||!S.trash[cityKey]||!S.trash[cityKey][trashIndex]) return;
+6412-  showConfirm('Supprimer définitivement cette activité ? Cette action est irréversible.', function(){
+6413-    S.trash[cityKey].splice(trashIndex,1);
+--
+6681-}
+6682-function guessActivityMoment(name, meta){
+6683-  var text = ((name||'')+' '+(meta||'')).toLowerCase();
+6684-  for(var mk in MOMENT_KEYWORDS){
+6685-    var kws = MOMENT_KEYWORDS[mk];
+6686-    for(var i=0;i<kws.length;i++){ if(text.indexOf(kws[i])>-1) return mk; }
+6687-  }
+6688-  return null;
+6689-}
+6690-// Retourne la clé du moment ('morning'/'noon'/'afternoon'/'evening') ou '' si non assigné.
+6691-// Logique cible (Correctif Lot 1 §3) :
+6692-//   SI une heure de début existe -> moment = getDayPeriod(startTime)  (l'heure prime toujours)
+6693://   SINON SI un moment a été choisi manuellement (S.actMoment) -> ce moment est conservé
+6694-//   SINON -> ''  (aucun horaire du tout)
+6695-function getActMoment(actKey, name, meta){
+6696:  var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6697-  if(start) return getDayPeriod(start);
+6698:  if(S.actMoment && S.actMoment[actKey]!==undefined) return S.actMoment[actKey];
+6699-  return '';
+6700-}
+6701-function setActMoment(actKey, momentKey, opts){
+6702:  if(!S.actMoment) S.actMoment={};
+6703:  S.actMoment[actKey] = momentKey;
+6704-  save();
+6705-  if(opts && opts.sync === false) return;
+6706-  if(sb && CURRENT_TRIP){
+6707-    if(_isCustomStableKey(actKey)){
+6708-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6709-    } else {
+6710:      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
+6711-    }
+6712-  }
+6713-}
+6714-function setActSuggestedTime(actKey, val){
+6715-  if(!S.actTime) S.actTime={};
+6716-  S.actTime[actKey] = (val||'').trim();
+6717-  save();
+6718-  if(sb && CURRENT_TRIP){
+6719-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6720-  }
+6721-}
+6722-// Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
+6723-// pour les horaires approximatifs type "Avant 7h" que la plage ne peut pas exprimer.
+6724-function setActTimeRange(actKey, start, end, freeText, opts){
+6725:  if(!S.actTimeStart) S.actTimeStart={};
+6726-  if(!S.actTimeEnd) S.actTimeEnd={};
+6727-  if(!S.actTime) S.actTime={};
+6728-  start = (start||'').trim(); end = (end||'').trim(); freeText = (freeText||'').trim();
+6729:  S.actTimeStart[actKey] = start;
+6730-  S.actTimeEnd[actKey] = end;
+6731-  // Le texte libre n'est utilisé que si aucune plage structurée n'est renseignée
+6732-  S.actTime[actKey] = (start||end) ? '' : freeText;
+6733-  save();
+6734-  if(opts && opts.sync === false) return;
+6735-  if(sb && CURRENT_TRIP){
+6736-    if(_isCustomStableKey(actKey)){
+6737-      _syncActivityState(actKey, CURRENT_TRIP.id);
+6738-    } else {
+6739:      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
+6740-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
+6741-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+6742-    }
+6743-  }
+6744-}
+6745-var _planningModalActKey = '';
+6746-var _planningModalMoment = '';
+6747-function openPlanningModal(actKey, name, meta){
+6748-  var _pErr = document.getElementById('planningModalErr');
+6749-  if(_pErr){ _pErr.textContent=''; _pErr.style.display='none'; }
+6750-  _planningModalActKey = actKey;
+6751:  var startVal = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6752-  var endVal = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+6753-  // Moment actuel : dérivé de l'heure si elle existe, sinon le moment manuel déjà enregistré.
+6754-  // Pré-remplit le sélecteur avec l'état réel de l'activité à l'ouverture du modal.
+6755-  _planningModalMoment = getActMoment(actKey, name||'', meta||'');
+6756-  var segments = Object.keys(ACTIVITY_MOMENTS).map(function(mk){
+6757-    var mo = ACTIVITY_MOMENTS[mk];
+6758-    var isActive = _planningModalMoment===mk;
+6759-    return '<div class="moment-seg'+(isActive?' active':'')+'" onclick="selectPlanningMoment(\''+mk+'\')" data-moment-pill="'+mk+'">'+svgIcon(mo.icon,16)+'<span>'+mo.label+'</span></div>';
+6760-  }).join('');
+6761-  // Sélecteur de date : ajouté au modal existant (Lot 4A §5/§6) pour permettre de modifier le
+6762-  // jour depuis le même point d'entrée que l'heure/le moment, sans créer un second mécanisme.
+6763-  // Correctif §4/§5 : le champ se PRÉ-REMPLIT avec la date réellement rendue (getRenderedActivityDate,
+6764-  // incluant le fallback) — sinon un tap sur Planning pouvait afficher un champ vide alors que la
+6765-  // fiche/la carte montraient déjà une date. Mais l'ouverture seule n'écrit jamais S.actDate :
+6766-  // seule une validation explicite (bouton Enregistrer, voir savePlanningModal) peut transformer
+6767-  // cette date affichée en date explicite.
+6768-  var ckForDate = actKey.replace(/_c?\d+$/,'');
+6769-  var stayRangeForDate = (typeof cityStayRange==='function') ? cityStayRange(ckForDate) : null;
+6770-  var renderedDate = getRenderedActivityDate(actKey, ckForDate) || '';
+6771-  document.getElementById('planningModalBody').innerHTML =
+6772-    '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Date</div>'
+6773-    +'<input class="ef-input" id="planningModalDate" type="date" value="'+escHtml(renderedDate)+'"'
+6774-    +(stayRangeForDate?(' min="'+stayRangeForDate.start+'" max="'+stayRangeForDate.end+'"'):'')
+6775-    +' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:16px"/>'
+--
+6794-  document.getElementById('planningModalTimeStart').value = '';
+6795-  document.getElementById('planningModalTimeEnd').value = '';
+6796-}
+6797-// P0.8-A : sync awaité des blobs planning pour les activités built-in.
+6798-// Regroupe en un seul Promise.all les upserts de date/moment/horaires
+6799-// qui étaient auparavant fire-and-forget dans chaque setter individuel.
+6800-// N'est appelé que si !_isCustomStableKey(actKey) — les _sid_ passent par _syncActivityState.
+6801-async function _syncPlanningBlobs(actKey, tripId){
+6802-  if(!sb || !tripId) return;
+6803-  var now = new Date().toISOString();
+6804-  var upserts = [];
+6805-  if(S.actDate)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actDate',     data:S.actDate,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+6806:  if(S.actMoment)    upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actMoment',   data:S.actMoment,   updated_at:now},{onConflict:'trip_id,detail_key'}));
+6807:  if(S.actTimeStart) upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:now},{onConflict:'trip_id,detail_key'}));
+6808-  if(S.actTimeEnd)   upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTimeEnd',  data:S.actTimeEnd,  updated_at:now},{onConflict:'trip_id,detail_key'}));
+6809-  if(S.actTime)      upserts.push(sb.from('activity_details').upsert({trip_id:tripId,detail_key:'__planitrip__actTime',     data:S.actTime,     updated_at:now},{onConflict:'trip_id,detail_key'}));
+6810-  var results = await Promise.all(upserts);
+6811-  var err = results.find(function(r){ return r && r.error; });
+6812-  if(err){ console.error('[PlaniTrip] _syncPlanningBlobs:', err.error); throw err.error; }
+6813-}
+6814-async function savePlanningModal(){
+6815-  var dateEl = document.getElementById('planningModalDate');
+6816-  var dateVal = dateEl ? dateEl.value : '';
+6817-  var startVal = document.getElementById('planningModalTimeStart').value;
+6818-  var endVal = document.getElementById('planningModalTimeEnd').value;
+6819-  var finalMoment = startVal ? getDayPeriod(startVal) : _planningModalMoment;
+6820-  // Garde-fou : heure de fin sans heure de début ignorée
+6821-  if(endVal && !startVal){
+6822-    endVal = '';
+6823-    var endEl = document.getElementById('planningModalTimeEnd');
+6824-    if(endEl){ endEl.value = ''; endEl.style.borderColor = 'var(--red-muted)'; setTimeout(function(){ endEl.style.borderColor=''; }, 1200); }
+6825-  }
+6826-  var actKey = _planningModalActKey;
+6827-  var isStable = _isCustomStableKey(actKey);
+6828-  // P0.3/P0.8-A — batch local sans sync intermédiaire dans tous les cas
+6829-  var btn = document.getElementById('planningModalSaveBtn');
+6830-  // 1. Désactiver le bouton avant toute mutation
+6831-  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+--
+6875-  var mk = getActMoment(actKey, name, meta);
+6876-  var timeVal = (S.actTime && S.actTime[actKey]) || '';
+6877-  if(!mk && !timeVal){
+6878-    return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:500;color:#6E6E73;background:rgba(29,29,31,0.06);padding:2px 9px;border-radius:20px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+svgIcon('history',9)+' Planifier</span>';
+6879-  }
+6880-  var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
+6881-  var label = timeVal || (mo?mo.label:'');
+6882-  return '<span onclick="event.stopPropagation();openActionMenu(this)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--accent);background:rgba(45,106,79,0.10);padding:2px 9px;border-radius:20px;vertical-align:middle;cursor:pointer;flex-shrink:0">'+(mo?svgIcon(mo.icon,9):svgIcon('history',9))+' '+escHtml(label)+'</span>';
+6883-}
+6884-// Capsule horaire affichée en haut de chaque carte activité (sous le titre).
+6885-// Toujours visible — affiche l'heure si définie, sinon le moment, sinon "+ Planifier".
+6886-// Point d'entrée unique vers openPlanningModal.
+6887:// S.actTimeStart / S.actTimeEnd : bornes de la plage horaire (HH:MM), toutes deux optionnelles.
+6888-// Le moment de la journée est dérivé automatiquement de l'heure de début (voir momentFromTime).
+6889-// La capsule n'affiche que l'heure (plage ou heure simple) — jamais le nom du moment en texte,
+6890-// pour éviter la redondance avec le header de section (MATIN/MIDI/...).
+6891-function formatTimeRange(actKey){
+6892:  var start = (S.actTimeStart && S.actTimeStart[actKey]) || '';
+6893-  var end = (S.actTimeEnd && S.actTimeEnd[actKey]) || '';
+6894-  var legacy = (S.actTime && S.actTime[actKey]) || '';
+6895-  // Helper de formatage d'affichage uniquement — les valeurs stockées (HH:MM) restent inchangées.
+6896-  // Règle : masquer les minutes si elles valent exactement 00 (09:00 → 09h), sinon les conserver
+6897-  // (09:30 → 09h30). Le zéro devant les heures < 10 est conservé (09h, pas 9h).
+6898-  function _fmtTime(t){
+6899-    var m = /^(\d{2}):(\d{2})$/.exec(t);
+6900-    if(!m) return t.replace(':','h'); // fallback legacy
+6901-    return m[2] === '00' ? m[1]+'h' : m[1]+'h'+m[2];
+6902-  }
+6903-  if(start && end) return _fmtTime(start)+'-'+_fmtTime(end);
+6904-  if(start) return _fmtTime(start);
+6905-  if(legacy) return legacy;
+6906-  return '';
+6907-}
+6908-// Helper purement présentationnel : formate une date ISO en "12 SAM" (jour + abréviation du
+6909-// jour de semaine), même pattern que celui déjà utilisé pour les chips de filtre par jour.
+6910-// N'encode aucune règle métier — juste du formatage d'affichage.
+6911-function formatDayShort(iso){
+6912-  if(!iso) return '';
+6913-  var d = new Date(iso+'T00:00:00');
+6914-  var dayNum = d.toLocaleDateString('fr-FR',{day:'numeric'});
+6915-  var weekday = d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','').toUpperCase();
+6916-  return dayNum+' '+weekday;
+--
+7146-      if(isBase){
+7147-        if(S.deletedActs[ck+'_'+origIdx]) return null;
+7148-        var a=city.acts[origIdx];
+7149-        if(!a) return null;
+7150-        var k=ck+'_'+origIdx;
+7151-        var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
+7152-        if(activeDay!=='Tous' && actDateVal!==activeDay) return null;
+7153-        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m).indexOf(activeCat)===-1) return null;
+7154-        var done=!!S.done[k];
+7155-        var hasCoord=!!COORDS[k];
+7156-        var hasDetail=true;
+7157-        var actCat = getActCategory(k, a.n, a.m);
+7158:        var actMoment = getActMoment(k, a.n, a.m);
+7159-        // Type de lieu (ex: "Temple shinto") : priorité à l'édition locale de l'utilisateur
+7160-        // sur la fiche détaillée, repli sur la donnée statique — même logique que openDetail().
+7161-        var actPlaceType = (window._customDetails && window._customDetails[k] && window._customDetails[k].tag) || (ACT_DETAILS[k] && ACT_DETAILS[k].tag) || '';
+7162-        var actCityStay = cityStayRange(ck);
+7163-        var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
+7164-        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
+7165-        var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
+7166-        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
+7167-          +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+7168-          +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
+7169-          +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
+7170-          +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(_actDisplayName(k,a.n))+'</div>'
+7171-          +(actPlaceType?'<div class="act-meta">'+escHtml(actPlaceType)+'</div>':'')
+7172-          +'<div class="act-footer">'
+7173-          +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done)
+7174-          +categoryPill(actCat,k)
+7175-          +'</div></div>'
+7176-          +'<div class="act-actions">'
+7177-          +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
+7178-          +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
+7179-          +'</div></div></div>';
+7180:        return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m, dateVal:actDateVal};
+7181-      } else {
+7182-        var ca=custs[origIdx];
+7183-        if(!ca) return null;
+7184-        // Correctif P0 identité stable : dès qu'un _sid existe, la clé de rendu (et donc
+7185-        // data-act-key, propagé à toutes les actions carte) est stable entre appareils —
+7186-        // elle ne dépend plus de la position dans le tableau.
+7187-        var ck2=getCustomActivityKey(ck, ca, origIdx);
+7188-        var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
+7189-        if(activeDay!=='Tous' && cDateVal!==activeDay) return null;
+7190-        var caCat = getActCategory(ck2, ca.n, ca.m);
+7191-        if(activeCat!=='Tous' && caCat.indexOf(activeCat)===-1) return null;
+7192-        var caMoment = getActMoment(ck2, ca.n, ca.m);
+7193-        // Type de lieu (ex: "Marché couvert") : issu de la fiche détaillée (IA ou édition
+7194-        // manuelle) — pas de repli statique, une activité custom n'a pas d'entrée ACT_DETAILS.
+7195-        var caPlaceType = (window._customDetails && window._customDetails[ck2] && window._customDetails[ck2].tag) || '';
+7196-        var cdone=!!S.done[ck2];
+7197-        var cCityStay = cityStayRange(ck);
+7198-        var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
+7199-        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
+7200-        var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
+7201-        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Supprimer</span></div></div>'
+7202-          +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+7203-          +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
+7204-          +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
+--
+7216-      }
+7217-    }).filter(Boolean);
+7218-
+7219-    // Regroupement visuel façon "planning" : Matin / Midi / Après-midi / Soir, puis Non planifié
+7220-    // Lot 3 : le regroupement visuel par moment (MATIN/MIDI/...) n'a de sens QUE dans une vue
+7221-    // filtrée sur un jour précis — en vue "Tout", il mélangerait visuellement des activités de
+7222-    // jours différents sous un même bandeau "MATIN". La vue "Tout" devient donc une liste plate,
+7223-    // chaque carte portant déjà sa propre temporalité complète via timeCapsuleHTML (Lot 2).
+7224-    var baseActsHTML;
+7225-    if(activeDay==='Tous'){
+7226-      // Tri stable : date de rendu -> heure de début -> moment (repli) -> ordre existant en cas
+7227-      // d'égalité totale. N'utilise que des valeurs déjà produites ailleurs (getActivityDate,
+7228:      // S.actTimeStart, getActMoment) — aucune nouvelle logique temporelle n'est recréée ici.
+7229-      var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
+7230-      var _flatItems = baseActsItems.map(function(item, idx){ item._origIdx = idx; return item; });
+7231:      _flatItems.sort(function(a, b){
+7232-        var aDate = a.dateVal || '';
+7233-        var bDate = b.dateVal || '';
+7234-        if(aDate !== bDate) return aDate < bDate ? -1 : 1;
+7235:        var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+7236:        var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+7237-        if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7238-        if(aStart && !bStart) return -1;
+7239-        if(!aStart && bStart) return 1;
+7240-        var aMoment = _momentSortRank[a.moment||''] ?? 4;
+7241-        var bMoment = _momentSortRank[b.moment||''] ?? 4;
+7242-        if(aMoment !== bMoment) return aMoment - bMoment;
+7243-        return a._origIdx - b._origIdx; // égalité totale : ordre stable existant
+7244-      });
+7245-      baseActsHTML = _flatItems.map(function(it){ return it.html; }).join('');
+7246-    } else {
+7247-      // Vue Jour (comportement du Lot 1/2, inchangé) : regroupement par moment, tri intra-groupe,
+7248-      // groupes vides masqués.
+7249-      var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
+7250-      baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
+7251-      // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
+7252-      // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
+7253-      // sans heure gardent leur position relative issue de l'ordre existant (manuel ou par défaut),
+7254-      // placées après les activités horodatées. Sans ce tri, deux activités affectées au même
+7255-      // moment (ex: 08:00 et 09:00, toutes deux "Matin") pouvaient apparaître dans le désordre —
+7256-      // c'était l'incohérence signalée dans ce lot.
+7257-      Object.keys(momentGroups).forEach(function(mk){
+7258:        momentGroups[mk].sort(function(a, b){
+7259:          var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
+7260:          var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+7261-          if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7262-          if(aStart && !bStart) return -1;
+7263-          if(!aStart && bStart) return 1;
+7264-          return 0; // égalité (même heure, ou aucune heure des deux) : conserve l'ordre stable d'origine
+7265-        });
+7266-      });
+7267-      var hasAnyPlanned = momentGroups.morning.length+momentGroups.noon.length+momentGroups.afternoon.length+momentGroups.evening.length > 0;
+7268:      var momentOrder = ['morning','noon','afternoon','evening',''];
+7269:      baseActsHTML = momentOrder.map(function(mk){
+7270-        var items = momentGroups[mk];
+7271-        if(!items.length) return '';
+7272-        if(mk && ACTIVITY_MOMENTS[mk]){
+7273-          var header = '<div class="planning-group-header" style="color:'+momentAccent[mk]+'">'+svgIcon(ACTIVITY_MOMENTS[mk].icon,12)
+7274-            +'<span style="display:inline-block"><span style="letter-spacing:1px">'+ACTIVITY_MOMENTS[mk].label+'</span>'
+7275-            +'<div style="height:2px;border-radius:2px;background:'+momentAccent[mk]+';opacity:0.35;margin-top:4px"></div></span></div>';
+7276-          var rows = items.map(function(it){
+7277-            return it.html;
+7278-          }).join('');
+7279-          return '<div class="planning-group">'+header+rows+'</div>';
+7280-        } else {
+7281-          // Lot 3 §3 : libellé renommé "Horaire non défini" — l'activité a déjà une date connue
+7282-          // dans cette vue Jour, "Non planifié" était sémantiquement trompeur.
+7283-          var header2 = '<div class="planning-group-header planning-group-header--muted">Horaire non d\u00e9fini</div>';
+7284-          return header2+items.map(function(it){return it.html;}).join('');
+7285-        }
+7286-      }).join('');
+7287-    }
+7288-
+7289-    const activityTrashBtn = activityTrashButtonHTML(ck);
+7290-
+7291-    const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+activityTrashBtn+'<div style="height:24px"></div>';
+7292-
+7293-    // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
+--
+7694-  for(var i=0;i<COUNTRIES.length;i++){
+7695-    var range = getCountryDateRange(COUNTRIES[i]);
+7696-    if(range && todayStr>=range.start && todayStr<=range.end){
+7697-      currentCountry=COUNTRIES[i]; countryIdx=i; currentRange=range;
+7698-      dayInCountry = Math.round((now - new Date(range.start+'T00:00:00'))/86400000)+1;
+7699-      break;
+7700-    }
+7701-  }
+7702-  if(!currentCountry){
+7703-    // Avant le départ ou après le retour (ou pays sans dates) : on retombe sur le premier/dernier
+7704-    // pays par ordre chronologique de ses dates, sinon le premier/dernier du tableau en dernier recours.
+7705-    var withRange = COUNTRIES.map(function(cc){ return {cc:cc, range:getCountryDateRange(cc)}; }).filter(function(x){ return !!x.range; });
+7706:    withRange.sort(function(a,b){ return a.range.start<b.range.start ? -1 : (a.range.start>b.range.start?1:0); });
+7707-    if(elapsedDays<0){
+7708-      var first = withRange[0] || (COUNTRIES[0] ? {cc:COUNTRIES[0]} : null);
+7709-      currentCountry = first ? first.cc : null; countryIdx = currentCountry ? COUNTRIES.indexOf(currentCountry) : -1; dayInCountry = 0;
+7710-    } else {
+7711-      var last = withRange[withRange.length-1] || (COUNTRIES.length ? {cc:COUNTRIES[COUNTRIES.length-1]} : null);
+7712-      currentCountry = last ? last.cc : null; countryIdx = currentCountry ? COUNTRIES.indexOf(currentCountry) : -1;
+7713-      dayInCountry = (last && last.range) ? (Math.round((new Date(last.range.end+'T00:00:00')-new Date(last.range.start+'T00:00:00'))/86400000)+1) : (currentCountry?currentCountry.days:0);
+7714-    }
+7715-  }
+7716-  // Next transport: the one leaving the current (or next) country
+7717-  var nextTransport=null;
+7718-  if(elapsedDays<0){ nextTransport=null; }
+7719-  else if(countryIdx>-1 && countryIdx<TRANSPORTS.length){
+7720-    nextTransport=TRANSPORTS[countryIdx];
+7721-  }
+7722-  // Ville courante : celle dont les vraies dates de séjour (logement) contiennent aujourd'hui.
+7723-  var currentCity=null;
+7724-  if(currentCountry && currentCountry.cities.length){
+7725-    var orderedIdx = getCityOrder(currentCountry.id);
+7726-    var orderedCities = orderedIdx.map(function(idx){ return currentCountry.cities[idx]; });
+7727-    for(var j=0;j<orderedCities.length;j++){
+7728-      var city=orderedCities[j];
+7729-      var cRange = cityStayRange(currentCountry.id+'_'+city.city);
+7730-      if(cRange && todayStr>=cRange.start && todayStr<=cRange.end){ currentCity=city; break; }
+7731-    }
+7732-    if(!currentCity){
+7733-      // Pas de logement daté pile aujourd'hui : ville dont le séjour est le plus proche d'aujourd'hui.
+7734-      var withCityRange = orderedCities.map(function(city){ return {city:city, range:cityStayRange(currentCountry.id+'_'+city.city)}; }).filter(function(x){ return !!x.range; });
+7735-      if(withCityRange.length){
+7736:        withCityRange.sort(function(a,b){
+7737-          var da = Math.abs(new Date(a.range.start+'T00:00:00')-now);
+7738-          var db = Math.abs(new Date(b.range.start+'T00:00:00')-now);
+7739-          return da-db;
+7740-        });
+7741-        currentCity = withCityRange[0].city;
+7742-      } else {
+7743-        currentCity = orderedCities[0];
+7744-      }
+7745-    }
+7746-  }
+7747-  return {elapsedDays:elapsedDays, currentCountry:currentCountry, dayInCountry:dayInCountry, nextTransport:nextTransport, currentCity:currentCity};
+7748-}
+7749-function getCityActivitiesForToday(c, city, todayStr){
+7750-  var ck = c.id+'_'+city.city;
+7751-  var totalBase = city.acts.length;
+7752-  var totalCustom = (S.customActs[ck]||[]).length;
+7753-  var order = getOrder(ck, totalBase, totalCustom);
+7754-  var nonDeleted = order.filter(function(slot){
+7755-    if(slot[0]==='b'){ var oi=parseInt(slot.slice(1)); return !S.deletedActs[ck+'_'+oi]; }
+7756-    return true;
+7757-  });
+7758-  var results=[];
+7759-  nonDeleted.forEach(function(slot, idx){
+7760-    var isBase = slot[0]==='b';
+--
+7802-  if(c){
+7803-    c.cities.forEach(function(city){
+7804-      todayActs = todayActs.concat(getCityActivitiesForToday(c, city, todayStr));
+7805-    });
+7806-  }
+7807-  // Tri chronologique : horaire de début précis en priorité (ex: 09:30), sinon le moment de la
+7808-  // journée comme repli (Matin/Midi/Après-midi/Soir dans cet ordre), sinon la position d'origine
+7809-  // (ordre de la fiche ville, incluant un éventuel réordonnancement manuel par glisser-déposer) —
+7810-  // sans ce tri, la carte "Prochainement" affichait juste les activités concaténées ville par
+7811-  // ville sans respecter l'ordre chronologique réel de la journée.
+7812-  var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
+7813-  todayActs.forEach(function(a, idx){ a._origIdx = idx; });
+7814:  todayActs.sort(function(a, b){
+7815:    var aStart = (S.actTimeStart && S.actTimeStart[a.key]) || '';
+7816:    var bStart = (S.actTimeStart && S.actTimeStart[b.key]) || '';
+7817-    if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
+7818-    if(aStart && !bStart) return -1;
+7819-    if(!aStart && bStart) return 1;
+7820-    var aMoment = _momentSortRank[getActMoment(a.key, a.name, a.meta)] ?? 4;
+7821-    var bMoment = _momentSortRank[getActMoment(b.key, b.name, b.meta)] ?? 4;
+7822-    if(aMoment !== bMoment) return aMoment - bMoment;
+7823-    return a._origIdx - b._origIdx;
+7824-  });
+7825-  var myEmailToday = (CURRENT_USER && CURRENT_USER.email) || '';
+7826-  var todaySpent = S.expenses.filter(function(e){return e.date===todayStr && canonicalPerson(e.personLabel||e.person)===myEmailToday && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+7827-  var budgetDaily = c ? getMyCountryDailyBudget(c) : 0;
+7828-
+7829-  // ── Hero simple (sans indicateurs) ──
+7830-  var heroQuery = c ? getCountryImageQuery(c) : 'travel';
+7831-  var heroSubText;
+7832-  if(!hasDepartDate){
+7833-    heroSubText = 'Date de départ à renseigner';
+7834-  } else if(ts.elapsedDays<0){
+7835-    heroSubText = 'Départ dans '+Math.abs(ts.elapsedDays)+' jour'+(Math.abs(ts.elapsedDays)>1?'s':'');
+7836-  } else {
+7837-    heroSubText = (ts.currentCity?_cityDisplayName(c?c.id+'_'+ts.currentCity.city:'',ts.currentCity)+' · ':'')+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+7838-  }
+7839-  var heroClickable = !!c;
+7840-  var heroHref = heroClickable ? ' onclick="openCountryDetail(\''+jsStrEsc(c.id)+'\',\'guide\')" style="margin-bottom:12px;cursor:pointer"' : ' style="margin-bottom:12px"';
+--
+7890-      +'</div>';
+7891-  }
+7892-
+7893-  // ── Carte Prochain vol ──
+7894-  var flightCard = '';
+7895-  var realTodayStr = toLocalISODate(new Date());
+7896-  var flightsList = (S.documents && S.documents.tickets && S.documents.tickets.flightsList) || [];
+7897-  var myEmailFlight = canonicalPerson((CURRENT_USER && CURRENT_USER.email) || '');
+7898-  var upcomingFlights = flightsList.filter(function(f){
+7899-    if(!f.date || f.date<realTodayStr) return false;
+7900-    if(!f.participants || !f.participants.length) return true; // vol ancien sans participants renseignés = tout le monde
+7901-    return f.participants.map(canonicalPerson).indexOf(myEmailFlight)>-1;
+7902:  }).sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+7903-  if(upcomingFlights.length){
+7904-    var nf = upcomingFlights[0];
+7905-    var nfDate = new Date(nf.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+7906-    var nfPeople = getPeopleList();
+7907-    var nfParticipants = (nf.participants && nf.participants.length) ? nf.participants : nfPeople;
+7908-    var nfWithLabel = nfParticipants.length>=nfPeople.length ? '' : (' · avec '+nfParticipants.filter(function(p){return canonicalPerson(p)!==myEmailFlight;}).map(function(p){return personDisplayName(p,'Toi');}).join(', '));
+7909-    flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Prochain vol')+'</div>'
+7910-      +'<div class="status-main">'+escHtml(nf.from||'?')+' → '+escHtml(nf.to||'?')+'</div>'
+7911-      +'<div class="status-sub">'+nfDate+(nf.link?' · billet enregistré':'')+escHtml(nfWithLabel)+'</div></div>';
+7912-  } else {
+7913-    flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochain vol</div><div class="status-sub">À renseigner — aucun vol à venir enregistré.</div></div>';
+7914-  }
+7915-  var realTomorrowStr = toLocalISODate(new Date(Date.now()+86400000));
+7916-  var isFlightSoon = upcomingFlights.length>0 && (upcomingFlights[0].date===realTodayStr || upcomingFlights[0].date===realTomorrowStr);
+7917-
+7918-  // ── Carte Demain / Ensuite ──
+7919-  var tomorrowCard = '';
+7920-  if(c){
+7921-    var tmCountry=null, tmDayInCountry=0;
+7922-    for(var ti=0; ti<COUNTRIES.length; ti++){
+7923-      var cc=COUNTRIES[ti];
+7924-      var ccRange = getCountryDateRange(cc);
+7925-      if(ccRange && tomorrowStrRef>=ccRange.start && tomorrowStrRef<=ccRange.end){
+7926-        tmCountry=cc;
+--
+7986-        +'</div></div>';
+7987-    }
+7988-  }
+7989-
+7990-  // ── Carte À ne pas oublier (priorité aux non cochés, toujours modifiable) ──
+7991-  var forgetCard = '';
+7992-  if(c && c.practical && c.practical.checklist && c.practical.checklist.length){
+7993-    var allItems = c.practical.checklist.map(function(item,i){
+7994-      var k=c.id+'_cl_'+i;
+7995-      return {k:k, item:item, checked:!!S.checklist[k]};
+7996-    });
+7997-    var uncheckedCount = allItems.filter(function(u){return !u.checked;}).length;
+7998:    var sorted = allItems.slice().sort(function(a,b){return (a.checked?1:0)-(b.checked?1:0);});
+7999-    var shown = sorted.slice(0,3);
+8000-    var forgetHTML = shown.map(function(u){
+8001-      return '<div class="check-item'+(u.checked?' checked':'')+'" onclick="toggleCL(\''+u.k+'\')"><div class="ci-box">'+(u.checked?'✓':'')+'</div><span class="ci-text">'+parseLinks(clItemDisplayText(u.item))+'</span></div>';
+8002-    }).join('');
+8003-    var seeAllLink = c.practical.checklist.length>3 ? '<div style="text-align:right;margin-top:4px"><span style="font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="openCountryChecklist(\''+c.id+'\')">Voir toute la checklist →</span></div>' : '';
+8004-    var doneMsg = uncheckedCount===0 ? '<div class="status-sub" style="padding:4px 0 8px">Tout est prêt 🎉</div>' : '';
+8005-    forgetCard = '<div class="info-card"><div class="ic-header"><span data-icon="check-square" data-icon-size="16"></span> À ne pas oublier</div>'+doneMsg+forgetHTML+seeAllLink+'</div>';
+8006-  }
+8007-
+8008-  // ── Messages importants du Fil (visibles 24h) ──
+8009-  var nowMs = Date.now();
+8010-  var importantPosts = (S.feedPosts||[]).filter(function(p){
+8011-    return p.important && p.createdAt && (nowMs - new Date(p.createdAt).getTime()) < 86400000;
+8012:  }).sort(function(a,b){ return (b.createdAt||'')<(a.createdAt||'') ? -1 : 1; });
+8013-  var importantCard = importantPosts.map(function(p){
+8014-    var pText = p.text || p.photoCaption || '';
+8015-    var pTagged = (p.tagged && p.tagged.length) ? ('<div style="font-size:12px;color:var(--red-muted);margin-top:4px">avec '+p.tagged.map(function(t){return escHtml(personDisplayName(t,'Toi'));}).join(', ')+'</div>') : '';
+8016-    return '<div class="info-card" style="border:1.5px solid var(--red-muted);background:var(--red-pale);cursor:pointer;padding:0;overflow:hidden" onclick="setTab(\'feed\')">'
+8017-      +'<div style="padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px"><div class="ic-header" style="color:var(--red-muted);margin:0">'+svgIcon('triangle-alert',16)+' Important — '+escHtml(personDisplayName(p.author,'Toi'))+'</div><span style="font-size:11px;color:var(--ink-subtle);flex-shrink:0">'+timeAgoLabel(p.createdAt)+'</span></div>'
+8018-      +(p.photo?('<img src="'+p.photo+'" style="width:100%;display:block;max-height:220px;object-fit:cover"/>'):'')
+8019-      +(pText||pTagged?('<div style="padding:'+(p.photo?'10px':'0')+' 16px 14px">'
+8020-      +(pText?'<div style="font-size:13.5px;color:var(--ink);line-height:1.4">'+linkifyText(pText)+'</div>':'')
+8021-      +pTagged
+8022-      +'</div>'):(p.photo?'<div style="height:8px"></div>':''))
+8023-      +'</div>';
+8024-  }).join('');
+8025-
+8026-  return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
+8027-    +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
+8028-    +heroHTML
+8029-    +summaryHTML
+8030-    +importantCard
+8031-    +(isFlightSoon?flightCard:'')
+8032-    +actsCard
+8033-    +(isFlightSoon?'':flightCard)
+8034-    +photoSpotCard
+8035-    +tomorrowCard
+8036-    +forgetCard
+--
+8416-  }).join('');
+8417-
+8418-  var body='';
+8419-  var fabHTML = '<button class="budget-fab" onclick="openAddExpenseModal()" title="Ajouter une dépense">'+svgIcon('plus',24)+'</button>';
+8420-
+8421-  if(sub==='resume'){
+8422-    if(S.budgetCountryView){
+8423-      var cv = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
+8424-      if(!cv){ S.budgetCountryView=null; }
+8425-    }
+8426-    if(S.budgetPersonView){
+8427-      var myLabelP = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+8428:      var pExps = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===S.budgetPersonView && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+8429-      var pTotal = pExps.reduce(function(s,e){return s+e.amount;},0);
+8430-      var byDateP = {}; var dateOrderP = [];
+8431-      pExps.forEach(function(e){
+8432-        if(!byDateP[e.date]){ byDateP[e.date]=[]; dateOrderP.push(e.date); }
+8433-        byDateP[e.date].push(e);
+8434-      });
+8435-      var groupsHTMLP = dateOrderP.map(function(d){
+8436-        var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+8437-        var rows = byDateP[d].map(function(e){
+8438-          var c3 = COUNTRIES.find(function(co){return co.id===e.country;});
+8439-          var catIcon = getExpenseCategoryIcon(e.category);
+8440-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span style="font-size:14px;margin-right:2px">'+(c3?c3.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+8441-        }).join('');
+8442-        return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
+8443-      }).join('');
+8444-      // Exception : mes propres dépenses peuvent se comparer au budget PRÉVU (règle validée).
+8445-      // Pour tout le monde d'autre : comparaison avec les dépenses RÉELLES du groupe, jamais une estimation.
+8446-      var isSelfView = S.budgetPersonView===myLabelP;
+8447-      var myTotalBudget = getMyTotalPlannedBudget();
+8448-      var pDenom = isSelfView ? myTotalBudget : totalSpent;
+8449-      var pPctReal = pDenom>0 ? Math.round((pTotal/pDenom)*100) : 0;
+8450-      var pOver = isSelfView && pPctReal>100;
+8451-      var pSubLabel = isSelfView ? ('sur '+fmtEUR(myTotalBudget)+' prévu au total') : ('sur '+fmtEUR(totalSpent)+' dépensés au total par le groupe');
+8452-      body = '<div class="more-row" onclick="S.budgetPersonView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+8453-        +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
+8454-        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Payé par '+escHtml(S.budgetPersonView===myLabelP?'moi':personDisplayName(S.budgetPersonView))+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(pTotal)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">'+pSubLabel+'</div></div>'
+8455-        +renderProgressRing(pPctReal, 72, 7, pOver?'#E76F51':'#95D5B2')
+8456-        +'</div></div>'
+8457-        +(pExps.length ? groupsHTMLP : '<div class="fav-empty">Aucune dépense payée par cette personne.</div>')
+8458-        +fabHTML;
+8459-    } else if(S.budgetCountryView){
+8460-      var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
+8461-      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+8462-      var cBudget = getCountryPlannedBudget(c2);
+8463:      var cExps = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+8464-      var byDate = {};
+8465-      var dateOrder = [];
+8466-      cExps.forEach(function(e){
+8467-        if(!byDate[e.date]){ byDate[e.date]=[]; dateOrder.push(e.date); }
+8468-        byDate[e.date].push(e);
+8469-      });
+8470-      var groupsHTML = dateOrder.map(function(d){
+8471-        var dLabel = new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+8472-        var rows = byDate[d].map(function(e){
+8473-          var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
+8474-          var catIcon = getExpenseCategoryIcon(e.category);
+8475-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+8476-        }).join('');
+8477-        return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
+8478-      }).join('');
+8479-      var cPctReal = cBudget>0 ? Math.round((cSpent/cBudget)*100) : 0;
+8480-      var cOver = cPctReal>100;
+8481-      // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
+8482-      body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+8483-        +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
+8484-        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpent)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' prévu</div></div>'
+8485-        +renderProgressRing(cPctReal, 72, 7, cOver?'#E76F51':'#95D5B2')
+8486-        +'</div></div>'
+8487-        +(cExps.length ? groupsHTML : '<div class="fav-empty">Aucune dépense enregistrée pour ce pays.</div>')
+--
+8494-      var pReal = budget>0 ? Math.round((countrySpent/budget)*100) : 0;
+8495-      var isOver = pReal>100;
+8496-      var p = Math.min(100, pReal);
+8497-      var barColor = isOver ? '#E76F51' : '';
+8498-      return '<div class="budget-country-row" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'
+8499-        +'<div class="bcr-top"><span class="bcr-flag">'+c.flag+'</span><span class="bcr-name">'+c.name+'</span>'
+8500-        +'<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0"><span class="bcr-amt">'+fmtEUR(countrySpent)+' / '+fmtEUR(budget)+'</span><div class="bh-bar" style="margin-top:7px;width:100%;height:7px;border-radius:3.5px"><div class="bh-fill" style="width:'+p+'%;border-radius:3.5px'+(barColor?';background:'+barColor:'')+'"></div></div></div>'
+8501-        +'<span class="bcr-pct"'+(isOver?' style="color:#E76F51"':'')+'>'+pReal+'%</span></div>'
+8502-        +'</div>';
+8503-    }).join('');
+8504-    var paidBalances = computeBalances();
+8505-    var myLabel3 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+8506:    var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
+8507-      return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';save();renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
+8508-        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Moi':personDisplayName(b.person))+'</span></div>'
+8509-        +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
+8510-        +'</div>';
+8511-    }).join('');
+8512-    // ── Carte "Mes depenses vs Total groupe" : un seul encart moderne, degrade, texte adaptatif ──
+8513-    var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+8514-    var mySpent = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+8515-    var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
+8516-    var nbTravelers = 1 + ((typeof CURRENT_COLLABORATORS !== 'undefined' && CURRENT_COLLABORATORS ? CURRENT_COLLABORATORS.length : 0));
+8517-    var dashRow;
+8518-    if(nbTravelers >= 2){
+8519-      dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'        +'<div style="display:flex;align-items:flex-end;gap:16px">'        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Mes dépenses</div>'        +'<div style="display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-size:34px;font-weight:700;letter-spacing:-1px">'+fmtEUR(mySpent)+'</span><span style="color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',18)+'</span></div></div>'        +'<div style="width:1px;align-self:stretch;background:rgba(255,255,255,0.18)"></div>'        +'<div style="flex:1;text-align:right"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total groupe</div>'        +'<div style="font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-top:6px;color:rgba(255,255,255,0.92)">'+fmtEUR(totalSpent)+'</div></div>'        +'</div>'        +'<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+mySharePct+'%;background:#95D5B2;border-radius:2px"></div></div>'        +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">Tu représentes '+mySharePct+'% des dépenses du groupe</div>'        +'</div>';    } else {
+8520-      dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'        +'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total dépenses</div>'        +'<div style="display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-size:34px;font-weight:700;letter-spacing:-1px">'+fmtEUR(totalSpent)+'</span><span style="color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',18)+'</span></div>'        +(totalBudget>0 ? '<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+Math.min(100,pct)+'%;background:#95D5B2;border-radius:2px"></div></div>'        +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">'+pct+'% du budget prévu ('+fmtEUR(totalBudget)+')</div>' : '')        +'</div>';    }    body = dashRow
+8521-      +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
+8522-      +fabHTML;
+8523-    }
+8524-  } else if(sub==='remb'){
+8525-    var balances = computeBalances();
+8526-    var txns = simplifyDebts(balances);
+8527-    var myLabel2 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
+8528-    var balanceCards = balances.map(function(b){
+8529-      var isPos = b.balance>0.01, isNeg = b.balance<-0.01;
+8530-      var color = isPos?'var(--accent)':(isNeg?'var(--red-muted)':'var(--ink-subtle)');
+--
+8543-        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
+8544-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(fromLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromLabel)+'</span></div>'
+8545-        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
+8546-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(toLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
+8547-        +'</div>'
+8548-        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#C9762E;flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
+8549-        +'</div>'
+8550-        +'<div style="display:flex;justify-content:flex-end;margin-top:6px">'
+8551-        +'<button class="settle-btn" onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')">'+svgIcon('check',12)+' Marqué remboursé</button>'
+8552-        +'</div>'
+8553-        +'</div>';
+8554-    }).join('') : '<div class="fav-empty">Tout le monde est à jour 🎉</div>';
+8555:    var reimbHistory = S.expenses.filter(function(e){return e.category==='reimbursement';}).sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+8556-    var reimbHistoryByMonth = {};
+8557-    var reimbHistoryMonthOrder = [];
+8558-    reimbHistory.forEach(function(e){
+8559-      var monthKey = e.date.slice(0,7); // 'YYYY-MM'
+8560-      if(!reimbHistoryByMonth[monthKey]){ reimbHistoryByMonth[monthKey]=[]; reimbHistoryMonthOrder.push(monthKey); }
+8561-      reimbHistoryByMonth[monthKey].push(e);
+8562-    });
+8563-    var reimbHistHTML = reimbHistoryMonthOrder.map(function(monthKey, monthIdx){
+8564-      var monthLabel = new Date(monthKey+'-01T00:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+8565-      monthLabel = monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+8566-      var accKey = 'reimb_month_'+monthKey;
+8567-      var isOpen = S.uiAccordion && S.uiAccordion[accKey]!==undefined ? !!S.uiAccordion[accKey] : monthIdx===0;
+8568-      var itemsHTML = reimbHistoryByMonth[monthKey].map(function(e){
+8569-      var toP = (e.participants&&e.participants[0]) || '?';
+8570-      var fromName = e.personLabel===myLabel2 ? 'Moi' : personDisplayName(e.personLabel);
+8571-      var toName = toP===myLabel2 ? 'Moi' : personDisplayName(toP);
+8572-      var dLabel = new Date(e.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+8573-      return '<div class="rh-card">'
+8574-        // Ligne 1 : participants (gauche) / montant (droite, mis en valeur)
+8575-        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+8576-        +'<div style="display:flex;align-items:center;gap:6px;min-width:0">'
+8577-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(fromName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(fromName)+'</span></div>'
+8578-        +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
+8579-        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
+--
+8902-      var per = e.amount / parts.length;
+8903-      sharesMap = {}; parts.forEach(function(p){ sharesMap[p]=per; });
+8904-    }
+8905-    Object.keys(sharesMap).forEach(function(p){ if(people.indexOf(p)>-1) share[p] = (share[p]||0) + sharesMap[p]; });
+8906-    var payer = canonicalPerson(e.personLabel || e.person);
+8907-    if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + e.amount;
+8908-  });
+8909-  return people.map(function(p){
+8910-    return {person:p, paid:paid[p]||0, share:share[p]||0, balance:(paid[p]||0)-(share[p]||0)};
+8911-  });
+8912-}
+8913-function simplifyDebts(balances){
+8914:  var creditors = balances.filter(function(b){return b.balance>0.01;}).map(function(b){return {person:b.person,amt:b.balance};}).sort(function(a,b){return b.amt-a.amt;});
+8915:  var debtors = balances.filter(function(b){return b.balance<-0.01;}).map(function(b){return {person:b.person,amt:-b.balance};}).sort(function(a,b){return b.amt-a.amt;});
+8916-  var txns = [];
+8917-  var i=0,j=0;
+8918-  while(i<debtors.length && j<creditors.length){
+8919-    var d=debtors[i], c=creditors[j];
+8920-    var amt = Math.min(d.amt, c.amt);
+8921-    if(amt>0.01) txns.push({from:d.person, to:c.person, amount:amt});
+8922-    d.amt -= amt; c.amt -= amt;
+8923-    if(d.amt<=0.01) i++;
+8924-    if(c.amt<=0.01) j++;
+8925-  }
+8926-  return txns;
+8927-}
+8928-function setBudgetSubTab(t){ S.budgetSubTab=t; S.budgetCountryView=null; save(); renderContent(); }
+8929-function renderExpenseFormModal(){
+8930-  var countryOptions = COUNTRIES.map(function(c){return '<option value="'+c.id+'"'+(S.expCountry===c.id?' selected':'')+'>'+c.flag+' '+c.name+'</option>';}).join('');
+8931-  var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
+8932-  var cityOptions = selCountry.cities.map(function(ci){return '<option value="'+escHtml(ci.city)+'"'+(S.expCity===ci.city?' selected':'')+'>'  +escHtml(_cityDisplayName(selCountry.id+'_'+ci.city,ci))+'</option>';}).join('');
+8933-  var selCity = selCountry.cities.find(function(ci){return ci.city===S.expCity;});
+8934-  var activityOptions = selCity ? selCity.acts.map(function(a){return '<option value="'+escHtml(a.n)+'"'+(S.expActivity===a.n?' selected':'')+'>'+escHtml(a.n)+'</option>';}).join('') : '';
+8935-  var personOptions = getExpensePersonOptions();
+8936-  var isEditing = !!S.editingExpenseId;
+8937-  return '<div class="modal-title" style="font-size:18px;margin-bottom:14px">'+(isEditing?'Modifier la dépense':'Ajouter une dépense')+'</div>'
+8938-    +'<div class="ef-row"><select class="ef-select" id="expCountrySel" onchange="S.expCountry=this.value;S.expCity=\'\';S.expActivity=\'\';refreshExpenseModal()">'+countryOptions+'</select></div>'
+8939-    +'<div class="ef-row"><input class="ef-input" type="text" placeholder="Description" id="eDesc" value="'+escHtml(S.expDesc||'')+'" oninput="S.expDesc=this.value"/></div>'
+--
+9377-    }
+9378-  }, 'Retirer');
+9379-}
+9380-async function loadFlights(){
+9381-  if(!sb || !CURRENT_TRIP) return;
+9382-  var {data, error} = await sb.from('flights').select('*').eq('trip_id',CURRENT_TRIP.id);
+9383-  if(error){ return; } // table pas encore créée ou erreur réseau : on garde les vols locaux tels quels
+9384-  if(!S.documents) S.documents = {};
+9385-  if(!S.documents.tickets) S.documents.tickets = {};
+9386-  // Serveur autoritaire : reconstruction complète de la liste des vols.
+9387-  S.documents.tickets.flightsList = (data||[]).map(function(row){
+9388-    return {id:row.id, from:row.from_place, to:row.to_place, date:row.flight_date, link:row.link, participants:row.participants||[]};
+9389:  }).sort(function(a,b){ return (a.date||'')<(b.date||'') ? -1 : ((a.date||'')>(b.date||'') ? 1 : 0); });
+9390-  save();
+9391-}
+9392-
+9393-// ── FIL DU VOYAGE (FEED) ────────────────────────────────────
+9394-function markFeedSeen(){
+9395-  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+9396-  S.feedLastSeenAt = new Date().toISOString();
+9397-  try{ if(CURRENT_STORAGE_KEY) localStorage.setItem(CURRENT_STORAGE_KEY+'_feedSeen', S.feedLastSeenAt); }catch(e){}
+9398-  if(!S.feedSeenReactionCounts) S.feedSeenReactionCounts={};
+9399-  (S.feedPosts||[]).forEach(function(p){
+9400-    if(canonicalPerson(p.author)===myEmail){
+9401-      S.feedSeenReactionCounts[p.id] = (p.reactions||[]).length;
+9402-    }
+9403-  });
+9404-  try{ if(CURRENT_STORAGE_KEY) localStorage.setItem(CURRENT_STORAGE_KEY+'_feedSeenReactions', JSON.stringify(S.feedSeenReactionCounts)); }catch(e){}
+9405-  save();
+9406-  updateFeedBadge();
+9407-  if(sb && CURRENT_TRIP && CURRENT_USER){
