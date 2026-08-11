@@ -13056,10 +13056,10 @@ async function loadCitiesActivities(){
     // migration legacy→stable. Les clés _sid_ en sont filtrées et ces writes ne servent donc
     // pas la migration ; ils peuvent en revanche écraser une valeur Supabase plus récente
     // (date/moment/horaires) avant que loadActivityDetails() ne la recharge.
-    Promise.all([
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:_blobOnly(S.actDay),       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),
-      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:_blobOnly(S.done),         updated_at:_mnow},{onConflict:'trip_id,detail_key'})
-    ]).catch(function(e){ console.error('[PlaniTrip] migration blobs upsert:', e); });
+    // P0.8-C : même garde que pour date/moment/horaires/catégorie.
+    // Une migration legacy ne doit JAMAIS écrire actDay/done depuis le cache local :
+    // ces blobs ne sont pas nécessaires à la migration des clés _sid_ et peuvent
+    // écraser une valeur collaborative plus récente avant le chargement serveur.
     // Fiches individuelles : upsert sous la clé stable uniquement (jamais de delete de la
     // légacy ici — cette migration est best-effort et purement locale à la lecture, on laisse
     // la légacy en place tant qu'aucune écriture explicite n'a confirmé la nouvelle clé).
