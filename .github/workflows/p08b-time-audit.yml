@@ -1,0 +1,31 @@
+name: P0.8-B timing audit
+on:
+  push:
+    branches:
+      - gpt/p08b-time-audit
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit timing flow
+        run: |
+          {
+            echo '=== timing functions ==='
+            grep -n -B 8 -A 28 -E "function (setActMoment|setActivityTime|setActTime|savePlanningModal|_syncActivityState|_syncPlanningBlobs)" index.html || true
+            echo '=== timing assignments ==='
+            grep -n -B 4 -A 8 -E "S\.act(TimeStart|TimeEnd|Time|Moment)\[" index.html || true
+            echo '=== timing blob loader ==='
+            grep -n -B 4 -A 8 -E "__planitrip__act(TimeStart|TimeEnd|Time|Moment)|state\.timeStart|state\.timeEnd|state\.moment" index.html || true
+            echo '=== render sort ==='
+            grep -n -B 8 -A 30 -E "_flatItems\.sort|momentGroups\[mk\]\.sort" index.html || true
+          } > P08B_TIME_AUDIT.txt
+      - name: Commit audit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add P08B_TIME_AUDIT.txt
+          git commit -m "chore: record P0.8-B timing audit"
+          git push origin HEAD:gpt/p08b-time-audit
