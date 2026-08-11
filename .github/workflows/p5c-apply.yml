@@ -19,7 +19,21 @@ jobs:
           git diff --check
           test "$(grep -c "sync detail geo" index.html)" -eq 1
           test "$(grep -c "_dfField === '_geo'" index.html)" -eq 1
-          node --check <(python -c "import re,pathlib; h=pathlib.Path('index.html').read_text(); print('\\n'.join(b for a,b in re.findall(r'<script\\b([^>]*)>(.*?)</script>',h,flags=re.I|re.S) if not re.search(r'\\bsrc\\s*=',a,flags=re.I)))")
+          python - <<'PY'
+          import re, pathlib, subprocess
+          html = pathlib.Path('index.html').read_text(encoding='utf-8')
+          n = 0
+          for attrs, body in re.findall(r'<script\b([^>]*)>(.*?)</script>', html, flags=re.I|re.S):
+              if re.search(r'\bsrc\s*=', attrs, flags=re.I):
+                  continue
+              q = pathlib.Path(f'/tmp/p5c-inline-{n}.js')
+              q.write_text(body, encoding='utf-8')
+              subprocess.run(['node','--check',str(q)], check=True)
+              n += 1
+          if not n:
+              raise SystemExit('no inline scripts')
+          print('validated', n, 'inline scripts')
+          PY
       - name: Commit patch
         run: |
           git config user.name "PlaniTrip GPT"
