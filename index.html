@@ -6565,15 +6565,17 @@ function swipeMove(e, el){
   }
   if(_swipeState && _swipeState.dragging){
     var allowRight = !!el.dataset.actKey;
+    var _swipeWrap = el.parentNode;
+    var _swipeDeleteBg = _swipeWrap ? _swipeWrap.querySelector('.swipe-delete-bg') : null;
+    var _swipeLeftMax = (_swipeDeleteBg && _swipeDeleteBg.offsetWidth) ? _swipeDeleteBg.offsetWidth : 160;
     var dxRaw;
-    if(dx>=0){
+    if(_swipeState.wasOpen){
+      // Une carte deja ouverte suit le doigt de -largeur vers 0 lors d'un geste droite.
+      dxRaw = Math.min(0, Math.max(-_swipeLeftMax, -_swipeLeftMax + dx));
+    } else if(dx>=0){
       dxRaw = allowRight ? Math.min(90, dx) : 0;
     } else {
-      var _swipeWrap = el.parentNode;
-      var _swipeDeleteBg = _swipeWrap ? _swipeWrap.querySelector('.swipe-delete-bg') : null;
-      var _swipeLeftMax = (_swipeDeleteBg && _swipeDeleteBg.offsetWidth) ? _swipeDeleteBg.offsetWidth : 160;
-      var base = _swipeState.wasOpen ? -_swipeLeftMax : 0;
-      dxRaw = Math.min(0, Math.max(-_swipeLeftMax, base + dx));
+      dxRaw = Math.min(0, Math.max(-_swipeLeftMax, dx));
     }
     _swipeState.dx = dxRaw;
     el.style.transition = 'none';
@@ -6640,9 +6642,11 @@ function swipeEnd(e, el){
       // plus jamais vers la fiche ville (openCityDetail jamais appelé).
     }
   } else if(_swipeState.wasOpen){
-    el.style.transform = '';
-    el.dataset.swipeOpen = '';
-    snapBg(false);
+    // Un simple tap sur une carte ouverte ne doit plus refermer l'action.
+    var _keepOpenWidth = (delBg && delBg.offsetWidth) ? delBg.offsetWidth : 160;
+    el.style.transform = 'translateX(-'+_keepOpenWidth+'px)';
+    el.dataset.swipeOpen = '1';
+    snapBg(true);
     e.preventDefault();
   }
   _swipeState = null;
