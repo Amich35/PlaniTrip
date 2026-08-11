@@ -1,0 +1,31 @@
+name: Target country UI audit
+on:
+  push:
+    branches: [gpt/ui-country-actions]
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture exact country action blocks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8').splitlines()
+          needles=['archiveCurrentCountry(', 'deleteCountryPermanently(', 'restoreCountry(', 'archived-countries', 'country-card swipe-fg']
+          hits=[]
+          for i,line in enumerate(s):
+            if any(n in line for n in needles):
+              a=max(0,i-18); b=min(len(s),i+28)
+              hits.append('\n'.join(f'{j+1}:{s[j]}' for j in range(a,b)))
+          Path('.github/_country_ui_target.txt').write_text('\n\n===== HIT =====\n\n'.join(hits),encoding='utf-8')
+          PY
+      - name: Commit target audit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/_country_ui_target.txt
+          git commit -m "chore: capture exact country UI blocks"
+          git push origin HEAD:gpt/ui-country-actions
