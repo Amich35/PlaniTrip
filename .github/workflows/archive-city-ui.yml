@@ -1,0 +1,40 @@
+name: Apply city archive UI
+on:
+  push:
+    branches: [gpt/archive-city-ui]
+    paths: [.github/workflows/archive-city-ui.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/archive-city-ui
+      - name: Patch index
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html'); s=p.read_text(encoding='utf-8')
+          old="return '<div class=\"swipe-wrap\" style=\"border-radius:var(--r22)\"><div class=\"swipe-delete-bg\" style=\"border-radius:0 var(--r22) var(--r22) 0\" onclick=\"deleteCityConfirm(\\''+c.id+'\\',\\''+jsStrEsc(city.city)+'\\')\">'+svgIcon('trash-2',15)+' Supprimer</div>'"
+          new="return '<div class=\"swipe-wrap\" style=\"border-radius:var(--r22)\"><div class=\"swipe-delete-bg city-archive-bg\" style=\"width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600\" onclick=\"deleteCityConfirm(\\''+c.id+'\\',\\''+jsStrEsc(city.city)+'\\')\">'+svgIcon('archive',16)+' <span>Archiver</span></div>'"
+          assert s.count(old)==1, s.count(old)
+          s=s.replace(old,new,1)
+          old2="showConfirm('Supprimer '+cityName+' ? Tu pourras la restaurer à tout moment depuis la Corbeille. Ses activités, dépenses et entrées de carnet liées seront aussi mises en corbeille.', function(){\n    deleteCity(countryId, cityName);\n  }, 'Supprimer');"
+          new2="showConfirm('Archiver '+cityName+' ? Tu pourras la restaurer à tout moment depuis la Corbeille. Ses activités, dépenses et entrées de carnet liées seront aussi archivées.', function(){\n    deleteCity(countryId, cityName);\n  }, 'Archiver');"
+          assert s.count(old2)==1, s.count(old2)
+          s=s.replace(old2,new2,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Validate
+        run: |
+          git diff --check
+          grep -q "city-archive-bg" index.html
+          grep -q "Archiver '+cityName" index.html
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(ui): align city action with archive semantics"
+          git push origin HEAD:gpt/archive-city-ui
