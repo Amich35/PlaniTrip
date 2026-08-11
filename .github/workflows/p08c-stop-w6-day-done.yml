@@ -1,0 +1,50 @@
+name: Apply P0.8-C W6 day done guard
+on:
+  push:
+    branches: [gpt/p08c-stop-w6-day-done]
+    paths: [.github/workflows/p08c-stop-w6-day-done.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08c-stop-w6-day-done
+      - name: Patch index
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          old="""    Promise.all([\n      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__actDay',       data:_blobOnly(S.actDay),       updated_at:_mnow},{onConflict:'trip_id,detail_key'}),\n      sb.from('activity_details').upsert({trip_id:_mtid,detail_key:'__planitrip__done',         data:_blobOnly(S.done),         updated_at:_mnow},{onConflict:'trip_id,detail_key'})\n    ]).catch(function(e){ console.error('[PlaniTrip] migration blobs upsert:', e); });\n"""
+          new="""    // P0.8-C : même garde que pour date/moment/horaires/catégorie.\n    // Une migration legacy ne doit JAMAIS écrire actDay/done depuis le cache local :\n    // ces blobs ne sont pas nécessaires à la migration des clés _sid_ et peuvent\n    // écraser une valeur collaborative plus récente avant le chargement serveur.\n"""
+          if s.count(old)!=1:
+              raise SystemExit(f'expected one W6 day/done block, got {s.count(old)}')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Validate
+        run: |
+          git diff --check
+          python - <<'PY'
+          import re, pathlib, subprocess, tempfile, os
+          s=pathlib.Path('index.html').read_text(encoding='utf-8')
+          marker=s.index('P0.8-C : même garde')
+          tail=s[marker:marker+900]
+          if "detail_key:'__planitrip__actDay'" in tail or "detail_key:'__planitrip__done'" in tail:
+              raise SystemExit('W6 day/done writer still present near guard')
+          for m in re.finditer(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S):
+              body=m.group(1)
+              if not body.strip() or 'src=' in m.group(0).split('>')[0]: continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8'); f.write(body); f.close()
+              r=subprocess.run(['node','--check',f.name],capture_output=True,text=True); os.unlink(f.name)
+              if r.returncode: raise SystemExit(r.stderr)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(P0.8-C): stop W6 from overwriting day and done blobs"
+          git push origin HEAD:gpt/p08c-stop-w6-day-done
