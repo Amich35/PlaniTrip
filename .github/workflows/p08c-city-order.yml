@@ -1,0 +1,59 @@
+name: Apply P0.8-C city order
+on:
+  push:
+    branches: [gpt/p08c-city-order]
+    paths: [.github/workflows/p08c-city-order.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/p08c-city-order
+      - name: Patch index
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html'); s=p.read_text(encoding='utf-8')
+          old="""function syncCityOrder(){\n  if(sb && CURRENT_TRIP){\n    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder',data:S.cityOrder,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error(\"[PlaniTrip] sync error:\",_r.error); });\n  }\n}\n"""
+          new="""function syncCityOrder(countryId){\n  if(sb && CURRENT_TRIP && countryId){\n    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityOrder__'+countryId,data:(S.cityOrder[countryId]||[]),updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error(\"[PlaniTrip] sync city order:\",_r.error); });\n  }\n}\n"""
+          if s.count(old)!=1: raise SystemExit('syncCityOrder def mismatch')
+          s=s.replace(old,new,1)
+          # moveCity caller
+          s=s.replace("S.cityOrder[countryId]=order;\n  save();renderContent();\n  syncCityOrder();","S.cityOrder[countryId]=order;\n  save();renderContent();\n  syncCityOrder(countryId);",1)
+          # drag caller
+          s=s.replace("S.cityOrder[country]=order;\n      save(); renderContent();\n      syncCityOrder();","S.cityOrder[country]=order;\n      save(); renderContent();\n      syncCityOrder(country);",1)
+          # delete city caller
+          s=s.replace("save();\n  renderContent();\n  syncDeletedActs(); syncCityOrder(); syncDeletedCities(); syncCityTrash();","save();\n  renderContent();\n  syncDeletedActs(); syncCityOrder(countryId); syncDeletedCities(); syncCityTrash();",1)
+          # restore city caller
+          s=s.replace("S.cityTrash.splice(idx,1);\n  save();\n  renderContent();\n  syncDeletedActs(); syncCityOrder(); syncDeletedCities(); syncCityTrash();","S.cityTrash.splice(idx,1);\n  save();\n  renderContent();\n  syncDeletedActs(); syncCityOrder(t.countryId); syncDeletedCities(); syncCityTrash();",1)
+          loader="""    } else if(row.detail_key === '__planitrip__cityOrder'){\n      if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }\n    } else if(row.detail_key === '__planitrip__deletedActs'){\n"""
+          loader2="""    } else if(row.detail_key === '__planitrip__cityOrder'){\n      if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }\n    } else if(row.detail_key.indexOf('__planitrip__cityOrder__')===0){\n      var _cityOrderCountry = row.detail_key.slice('__planitrip__cityOrder__'.length);\n      if(_cityOrderCountry && Array.isArray(row.data)){ S.cityOrder[_cityOrderCountry] = row.data; }\n    } else if(row.detail_key === '__planitrip__deletedActs'){\n"""
+          if s.count(loader)!=1: raise SystemExit('loader mismatch')
+          s=s.replace(loader,loader2,1)
+          p.write_text(s,encoding='utf-8')
+      - name: Validate
+        run: |
+          git diff --check
+          grep -q "__planitrip__cityOrder__'+countryId" index.html
+          grep -q "__planitrip__cityOrder__')===0" index.html
+          ! grep -q "syncCityOrder();" index.html
+          python - <<'PY'
+          import re, pathlib, subprocess, tempfile, os
+          s=pathlib.Path('index.html').read_text(encoding='utf-8')
+          for m in re.finditer(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S):
+              body=m.group(1)
+              if not body.strip() or 'src=' in m.group(0).split('>')[0]: continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8'); f.write(body); f.close()
+              r=subprocess.run(['node','--check',f.name],capture_output=True,text=True); os.unlink(f.name)
+              if r.returncode: raise SystemExit(r.stderr)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix(P0.8-C): persist city order per country"
+          git push origin HEAD:gpt/p08c-city-order
