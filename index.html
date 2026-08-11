@@ -10689,9 +10689,9 @@ if(!S.order) S.order={};
 if(!S.travelerBudgets) S.travelerBudgets={};
 if(!S.customDetails) S.customDetails={};
 if(!window._customDetails) window._customDetails=S.customDetails||{};
-function syncActOrder(){
-  if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder',data:S.order,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+function syncActOrder(ck){
+  if(sb && CURRENT_TRIP && ck){
+    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actOrder__'+ck,data:(S.order[ck]||[]),updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync act order:",_r.error); });
   }
 }
 function syncCityOrder(){
@@ -10742,7 +10742,7 @@ function moveActivity(ck,currentIndex,direction){
   newOrder[targetIndex]=tmp;
   S.order[ck]=newOrder;
   save();renderContent();
-  syncActOrder();
+  syncActOrder(ck);
 }
 // ── DRAG & DROP (touch + mouse) ──────────────────────────────
 var _drag = { type:null, fromIdx:null, fromCk:null, fromCountry:null, el:null, ghost:null };
@@ -10826,7 +10826,7 @@ function bindDragEvents() {
       var tmp=order[fromIdx]; order[fromIdx]=order[toIdx]; order[toIdx]=tmp;
       S.order[ck]=order;
       save(); renderContent();
-      syncActOrder();
+      syncActOrder(ck);
     }
 
     handle.addEventListener('touchstart',function(e){
@@ -13146,6 +13146,9 @@ async function loadActivityDetails(){
       if(row.data && typeof row.data === 'object'){ S.actDay = row.data; }
     } else if(row.detail_key === '__planitrip__actOrder'){
       if(row.data && typeof row.data === 'object'){ S.order = row.data; }
+    } else if(row.detail_key.indexOf('__planitrip__actOrder__')===0){
+      var _orderCk = row.detail_key.slice('__planitrip__actOrder__'.length);
+      if(_orderCk && Array.isArray(row.data)){ S.order[_orderCk] = row.data; }
     } else if(row.detail_key === '__planitrip__cityOrder'){
       if(row.data && typeof row.data === 'object'){ S.cityOrder = row.data; }
     } else if(row.detail_key === '__planitrip__deletedActs'){
