@@ -7494,7 +7494,7 @@ function renderItinerary(c, embedded){
       : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+', '+getEnglishCountryName(c.name);
 
-    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg" style="border-radius:0 var(--r22) var(--r22) 0" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('trash-2',15)+' Supprimer</div>'
+    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-query="'+escHtml(imgQuery)+'"></div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
@@ -10491,9 +10491,9 @@ function cityTrashSectionHTML(countryId){
     +'</div>';
 }
 function deleteCityConfirm(countryId, cityName){
-  showConfirm('Supprimer '+cityName+' ? Tu pourras la restaurer à tout moment depuis la Corbeille. Ses activités, dépenses et entrées de carnet liées seront aussi mises en corbeille.', function(){
+  showConfirm('Archiver '+cityName+' ? Tu pourras la restaurer à tout moment depuis la Corbeille. Ses activités, dépenses et entrées de carnet liées seront aussi archivées.', function(){
     deleteCity(countryId, cityName);
-  }, 'Supprimer');
+  }, 'Archiver');
 }
 function deleteCity(countryId, cityName){
   if(!S.cityTrash) S.cityTrash=[]; // filet de sécurité si ensureStateDefaults() n'a pas encore tourné
