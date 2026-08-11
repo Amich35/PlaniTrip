@@ -4524,6 +4524,7 @@ function countActivitiesByDate(ck){
     if(isBase && S.deletedActs[ck+'_'+origIdx]) return;
     if(!isBase && !customs[origIdx]) return;
     var k = isBase ? (ck+'_'+origIdx) : getCustomActivityKey(ck, customs[origIdx], origIdx);
+    if(isActivityArchived(k)) return;
     var d = getActivityDate(k, countryId, cityName, slotIdx, order.length);
     if(d) counts[d] = (counts[d]||0)+1;
   });
@@ -6219,6 +6220,46 @@ function deleteActivityFromEl(el){
   var actName = el.getAttribute('data-act-name');
   deleteActivity(cityKey, idx, isCustom, actName);
 }
+async function archiveActivitySoft(cityKey,index,isCustom,actName){
+  if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour archiver cette activité.'); return; }
+  if(!S.trash) S.trash={}; if(!S.trash[cityKey]) S.trash[cityKey]=[];
+  if(!S.deletedActs) S.deletedActs={};
+  var act = isCustom ? (S.customActs[cityKey]||[])[index] : null;
+  // Les custom legacy _cN restent sur l'ancien chemin : pas de migration aveugle ici.
+  if(isCustom && (!act || !act._sid)) return {legacyRequired:true};
+  var actKey = isCustom ? getCustomActivityKey(cityKey,act,index) : cityKey+'_'+index;
+  var item;
+  if(isCustom){
+    item = JSON.parse(JSON.stringify(act));
+    item._wasCustom=true;
+  } else {
+    item = {_builtinIndex:index,_cityKey:cityKey};
+  }
+  item._softArchived=true;
+  item._archiveActKey=actKey;
+  var trashRes=await syncActivityTrashMarker(cityKey,actKey,item,true);
+  if(trashRes && trashRes.error){ alert('Impossible d’archiver cette activité pour le moment.'); return; }
+  var markerRes=await syncDeletedAct(actKey,true);
+  if(markerRes && markerRes.error){ await syncActivityTrashMarker(cityKey,actKey,item,false); alert('Impossible d’archiver cette activité pour le moment.'); return; }
+  if(!S.trash[cityKey].some(function(x){return _trashItemActKey(cityKey,x)===actKey;})) S.trash[cityKey].push(item);
+  S.deletedActs[actKey]=true;
+  // Aucune suppression de activities/activity_details/favorites, aucun changement de _sid.
+  save(); renderContent();
+}
+async function restoreActivitySoft(cityKey,trashIndex){
+  if(!S.trash || !S.trash[cityKey] || !S.trash[cityKey][trashIndex]) return;
+  var item=S.trash[cityKey][trashIndex];
+  var actKey=_trashItemActKey(cityKey,item);
+  if(!item._softArchived || !actKey) return;
+  if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour restaurer cette activité.'); return; }
+  var markerRes=await syncDeletedAct(actKey,false);
+  if(markerRes && markerRes.error){ alert('Impossible de restaurer cette activité pour le moment.'); return; }
+  var trashRes=await syncActivityTrashMarker(cityKey,actKey,item,false);
+  if(trashRes && trashRes.error){ await syncDeletedAct(actKey,true); alert('Impossible de restaurer cette activité pour le moment.'); return; }
+  if(S.deletedActs) delete S.deletedActs[actKey];
+  S.trash[cityKey].splice(trashIndex,1);
+  save(); renderContent();
+}
 async function deleteActivity(cityKey, index, isCustom, actName, opts) {
   var label = actName ? actName : 'cette activité';
   var _skipConfirm = opts && opts.skipConfirm;
@@ -6315,7 +6356,12 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
     save(); renderContent();
     syncDeletedActs();
   }
-  if(_skipConfirm){ _doDelete(); } else { showConfirm('Archiver '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', _doDelete, 'Archiver'); }
+  if(_skipConfirm){ _doDelete(); } else { showConfirm('Archiver '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', function(){
+    var _a=isCustom ? (S.customActs[cityKey]||[])[index] : null;
+    // Legacy _cN : conserver le flow historique, sans inventer de clé stable.
+    if(isCustom && (!_a || !_a._sid)){ _doDelete(); return; }
+    archiveActivitySoft(cityKey,index,isCustom,actName);
+  }, 'Archiver'); }
 }
 if(!S.deletedActs) S.deletedActs={};
 if(!S.trash) S.trash={};
@@ -6324,6 +6370,8 @@ if(!S.customRates) S.customRates={};
 
 function restoreActivity(cityKey, trashIndex) {
   if(!S.trash||!S.trash[cityKey]) return;
+  var _peek=S.trash[cityKey][trashIndex];
+  if(_peek && _peek._softArchived){ restoreActivitySoft(cityKey,trashIndex); return; }
   const item = S.trash[cityKey].splice(trashIndex,1)[0];
   if(!item) return;
   if(item._wasCustom) {
@@ -6414,7 +6462,11 @@ function restoreActivity(cityKey, trashIndex) {
 function deleteActivityPermanently(cityKey, trashIndex){
   if(!S.trash||!S.trash[cityKey]||!S.trash[cityKey][trashIndex]) return;
   showConfirm('Supprimer définitivement cette activité ? Cette action est irréversible.', function(){
+    var _item=S.trash[cityKey][trashIndex];
+    var _actKey=_trashItemActKey(cityKey,_item);
     S.trash[cityKey].splice(trashIndex,1);
+    // Le marqueur deleted reste vrai : suppression logique définitive, données physiques conservées par sécurité.
+    if(_item && _item._softArchived && _actKey) syncActivityTrashMarker(cityKey,_actKey,_item,false);
     save();
     renderContent();
   }, 'Supprimer définitivement');
@@ -7197,6 +7249,7 @@ function renderCityPanelContentBody(c, city){
         // data-act-key, propagé à toutes les actions carte) est stable entre appareils —
         // elle ne dépend plus de la position dans le tableau.
         var ck2=getCustomActivityKey(ck, ca, origIdx);
+        if(isActivityArchived(ck2)) return null;
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         if(activeDay!=='Tous' && cDateVal!==activeDay) return null;
         var caCat = getActCategory(ck2, ca.n, ca.m);
@@ -7305,7 +7358,7 @@ function renderCityPanelContentBody(c, city){
     // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
     var presentCats = {};
     city.acts.forEach(function(a,i){ if(!S.deletedActs[ck+'_'+i]){ getActCategory(ck+'_'+i,a.n,a.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); } });
-    (S.customActs[ck]||[]).forEach(function(ca,i){ getActCategory(getCustomActivityKey(ck,ca,i),ca.n,ca.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); });
+    (S.customActs[ck]||[]).forEach(function(ca,i){ var _k=getCustomActivityKey(ck,ca,i); if(isActivityArchived(_k)) return; getActCategory(_k,ca.n,ca.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); });
     var catKeys = Object.keys(presentCats);
     var categoryFilterHTML = '';
     if(catKeys.length){
@@ -7412,7 +7465,7 @@ function renderCityDetailScreen(){
   if(!city) { return closeCityDetailAndFallback(); }
 
   const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
-  const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
+  const cityTotal=visibleBase+countVisibleCustomActs(ck);
   const cityDone=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i]&&S.done[ck+'_'+i];}).length
     +(S.customActs[ck]||[]).filter(function(ca,i){return S.done[getCustomActivityKey(ck,ca,i)];}).length;
   const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
@@ -7486,7 +7539,7 @@ function renderItinerary(c, embedded){
     const ck=c.id+'_'+city.city;
 
     const visibleBase=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i];}).length;
-    const cityTotal=visibleBase+(S.customActs[ck]||[]).length;
+    const cityTotal=visibleBase+countVisibleCustomActs(ck);
     const cityDone=city.acts.filter(function(_,i){return !S.deletedActs[ck+'_'+i]&&S.done[ck+'_'+i];}).length
       +(S.customActs[ck]||[]).filter(function(ca,i){return S.done[getCustomActivityKey(ck,ca,i)];}).length;
     const pct=cityTotal>0?Math.round((cityDone/cityTotal)*100):0;
@@ -10409,8 +10462,9 @@ function _buildSearchIndex(){
         });
       });
       (S.customActs[ck]||[]).forEach(function(ca,i){
+        var _searchK=getCustomActivityKey(ck,ca,i); if(isActivityArchived(_searchK)) return;
         items.push({
-          k:getCustomActivityKey(ck,ca,i), countryId:c.id, flag:c.flag, country:c.name, city:_cityDisplayName(ck,city),
+          k:_searchK, countryId:c.id, flag:c.flag, country:c.name, city:_cityDisplayName(ck,city),
           name:_actDisplayName(getCustomActivityKey(ck,ca,i), ca.n), meta:'', tags:[]
         });
       });
@@ -10752,6 +10806,18 @@ function _deletedActDetailKey(actKey){ return '__planitrip__deletedAct__'+encode
 function syncDeletedAct(actKey, isDeleted){
   if(!sb || !CURRENT_TRIP || !actKey) return Promise.resolve(null);
   return sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_deletedActDetailKey(actKey),data:{actKey:actKey,deleted:!!isDeleted},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync deleted act:',_r.error); return _r; });
+}
+function _activityTrashDetailKey(actKey){ return '__planitrip__activityTrash__'+encodeURIComponent(actKey||''); }
+function _trashItemActKey(cityKey,item){
+  if(!item) return '';
+  if(item._archiveActKey) return item._archiveActKey;
+  if(item._builtinIndex!==undefined) return (item._cityKey||cityKey)+'_'+item._builtinIndex;
+  if(item._sid) return cityKey+'_sid_'+item._sid;
+  return '';
+}
+function syncActivityTrashMarker(cityKey,actKey,item,archived){
+  if(!sb || !CURRENT_TRIP || !cityKey || !actKey) return Promise.resolve(null);
+  return sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_activityTrashDetailKey(actKey),data:{cityKey:cityKey,actKey:actKey,archived:!!archived,item:item||null},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync activity trash:',_r.error); return _r; });
 }
 function syncDeletedActs(){
   // P0.8-C : migration/compatibilité vers un marqueur par activité ; plus aucun full-blob write.
@@ -12980,6 +13046,11 @@ function getCustomActivityKey(cityKey, activity, fallbackIndex){
   if(activity && activity._sid) return cityKey+'_sid_'+activity._sid;
   return cityKey+'_c'+fallbackIndex; // legacy — uniquement si pas encore synchronisé
 }
+function isActivityArchived(actKey){ return !!(S.deletedActs && S.deletedActs[actKey]); }
+function countVisibleCustomActs(cityKey){
+  var n=0; (S.customActs[cityKey]||[]).forEach(function(a,i){ if(!isActivityArchived(getCustomActivityKey(cityKey,a,i))) n++; });
+  return n;
+}
 // Variante quand seul le _sid est connu (sans l'objet activité complet).
 function getCustomActivityKeyFromSid(cityKey, sid, fallbackIndex){
   if(sid) return cityKey+'_sid_'+sid;
@@ -13244,6 +13315,7 @@ async function loadActivityDetails(){
   var _cityTrashRows = [];
   var _deletedActRows = [];
   var _deletedCityRows = [];
+  var _activityTrashRows = [];
   Object.values(latest).forEach(function(row){
     // Champs granulaires P0.8-A/5A : collectés puis appliqués APRÈS les fiches legacy,
     // pour être autoritaires indépendamment de l'ordre des rows Supabase.
@@ -13279,6 +13351,8 @@ async function loadActivityDetails(){
     } else if(row.detail_key.indexOf('__planitrip__cityOrder__')===0){
       var _cityOrderCountry = row.detail_key.slice('__planitrip__cityOrder__'.length);
       if(_cityOrderCountry && Array.isArray(row.data)){ S.cityOrder[_cityOrderCountry] = row.data; }
+    } else if(row.detail_key.indexOf('__planitrip__activityTrash__')===0){
+      if(row.data && typeof row.data === 'object' && row.data.cityKey && row.data.actKey){ _activityTrashRows.push(row.data); }
     } else if(row.detail_key.indexOf('__planitrip__deletedAct__')===0){
       if(row.data && typeof row.data === 'object' && row.data.actKey){ _deletedActRows.push(row.data); }
     } else if(row.detail_key === '__planitrip__deletedActs'){
@@ -13318,6 +13392,18 @@ async function loadActivityDetails(){
     var _da = {};
     _deletedActRows.forEach(function(m){ if(m && m.actKey && m.deleted) _da[m.actKey]=true; });
     S.deletedActs = _da;
+  }
+  // P0.8-C : corbeille activité partagée. archived:false retire aussi une vieille copie locale.
+  if(_activityTrashRows.length){
+    if(!S.trash) S.trash={};
+    _activityTrashRows.forEach(function(m){
+      if(!S.trash[m.cityKey]) S.trash[m.cityKey]=[];
+      S.trash[m.cityKey]=S.trash[m.cityKey].filter(function(it){ return _trashItemActKey(m.cityKey,it)!==m.actKey; });
+      if(m.archived && m.item){
+        m.item._softArchived=true; m.item._archiveActKey=m.actKey;
+        S.trash[m.cityKey].push(m.item);
+      }
+    });
   }
   // P0.8-C : dès que des lignes granulaires existent, elles deviennent autoritaires.
   if(_cityTrashRows.length){
