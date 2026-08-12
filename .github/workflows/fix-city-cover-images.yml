@@ -1,0 +1,172 @@
+name: Apply targeted city cover image fix
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fix-city-cover-images.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch city cover image selection
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # 1) City-only helpers. Keep generic activity filtering unchanged.
+          marker = "if(!S.customPhotos) S.customPhotos={};\nasync function fetchPlaceImage(query){"
+          assert marker in s, 'fetchPlaceImage marker not found'
+          helpers = r'''if(!S.customPhotos) S.customPhotos={};
+function _cityCoverText(title,url){
+  var text=((title||'')+' '+(url||'')).toLowerCase();
+  try{text=decodeURIComponent(text);}catch(e){}
+  return text.replace(/[_-]+/g,' ');
+}
+function isBadCityCover(title,url){
+  if(isLikelyNotAPhoto(url)) return true;
+  var text=_cityCoverText(title,url);
+  return /\b(atomic|bombing|bomb|mushroom|nuclear|world war|wwii|battle|attack|explosion|disaster|military|weapon|soldier|earthquake|tsunami|flood)\b/i.test(text);
+}
+function cityCoverScore(title,url){
+  var text=_cityCoverText(title,url);
+  var score=0;
+  if(/\b(skyline|cityscape|panorama|aerial|downtown|city view|street|night view)\b/i.test(text)) score+=10;
+  return score;
+}
+async function fetchPlaceImage(query, options){'''
+          s = s.replace(marker, helpers, 1)
+
+          # 2) Replace function body while preserving the original no-option path.
+          start = s.index('async function fetchPlaceImage(query, options){')
+          m = re.search(r'\n  return img;\n\}', s[start:])
+          assert m, 'fetchPlaceImage end not found'
+          end = start + m.end()
+          new_func = r'''async function fetchPlaceImage(query, options){
+  var isCityCover=!!(options&&options.cityCover);
+  if(S.customPhotos && S.customPhotos[query]) return S.customPhotos[query];
+  if(_imgCache[query]){
+    if(!isCityCover || !isBadCityCover('',_imgCache[query])) return _imgCache[query];
+    delete _imgCache[query];
+    _saveImgCache();
+  }
+  var img=null;
+
+  // Couvertures de ville : privilégier une vue actuelle/représentative et écarter
+  // les archives de guerre/catastrophe. Ce chemin n'est jamais utilisé par les activités.
+  if(isCityCover){
+    try{
+      var citySearch=query+' skyline cityscape panorama';
+      var cityUrl='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch='+encodeURIComponent(citySearch)+'&gsrlimit=12&prop=imageinfo&iiprop=url&iiurlwidth=900';
+      var cityRes=await fetch(cityUrl);
+      var cityData=await cityRes.json();
+      var cityPages=cityData&&cityData.query&&cityData.query.pages;
+      if(cityPages){
+        var candidates=[];
+        Object.values(cityPages).forEach(function(page){
+          var ii=page.imageinfo;
+          var u=ii&&ii[0]&&ii[0].thumburl;
+          if(u && !isBadCityCover(page.title||'',u)) candidates.push({url:u,score:cityCoverScore(page.title||'',u)});
+        });
+        candidates.sort(function(a,b){return b.score-a.score;});
+        if(candidates.length) img=candidates[0].url;
+      }
+    }catch(e){}
+
+    // Fallback Wikipedia, toujours avec le filtre spécifique ville.
+    if(!img){
+      try{
+        var cityWiki='https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=900&generator=search&gsrsearch='+encodeURIComponent(query+' city skyline')+'&gsrlimit=5';
+        var cityWikiRes=await fetch(cityWiki);
+        var cityWikiData=await cityWikiRes.json();
+        var cityWikiPages=cityWikiData&&cityWikiData.query&&cityWikiData.query.pages;
+        if(cityWikiPages){
+          var wikiCandidates=[];
+          Object.values(cityWikiPages).forEach(function(page){
+            var u=page&&page.thumbnail&&page.thumbnail.source;
+            if(u && !isBadCityCover(page.title||'',u)) wikiCandidates.push({url:u,score:cityCoverScore(page.title||'',u)});
+          });
+          wikiCandidates.sort(function(a,b){return b.score-a.score;});
+          if(wikiCandidates.length) img=wikiCandidates[0].url;
+        }
+      }catch(e){}
+    }
+  } else {
+    // Comportement historique inchangé pour activités, pays et autres images.
+    try{
+      var url='https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=600&generator=search&gsrsearch='+encodeURIComponent(query)+'&gsrlimit=1';
+      var res=await fetch(url);
+      var data=await res.json();
+      var pages=data&&data.query&&data.query.pages;
+      if(pages){
+        var first=Object.values(pages)[0];
+        if(first&&first.thumbnail&&first.thumbnail.source && !isLikelyNotAPhoto(first.thumbnail.source)) img=first.thumbnail.source;
+      }
+    }catch(e){}
+    if(!img){
+      try{
+        var curl='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch='+encodeURIComponent(query)+'&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=600';
+        var cres=await fetch(curl);
+        var cdata=await cres.json();
+        var cpages=cdata&&cdata.query&&cdata.query.pages;
+        if(cpages){
+          var list=Object.values(cpages);
+          for(var i=0;i<list.length;i++){
+            var ii=list[i].imageinfo;
+            if(ii&&ii[0]&&ii[0].thumburl && !isLikelyNotAPhoto(ii[0].thumburl)){ img=ii[0].thumburl; break; }
+          }
+        }
+      }catch(e){}
+    }
+  }
+  if(img){ _imgCache[query]=img; _saveImgCache(); }
+  return img;
+}'''
+          s = s[:start] + new_func + s[end:]
+
+          # 3) Only data-img-kind=city elements opt into the new behavior.
+          old_loader = "    fetchPlaceImage(q).then(function(url){"
+          new_loader = "    fetchPlaceImage(q, el.getAttribute('data-img-kind')==='city' ? {cityCover:true} : undefined).then(function(url){"
+          assert s.count(old_loader) >= 1, 'loadPlaceImages fetch call not found'
+          s = s.replace(old_loader, new_loader, 1)
+
+          # 4) Tag exactly the two city-cover surfaces: city detail hero + city list thumbnail.
+          old_thumb = "'<div class=\"city-thumb\" data-img-query=\"'+escHtml(imgQuery)+'\"></div>'"
+          new_thumb = "'<div class=\"city-thumb\" data-img-kind=\"city\" data-img-query=\"'+escHtml(imgQuery)+'\"></div>'"
+          assert old_thumb in s, 'city thumbnail markup not found'
+          s = s.replace(old_thumb, new_thumb, 1)
+
+          hero_pat = r'(class=\\?"country-detail-header\\?"[^\n]*?data-img-query=\\?"\'\+escHtml\(query\)\+\'\\?")'
+          hero_matches = list(re.finditer(hero_pat, s))
+          assert hero_matches, 'city detail hero markup not found'
+          hm = hero_matches[0]
+          hero = hm.group(1)
+          assert 'data-img-kind' not in hero
+          hero_new = hero.replace('data-img-query', 'data-img-kind=\\"city\\" data-img-query' if '\\"' in hero else 'data-img-kind="city" data-img-query', 1)
+          s = s[:hm.start()] + hero_new + s[hm.end():]
+
+          # Guardrails: exactly two city opt-ins, default direct activity calls still exist.
+          assert s.count('data-img-kind=\\"city\\"') + s.count('data-img-kind="city"') >= 2, 'expected two city image opt-ins'
+          assert "fetchPlaceImage(photoQuery).then(function(url){" in s, 'activity detail image behavior changed unexpectedly'
+          assert 'function isBadCityCover(title,url)' in s
+          assert "el.getAttribute('data-img-kind')==='city'" in s
+
+          p.write_text(s, encoding='utf-8')
+          PY
+          git diff --check
+          git diff --stat
+      - name: Commit patch and cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-city-cover-images.yml
+          git add index.html
+          git diff --cached --check
+          git commit -m "fix: improve automatic city cover photos"
+          git push
