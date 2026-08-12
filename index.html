@@ -7394,7 +7394,7 @@ function renderCityPanelContentBody(c, city){
         // Aucune activité réellement affectée à cette date
         _emptyDayHTML = '<div style="text-align:center;padding:48px 24px 32px;color:var(--ink-muted)">'
           +'<div style="font-size:15px;font-weight:500;margin-bottom:16px">Aucune activité prévue ce jour</div>'
-          +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'
+          +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'+activityTrashButtonHTML(ck)+''
           +'</div>';
       } else {
         // Activités existent ce jour mais masquées par filtre catégorie
@@ -10851,7 +10851,10 @@ function syncCityTrashEntry(t){
 }
 function removeCityTrashEntry(t){
   if(!sb || !CURRENT_TRIP || !t) return Promise.resolve(null);
-  return sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).eq('detail_key',_cityTrashDetailKey(t)).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] remove city trash entry:',_r.error); return _r; });
+  // P0.8-C : conserver une ligne négative explicite. Si on DELETE la dernière ligne
+  // granulaire, le blob legacy __planitrip__cityTrash redevient autoritaire au reload.
+  var marker={countryId:t.countryId,cityName:t.cityName,_cityTrashRemoved:true};
+  return sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_cityTrashDetailKey(t),data:marker,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] remove city trash entry:',_r.error); return _r; });
 }
 function syncCityTrash(){
   // P0.8-C : une ligne par ville archivée. Le blob historique reste en lecture uniquement.
@@ -13408,7 +13411,12 @@ async function loadActivityDetails(){
   // P0.8-C : dès que des lignes granulaires existent, elles deviennent autoritaires.
   if(_cityTrashRows.length){
     var _ctByKey = {};
-    _cityTrashRows.forEach(function(t){ if(t && t.countryId && t.cityName) _ctByKey[t.countryId+'||'+t.cityName]=t; });
+    _cityTrashRows.forEach(function(t){
+      if(!t || !t.countryId || !t.cityName) return;
+      var _ctKey=t.countryId+'||'+t.cityName;
+      if(t._cityTrashRemoved) delete _ctByKey[_ctKey];
+      else _ctByKey[_ctKey]=t;
+    });
     S.cityTrash = Object.values(_ctByKey);
   }
   // P0.8-A/5A : overlay granulaire après les fiches complètes legacy.
