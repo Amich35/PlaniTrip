@@ -1,0 +1,52 @@
+name: Fix city trash order v2
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fix-city-trash-order-v2.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/fix_city_trash_order.py
+      - run: git diff --check
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile, sys, os
+          s=Path('index.html').read_text(encoding='utf-8')
+          for m in re.finditer(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S):
+              body=m.group(1)
+              if not body.strip():
+                  continue
+              f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8')
+              f.write(body)
+              f.close()
+              r=subprocess.run(['node','--check',f.name],capture_output=True,text=True)
+              os.unlink(f.name)
+              if r.returncode:
+                  print(r.stderr)
+                  sys.exit(r.returncode)
+          PY
+      - name: Verify order
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          a=s.index('S.cityTrash = Object.values(_ctByKey);')
+          b=s.index('invariant après overlay granulaire cityTrash')
+          assert b > a
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/fix_city_trash_order.py .github/workflows/fix-city-trash-order-v2.yml .github/workflows/fix-city-trash-order.yml .github/workflows/debug-city-trash.yml
+          git add index.html
+          git commit -m "fix(P0.8-C): reconcile city trash after granular overlay"
+          git push origin HEAD:main
