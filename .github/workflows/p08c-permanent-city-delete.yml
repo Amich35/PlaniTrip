@@ -1,0 +1,79 @@
+name: P0.8-C permanent city deletion patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/p08c-permanent-city-delete.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch permanent city deletion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          pattern = r"function deleteCityPermanently\(trashId\)\{.*?\n\}"
+          matches = list(re.finditer(pattern, s, flags=re.S))
+          if len(matches) != 1:
+              raise SystemExit(f'Expected exactly one deleteCityPermanently function, found {len(matches)}')
+
+          replacement = r'''function deleteCityPermanently(trashId){
+  var t = S.cityTrash.find(function(tt){return tt.id===trashId;});
+  if(!t) return;
+  showConfirm('Supprimer définitivement '+t.cityName+' ? Cette action est irréversible.<br><small>La ville et ses activités seront supprimées. Les logements, dépenses et le carnet seront conservés.</small>', async function(){
+    var idx = S.cityTrash.findIndex(function(tt){return tt.id===trashId;});
+    if(idx===-1) return;
+    var countryId = t.countryId;
+    var tripId = CURRENT_TRIP && CURRENT_TRIP.id;
+
+    // P0.8-C : suppression physique limitée aux activités de la ville.
+    // Les logements, dépenses et entrées de carnet ne doivent jamais être supprimés ici.
+    if(!sb || !tripId){
+      alert('Connexion requise pour supprimer définitivement cette ville.');
+      return;
+    }
+    try{
+      var rAct = await sb.from('activities').delete()
+        .eq('trip_id',tripId)
+        .eq('country_id',countryId)
+        .eq('city',t.cityName);
+      if(rAct && rAct.error) throw rAct.error;
+
+      // La ville elle-même est matérialisée par le marqueur deletedCities : on le conserve
+      // après retrait de la corbeille pour qu'elle reste définitivement masquée.
+      S.cityTrash.splice(idx,1);
+      await removeCityTrashEntry(t);
+      syncCityTrash();
+      save();
+      openCountryDetail(countryId, 'lieux');
+      toast('Ville supprimée définitivement');
+    }catch(err){
+      console.error('[PlaniTrip] permanent city delete:', err);
+      alert('Impossible de supprimer définitivement cette ville pour le moment.');
+    }
+  });
+}'''
+          s = pattern and re.sub(pattern, replacement, s, count=1, flags=re.S)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Remove temporary workflow
+        run: git rm .github/workflows/p08c-permanent-city-delete.yml
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix: limit permanent city deletion to activities"
+          git push
