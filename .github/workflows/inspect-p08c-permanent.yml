@@ -1,0 +1,31 @@
+name: Inspect P0.8-C permanent deletion
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/inspect-p08c-permanent.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show permanent deletion paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8').splitlines()
+          needles=['deleteActivityPermanently','deleteCityPermanently','removeCityTrashEntry','syncCityTrashEntry','syncDeletedCity','syncActivityTrashMarker','syncDeletedAct','activities\'','activity_details','customActs']
+          hits=[]
+          for i,line in enumerate(s,1):
+            if any(n in line for n in needles): hits.append(i)
+          ranges=[]
+          for i in hits:
+            a=max(1,i-12); b=min(len(s),i+35)
+            if ranges and a <= ranges[-1][1]+1:
+              ranges[-1]=(ranges[-1][0],max(ranges[-1][1],b))
+            else: ranges.append((a,b))
+          for a,b in ranges:
+            print(f'--- L{a}-L{b} ---')
+            for j in range(a,b+1): print(f'{j}: {s[j-1]}')
+          PY
