@@ -14,47 +14,13 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
+          import base64, re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
           pattern=r"function deleteCityPermanently\(trashId\)\{.*?\n\}"
           if len(re.findall(pattern,s,flags=re.S)) != 1:
             raise SystemExit('deleteCityPermanently match count is not 1')
-          replacement="""function deleteCityPermanently(trashId){
-  var t = S.cityTrash.find(function(tt){return tt.id===trashId;});
-  if(!t) return;
-  showConfirm('Supprimer définitivement '+t.cityName+' ? Cette action est irréversible.<br><small>La ville et ses activités seront supprimées. Les logements, dépenses et le carnet seront conservés.</small>', async function(){
-    var idx = S.cityTrash.findIndex(function(tt){return tt.id===trashId;});
-    if(idx===-1) return;
-    var countryId = t.countryId;
-    var tripId = CURRENT_TRIP && CURRENT_TRIP.id;
-
-    // P0.8-C : suppression physique limitée aux activités de la ville.
-    // Logements, dépenses et carnet restent intacts.
-    if(!sb || !tripId){
-      alert('Connexion requise pour supprimer définitivement cette ville.');
-      return;
-    }
-    try{
-      var rAct = await sb.from('activities').delete()
-        .eq('trip_id',tripId)
-        .eq('country_id',countryId)
-        .eq('city',t.cityName);
-      if(rAct && rAct.error) throw rAct.error;
-
-      // Le marqueur deletedCities est conservé : la ville reste définitivement masquée.
-      S.cityTrash.splice(idx,1);
-      await removeCityTrashEntry(t);
-      syncCityTrash();
-      save();
-      openCountryDetail(countryId, 'lieux');
-      toast('Ville supprimée définitivement');
-    }catch(err){
-      console.error('[PlaniTrip] permanent city delete:', err);
-      alert('Impossible de supprimer définitivement cette ville pour le moment.');
-    }
-  });
-}"""
+          replacement=base64.b64decode('ZnVuY3Rpb24gZGVsZXRlQ2l0eVBlcm1hbmVudGx5KHRyYXNoSWQpewogIHZhciB0ID0gUy5jaXR5VHJhc2guZmluZChmdW5jdGlvbih0dCl7cmV0dXJuIHR0LmlkPT09dHJhc2hJZDt9KTsKICBpZighdCkgcmV0dXJuOwogIHNob3dDb25maXJtKCdTdXBwcmltZXIgZMOpZmluaXRpdmVtZW50ICcrdC5jaXR5TmFtZSsnID8gQ2V0dGUgYWN0aW9uIGVzdCBpcnLDqXZlcnNpYmxlLjxicj48c21hbGw+TGEgdmlsbGUgZXQgc2VzIGFjdGl2aXTDqXMgc2Vyb250IHN1cHByaW3DqWVzLiBMZXMgbG9nZW1lbnRzLCBkw6lwZW5zZXMgZXQgbGUgY2FybmV0IHNlcm9udCBjb25zZXJ2w6lzLjwvc21hbGw+JywgYXN5bmMgZnVuY3Rpb24oKXsKICAgIHZhciBpZHggPSBTLmNpdHlUcmFzaC5maW5kSW5kZXgoZnVuY3Rpb24odHQpe3JldHVybiB0dC5pZD09PXRyYXNoSWQ7fSk7CiAgICBpZihpZHg9PT0tMSkgcmV0dXJuOwogICAgdmFyIGNvdW50cnlJZCA9IHQuY291bnRyeUlkOwogICAgdmFyIHRyaXBJZCA9IENVUlJFTlRfVFJJUCAmJiBDVVJSRU5UX1RSSVAuaWQ7CgogICAgLy8gUDAuOC1DIDogc3VwcHJlc3Npb24gcGh5c2lxdWUgbGltaXTDqWUgYXV4IGFjdGl2aXTDqXMgZGUgbGEgdmlsbGUuCiAgICAvLyBMb2dlbWVudHMsIGTDqXBlbnNlcyBldCBjYXJuZXQgcmVzdGVudCBpbnRhY3RzLgogICAgaWYoIXNiIHx8ICF0cmlwSWQpewogICAgICBhbGVydCgnQ29ubmV4aW9uIHJlcXVpc2UgcG91ciBzdXBwcmltZXIgZMOpZmluaXRpdmVtZW50IGNldHRlIHZpbGxlLicpOwogICAgICByZXR1cm47CiAgICB9CiAgICB0cnl7CiAgICAgIHZhciByQWN0ID0gYXdhaXQgc2IuZnJvbSgnYWN0aXZpdGllcycpLmRlbGV0ZSgpCiAgICAgICAgLmVxKCd0cmlwX2lkJyx0cmlwSWQpCiAgICAgICAgLmVxKCdjb3VudHJ5X2lkJyxjb3VudHJ5SWQpCiAgICAgICAgLmVxKCdjaXR5Jyx0LmNpdHlOYW1lKTsKICAgICAgaWYockFjdCAmJiByQWN0LmVycm9yKSB0aHJvdyByQWN0LmVycm9yOwoKICAgICAgLy8gTGUgbWFycXVldXIgZGVsZXRlZENpdGllcyBlc3QgY29uc2VydsOpIDogbGEgdmlsbGUgcmVzdGUgZMOpZmluaXRpdmVtZW50IG1hc3F1w6llLgogICAgICBTLmNpdHlUcmFzaC5zcGxpY2UoaWR4LDEpOwogICAgICBhd2FpdCByZW1vdmVDaXR5VHJhc2hFbnRyeSh0KTsKICAgICAgc3luY0NpdHlUcmFzaCgpOwogICAgICBzYXZlKCk7CiAgICAgIG9wZW5Db3VudHJ5RGV0YWlsKGNvdW50cnlJZCwgJ2xpZXV4Jyk7CiAgICAgIHRvYXN0KCdWaWxsZSBzdXBwcmltw6llIGTDqWZpbml0aXZlbWVudCcpOwogICAgfWNhdGNoKGVycil7CiAgICAgIGNvbnNvbGUuZXJyb3IoJ1tQbGFuaVRyaXBdIHBlcm1hbmVudCBjaXR5IGRlbGV0ZTonLCBlcnIpOwogICAgICBhbGVydCgnSW1wb3NzaWJsZSBkZSBzdXBwcmltZXIgZMOpZmluaXRpdmVtZW50IGNldHRlIHZpbGxlIHBvdXIgbGUgbW9tZW50LicpOwogICAgfQogIH0pOwp9').decode('utf-8')
           p.write_text(re.sub(pattern,replacement,s,count=1,flags=re.S),encoding='utf-8')
           PY
       - name: Commit patch
