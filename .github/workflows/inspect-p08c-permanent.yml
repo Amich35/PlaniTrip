@@ -10,18 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply permanent deletion patch
+      - name: Preserve permanent-delete CTA label
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64, re
+          import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
           pattern=r"function deleteCityPermanently\(trashId\)\{.*?\n\}"
-          if len(re.findall(pattern,s,flags=re.S)) != 1:
-            raise SystemExit('deleteCityPermanently match count is not 1')
-          replacement=base64.b64decode('ZnVuY3Rpb24gZGVsZXRlQ2l0eVBlcm1hbmVudGx5KHRyYXNoSWQpewogIHZhciB0ID0gUy5jaXR5VHJhc2guZmluZChmdW5jdGlvbih0dCl7cmV0dXJuIHR0LmlkPT09dHJhc2hJZDt9KTsKICBpZighdCkgcmV0dXJuOwogIHNob3dDb25maXJtKCdTdXBwcmltZXIgZMOpZmluaXRpdmVtZW50ICcrdC5jaXR5TmFtZSsnID8gQ2V0dGUgYWN0aW9uIGVzdCBpcnLDqXZlcnNpYmxlLjxicj48c21hbGw+TGEgdmlsbGUgZXQgc2VzIGFjdGl2aXTDqXMgc2Vyb250IHN1cHByaW3DqWVzLiBMZXMgbG9nZW1lbnRzLCBkw6lwZW5zZXMgZXQgbGUgY2FybmV0IHNlcm9udCBjb25zZXJ2w6lzLjwvc21hbGw+JywgYXN5bmMgZnVuY3Rpb24oKXsKICAgIHZhciBpZHggPSBTLmNpdHlUcmFzaC5maW5kSW5kZXgoZnVuY3Rpb24odHQpe3JldHVybiB0dC5pZD09PXRyYXNoSWQ7fSk7CiAgICBpZihpZHg9PT0tMSkgcmV0dXJuOwogICAgdmFyIGNvdW50cnlJZCA9IHQuY291bnRyeUlkOwogICAgdmFyIHRyaXBJZCA9IENVUlJFTlRfVFJJUCAmJiBDVVJSRU5UX1RSSVAuaWQ7CgogICAgLy8gUDAuOC1DIDogc3VwcHJlc3Npb24gcGh5c2lxdWUgbGltaXTDqWUgYXV4IGFjdGl2aXTDqXMgZGUgbGEgdmlsbGUuCiAgICAvLyBMb2dlbWVudHMsIGTDqXBlbnNlcyBldCBjYXJuZXQgcmVzdGVudCBpbnRhY3RzLgogICAgaWYoIXNiIHx8ICF0cmlwSWQpewogICAgICBhbGVydCgnQ29ubmV4aW9uIHJlcXVpc2UgcG91ciBzdXBwcmltZXIgZMOpZmluaXRpdmVtZW50IGNldHRlIHZpbGxlLicpOwogICAgICByZXR1cm47CiAgICB9CiAgICB0cnl7CiAgICAgIHZhciByQWN0ID0gYXdhaXQgc2IuZnJvbSgnYWN0aXZpdGllcycpLmRlbGV0ZSgpCiAgICAgICAgLmVxKCd0cmlwX2lkJyx0cmlwSWQpCiAgICAgICAgLmVxKCdjb3VudHJ5X2lkJyxjb3VudHJ5SWQpCiAgICAgICAgLmVxKCdjaXR5Jyx0LmNpdHlOYW1lKTsKICAgICAgaWYockFjdCAmJiByQWN0LmVycm9yKSB0aHJvdyByQWN0LmVycm9yOwoKICAgICAgLy8gTGUgbWFycXVldXIgZGVsZXRlZENpdGllcyBlc3QgY29uc2VydsOpIDogbGEgdmlsbGUgcmVzdGUgZMOpZmluaXRpdmVtZW50IG1hc3F1w6llLgogICAgICBTLmNpdHlUcmFzaC5zcGxpY2UoaWR4LDEpOwogICAgICBhd2FpdCByZW1vdmVDaXR5VHJhc2hFbnRyeSh0KTsKICAgICAgc3luY0NpdHlUcmFzaCgpOwogICAgICBzYXZlKCk7CiAgICAgIG9wZW5Db3VudHJ5RGV0YWlsKGNvdW50cnlJZCwgJ2xpZXV4Jyk7CiAgICAgIHRvYXN0KCdWaWxsZSBzdXBwcmltw6llIGTDqWZpbml0aXZlbWVudCcpOwogICAgfWNhdGNoKGVycil7CiAgICAgIGNvbnNvbGUuZXJyb3IoJ1tQbGFuaVRyaXBdIHBlcm1hbmVudCBjaXR5IGRlbGV0ZTonLCBlcnIpOwogICAgICBhbGVydCgnSW1wb3NzaWJsZSBkZSBzdXBwcmltZXIgZMOpZmluaXRpdmVtZW50IGNldHRlIHZpbGxlIHBvdXIgbGUgbW9tZW50LicpOwogICAgfQogIH0pOwp9').decode('utf-8')
-          p.write_text(re.sub(pattern,replacement,s,count=1,flags=re.S),encoding='utf-8')
+          m=re.search(pattern,s,flags=re.S)
+          if not m:
+            raise SystemExit('deleteCityPermanently not found')
+          block=m.group(0)
+          old="  });\n}"
+          new="  }, 'Supprimer définitivement');\n}"
+          if old not in block:
+            raise SystemExit('CTA closing pattern not found')
+          block=block.rsplit(old,1)[0]+new
+          p.write_text(s[:m.start()]+block+s[m.end():],encoding='utf-8')
           PY
       - name: Commit patch
         run: |
@@ -29,5 +35,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git diff --cached --check
-          git commit -m "fix: limit permanent city deletion to activities"
+          git commit -m "fix: preserve permanent city delete CTA"
           git push
