@@ -10770,7 +10770,7 @@ function deleteCityPermanently(trashId){
       console.error('[PlaniTrip] permanent city delete:', err);
       alert('Impossible de supprimer définitivement cette ville pour le moment.');
     }
-  });
+  }, 'Supprimer définitivement');
 }
 function getCityOrder(countryId) {
   const c=COUNTRIES.find(function(co){return co.id===countryId;});
