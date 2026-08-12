@@ -1,0 +1,90 @@
+name: Fix city trash reconciliation order
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fix-city-trash-order.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch loader order
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          block="""  // P0.8-C : invariant de cohérence. Une entrée de Corbeille ville n'est valide que
+          // si la ville est encore marquée archivée. Nettoie notamment les reliquats du blob legacy
+          // après une restauration effectuée avant les marqueurs négatifs granulaires.
+          if(Array.isArray(S.cityTrash)){
+            S.cityTrash = S.cityTrash.filter(function(t){
+              return !!(t && t.countryId && t.cityName && S.deletedCities && S.deletedCities[t.countryId+'||'+t.cityName]);
+            });
+          }
+"""
+          if s.count(block)!=1:
+              raise SystemExit('invariant block count='+str(s.count(block)))
+          s=s.replace(block,'',1)
+          anchor="""  if(_cityTrashRows.length){
+            var _ctByKey = {};
+            _cityTrashRows.forEach(function(t){
+              if(!t || !t.countryId || !t.cityName) return;
+              var _ctKey=t.countryId+'||'+t.cityName;
+              if(t._cityTrashRemoved) delete _ctByKey[_ctKey];
+              else _ctByKey[_ctKey]=t;
+            });
+            S.cityTrash = Object.values(_ctByKey);
+          }
+"""
+          if s.count(anchor)!=1:
+              raise SystemExit('cityTrash overlay anchor count='+str(s.count(anchor)))
+          moved=anchor+"""  // P0.8-C : appliquer l'invariant APRES l'overlay granulaire cityTrash.
+          // Sinon une entrée fantôme nettoyée juste avant peut être réinjectée immédiatement.
+          if(Array.isArray(S.cityTrash)){
+            S.cityTrash = S.cityTrash.filter(function(t){
+              return !!(t && t.countryId && t.cityName && S.deletedCities && S.deletedCities[t.countryId+'||'+t.cityName]);
+            });
+          }
+"""
+          s=s.replace(anchor,moved,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - run: git diff --check
+      - name: Verify ordering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8')
+          a=s.index('if(_cityTrashRows.length){')
+          b=s.index("appliquer l'invariant APRES l'overlay granulaire cityTrash")
+          assert b>a
+          chunk=s[a:b+1200]
+          assert 'S.cityTrash = Object.values(_ctByKey);' in chunk
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile, sys, os
+          s=Path('index.html').read_text(encoding='utf-8')
+          for m in re.finditer(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S):
+            body=m.group(1)
+            if not body.strip(): continue
+            f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8')
+            f.write(body); f.close()
+            r=subprocess.run(['node','--check',f.name],capture_output=True,text=True)
+            os.unlink(f.name)
+            if r.returncode:
+              print(r.stderr); sys.exit(r.returncode)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/fix-city-trash-order.yml .github/workflows/debug-city-trash.yml
+          git add index.html
+          git commit -m "fix(P0.8-C): reconcile city trash after granular overlay"
+          git push origin HEAD:main
