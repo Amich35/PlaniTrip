@@ -10740,13 +10740,37 @@ function restoreCity(trashId){
 function deleteCityPermanently(trashId){
   var t = S.cityTrash.find(function(tt){return tt.id===trashId;});
   if(!t) return;
-  showConfirm('Supprimer définitivement '+t.cityName+' ? Cette action est irréversible.', function(){
+  showConfirm('Supprimer définitivement '+t.cityName+' ? Cette action est irréversible.<br><small>La ville et ses activités seront supprimées. Les logements, dépenses et le carnet seront conservés.</small>', async function(){
     var idx = S.cityTrash.findIndex(function(tt){return tt.id===trashId;});
-    if(idx>-1) S.cityTrash.splice(idx,1);
+    if(idx===-1) return;
     var countryId = t.countryId;
-    removeCityTrashEntry(t); syncCityTrash();
-    openCountryDetail(countryId, 'lieux');
-  }, 'Supprimer définitivement');
+    var tripId = CURRENT_TRIP && CURRENT_TRIP.id;
+
+    // P0.8-C : suppression physique limitée aux activités de la ville.
+    // Logements, dépenses et carnet restent intacts.
+    if(!sb || !tripId){
+      alert('Connexion requise pour supprimer définitivement cette ville.');
+      return;
+    }
+    try{
+      var rAct = await sb.from('activities').delete()
+        .eq('trip_id',tripId)
+        .eq('country_id',countryId)
+        .eq('city',t.cityName);
+      if(rAct && rAct.error) throw rAct.error;
+
+      // Le marqueur deletedCities est conservé : la ville reste définitivement masquée.
+      S.cityTrash.splice(idx,1);
+      await removeCityTrashEntry(t);
+      syncCityTrash();
+      save();
+      openCountryDetail(countryId, 'lieux');
+      toast('Ville supprimée définitivement');
+    }catch(err){
+      console.error('[PlaniTrip] permanent city delete:', err);
+      alert('Impossible de supprimer définitivement cette ville pour le moment.');
+    }
+  });
 }
 function getCityOrder(countryId) {
   const c=COUNTRIES.find(function(co){return co.id===countryId;});
