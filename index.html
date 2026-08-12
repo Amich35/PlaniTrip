@@ -13390,14 +13390,6 @@ async function loadActivityDetails(){
     _deletedCityRows.forEach(function(m){ if(m && m.countryId && m.cityName && m.deleted) _dc[m.countryId+'||'+m.cityName]=true; });
     S.deletedCities = _dc;
   }
-  // P0.8-C : invariant de cohérence. Une entrée de Corbeille ville n'est valide que
-  // si la ville est encore marquée archivée. Nettoie notamment les reliquats du blob legacy
-  // après une restauration effectuée avant les marqueurs négatifs granulaires.
-  if(Array.isArray(S.cityTrash)){
-    S.cityTrash = S.cityTrash.filter(function(t){
-      return !!(t && t.countryId && t.cityName && S.deletedCities && S.deletedCities[t.countryId+'||'+t.cityName]);
-    });
-  }
   // P0.8-C : les marqueurs granulaires deletedAct deviennent autoritaires dès qu'ils existent.
   if(_deletedActRows.length){
     var _da = {};
@@ -13426,6 +13418,12 @@ async function loadActivityDetails(){
       else _ctByKey[_ctKey]=t;
     });
     S.cityTrash = Object.values(_ctByKey);
+  }
+  // P0.8-C : invariant après overlay granulaire cityTrash (ordre autoritaire).
+  if(Array.isArray(S.cityTrash)){
+    S.cityTrash = S.cityTrash.filter(function(t){
+      return !!(t && t.countryId && t.cityName && S.deletedCities && S.deletedCities[t.countryId+'||'+t.cityName]);
+    });
   }
   // P0.8-A/5A : overlay granulaire après les fiches complètes legacy.
   _detailFieldRows.forEach(function(row){
