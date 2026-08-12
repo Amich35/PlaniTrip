@@ -5477,22 +5477,38 @@ function editCountryDateRange(countryId, startVal, endVal){
   renderContent();
 }
 // ── Dates de séjour par ville (arrivée/départ réelles, remplace le texte "X jours") ──
-function editCityDateRange(ck, startVal, endVal){
+async function editCityDateRange(ck, startVal, endVal){
   if(!S.cityDates) S.cityDates={};
   var cur = S.cityDates[ck]||{};
   var newStart = startVal!==null ? startVal : cur.start;
   var newEnd = endVal!==null ? endVal : cur.end;
   if(newStart && newEnd && newEnd < newStart){
-    alert("La date de départ doit être postérieure à la date d'arrivée.");
-    renderContent();
-    return;
+    alert('La date de départ doit être postérieure à la date d’arrivée.');
+    return false;
   }
-  S.cityDates[ck] = {start:newStart||'', end:newEnd||''};
+
+  var nextCityDates = Object.assign({}, S.cityDates || {});
+  nextCityDates[ck] = {start:newStart||'', end:newEnd||''};
+
+  // P0.8 Patch 2 : Supabase confirme avant toute mutation locale.
+  try{
+    if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id) throw new Error('no_active_trip_sync');
+    var r = await sb.from('activity_details').upsert(
+      {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__cityDates', data:nextCityDates, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,detail_key'}
+    );
+    if(r && r.error) throw r.error;
+  } catch(e){
+    console.error('[PlaniTrip] editCityDateRange sync error:', e);
+    alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
+    return false;
+  }
+
+  // Supabase confirmé : commit local seulement maintenant.
+  S.cityDates = nextCityDates;
   save();
   renderContent();
-  if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__cityDates',data:S.cityDates,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-  }
+  return true;
 }
 // Dates réelles d'un pays = étendue min/max des séjours réels de ses villes (logements),
 // pas une valeur saisie à part qui peut se désynchroniser. Fallback sur une date saisie
@@ -6138,7 +6154,7 @@ async function _createCityFromModal(countryId, name, sub, dateStart, dateEnd, sk
   save();
   S.openCities[countryId+'_'+newCity.city]=true;
   if(dateStart && dateEnd){
-    editCityDateRange(countryId+'_'+newCity.city, dateStart, dateEnd);
+    await editCityDateRange(countryId+'_'+newCity.city, dateStart, dateEnd);
   } else {
     renderContent();
   }
