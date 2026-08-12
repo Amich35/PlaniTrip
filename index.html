@@ -2455,7 +2455,7 @@ async function toggleFavorite(k){
     else delete S.favorites[k];
     save();
     renderContent();
-    toast('Impossible de modifier le favorite');
+    toast('Impossible de modifier le favori');
     return false;
   } finally {
     delete toggleFavorite._inFlight[k];
