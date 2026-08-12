@@ -1,0 +1,27 @@
+name: Fix P1-A favorite label
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/p1a-favorite-label.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix favorite error label
+        run: |
+          grep -q "Impossible de modifier le favorite" index.html
+          sed -i 's/Impossible de modifier le favorite/Impossible de modifier le favori/' index.html
+          grep -q "Impossible de modifier le favori" index.html
+          git diff --check
+      - name: Commit and cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/p1a-favorite-label.yml
+          git add index.html
+          git diff --cached --check
+          git commit -m "fix(P1-A): correct favorite error label"
+          git push
