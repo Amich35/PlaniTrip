@@ -1,0 +1,27 @@
+name: Apply P0.8 Patch 2 city dates
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/p08-p2-city-dates.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch city date inline save
+        env:
+          REPLACEMENT_B64: YXN5bmMgZnVuY3Rpb24gZWRpdENpdHlEYXRlUmFuZ2UoY2ssIHN0YXJ0VmFsLCBlbmRWYWwpewogIGlmKCFTLmNpdHlEYXRlcykgUy5jaXR5RGF0ZXM9e307CiAgdmFyIGN1ciA9IFMuY2l0eURhdGVzW2NrXXx8e307CiAgdmFyIG5ld1N0YXJ0ID0gc3RhcnRWYWwhPT1udWxsID8gc3RhcnRWYWwgOiBjdXIuc3RhcnQ7CiAgdmFyIG5ld0VuZCA9IGVuZFZhbCE9PW51bGwgPyBlbmRWYWwgOiBjdXIuZW5kOwogIGlmKG5ld1N0YXJ0ICYmIG5ld0VuZCAmJiBuZXdFbmQgPCBuZXdTdGFydCl7CiAgICBhbGVydCgnTGEgZGF0ZSBkZSBkw6lwYXJ0IGRvaXQgw6p0cmUgcG9zdMOpcmlldXJlIMOgIGxhIGRhdGUgZOKAmWFycml2w6llLicpOwogICAgcmV0dXJuIGZhbHNlOwogIH0KCiAgdmFyIG5leHRDaXR5RGF0ZXMgPSBPYmplY3QuYXNzaWduKHt9LCBTLmNpdHlEYXRlcyB8fCB7fSk7CiAgbmV4dENpdHlEYXRlc1tja10gPSB7c3RhcnQ6bmV3U3RhcnR8fCcnLCBlbmQ6bmV3RW5kfHwnJ307CgogIC8vIFAwLjggUGF0Y2ggMiA6IFN1cGFiYXNlIGNvbmZpcm1lIGF2YW50IHRvdXRlIG11dGF0aW9uIGxvY2FsZS4KICB0cnl7CiAgICBpZighc2IgfHwgIUNVUlJFTlRfVFJJUCB8fCAhQ1VSUkVOVF9UUklQLmlkKSB0aHJvdyBuZXcgRXJyb3IoJ25vX2FjdGl2ZV90cmlwX3N5bmMnKTsKICAgIHZhciByID0gYXdhaXQgc2IuZnJvbSgnYWN0aXZpdHlfZGV0YWlscycpLnVwc2VydCgKICAgICAge3RyaXBfaWQ6Q1VSUkVOVF9UUklQLmlkLCBkZXRhaWxfa2V5OidfX3BsYW5pdHJpcF9fY2l0eURhdGVzJywgZGF0YTpuZXh0Q2l0eURhdGVzLCB1cGRhdGVkX2F0Om5ldyBEYXRlKCkudG9JU09TdHJpbmcoKX0sCiAgICAgIHtvbkNvbmZsaWN0Oid0cmlwX2lkLGRldGFpbF9rZXknfQogICAgKTsKICAgIGlmKHIgJiYgci5lcnJvcikgdGhyb3cgci5lcnJvcjsKICB9IGNhdGNoKGUpewogICAgY29uc29sZS5lcnJvcignW1BsYW5pVHJpcF0gZWRpdENpdHlEYXRlUmFuZ2Ugc3luYyBlcnJvcjonLCBlKTsKICAgIGFsZXJ0KCdFcnJldXIgZGUgc2F1dmVnYXJkZSDigJQgdsOpcmlmaWUgdGEgY29ubmV4aW9uIGV0IHLDqWVzc2FpZS4nKTsKICAgIHJldHVybiBmYWxzZTsKICB9CgogIC8vIFN1cGFiYXNlIGNvbmZpcm3DqSA6IGNvbW1pdCBsb2NhbCBzZXVsZW1lbnQgbWFpbnRlbmFudC4KICBTLmNpdHlEYXRlcyA9IG5leHRDaXR5RGF0ZXM7CiAgc2F2ZSgpOwogIHJlbmRlckNvbnRlbnQoKTsKICByZXR1cm4gdHJ1ZTsKfQ==
+        run: |
+          python -c "import os,re,base64,pathlib; p=pathlib.Path('index.html'); s=p.read_text(encoding='utf-8'); pat=r'function editCityDateRange\(ck, startVal, endVal\)\{.*?\n\}(?=\n// Dates réelles)'; m=re.search(pat,s,re.S); assert m, 'editCityDateRange block not found'; rep=base64.b64decode(os.environ['REPLACEMENT_B64']).decode(); s=s[:m.start()]+rep+s[m.end():]; old=\"    editCityDateRange(countryId+'_'+newCity.city, dateStart, dateEnd);\"; new=\"    await editCityDateRange(countryId+'_'+newCity.city, dateStart, dateEnd);\"; assert old in s, 'create-city date call not found'; s=s.replace(old,new,1); p.write_text(s,encoding='utf-8')"
+          git diff --check
+      - name: Commit patch and cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/p08-p2-city-dates.yml
+          git add index.html
+          git diff --cached --check
+          git commit -m "fix(P0.8/2): make inline city dates server-first"
+          git push
