@@ -1,0 +1,38 @@
+name: Reconcile city trash
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/p08c-city-trash-reconcile.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python .github/p08c_city_trash_reconcile.py
+      - run: git diff --check
+      - run: grep -q "Une entrée de Corbeille ville n'est valide" index.html
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile, sys
+          s=Path('index.html').read_text(encoding='utf-8')
+          for m in re.finditer(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S):
+            body=m.group(1)
+            if not body.strip(): continue
+            f=tempfile.NamedTemporaryFile('w',suffix='.js',delete=False,encoding='utf-8')
+            f.write(body); f.close()
+            r=subprocess.run(['node','--check',f.name],capture_output=True,text=True)
+            if r.returncode: print(r.stderr); sys.exit(r.returncode)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PlaniTrip GPT"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/p08c-city-trash-reconcile.yml .github/p08c_city_trash_reconcile.py
+          git add index.html
+          git commit -m "fix(P0.8-C): reconcile restored cities out of trash"
+          git push origin HEAD:main
