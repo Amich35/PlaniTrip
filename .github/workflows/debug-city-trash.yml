@@ -1,0 +1,31 @@
+name: Debug city trash paths
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/debug-city-trash.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show city trash code paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('index.html').read_text(encoding='utf-8').splitlines()
+          needles=['cityTrash','deletedCities','restoreCity','Corbeille (','openCityTrash','renderCityTrash','trashId']
+          hits=[]
+          for i,line in enumerate(s,1):
+            if any(n in line for n in needles):
+              hits.append(i)
+          shown=set()
+          for i in hits:
+            a=max(1,i-5); b=min(len(s),i+9)
+            key=(a,b)
+            if key in shown: continue
+            shown.add(key)
+            print(f'--- L{a}-L{b} ---')
+            for j in range(a,b+1): print(f'{j}: {s[j-1]}')
+          PY
