@@ -3560,6 +3560,54 @@ function saveActDetailHours(actKey, cityKey, custIdx, subfield, val){
   }
   refreshDetailHeaderLive(actKey);
 }
+
+// P0.8-A/5C — files d'écriture onblur : préserve l'UX locale immédiate,
+// sérialise les writes Supabase et affiche un feedback discret en cas d'échec.
+var _detailSyncChains = {};
+var _detailSyncLastToastAt = 0;
+function _cloneDetailSyncValue(v){
+  if(v && typeof v === 'object'){
+    try{ return JSON.parse(JSON.stringify(v)); }catch(e){}
+  }
+  return v;
+}
+function _queueCustomDetailSync(actKey, field, value, tripId, fullData, scoped){
+  if(!sb || !tripId) return Promise.resolve(null);
+  var isScoped = !!scoped;
+  var queueKey = tripId+'|'+actKey+'|'+(isScoped ? field : '__legacy__');
+  var queuedValue = _cloneDetailSyncValue(value);
+  var queuedData = _cloneDetailSyncValue(fullData);
+  var previous = _detailSyncChains[queueKey] || Promise.resolve(null);
+
+  var current = previous.catch(function(){ return null; }).then(async function(){
+    var r;
+    if(isScoped){
+      r = await _syncDetailField(actKey, field, queuedValue, tripId);
+    } else {
+      r = await sb.from('activity_details').upsert(
+        {trip_id:tripId, detail_key:actKey, data:queuedData, updated_at:new Date().toISOString()},
+        {onConflict:'trip_id,detail_key'}
+      );
+    }
+    if(r && r.error) throw r.error;
+    return r;
+  }).catch(function(err){
+    console.error('[PlaniTrip] custom detail deferred sync:', actKey, field, err);
+    var now = Date.now();
+    if(now - _detailSyncLastToastAt > 2000){
+      _detailSyncLastToastAt = now;
+      if(typeof toast === 'function') toast('Modification locale conservée — synchronisation à réessayer');
+    }
+    return null;
+  });
+
+  _detailSyncChains[queueKey] = current;
+  current.then(function(){
+    if(_detailSyncChains[queueKey] === current) delete _detailSyncChains[queueKey];
+  });
+  return current;
+}
+
 function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   if(!window._customDetails) window._customDetails = {};
   if(!window._customDetails[actKey]) window._customDetails[actKey] = {};
@@ -3715,18 +3763,20 @@ function saveCustomActDetail(actKey, cityKey, custIdx, field, val){
   S.customDetails = window._customDetails;
   save();
   if(sb && CURRENT_TRIP){
-    // Les _cN restent sur le chemin legacy jusqu'à leur migration stable contrôlée.
-    // Pour built-in et _sid_, un blur n'écrit plus toute la fiche : il ne peut donc
-    // plus écraser les autres champs avec une snapshot locale obsolète.
-    if(_dp5ScopedField && !_isTransientLegacyCustomKey(actKey)){
-      console.log('[DETAIL-P5] WRITE BEFORE', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'detailKey:', _detailFieldRowKey(actKey,field), 'payloadFieldValue:', JSON.stringify(d[field]));
-      _syncDetailField(actKey, field, d[field], CURRENT_TRIP.id).then(function(_r){
-        if(_r&&_r.error){ console.error('[PlaniTrip] sync detail field:',_r.error); console.error('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: error', JSON.stringify(_r.error)); }
-        else { console.log('[DETAIL-P5] WRITE AFTER', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'result: success'); }
-      });
-    } else {
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:actKey, data:d, updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
+    // onblur reste local-first pour ne pas bloquer la saisie.
+    // Les clés stables écrivent un champ granulaire; les _cN legacy gardent le blob historique.
+    var _dp5UseScopedSync = _dp5ScopedField && !_isTransientLegacyCustomKey(actKey);
+    if(_dp5UseScopedSync){
+      console.log('[DETAIL-P5] WRITE QUEUED', new Date().toISOString(), 'writeId:', _dp5WriteId, 'actKey:', actKey, 'field:', field, 'detailKey:', _detailFieldRowKey(actKey,field), 'payloadFieldValue:', JSON.stringify(d[field]));
     }
+    _queueCustomDetailSync(
+      actKey,
+      field,
+      d[field],
+      CURRENT_TRIP.id,
+      d,
+      _dp5UseScopedSync
+    );
   }
   refreshDetailHeaderLive(actKey);
   renderContent();
