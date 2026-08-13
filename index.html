@@ -2635,7 +2635,7 @@ function openActionMenu(el){
     {icon:'star',     label:isFav?'Retirer des favoris':'Ajouter aux favoris', action:'fav'},
     {icon:'repeat',   label:'Dupliquer',                                action:'duplicate'},
     {icon:'map',      label:'D\u00e9placer vers une autre ville',       action:'moveCity'},
-    {icon:'trash-2',  label:'Supprimer',                                action:'delete', danger:true}
+    {icon:'trash-2',  label:'Mettre à la corbeille',                   action:'delete', danger:true}
   ];
   document.getElementById('actionMenuTitle').textContent = actName;
   document.getElementById('actionMenuBody').innerHTML = items.map(function(it,i){
@@ -6373,7 +6373,7 @@ function deleteActivityFromEl(el){
   deleteActivity(cityKey, idx, isCustom, actName);
 }
 async function archiveActivitySoft(cityKey,index,isCustom,actName){
-  if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour archiver cette activité.'); return; }
+  if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour mettre cette activité à la corbeille.'); return; }
   if(!S.trash) S.trash={}; if(!S.trash[cityKey]) S.trash[cityKey]=[];
   if(!S.deletedActs) S.deletedActs={};
   var act = isCustom ? (S.customActs[cityKey]||[])[index] : null;
@@ -6390,9 +6390,9 @@ async function archiveActivitySoft(cityKey,index,isCustom,actName){
   item._softArchived=true;
   item._archiveActKey=actKey;
   var trashRes=await syncActivityTrashMarker(cityKey,actKey,item,true);
-  if(trashRes && trashRes.error){ alert('Impossible d’archiver cette activité pour le moment.'); return; }
+  if(trashRes && trashRes.error){ alert('Impossible de mettre cette activité à la corbeille pour le moment.'); return; }
   var markerRes=await syncDeletedAct(actKey,true);
-  if(markerRes && markerRes.error){ await syncActivityTrashMarker(cityKey,actKey,item,false); alert('Impossible d’archiver cette activité pour le moment.'); return; }
+  if(markerRes && markerRes.error){ await syncActivityTrashMarker(cityKey,actKey,item,false); alert('Impossible de mettre cette activité à la corbeille pour le moment.'); return; }
   if(!S.trash[cityKey].some(function(x){return _trashItemActKey(cityKey,x)===actKey;})) S.trash[cityKey].push(item);
   S.deletedActs[actKey]=true;
   // Aucune suppression de activities/activity_details/favorites, aucun changement de _sid.
@@ -6508,12 +6508,12 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
     save(); renderContent();
     syncDeletedActs();
   }
-  if(_skipConfirm){ _doDelete(); } else { showConfirm('Archiver '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', function(){
+  if(_skipConfirm){ _doDelete(); } else { showConfirm('Mettre « '+label+' » à la corbeille ? Tu pourras restaurer cette activité à tout moment depuis la Corbeille.', function(){
     var _a=isCustom ? (S.customActs[cityKey]||[])[index] : null;
     // Legacy _cN : conserver le flow historique, sans inventer de clé stable.
     if(isCustom && (!_a || !_a._sid)){ _doDelete(); return; }
     archiveActivitySoft(cityKey,index,isCustom,actName);
-  }, 'Archiver'); }
+  }, 'Mettre à la corbeille'); }
 }
 if(!S.deletedActs) S.deletedActs={};
 if(!S.trash) S.trash={};
@@ -7379,7 +7379,7 @@ function renderCityPanelContentBody(c, city){
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
         var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(k)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('archive',15)+'<span>Archiver</span></div></div>'
+        var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Corbeille</span></div></div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(actPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(done?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body"'+(hasDetail?' onclick="openDetailFromCard(this)" style="cursor:pointer"':'')+' style="flex:1;min-width:0">'
@@ -7415,7 +7415,7 @@ function renderCityPanelContentBody(c, city){
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
         var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();setActivityDate(\''+jsStrEsc(ck2)+'\',this.value)" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
-        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('archive',15)+'<span>Archiver</span></div></div>'
+        var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Corbeille</span></div></div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
           +'<div class="act-thumb" data-img-query="'+escHtml(cPhotoQuery)+'" onclick="openDetailFromCard(this)">'+(cdone?'<div style="position:absolute;inset:0;background:rgba(110,110,115,0.8);display:flex;align-items:center;justify-content:center;border-radius:12px">'+svgIcon('check',20)+'</div>':svgIcon('camera',18))+'</div>'
           +'<div class="act-body" onclick="openDetailFromCard(this)" style="cursor:pointer;flex:1;min-width:0">'
@@ -7832,7 +7832,7 @@ function renderArchivedActivitiesScreen(){
         var name = item._builtinIndex!==undefined ? ((city&&city.acts[item._builtinIndex])||{}).n||'Activité supprimée' : (item.n||'Activité supprimée');
         return '<div class="more-row"><span class="more-row-label">'+escHtml(name)+'</span>'
           +'<button onclick="restoreActivity(\''+jsStrEsc(ck)+'\','+ti+')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button>'
-          +'<button onclick="deleteActivityPermanently(\''+jsStrEsc(ck)+'\','+ti+')" style="margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer</button></div>';
+          +'<button onclick="deleteActivityPermanently(\''+jsStrEsc(ck)+'\','+ti+')" style="margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer définitivement</button></div>';
       }).join('')
     : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Corbeille vide.</div>';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
