@@ -1,0 +1,79 @@
+name: Fix activity trash wording
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fix-activity-trash-wording.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch activity trash wording only
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          old_menu="{icon:'trash-2',  label:'Supprimer',                                action:'delete', danger:true}"
+          new_menu="{icon:'trash-2',  label:'Mettre à la corbeille',                   action:'delete', danger:true}"
+          assert s.count(old_menu)==1, f'action menu count={s.count(old_menu)}'
+          s=s.replace(old_menu,new_menu,1)
+
+          old_confirm="showConfirm('Archiver '+label+' ? Tu pourras la restaurer à tout moment depuis la Corbeille.', function(){"
+          new_confirm="showConfirm('Mettre « '+label+' » à la corbeille ? Tu pourras restaurer cette activité à tout moment depuis la Corbeille.', function(){"
+          assert s.count(old_confirm)==1, f'activity confirm count={s.count(old_confirm)}'
+          s=s.replace(old_confirm,new_confirm,1)
+
+          old_ok="  }, 'Archiver'); }\n}\nif(!S.deletedActs) S.deletedActs={};"
+          new_ok="  }, 'Mettre à la corbeille'); }\n}\nif(!S.deletedActs) S.deletedActs={};"
+          assert s.count(old_ok)==1, f'activity confirm CTA count={s.count(old_ok)}'
+          s=s.replace(old_ok,new_ok,1)
+
+          old_swipe="svgIcon('archive',15)+'<span>Archiver</span>"
+          new_swipe="svgIcon('trash-2',15)+'<span>Corbeille</span>"
+          assert s.count(old_swipe)==2, f'activity swipe count={s.count(old_swipe)}'
+          s=s.replace(old_swipe,new_swipe)
+
+          old_conn="Connexion requise pour archiver cette activité."
+          new_conn="Connexion requise pour mettre cette activité à la corbeille."
+          assert s.count(old_conn)==1, f'activity connection copy count={s.count(old_conn)}'
+          s=s.replace(old_conn,new_conn,1)
+
+          old_fail="Impossible d’archiver cette activité pour le moment."
+          new_fail="Impossible de mettre cette activité à la corbeille pour le moment."
+          assert s.count(old_fail)==2, f'activity failure copy count={s.count(old_fail)}'
+          s=s.replace(old_fail,new_fail)
+
+          old_trash_btn="deleteActivityPermanently(\\''+jsStrEsc(ck)+'\\','+ti+')\" style=\"margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600\">Supprimer</button>"
+          new_trash_btn="deleteActivityPermanently(\\''+jsStrEsc(ck)+'\\','+ti+')\" style=\"margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600\">Supprimer définitivement</button>"
+          assert s.count(old_trash_btn)==1, f'activity trash permanent button count={s.count(old_trash_btn)}'
+          s=s.replace(old_trash_btn,new_trash_btn,1)
+
+          # Safety: permanent activity confirmation/CTA must remain intact.
+          assert "showConfirm('Supprimer définitivement cette activité ? Cette action est irréversible.'" in s
+          assert "}, 'Supprimer définitivement');" in s
+          # Do not alter city/country archive terminology in this patch.
+          assert "showConfirm('Archiver '+cityName+' ?" in s
+          assert "showConfirm('Archiver ' + c.name + ' ?" in s
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate patch
+        run: |
+          git diff --check
+          grep -q "label:'Mettre à la corbeille'" index.html
+          grep -q "Mettre « '+label+' » à la corbeille" index.html
+          grep -q "<span>Corbeille</span>" index.html
+          grep -q "Supprimer définitivement cette activité" index.html
+      - name: Commit patch and cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-activity-trash-wording.yml
+          git add index.html
+          git diff --cached --check
+          git commit -m "fix: clarify activity trash actions"
+          git push
