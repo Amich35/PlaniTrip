@@ -2501,14 +2501,26 @@ async function toggleCL(k){
   toggleCL._inFlight[k]=true;
   try{
     var countryId = k.split('_')[0];
-    var r;
-    if(nextChecked){
-      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-      r=await sb.from('checklist_items').upsert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who},{onConflict:'trip_id,key'});
-    } else {
-      r=await sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k);
-    }
+    var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+    // Source collaborative autoritaire : une ligne par case dans activity_details.
+    // checklist_items reste seulement un miroir legacy, car ses politiques historiques
+    // peuvent empêcher un voyageur de lire les coches créées par un autre compte.
+    var r=await sb.from('activity_details').upsert({
+      trip_id:CURRENT_TRIP.id,
+      detail_key:'__planitrip__checklist__'+k,
+      data:{key:k,checked:nextChecked},
+      updated_at:new Date().toISOString()
+    },{onConflict:'trip_id,detail_key'});
     if(r&&r.error) throw r.error;
+    try{
+      var legacyWrite;
+      if(nextChecked){
+        legacyWrite=await sb.from('checklist_items').upsert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who},{onConflict:'trip_id,key'});
+      }else{
+        legacyWrite=await sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k);
+      }
+      if(legacyWrite&&legacyWrite.error) console.warn('[PlaniTrip] checklist legacy mirror:',legacyWrite.error);
+    }catch(legacyErr){ console.warn('[PlaniTrip] checklist legacy mirror:',legacyErr); }
     if(nextChecked) S.checklist[k]=true;
     else delete S.checklist[k];
     save();
@@ -13686,12 +13698,41 @@ async function loadChecklist(){
   var {data,error} = await sb.from('checklist_items').select('key').eq('trip_id',CURRENT_TRIP.id);
   if(error){
     console.error('[PlaniTrip] load checklist error:',error);
-    return; // conserve l'état local si le serveur n'a pas répondu
+    // La table legacy peut être illisible pour un autre voyageur à cause de ses
+    // anciennes politiques RLS. Continuer vers la source collaborative granulaire.
+    data=[];
   }
   // Serveur autoritaire : reconstruction complète — un item décoché par un autre voyageur
   // doit se décocher localement aussi.
   S.checklist = {};
   (data||[]).forEach(function(row){ S.checklist[row.key] = true; });
+  // Migration progressive des coches legacy visibles par ce compte. Ne jamais écraser
+  // un marqueur granulaire existant, notamment un checked:false plus récent.
+  try{
+    var granularResult=await sb.from('activity_details').select('detail_key,data').eq('trip_id',CURRENT_TRIP.id).like('detail_key','__planitrip__checklist__%');
+    if(granularResult&&granularResult.error) throw granularResult.error;
+    var granularByKey={};
+    (granularResult.data||[]).forEach(function(row){
+      var key=(row.data&&row.data.key)||row.detail_key.slice('__planitrip__checklist__'.length);
+      if(key) granularByKey[key]=row.data||{};
+    });
+    var migrations=[];
+    (data||[]).forEach(function(row){
+      if(!row.key||Object.prototype.hasOwnProperty.call(granularByKey,row.key)) return;
+      migrations.push(sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__checklist__'+row.key,data:{key:row.key,checked:true},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}));
+      granularByKey[row.key]={key:row.key,checked:true};
+    });
+    if(migrations.length){
+      var migrationResults=await Promise.all(migrations);
+      migrationResults.forEach(function(result){ if(result&&result.error) throw result.error; });
+    }
+    Object.keys(granularByKey).forEach(function(key){
+      if(granularByKey[key].checked) S.checklist[key]=true;
+      else delete S.checklist[key];
+    });
+  }catch(granularErr){
+    console.error('[PlaniTrip] load granular checklist error:',granularErr);
+  }
   save();
 }
 async function loadJournalEntries(){
@@ -13816,6 +13857,13 @@ async function loadActivityDetails(){
       if(flightId && row.data && typeof row.data === 'object'){
         if(!S.flightMeta) S.flightMeta={};
         S.flightMeta[flightId]=row.data;
+      }
+    } else if(row.detail_key.indexOf('__planitrip__checklist__')===0){
+      var checklistKey=(row.data&&row.data.key)||row.detail_key.slice('__planitrip__checklist__'.length);
+      if(checklistKey){
+        if(!S.checklist) S.checklist={};
+        if(row.data&&row.data.checked) S.checklist[checklistKey]=true;
+        else delete S.checklist[checklistKey];
       }
     } else if(row.detail_key==='__planitrip__document__tickets__notes'){
       var ticketNotes=row.data;
