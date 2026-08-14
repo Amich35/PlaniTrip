@@ -5640,18 +5640,47 @@ function applyEmergencyFromTable(c){
   var entry = window.COUNTRY_EMERGENCY[c.name];
   if(entry && entry.length){ if(!c.practical) c.practical={}; c.practical.emergency = entry.slice(); }
 }
-function saveCountryEdit(countryId){
-  var c = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(!c) return;
-  S.countryEdits[countryId] = {
+function countryEditSnapshot(c){
+  return {
     tagline:c.tagline, currency:c.currency, rate:c.rate, visa:c.visa, lang:c.lang,
+    rateNum:c.rateNum,
     budget_daily:c.budget_daily, dates:c.dates, days:c.days, dateStart:c.dateStart||'', dateEnd:c.dateEnd||'', _aiGenerated:c._aiGenerated||false, _aiGeneratedAt:c._aiGeneratedAt||null,
     timezone:c.timezone||'', alerts:c.alerts||[],
     practical:{tips:c.practical.tips, emergency:c.practical.emergency, checklist:c.practical.checklist, phrases:c.practical.phrases||[]}
   };
+}
+async function persistCountryEdit(countryId, data){
+  if(!sb || !CURRENT_TRIP) throw new Error('Connexion indisponible');
+  var updatedAt=new Date().toISOString();
+  var r=await sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id,country_id:countryId,data:data,updated_at:updatedAt},{onConflict:'trip_id,country_id'}).select('data').single();
+  if(r&&r.error) throw r.error;
+  if(!r||!r.data||!r.data.data||typeof r.data.data!=='object') throw new Error('Enregistrement non confirmé par le serveur');
+  return r.data.data;
+}
+function saveCountryEdit(countryId){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return Promise.resolve(null);
+  S.countryEdits[countryId] = countryEditSnapshot(c);
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('country_settings').upsert({trip_id:CURRENT_TRIP.id, country_id:countryId, data:S.countryEdits[countryId], updated_at:new Date().toISOString()},{onConflict:'trip_id,country_id'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    return persistCountryEdit(countryId,S.countryEdits[countryId]).catch(function(e){console.error("[PlaniTrip] sync error:",e);return null;});
+  }
+  return Promise.resolve(S.countryEdits[countryId]);
+}
+async function saveCountryCurrency(countryId,value){
+  var c=COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c)return;
+  var previous=c.currency;
+  var next=countryEditSnapshot(c);next.currency=value;
+  try{
+    var saved=await persistCountryEdit(countryId,next);
+    c.currency=saved.currency;
+    S.countryEdits[countryId]=saved;
+    save();renderContent();
+  }catch(e){
+    console.error('[PlaniTrip] save currency:',e);
+    c.currency=previous;renderContent();
+    alert('Impossible d’enregistrer cette devise pour le moment.');
   }
 }
 function toLocalISODate(d){
@@ -10933,7 +10962,7 @@ function renderGuide(c){
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (JPY)" value="'+escHtml(c.currency)+'" oninput="editCountryField(\''+c.id+'\',\'currency\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (JPY)" value="'+escHtml(c.currency)+'" onchange="saveCountryCurrency(\''+c.id+'\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
     +'<div class="info-row" style="border-bottom:none"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:10px 0"></div>'
@@ -10971,11 +11000,10 @@ function openRateEditModal(countryId){
   document.getElementById('guideItemModal').classList.add('open');
   setTimeout(function(){ var i=document.getElementById('rateEditInput'); if(i){ i.focus(); i.select(); } }, 100);
 }
-function saveRateEdit(){
+async function saveRateEdit(){
   var input = document.getElementById('rateEditInput');
   var val = input ? input.value : '';
-  closeGuideItemModal();
-  if(_rateEditCountryId) updateCustomRate(_rateEditCountryId, val);
+  if(_rateEditCountryId && await updateCustomRate(_rateEditCountryId, val)) closeGuideItemModal();
 }
 function renderMiniConverter(c){
   var rate = getRate(c);
@@ -11037,7 +11065,25 @@ function renderConverterCard(c){
 }
 function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
 function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmtMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
-function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=Math.round(n); save(); renderContent(); var i=document.getElementById('convRateMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+async function updateCustomRate(cid,val){
+  var n=parseFloat(val);if(!n||n<=0)return false;
+  var c=COUNTRIES.find(function(co){return co.id===cid;});if(!c)return false;
+  n=Math.round(n);
+  var next=countryEditSnapshot(c);next.rateNum=n;
+  try{
+    var saved=await persistCountryEdit(cid,next);
+    c.rateNum=n;
+    if(!S.customRates)S.customRates={};
+    delete S.customRates[cid];
+    S.countryEdits[cid]=saved;
+    save();renderContent();
+    return true;
+  }catch(e){
+    console.error('[PlaniTrip] save exchange rate:',e);
+    alert('Impossible d’enregistrer ce taux pour le moment.');
+    return false;
+  }
+}
 function delExp(id){
   showConfirm('Supprimer cette dépense ?', async function(){
     var syncKey='delete_'+id;
