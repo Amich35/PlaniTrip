@@ -5667,21 +5667,41 @@ function saveCountryEdit(countryId){
   }
   return Promise.resolve(S.countryEdits[countryId]);
 }
-async function saveCountryCurrency(countryId,value){
+var _countryCurrencyPending={};
+var _countryCurrencySyncing={};
+var _countryCurrencyConfirmed={};
+function saveCountryCurrency(countryId,value){
   var c=COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c)return;
-  var previous=c.currency;
-  var next=countryEditSnapshot(c);next.currency=value;
-  try{
-    var saved=await persistCountryEdit(countryId,next);
-    c.currency=saved.currency;
-    S.countryEdits[countryId]=saved;
-    save();renderContent();
-  }catch(e){
-    console.error('[PlaniTrip] save currency:',e);
-    c.currency=previous;renderContent();
-    alert('Impossible d’enregistrer cette devise pour le moment.');
-  }
+  if(!Object.prototype.hasOwnProperty.call(_countryCurrencyConfirmed,countryId))_countryCurrencyConfirmed[countryId]=c.currency;
+  c.currency=value;
+  var next=countryEditSnapshot(c);
+  S.countryEdits[countryId]=next;
+  _countryCurrencyPending[countryId]=next;
+  save();
+  if(_countryCurrencySyncing[countryId])return;
+  _countryCurrencySyncing[countryId]=true;
+  (async function(){
+    try{
+      while(_countryCurrencyPending[countryId]){
+        var queued=_countryCurrencyPending[countryId];
+        delete _countryCurrencyPending[countryId];
+        var saved=await persistCountryEdit(countryId,queued);
+        _countryCurrencyConfirmed[countryId]=saved.currency;
+        if(!_countryCurrencyPending[countryId])S.countryEdits[countryId]=saved;
+      }
+    }catch(e){
+      console.error('[PlaniTrip] save currency:',e);
+      delete _countryCurrencyPending[countryId];
+      c.currency=_countryCurrencyConfirmed[countryId];
+      if(S.countryEdits[countryId])S.countryEdits[countryId].currency=c.currency;
+      save();renderContent();
+      alert('Impossible d’enregistrer cette devise pour le moment.');
+    }finally{
+      _countryCurrencySyncing[countryId]=false;
+      if(_countryCurrencyPending[countryId])saveCountryCurrency(countryId,_countryCurrencyPending[countryId].currency);
+    }
+  })();
 }
 function toLocalISODate(d){
   var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
@@ -10962,7 +10982,7 @@ function renderGuide(c){
     +'<div class="info-card"><div class="ic-header"><span data-icon="coins" data-icon-size="16"></span> Général</div>'
     +'<div class="info-row"><span class="ir-key">Visa</span><input class="ir-input" type="text" placeholder="ex: Non (≤ 90 jours)" value="'+escHtml(c.visa)+'" oninput="editCountryField(\''+c.id+'\',\'visa\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Langue</span><input class="ir-input" type="text" placeholder="ex: Japonais" value="'+escHtml(c.lang)+'" oninput="editCountryField(\''+c.id+'\',\'lang\',this.value)"/></div>'
-    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (JPY)" value="'+escHtml(c.currency)+'" onchange="saveCountryCurrency(\''+c.id+'\',this.value)"/></div>'
+    +'<div class="info-row"><span class="ir-key">Devise</span><input class="ir-input" type="text" placeholder="ex: Yen (JPY)" value="'+escHtml(c.currency)+'" oninput="saveCountryCurrency(\''+c.id+'\',this.value)"/></div>'
     +'<div class="info-row"><span class="ir-key">Budget / jour</span><div style="display:flex;align-items:center;gap:4px"><input class="ir-input" type="number" style="max-width:70px" value="'+getMyCountryDailyBudget(c)+'" oninput="setMyCountryBudget(\''+c.id+'\',this.value)"/><span style="font-size:13px;color:var(--ink-muted)">€</span></div></div>'
     +'<div class="info-row" style="border-bottom:none"><span class="ir-key">Décalage horaire</span><input class="ir-input" type="text" placeholder="ex: +7h par rapport à la France" value="'+escHtml(c.timezone||'')+'" oninput="editCountryField(\''+c.id+'\',\'timezone\',this.value)"/></div>'
     +'<div style="height:1px;background:rgba(29,29,31,0.07);margin:10px 0"></div>'
@@ -10982,7 +11002,10 @@ function renderGuide(c){
     +'</div>';
 }
 
-function getRate(c){ return Math.round((S.customRates && S.customRates[c.id]) || c.rateNum || 1); }
+function getRate(c){
+  var serverRate=S.countryEdits&&S.countryEdits[c.id]&&Number(S.countryEdits[c.id].rateNum);
+  return Math.round(serverRate||(S.customRates&&S.customRates[c.id])||c.rateNum||1);
+}
 var _rateEditCountryId = '';
 function openRateEditModal(countryId){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
