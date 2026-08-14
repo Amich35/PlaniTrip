@@ -1,0 +1,31 @@
+name: Patch date-only filters
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/patch-date-only-filters.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python scripts/patch_date_only_filters.py
+      - name: Validate
+        run: |
+          git diff --check
+          grep -q "S.activeDay\[ck\] = day;" index.html
+          grep -q "Filtre unique : dates" index.html
+          ! grep -q "const activeCat = S.activeCategory\[ck\]||'Tous';" index.html
+          ! grep -q "if(activeCat!=='Tous'" index.html
+          ! grep -q "var categoryFilterHTML = '';" index.html
+      - name: Commit and cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/patch-date-only-filters.yml scripts/patch_date_only_filters.py
+          git add index.html
+          git diff --cached --check
+          git commit -m "fix: persist no-date filter and remove category filters"
+          git push
