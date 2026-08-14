@@ -4648,7 +4648,7 @@ function removeDay(ck) {
 }
 function setActiveDay(ck, day){
   if(!S.activeDay) S.activeDay={};
-  if(day === 'Tous') delete S.activeDay[ck]; else S.activeDay[ck] = day;
+  S.activeDay[ck] = day;
   save();
   // Écriture immédiate de la clé séparée légère (iOS safety)
   try{
@@ -4714,7 +4714,7 @@ function renderDayTabs(ck) {
     ? _rawActive : 'Tous';
   if(active === 'Tous' && _rawActive !== 'Tous'){
     // Nettoyage silencieux du filtre devenu invalide (date hors séjour)
-    delete S.activeDay[ck];
+    S.activeDay[ck] = 'Tous';
     try{
       var _adClean = Object.keys(S.activeDay).length ? JSON.stringify(S.activeDay) : null;
       if(CURRENT_STORAGE_KEY){
@@ -7389,8 +7389,6 @@ function renderCityPanelContentBody(c, city){
     const ck=c.id+'_'+city.city;
     const customs=S.customActs[ck]||[];
     const activeDay = S.activeDay[ck]||'Tous';
-    if(!S.activeCategory) S.activeCategory={};
-    const activeCat = S.activeCategory[ck]||'Tous';
     const totalBase=city.acts.length;
     const totalCustomAll=(S.customActs[ck]||[]).length;
     const order=getOrder(ck,totalBase,totalCustomAll);
@@ -7405,7 +7403,6 @@ function renderCityPanelContentBody(c, city){
         var k=ck+'_'+origIdx;
         var actDateVal = getActivityDate(k, c.id, city.city, slotIdx, order.length);
         if(activeDay!=='Tous' && actDateVal!==activeDay) return null;
-        if(activeCat!=='Tous' && getActCategory(k,a.n,a.m).indexOf(activeCat)===-1) return null;
         var done=!!S.done[k];
         var hasCoord=!!COORDS[k];
         var hasDetail=true;
@@ -7444,7 +7441,6 @@ function renderCityPanelContentBody(c, city){
         var cDateVal = getActivityDate(ck2, c.id, city.city, slotIdx, order.length);
         if(activeDay!=='Tous' && cDateVal!==activeDay) return null;
         var caCat = getActCategory(ck2, ca.n, ca.m);
-        if(activeCat!=='Tous' && caCat.indexOf(activeCat)===-1) return null;
         var caMoment = getActMoment(ck2, ca.n, ca.m);
         // Type de lieu (ex: "Marché couvert") : issu de la fiche détaillée (IA ou édition
         // manuelle) — pas de repli statique, une activité custom n'a pas d'entrée ACT_DETAILS.
@@ -7546,39 +7542,18 @@ function renderCityPanelContentBody(c, city){
 
     const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+activityTrashBtn+'<div style="height:24px"></div>';
 
-    // Filtres horizontaux par catégorie — uniquement les catégories réellement présentes dans cette ville
-    var presentCats = {};
-    city.acts.forEach(function(a,i){ if(!S.deletedActs[ck+'_'+i]){ getActCategory(ck+'_'+i,a.n,a.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); } });
-    (S.customActs[ck]||[]).forEach(function(ca,i){ var _k=getCustomActivityKey(ck,ca,i); if(isActivityArchived(_k)) return; getActCategory(_k,ca.n,ca.m).forEach(function(cat){ if(cat) presentCats[cat]=true; }); });
-    var catKeys = Object.keys(presentCats);
-    var categoryFilterHTML = '';
-    if(catKeys.length){
-      categoryFilterHTML = '<div class="cf-chips">'
-        +'<button class="cf-cat-chip'+(activeCat==='Tous'?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\'Tous\')">Toutes</button>'
-        +catKeys.map(function(catKey){
-          var cat = ACTIVITY_CATEGORIES[catKey];
-          var isActive = activeCat===catKey;
-          return '<button class="cf-cat-chip'+(isActive?' active':'')+'" onclick="setCityCategory(\''+jsStrEsc(ck)+'\',\''+catKey+'\')" title="'+cat.label+'">'+svgIcon(cat.icon,15)+'</button>';
-        }).join('')
-        +'</div>';
-    }
-
+    // Filtre unique : dates. Le filtre catégorie a été retiré volontairement.
     var dayTabsHTML = renderDayTabs(ck);
     var filterBarHTML = '';
-    if(dayTabsHTML || categoryFilterHTML){
+    if(dayTabsHTML){
       var calIcon = '<span class="cf-filter-icon">'+svgIcon('calendar',15)+'</span>';
-      var compassIcon = '<span class="cf-filter-icon">'+svgIcon('compass',15)+'</span>';
-      var rowsHTML = '';
-      if(dayTabsHTML) rowsHTML += '<div class="cf-filter-row">'+calIcon+dayTabsHTML+'</div>';
-      if(dayTabsHTML && categoryFilterHTML) rowsHTML += '<div class="cf-filter-sep"></div>';
-      if(categoryFilterHTML) rowsHTML += '<div class="cf-filter-row">'+compassIcon+categoryFilterHTML+'</div>';
-      filterBarHTML = '<div class="city-filters-sticky"><div class="cf-filter-card">'+rowsHTML+'</div></div>';
+      filterBarHTML = '<div class="city-filters-sticky"><div class="cf-filter-card"><div class="cf-filter-row">'+calIcon+dayTabsHTML+'</div></div></div>';
     }
 
     var _activeDay = S.activeDay && S.activeDay[ck] ? S.activeDay[ck] : 'Tous';
     var _emptyDayHTML = '';
     if(_activeDay !== 'Tous' && !baseActsHTML.trim()){
-      // Distinguer : jour vraiment vide vs activités masquées par filtre catégorie
+      // Vérifier si cette date ne contient réellement aucune activité.
       var _dayCounts = countActivitiesByDate(ck);
       var _dayHasActs = (_dayCounts[_activeDay]||0) > 0;
       if(!_dayHasActs){
