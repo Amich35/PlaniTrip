@@ -619,12 +619,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-route-head{position:relative;padding:4px 0 6px 44px;margin-bottom:14px;}
 .mv-route-line{position:absolute;left:14px;top:15px;bottom:19px;width:2px;background:var(--accent);}
 .mv-route-line:before{content:'';position:absolute;top:-2px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent);}
-.mv-route-line:after{content:'↓';position:absolute;bottom:-9px;left:-7px;color:var(--accent);font-size:23px;line-height:1;}
+.mv-route-line:after{content:'';position:absolute;bottom:-1px;left:-3px;width:7px;height:7px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);transform:rotate(45deg);}
 .mv-route-field{margin-bottom:13px;}
 .mv-label{display:block;font-size:10px;line-height:1.2;letter-spacing:.75px;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:4px;}
 .mv-route-input{display:block;width:100%;min-width:0;border:none!important;background:transparent!important;padding:0!important;font-size:16px!important;font-weight:700;color:var(--ink);box-shadow:none!important;}
-.mv-summary{display:grid;grid-template-columns:auto 1fr 1.35fr;gap:7px;align-items:stretch;padding:9px;border:1px solid rgba(100,70,30,.16);border-radius:var(--r16);margin-bottom:14px;}
-.mv-summary-cell{min-width:0;border-radius:var(--r12);background:var(--sand);padding:8px 9px;}
+.mv-summary{display:grid;grid-template-columns:1.15fr .9fr 1.15fr;gap:7px;align-items:start;padding:9px;border:1px solid rgba(100,70,30,.16);border-radius:var(--r16);margin-bottom:14px;}
+.mv-summary-cell{min-width:0;min-height:62px;border-radius:var(--r12);background:var(--sand);padding:7px 8px;}
 .mv-summary-cell .ef-input,.mv-summary-cell .ef-select{border:none!important;background:transparent!important;padding:0!important;height:auto!important;min-height:0!important;font-size:13px!important;font-weight:650;box-shadow:none!important;width:100%;min-width:0;}
 .mv-schedule-btn{grid-column:1/-1;border:none;background:transparent;color:var(--accent);font-size:11.5px;font-weight:650;padding:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
 .mv-schedule{grid-column:1/-1;display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:7px;}
@@ -652,7 +652,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-span-2{grid-column:span 2}.mv-span-3{grid-column:span 3}.mv-span-6{grid-column:1/-1}
 .mv-add-leg{width:100%;padding:11px;border-radius:var(--r12);border:1px solid rgba(45,106,79,.55);background:transparent;color:var(--accent);font-weight:650;margin-top:4px;}
 .mv-inline-edit{width:100%;margin-top:10px;padding:10px;border-radius:var(--r12);border:none;background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;}
-#movementModalSaveBtn{position:sticky;bottom:0;z-index:3;margin-top:12px;box-shadow:0 -8px 18px rgba(255,255,255,.92),0 4px 12px rgba(29,29,31,.14);}
+#movementModalSaveBtn{position:static;margin-top:12px;box-shadow:0 4px 12px rgba(29,29,31,.14);}
 .mv-country-card{background:#fff;border:1px solid rgba(100,70,30,.12);border-radius:var(--r16);overflow:hidden;}
 .mv-country-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;}
 .mv-country-route{flex:1;min-width:0;font-size:13.5px;font-weight:700;line-height:1.35;overflow-wrap:anywhere;}
@@ -660,6 +660,9 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-currency-select{border:none;background:transparent;color:var(--accent);font-size:10.5px;font-weight:750;padding:0 14px 0 0;min-width:54px;}
 .mv-price-row{display:flex;align-items:center;gap:5px;min-width:0;}
 .mv-price-row .ef-input{flex:1;min-width:0;}
+.mv-duration-row{display:flex;align-items:center;gap:4px;min-width:0;}
+.mv-duration-row .ef-input{flex:1;min-width:0;}
+.mv-duration-select{border:none;background:transparent;color:var(--accent);font-size:10.5px;font-weight:750;padding:0 12px 0 0;min-width:42px;}
 @media(max-width:370px){.mv-summary{grid-template-columns:1fr 1fr}.mv-summary> :first-child{grid-column:1/-1}.mv-schedule{grid-template-columns:1fr 1fr}.mv-schedule> :first-child{grid-column:1/-1}.mv-leg-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mv-span-2,.mv-span-3{grid-column:span 1}.mv-span-6{grid-column:1/-1}}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
@@ -7840,6 +7843,25 @@ function movementFormatCost(value,m,perPerson){
 function movementCalculatedCost(m){
   return (m.legs||[]).reduce(function(total,l){var n=parseAmt(l.costJPY);return total+(isNaN(n)?0:n);},0);
 }
+function movementDurationUnit(item){return item&&item.durationUnit==='hour'?'hour':'min';}
+function movementDurationDisplay(value,item){
+  var n=parseAmt(value);if(isNaN(n))return '';
+  return movementDurationUnit(item)==='hour'?Math.round((n/60)*100)/100:n;
+}
+function movementDurationToMinutes(value,unit){
+  var n=parseAmt(value);if(isNaN(n))return '';
+  return Math.round((unit==='hour'?n*60:n)*100)/100;
+}
+function movementFormatDuration(value,item){
+  var display=movementDurationDisplay(value,item);if(display==='')return '';
+  return Number(display).toLocaleString('fr-FR',{maximumFractionDigits:2})+(movementDurationUnit(item)==='hour'?' h':' min');
+}
+function changeMovementDurationUnit(inputId,selectEl){
+  var input=document.getElementById(inputId);if(!input)return;
+  var previous=selectEl.dataset.previous||'min';var next=selectEl.value;var n=parseAmt(input.value);
+  if(!isNaN(n)&&previous!==next)input.value=next==='hour'?Math.round((n/60)*100)/100:Math.round((n*60)*100)/100;
+  selectEl.dataset.previous=next;
+}
 function builtinMovementsForCountry(countryId){
   if(countryId!=='jp') return [];
   var osakaAccom=(Array.isArray(S.accom&&S.accom.jp_Osaka)?S.accom.jp_Osaka:[])[0];
@@ -7878,11 +7900,11 @@ function renderMovementsSection(countryId){
     var open=!!(S.uiAccordion&&S.uiAccordion[accordionKey]);
     var missing=movementMissingCount(m);
     var meta=[];
-    if(m.durationMin) meta.push('≈ '+m.durationMin+' min');
+    if(m.durationMin) meta.push('≈ '+movementFormatDuration(m.durationMin,m));
     if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null) meta.push('≈ '+movementFormatCost(m.costPerPersonJPY,m,true));
     var legs=open?'<div class="mv-timeline" style="margin-top:12px">'+(m.legs||[]).map(function(l,i){
       var incomplete=!l.from||!l.to||String(l.line||'').toLowerCase()==='à compléter';
-      var legMeta=[];if(l.durationMin)legMeta.push(l.durationMin+' min');if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
+      var legMeta=[];if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
       return '<div class="mv-leg-card'+(incomplete?' incomplete':'')+'"><span class="mv-leg-node">'+(incomplete?'':movementModeIcon(l.mode))+'</span><div class="mv-leg-head" style="cursor:default"><span class="mv-leg-number">'+(i+1)+'</span><div class="mv-leg-copy"><div class="mv-leg-title">'+escHtml(incomplete?'Étape à compléter':(l.mode||'Étape'))+'</div><div class="mv-leg-sub">'+escHtml(l.line||'Informations à compléter')+'</div>'+(l.from||l.to?'<div class="mv-leg-route">'+escHtml(l.from||'Départ')+' → '+escHtml(l.to||'Arrivée')+'</div>':'')+(legMeta.length?'<div class="mv-leg-meta">'+escHtml(legMeta.join(' · '))+'</div>':'')+'</div></div></div>';
     }).join('')+'</div>':'';
     return '<div class="mv-country-card"><div class="mv-country-head" onclick="toggleMovementAccordion(\''+jsStrEsc(m.id)+'\')"><div class="mv-country-route">'+escHtml(m.origin||'Départ')+' → '+escHtml(m.destination||'Arrivée')+'</div><span data-icon="chevron-right" data-icon-size="15" style="color:var(--ink-subtle);transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')"></span></div>'
@@ -7898,6 +7920,8 @@ function openMovementModal(id,countryId){
   _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:'',destination:'',date:'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',legs:[]};
   if(!_movementDraft.priceCurrencyMode)_movementDraft.priceCurrencyMode='LOCAL';
   if(_movementDraft.costManualOverride==null)_movementDraft.costManualOverride=false;
+  if(!_movementDraft.durationUnit)_movementDraft.durationUnit='min';
+  (_movementDraft.legs||[]).forEach(function(l){if(!l.durationUnit)l.durationUnit='min';});
   _movementPriceInputsDirty=false;
   _movementOpenLeg=null;
   _movementScheduleOpen=!!(_movementDraft.date||_movementDraft.departureTime||_movementDraft.arrivalTime);
@@ -7909,11 +7933,15 @@ function openMovementModal(id,countryId){
 function closeMovementModal(){ document.getElementById('movementModal').classList.remove('open'); _movementDraft=null; }
 function movementDraftFromInputs(skipPrices){
   if(!_movementDraft) return;
-  ['origin','destination','date','departureTime','arrivalTime','status','durationMin','notes'].forEach(function(k){var el=document.getElementById('mv_'+k);if(el)_movementDraft[k]=el.value;});
+  ['origin','destination','date','departureTime','arrivalTime','status','notes'].forEach(function(k){var el=document.getElementById('mv_'+k);if(el)_movementDraft[k]=el.value;});
+  var durationEl=document.getElementById('mv_durationDisplay');var durationUnitEl=document.getElementById('mv_durationUnit');
+  if(durationEl&&durationUnitEl){_movementDraft.durationUnit=durationUnitEl.value;_movementDraft.durationMin=movementDurationToMinutes(durationEl.value,durationUnitEl.value);}
   var totalEl=document.getElementById('mv_costPerPersonDisplay');
   if(!skipPrices&&totalEl)_movementDraft.costPerPersonJPY=movementDisplayToLocal(totalEl.value,_movementDraft);
   (_movementDraft.legs||[]).forEach(function(l,i){
-    ['mode','line','direction','from','to','durationMin','stops','instruction'].forEach(function(k){var el=document.getElementById('mvl_'+i+'_'+k);if(el)l[k]=el.value;});
+    ['mode','line','direction','from','to','stops','instruction'].forEach(function(k){var el=document.getElementById('mvl_'+i+'_'+k);if(el)l[k]=el.value;});
+    var legDurationEl=document.getElementById('mvl_'+i+'_durationDisplay');var legDurationUnitEl=document.getElementById('mvl_'+i+'_durationUnit');
+    if(legDurationEl&&legDurationUnitEl){l.durationUnit=legDurationUnitEl.value;l.durationMin=movementDurationToMinutes(legDurationEl.value,legDurationUnitEl.value);}
     var costEl=document.getElementById('mvl_'+i+'_costDisplay');
     if(!skipPrices&&costEl)l.costJPY=movementDisplayToLocal(costEl.value,_movementDraft);
   });
@@ -7943,14 +7971,14 @@ function movementTotalPriceChanged(){
 function renderMovementModalBody(){
   var m=_movementDraft;if(!m)return;
   var legs='<div class="mv-timeline">'+(m.legs||[]).map(function(l,i){
-    var open=_movementOpenLeg===i;var incomplete=!l.from||!l.to||String(l.line||'').toLowerCase()==='à compléter';var legMeta=[];if(l.durationMin)legMeta.push(l.durationMin+' min');if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
+    var open=_movementOpenLeg===i;var incomplete=!l.from||!l.to||String(l.line||'').toLowerCase()==='à compléter';var legMeta=[];if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
     var fields=open?'<div class="mv-leg-fields">'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Mode de transport</span><select class="ef-select" id="mvl_'+i+'_mode"><option'+(l.mode==='Train'?' selected':'')+'>Train</option><option'+(l.mode==='Métro'?' selected':'')+'>Métro</option><option'+(l.mode==='Marche'?' selected':'')+'>Marche</option><option'+(l.mode==='Bus'?' selected':'')+'>Bus</option><option'+(l.mode==='Avion'?' selected':'')+'>Avion</option><option'+(l.mode==='Autre'?' selected':'')+'>Autre</option></select></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Ligne</span><input class="ef-input" id="mvl_'+i+'_line" value="'+escHtml(l.line||'')+'"></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Départ</span><input class="ef-input" id="mvl_'+i+'_from" value="'+escHtml(l.from||'')+'"></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mvl_'+i+'_to" value="'+escHtml(l.to||'')+'"></label>'
       +'<label class="mv-field mv-span-2"><span class="mv-field-label">Direction</span><input class="ef-input" id="mvl_'+i+'_direction" value="'+escHtml(l.direction||'')+'"></label>'
-      +'<label class="mv-field mv-span-2"><span class="mv-field-label">Durée</span><input class="ef-input" id="mvl_'+i+'_durationMin" type="number" inputmode="numeric" value="'+escHtml(l.durationMin==null?'':l.durationMin)+'"></label>'
+      +'<label class="mv-field mv-span-2"><span class="mv-field-label">Durée</span><div class="mv-duration-row"><input class="ef-input" id="mvl_'+i+'_durationDisplay" type="number" inputmode="decimal" step="0.01" value="'+escHtml(movementDurationDisplay(l.durationMin,l))+'"><select class="mv-duration-select" id="mvl_'+i+'_durationUnit" data-previous="'+movementDurationUnit(l)+'" onchange="changeMovementDurationUnit(\'mvl_'+i+'_durationDisplay\',this)"><option value="min"'+(movementDurationUnit(l)==='min'?' selected':'')+'>min</option><option value="hour"'+(movementDurationUnit(l)==='hour'?' selected':'')+'>h</option></select></div></label>'
       +'<label class="mv-field mv-span-2"><span class="mv-field-label">Prix ('+escHtml(movementCurrencyLabel(m))+')</span><input class="ef-input" id="mvl_'+i+'_costDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementLegPriceChanged()" value="'+escHtml(movementLocalToDisplay(l.costJPY,m))+'"></label>'
       +'<label class="mv-field mv-span-2"><span class="mv-field-label">Arrêts</span><input class="ef-input" id="mvl_'+i+'_stops" value="'+escHtml(l.stops||'')+'"></label>'
       +'<label class="mv-field mv-span-6"><span class="mv-field-label">Conseil pratique (optionnel)</span><input class="ef-input" id="mvl_'+i+'_instruction" value="'+escHtml(l.instruction||'')+'"></label></div>':'';
@@ -7959,13 +7987,15 @@ function renderMovementModalBody(){
   document.getElementById('movementModalTitle').textContent=(m.source==='manual'&&!movementsForCountry(m.countryId).some(function(x){return x.id===m.id;}))?'Ajouter un déplacement':'Modifier le déplacement';
   var schedule=_movementScheduleOpen?'<div class="mv-schedule"><label class="mv-field"><span class="mv-field-label">Date</span><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'"></label><label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'"></label><label class="mv-field"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mv_arrivalTime" type="time" value="'+escHtml(m.arrivalTime||'')+'"></label></div>':'<button class="mv-schedule-btn" onclick="toggleMovementSchedule()">'+svgIcon('calendar',15)+' Ajouter date et horaires</button>';
   var localCurrency=movementCurrencyInfo(m.countryId).symbol;
-  var priceInput='<label class="mv-summary-cell"><span class="mv-field-label">Prix par personne</span><div class="mv-price-row"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div><span class="mv-field-label" id="mv_costHint">'+(m.costManualOverride?'Montant personnalisé':'Calculé depuis les étapes')+'</span></label>';
+  var priceInput='<label class="mv-summary-cell"><span class="mv-field-label">Prix par personne</span><div class="mv-price-row"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>';
+  var durationInput='<label class="mv-summary-cell"><span class="mv-field-label">Durée estimée</span><div class="mv-duration-row"><input class="ef-input" id="mv_durationDisplay" type="number" inputmode="decimal" step="0.01" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'" placeholder="0"><select class="mv-duration-select" id="mv_durationUnit" data-previous="'+movementDurationUnit(m)+'" onchange="changeMovementDurationUnit(\'mv_durationDisplay\',this)"><option value="min"'+(movementDurationUnit(m)==='min'?' selected':'')+'>min</option><option value="hour"'+(movementDurationUnit(m)==='hour'?' selected':'')+'>h</option></select></div></label>';
   document.getElementById('movementModalBody').innerHTML='<div class="mv-route-head"><span class="mv-route-line"></span><label class="mv-route-field"><span class="mv-label">Départ</span><input class="mv-route-input" id="mv_origin" value="'+escHtml(m.origin||'')+'" placeholder="Point de départ"></label><label class="mv-route-field"><span class="mv-label">Destination</span><input class="mv-route-input" id="mv_destination" value="'+escHtml(m.destination||'')+'" placeholder="Destination"></label></div>'
-    +'<div class="mv-summary"><label class="mv-summary-cell"><span class="mv-field-label">Statut</span><select class="ef-select" id="mv_status"><option value="incomplete"'+(m.status==='incomplete'?' selected':'')+'>À compléter</option><option value="planned"'+(m.status==='planned'?' selected':'')+'>Prévu</option><option value="booked"'+(m.status==='booked'?' selected':'')+'>Réservé</option></select></label><label class="mv-summary-cell"><span class="mv-field-label">Durée estimée</span><input class="ef-input" id="mv_durationMin" type="number" inputmode="numeric" value="'+escHtml(m.durationMin==null?'':m.durationMin)+'" placeholder="Minutes"></label>'+priceInput+schedule+'</div>'
+    +'<div class="mv-summary"><label class="mv-summary-cell"><span class="mv-field-label">Statut</span><select class="ef-select" id="mv_status"><option value="incomplete"'+(m.status==='incomplete'?' selected':'')+'>À compléter</option><option value="planned"'+(m.status==='planned'?' selected':'')+'>Prévu</option><option value="booked"'+(m.status==='booked'?' selected':'')+'>Réservé</option></select></label>'+durationInput+priceInput+schedule+'</div>'
     +'<label class="mv-field" style="display:block;margin-bottom:12px"><span class="mv-field-label">Note générale (optionnel)</span><textarea class="ef-input" id="mv_notes" rows="2" style="resize:none">'+escHtml(m.notes||'')+'</textarea></label>'
     +'<div class="mv-editor-title">ITINÉRAIRE</div>'+legs
-    +'<button class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une étape</button>'
-    +(movementsForCountry(m.countryId).some(function(x){return x.id===m.id;})?'<button onclick="archiveMovement()" style="width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Supprimer ce déplacement</button>':'');
+    +'<button class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une étape</button>';
+  var deleteBtn=document.getElementById('movementModalDeleteBtn');
+  if(deleteBtn)deleteBtn.style.display=movementsForCountry(m.countryId).some(function(x){return x.id===m.id;})?'block':'none';
   _movementPriceInputsDirty=false;
 }
 function toggleMovementLeg(i){movementDraftFromInputs();_movementOpenLeg=_movementOpenLeg===i?null:i;renderMovementModalBody();}
@@ -17580,6 +17610,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-title" id="movementModalTitle">Déplacement</div>
     <div id="movementModalBody"></div>
     <button class="modal-cta" id="movementModalSaveBtn" onclick="saveMovementModal()">Enregistrer</button>
+    <button id="movementModalDeleteBtn" onclick="archiveMovement()" style="display:none;width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Supprimer ce déplacement</button>
     <button class="modal-cancel-btn" onclick="closeMovementModal()">Annuler</button>
   </div>
 </div>
