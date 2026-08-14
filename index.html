@@ -9602,7 +9602,9 @@ function renderFlightsList(flights){
   var people = getPeopleList();
   if(!S.newFlightParticipants || !S.newFlightParticipants.length) S.newFlightParticipants = people.slice();
   var cards = flights.map(function(f, i){
-    var dateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'Date non renseignée';
+    var departureDateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'non renseignée';
+    var arrivalDateLabel = f.arrivalDate ? new Date(f.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : '';
+    var dateLabel = 'Départ '+departureDateLabel+(arrivalDateLabel?' · Arrivée '+arrivalDateLabel:'');
     var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
     var timesLabel = f.departureTime || f.arrivalTime ? ('Départ '+(f.departureTime||'—')+' · Arrivée '+(f.arrivalTime||'—')) : '';
     var fParticipants = (f.participants && f.participants.length) ? f.participants : people;
@@ -9635,8 +9637,12 @@ function renderFlightsList(flights){
     +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'" style="flex:1;min-width:0">'
     +'</div>'
     +'<div style="display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:8px">'
-    +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date du vol</span>'
+    +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date de départ</span>'
     +dateTripleHTML('newFlightDate', editingFlight?(editingFlight.date||''):'')
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:8px">'
+    +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date d’arrivée</span>'
+    +dateTripleHTML('newFlightArrivalDate', editingFlight?(editingFlight.arrivalDate||''):'')
     +'</div>'
     +'<div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de départ</div><input id="newFlightDepartureTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'" style="width:100%;box-sizing:border-box"></div><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure d’arrivée</div><input id="newFlightArrivalTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'" style="width:100%;box-sizing:border-box"></div></div>'
     +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" value="'+(editingFlight?escHtml(editingFlight.link||''):'')+'" style="width:100%;margin-top:6px">'
@@ -9686,6 +9692,7 @@ async function saveFlight(){
   var from = document.getElementById('newFlightFrom').value.trim();
   var to = document.getElementById('newFlightTo').value.trim();
   var date = document.getElementById('newFlightDate-hidden').value;
+  var arrivalDate = document.getElementById('newFlightArrivalDate-hidden').value;
   var departureTime = document.getElementById('newFlightDepartureTime').value;
   var arrivalTime = document.getElementById('newFlightArrivalTime').value;
   var link = document.getElementById('newFlightLink').value.trim();
@@ -9699,8 +9706,8 @@ async function saveFlight(){
 
   var saveBtn=document.getElementById('saveFlightBtn');
   var flightId=S.editingFlightId||Date.now();
-  var flightPayload={id:flightId,from:from,to:to,date:date,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants};
-  var metaPayload={departureTime:departureTime,arrivalTime:arrivalTime,notes:notes};
+  var flightPayload={id:flightId,from:from,to:to,date:date,arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants};
+  var metaPayload={arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,notes:notes};
   try{
     if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='…'; }
     var flightWrite;
@@ -9755,7 +9762,7 @@ async function loadFlights(){
   // Serveur autoritaire : reconstruction complète de la liste des vols.
   S.documents.tickets.flightsList = (data||[]).map(function(row){
     var meta=(S.flightMeta&&S.flightMeta[String(row.id)])||{};
-    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[]};
+    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,arrivalDate:meta.arrivalDate||'',departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[]};
   }).sort(function(a,b){
     var ak=(a.date||'')+' '+(a.departureTime||'');
     var bk=(b.date||'')+' '+(b.departureTime||'');
