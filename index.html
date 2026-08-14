@@ -316,6 +316,13 @@ a{color:var(--ink);}
 .share-modal.open{display:flex;}
 #photoModal{z-index:450;}
 .share-sheet{background:var(--parchment);border-radius:var(--r20) var(--r20) 0 0;padding:28px 24px 40px;width:100%;max-width:420px;}
+.share-sheet,.map-sheet,.detail-sheet,.search-sheet,.ct-modal-sheet{
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+}
+.share-sheet,.map-sheet{max-height:92vh;max-height:92dvh;overflow-y:auto;}
+html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-behavior:none;}
 .modal-handle{width:36px;height:4px;background:rgba(29,29,31,0.140);border-radius:2px;margin:0 auto 20px;}
 .modal-title{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:22px;font-weight:700;margin-bottom:6px;}
 .modal-sub{font-size:13px;color:var(--ink-muted);margin-bottom:20px;}
@@ -17759,6 +17766,74 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   </div>
 </div>
 <!-- Country management modal -->
+<script>
+/* Verrou global des pages sous les modales, y compris sur Safari iOS. */
+(function(){
+  var locked = false;
+  var scrollY = 0;
+  var savedBodyStyle = null;
+  var modalSelector = '.share-modal.open,.map-modal.open,.detail-modal.open,.search-modal.open,.confirm-overlay.open,.pin-overlay.open';
+
+  function hasOpenModal(){
+    if(document.querySelector(modalSelector)) return true;
+    var countryModal = document.getElementById('ct-country-modal');
+    return !!countryModal && window.getComputedStyle(countryModal).display !== 'none';
+  }
+
+  function lockPage(){
+    if(locked) return;
+    scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    savedBodyStyle = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      left: document.body.style.left,
+      right: document.body.style.right,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow
+    };
+    document.documentElement.classList.add('modal-scroll-locked');
+    document.body.classList.add('modal-scroll-locked');
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + scrollY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+    locked = true;
+  }
+
+  function unlockPage(){
+    if(!locked) return;
+    document.documentElement.classList.remove('modal-scroll-locked');
+    document.body.classList.remove('modal-scroll-locked');
+    document.body.style.position = savedBodyStyle.position;
+    document.body.style.top = savedBodyStyle.top;
+    document.body.style.left = savedBodyStyle.left;
+    document.body.style.right = savedBodyStyle.right;
+    document.body.style.width = savedBodyStyle.width;
+    document.body.style.overflow = savedBodyStyle.overflow;
+    locked = false;
+    window.scrollTo(0, scrollY);
+  }
+
+  function syncModalScrollLock(){
+    if(hasOpenModal()) lockPage();
+    else unlockPage();
+  }
+
+  function initModalScrollLock(){
+    new MutationObserver(syncModalScrollLock).observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class','style']
+    });
+    syncModalScrollLock();
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initModalScrollLock);
+  else initModalScrollLock();
+})();
+</script>
 </div>
 </body>
 </html>
