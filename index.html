@@ -5693,7 +5693,16 @@ function cityStayRange(ck){
   return (start && end) ? {start:start, end:end} : null;
 }
 function fmtCityStayLine(ck){
-  var range = cityStayRange(ck);
+  // Sur les cartes Ville, afficher en priorité les dates réellement enregistrées
+  // sur les logements. S.cityDates reste un repli pour les villes sans logement daté.
+  var start=null, end=null;
+  var accomList = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
+  accomList.forEach(function(a){
+    if(!a.start || !a.end) return;
+    if(!start || a.start<start) start=a.start;
+    if(!end || a.end>end) end=a.end;
+  });
+  var range = (start && end) ? {start:start, end:end} : cityStayRange(ck);
   if(!range) return null;
   var d1 = new Date(range.start+'T00:00:00'), d2 = new Date(range.end+'T00:00:00');
   var nights = Math.round((d2-d1)/86400000);
