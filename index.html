@@ -9208,7 +9208,7 @@ function renderExpenseFormModal(){
     +renderSplitRows(S.expAmt)
     +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||toLocalISODate(new Date()))+'" oninput="S.expDate=this.value" style="width:100%"/></div>'
     +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
-    +'<button class="ef-btn" onclick="addExpGlobal();closeAddExpenseModal();">'+(isEditing?'✓ Enregistrer':'+ Ajouter')+'</button></div>'
+    +'<button class="ef-btn" id="expenseSaveBtn" onclick="addExpGlobal()">'+(isEditing?'✓ Enregistrer':'+ Ajouter')+'</button></div>'
     +(isEditing?('<button class="modal-cancel-btn" style="color:var(--red-muted)" onclick="var idToDel=S.editingExpenseId;closeAddExpenseModal();delExp(idToDel);">Supprimer cette dépense</button>'):'')
     +'<button class="modal-cancel-btn" onclick="closeAddExpenseModal()">Annuler</button>';
 }
@@ -9250,7 +9250,8 @@ function closeAddExpenseModal(){
 function refreshExpenseModal(){
   document.getElementById('addExpenseModalBody').innerHTML = renderExpenseFormModal();
 }
-function addExpGlobal(){
+var _expenseSyncInFlight = {};
+async function addExpGlobal(){
   var desc=document.getElementById('eDesc').value.trim();
   var amt=parseAmt(document.getElementById('eAmt').value);
   var country = (document.getElementById('expCountrySel')||{}).value || S.expCountry || getC().id;
@@ -9269,25 +9270,42 @@ function addExpGlobal(){
   // person_label = identité EMAIL de la personne sélectionnée dans le dropdown (S.expPerson),
   // PAS forcément l'utilisateur courant — on peut enregistrer une dépense payée par quelqu'un d'autre.
   var payerEmail = S.expPerson || (CURRENT_USER && CURRENT_USER.email) || '';
-  if(S.editingExpenseId){
-    var existing = S.expenses.find(function(x){return x.id===S.editingExpenseId;});
-    if(existing){
-      existing.country=country; existing.city=city; existing.activity=activity; existing.category=category;
-      existing.desc=desc; existing.amount=amt; existing.person=payerEmail; existing.personLabel=payerEmail;
-      existing.participants=participants; existing.splits=splits; existing.date=expDate;
-      if(sb && CURRENT_TRIP){
-        sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:payerEmail,participants:participants,splits:splits,entry_date:expDate}).eq('id',S.editingExpenseId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
-      }
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ alert('Connexion requise pour enregistrer cette dépense.'); return; }
+  var editingId = S.editingExpenseId;
+  var syncKey = editingId ? String(editingId) : 'new';
+  if(_expenseSyncInFlight[syncKey]) return;
+  var btn = document.getElementById('expenseSaveBtn');
+  if(btn){ btn.disabled=true; btn.textContent='…'; }
+  _expenseSyncInFlight[syncKey]=true;
+  var newId = editingId || Date.now();
+  var nextExpense = {id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:payerEmail,personLabel:payerEmail,participants:participants,splits:splits,date:expDate};
+  try{
+    var r;
+    if(editingId){
+      r = await sb.from('budget_entries').update({country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:payerEmail,participants:participants,splits:splits,entry_date:expDate})
+        .eq('id',editingId).eq('trip_id',CURRENT_TRIP.id).select('id').maybeSingle();
+      if(r && !r.error && !r.data) throw new Error('Dépense introuvable sur le serveur');
+    } else {
+      r = await sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:payerEmail,participants:participants,splits:splits,entry_date:expDate}).select('id').single();
     }
-    S.editingExpenseId = null;
-  } else {
-    var newId=Date.now();
-    S.expenses.push({id:newId,country:country,city:city,activity:activity,category:category,desc:desc,amount:amt,person:payerEmail,personLabel:payerEmail,participants:participants,splits:splits,date:expDate});
-    if(sb && CURRENT_TRIP){
-      sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:country,city:city,activity:activity,category:category,description:desc,amount:amt,person_label:payerEmail,participants:participants,splits:splits,entry_date:expDate}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert budget_entries:', r.error); alert('Erreur sauvegarde dépense : '+r.error.message); } });
-    }
+    if(r && r.error) throw r.error;
+  }catch(err){
+    console.error('[PlaniTrip] save budget entry:', err);
+    alert('Impossible d’enregistrer cette dépense pour le moment.');
+    if(btn){ btn.disabled=false; btn.textContent=editingId?'✓ Enregistrer':'+ Ajouter'; }
+    delete _expenseSyncInFlight[syncKey];
+    return;
   }
-  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};S.expDate='';save();renderContent();
+  if(editingId){
+    var existingIdx = S.expenses.findIndex(function(x){return x.id===editingId;});
+    if(existingIdx>-1) S.expenses[existingIdx]=nextExpense;
+  } else {
+    S.expenses.push(nextExpense);
+  }
+  delete _expenseSyncInFlight[syncKey];
+  S.editingExpenseId=null;
+  S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};S.expDate='';
+  save();renderContent();closeAddExpenseModal();
 }
 
 // ── DOCUMENTS ────────────────────────────────────────────────
@@ -10481,15 +10499,28 @@ function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.conv
 function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmtMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function updateCustomRate(cid, val){ var n=parseFloat(val); if(!n||n<=0) return; if(!S.customRates) S.customRates={}; S.customRates[cid]=Math.round(n); save(); renderContent(); var i=document.getElementById('convRateMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
 function delExp(id){
-  showConfirm('Supprimer cette dépense ?', function(){
+  showConfirm('Supprimer cette dépense ?', async function(){
+    var syncKey='delete_'+id;
+    if(_expenseSyncInFlight[syncKey]) return;
+    if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ alert('Connexion requise pour supprimer cette dépense.'); return; }
+    _expenseSyncInFlight[syncKey]=true;
+    try{
+      var r=await sb.from('budget_entries').delete().eq('id',id).eq('trip_id',CURRENT_TRIP.id);
+      if(r&&r.error) throw r.error;
+    }catch(err){
+      console.error('[PlaniTrip] delete budget entry:',err);
+      alert('Impossible de supprimer cette dépense pour le moment.');
+      delete _expenseSyncInFlight[syncKey];
+      return;
+    }
+    delete _expenseSyncInFlight[syncKey];
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
-    markDeletedTombstone('expenses', id);
-    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    markDeletedTombstone('expenses',id);
     save();renderContent();
   }, 'Supprimer');
 }
 function markAsReimbursed(fromPerson, toPerson, amount){
-  showConfirm('Confirmer que '+personDisplayName(fromPerson)+' a remboursé '+fmtEUR(amount)+' à '+personDisplayName(toPerson)+' ?', function(){
+  showConfirm('Confirmer que '+personDisplayName(fromPerson)+' a remboursé '+fmtEUR(amount)+' à '+personDisplayName(toPerson)+' ?', async function(){
     var newId = Date.now();
     var todayStr = toLocalISODate(new Date());
     var entry = {
@@ -10498,14 +10529,25 @@ function markAsReimbursed(fromPerson, toPerson, amount){
       person:fromPerson, personLabel:fromPerson,
       participants:[toPerson], splits:null, date:todayStr
     };
+    if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ alert('Connexion requise pour confirmer ce remboursement.'); return; }
+    var syncKey='reimbursement_new';
+    if(_expenseSyncInFlight[syncKey]) return;
+    _expenseSyncInFlight[syncKey]=true;
+    try{
+      var r=await sb.from('budget_entries').insert({id:newId,trip_id:CURRENT_TRIP.id,country_id:entry.country,city:null,activity:null,category:'reimbursement',description:'Remboursement',amount:amount,person_label:fromPerson,participants:[toPerson],splits:null,entry_date:todayStr}).select('id').single();
+      if(r&&r.error) throw r.error;
+    }catch(err){
+      console.error('[PlaniTrip] create reimbursement:',err);
+      alert('Impossible de confirmer ce remboursement pour le moment.');
+      delete _expenseSyncInFlight[syncKey];
+      return;
+    }
+    delete _expenseSyncInFlight[syncKey];
     S.expenses.push(entry);
     save(); renderContent();
-    if(sb && CURRENT_TRIP){
-      sb.from('budget_entries').insert({id:newId, trip_id:CURRENT_TRIP.id, country_id:entry.country, city:null, activity:null, category:'reimbursement', description:'Remboursement', amount:amount, person_label:fromPerson, participants:[toPerson], splits:null, entry_date:todayStr}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    }
   }, 'Confirmer');
 }
-function editReimbursement(id){
+async function editReimbursement(id){
   var e = S.expenses.find(function(x){return x.id===id;});
   if(!e) return;
   var toP = (e.participants&&e.participants[0]) || '?';
@@ -10513,18 +10555,43 @@ function editReimbursement(id){
   if(val===null) return;
   var amt = parseFloat(val.replace(',','.'));
   if(isNaN(amt) || amt<=0){ alert('Montant invalide.'); return; }
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ alert('Connexion requise pour modifier ce remboursement.'); return; }
+  var syncKey='reimbursement_edit_'+id;
+  if(_expenseSyncInFlight[syncKey]) return;
+  _expenseSyncInFlight[syncKey]=true;
+  try{
+    var r=await sb.from('budget_entries').update({amount:amt}).eq('id',id).eq('trip_id',CURRENT_TRIP.id).select('id').maybeSingle();
+    if(r&&r.error) throw r.error;
+    if(!r||!r.data) throw new Error('Remboursement introuvable sur le serveur');
+  }catch(err){
+    console.error('[PlaniTrip] edit reimbursement:',err);
+    alert('Impossible de modifier ce remboursement pour le moment.');
+    delete _expenseSyncInFlight[syncKey];
+    return;
+  }
+  delete _expenseSyncInFlight[syncKey];
   e.amount = amt;
   save(); renderContent();
-  if(sb && CURRENT_TRIP){
-    sb.from('budget_entries').update({amount:amt}).eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-  }
 }
 function restoreReimbursement(id){
-  showConfirm('Annuler ce remboursement ? La dette sera restaurée.', function(){
+  showConfirm('Annuler ce remboursement ? La dette sera restaurée.', async function(){
+    if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ alert('Connexion requise pour annuler ce remboursement.'); return; }
+    var syncKey='reimbursement_delete_'+id;
+    if(_expenseSyncInFlight[syncKey]) return;
+    _expenseSyncInFlight[syncKey]=true;
+    try{
+      var r=await sb.from('budget_entries').delete().eq('id',id).eq('trip_id',CURRENT_TRIP.id);
+      if(r&&r.error) throw r.error;
+    }catch(err){
+      console.error('[PlaniTrip] delete reimbursement:',err);
+      alert('Impossible d’annuler ce remboursement pour le moment.');
+      delete _expenseSyncInFlight[syncKey];
+      return;
+    }
+    delete _expenseSyncInFlight[syncKey];
     S.expenses = S.expenses.filter(function(e){return e.id!==id;});
-    markDeletedTombstone('expenses', id);
+    markDeletedTombstone('expenses',id);
     save(); renderContent();
-    if(sb && CURRENT_TRIP) sb.from('budget_entries').delete().eq('id', id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }, 'Restaurer la dette');
 }
 function openShare(){document.getElementById('shareModal').classList.add('open');document.getElementById('shareLinkStatus').textContent='';}
@@ -13440,7 +13507,11 @@ async function loadCitiesActivities(){
 
 async function loadBudgetEntries(){
   if(!sb || !CURRENT_TRIP) return;
-  var {data} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
+  var {data,error} = await sb.from('budget_entries').select('*').eq('trip_id',CURRENT_TRIP.id);
+  if(error){
+    console.error('[PlaniTrip] loadBudgetEntries:',error);
+    return; // ne jamais interpréter une requête échouée comme un serveur vide
+  }
   // Le serveur fait autorité : reconstruction depuis Supabase à chaque chargement.
   // On garde uniquement les dépenses locales pas encore synchronisées (id absent côté serveur),
   // en excluant celles marquées comme supprimées via tombstone (voir markDeletedTombstone) —
