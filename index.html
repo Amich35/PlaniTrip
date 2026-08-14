@@ -7799,6 +7799,7 @@ if(!S.movements) S.movements={};
 var _movementDraft=null;
 var _movementOpenLeg=null;
 var _movementScheduleOpen=false;
+var _movementPriceInputsDirty=false;
 
 function movementUid(prefix){
   if(window.crypto&&crypto.randomUUID) return (prefix||'mv_')+crypto.randomUUID();
@@ -7897,6 +7898,7 @@ function openMovementModal(id,countryId){
   _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:'',destination:'',date:'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',legs:[]};
   if(!_movementDraft.priceCurrencyMode)_movementDraft.priceCurrencyMode='LOCAL';
   if(_movementDraft.costManualOverride==null)_movementDraft.costManualOverride=false;
+  _movementPriceInputsDirty=false;
   _movementOpenLeg=null;
   _movementScheduleOpen=!!(_movementDraft.date||_movementDraft.departureTime||_movementDraft.arrivalTime);
   renderMovementModalBody();
@@ -7905,20 +7907,20 @@ function openMovementModal(id,countryId){
   document.getElementById('movementModal').classList.add('open');
 }
 function closeMovementModal(){ document.getElementById('movementModal').classList.remove('open'); _movementDraft=null; }
-function movementDraftFromInputs(){
+function movementDraftFromInputs(skipPrices){
   if(!_movementDraft) return;
   ['origin','destination','date','departureTime','arrivalTime','status','durationMin','notes'].forEach(function(k){var el=document.getElementById('mv_'+k);if(el)_movementDraft[k]=el.value;});
   var totalEl=document.getElementById('mv_costPerPersonDisplay');
-  if(totalEl)_movementDraft.costPerPersonJPY=movementDisplayToLocal(totalEl.value,_movementDraft);
+  if(!skipPrices&&totalEl)_movementDraft.costPerPersonJPY=movementDisplayToLocal(totalEl.value,_movementDraft);
   (_movementDraft.legs||[]).forEach(function(l,i){
     ['mode','line','direction','from','to','durationMin','stops','instruction'].forEach(function(k){var el=document.getElementById('mvl_'+i+'_'+k);if(el)l[k]=el.value;});
     var costEl=document.getElementById('mvl_'+i+'_costDisplay');
-    if(costEl)l.costJPY=movementDisplayToLocal(costEl.value,_movementDraft);
+    if(!skipPrices&&costEl)l.costJPY=movementDisplayToLocal(costEl.value,_movementDraft);
   });
-  if(!_movementDraft.costManualOverride)_movementDraft.costPerPersonJPY=movementCalculatedCost(_movementDraft);
+  if(!skipPrices&&!_movementDraft.costManualOverride)_movementDraft.costPerPersonJPY=movementCalculatedCost(_movementDraft);
 }
 function changeMovementCurrency(mode){
-  movementDraftFromInputs();
+  movementDraftFromInputs(!_movementPriceInputsDirty);
   _movementDraft.priceCurrencyMode=mode==='EUR'?'EUR':'LOCAL';
   renderMovementModalBody();
 }
@@ -7928,11 +7930,13 @@ function movementLegPriceChanged(){
   (_movementDraft.legs||[]).forEach(function(l,i){var el=document.getElementById('mvl_'+i+'_costDisplay');var n=parseAmt(el?el.value:movementLocalToDisplay(l.costJPY,_movementDraft));if(!isNaN(n))total+=n;});
   var totalEl=document.getElementById('mv_costPerPersonDisplay');
   if(totalEl)totalEl.value=Math.round(total*100)/100;
+  _movementPriceInputsDirty=true;
   _movementDraft.costManualOverride=false;
   var hint=document.getElementById('mv_costHint');if(hint)hint.textContent='Calculé depuis les étapes';
 }
 function movementTotalPriceChanged(){
   if(!_movementDraft)return;
+  _movementPriceInputsDirty=true;
   _movementDraft.costManualOverride=true;
   var hint=document.getElementById('mv_costHint');if(hint)hint.textContent='Montant personnalisé';
 }
@@ -7962,6 +7966,7 @@ function renderMovementModalBody(){
     +'<div class="mv-editor-title">ITINÉRAIRE</div>'+legs
     +'<button class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une étape</button>'
     +(movementsForCountry(m.countryId).some(function(x){return x.id===m.id;})?'<button onclick="archiveMovement()" style="width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Supprimer ce déplacement</button>':'');
+  _movementPriceInputsDirty=false;
 }
 function toggleMovementLeg(i){movementDraftFromInputs();_movementOpenLeg=_movementOpenLeg===i?null:i;renderMovementModalBody();}
 function toggleMovementSchedule(){movementDraftFromInputs();_movementScheduleOpen=true;renderMovementModalBody();}
