@@ -10114,7 +10114,9 @@ function openFeedPhoto(postId){
   if(!p || !p.photo) return;
   window.open(p.photo, '_blank');
 }
-function addFeedPost(){
+var _feedPostCreateInFlight = false;
+async function addFeedPost(){
+  if(_feedPostCreateInFlight) return;
   var textEl = document.getElementById('feedTextInput');
   var text = textEl ? textEl.value.trim() : '';
   var photo = window._feedDraftPhoto || null;
@@ -10126,6 +10128,28 @@ function addFeedPost(){
   var tagged = (S.feedComposerTagged||[]).slice();
   var important = !!S.feedComposerImportant;
   var post = {id:newId, author:myEmail, text:text, photo:photo, photoCaption:photoCaption, createdAt:createdAt, reactions:[], tagged:tagged, important:important};
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){
+    toast('Connexion requise pour publier dans le Fil');
+    return;
+  }
+  var btn=document.getElementById('feedPublishBtn');
+  _feedPostCreateInFlight=true;
+  if(btn){ btn.disabled=true; btn.textContent='…'; }
+  var feedRow = {id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, photo_caption:photoCaption||null, created_at:createdAt, reactions:[], tagged:tagged, important:important};
+  try{
+    var r=await sb.from('feed_posts').insert(feedRow);
+    if(r&&r.error&&/photo_caption/.test(r.error.message||'')){
+      delete feedRow.photo_caption;
+      r=await sb.from('feed_posts').insert(feedRow);
+    }
+    if(r&&r.error) throw r.error;
+  }catch(err){
+    console.error('[PlaniTrip] insert feed_posts:',err);
+    toast('Impossible de publier pour le moment');
+    _feedPostCreateInFlight=false;
+    if(btn){ btn.disabled=false; btn.textContent='Publier'; }
+    return;
+  }
   if(!S.feedPosts) S.feedPosts=[];
   S.feedPosts.push(post);
   window._feedDraftPhoto = null;
@@ -10135,19 +10159,7 @@ function addFeedPost(){
   S.feedComposerImportant = false;
   save();
   renderContent();
-  if(sb && CURRENT_TRIP){
-    var feedRow = {id:newId, trip_id:CURRENT_TRIP.id, author_email:myEmail, text:text||null, photo_data:photo||null, photo_caption:photoCaption||null, created_at:createdAt, reactions:[], tagged:tagged, important:important};
-    sb.from('feed_posts').insert(feedRow).then(function(r){
-      if(r && r.error){
-        console.error('[PlaniTrip] insert feed_posts:', r.error);
-        // Fallback si la colonne photo_caption n'existe pas encore côté base
-        if(/photo_caption/.test(r.error.message||'')){
-          delete feedRow.photo_caption;
-          sb.from('feed_posts').insert(feedRow).then(function(r2){ if(r2&&r2.error){ console.error('[PlaniTrip] insert feed_posts (fallback):', r2.error); } });
-        }
-      }
-    });
-  }
+  _feedPostCreateInFlight=false;
 }
 function toggleFeedReaction(postId){
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
