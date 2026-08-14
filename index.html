@@ -8147,12 +8147,13 @@ function renderToday(){
   if(upcomingFlights.length){
     var nf = upcomingFlights[0];
     var nfDate = new Date(nf.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
+    var nfTime = nf.departureTime ? (' · '+nf.departureTime) : '';
     var nfPeople = getPeopleList();
     var nfParticipants = (nf.participants && nf.participants.length) ? nf.participants : nfPeople;
     var nfWithLabel = nfParticipants.length>=nfPeople.length ? '' : (' · avec '+nfParticipants.filter(function(p){return canonicalPerson(p)!==myEmailFlight;}).map(function(p){return personDisplayName(p,'Toi');}).join(', '));
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Prochain vol')+'</div>'
       +'<div class="status-main">'+escHtml(nf.from||'?')+' → '+escHtml(nf.to||'?')+'</div>'
-      +'<div class="status-sub">'+nfDate+(nf.link?' · billet enregistré':'')+escHtml(nfWithLabel)+'</div></div>';
+      +'<div class="status-sub">'+nfDate+nfTime+(nf.link?' · billet enregistré':'')+escHtml(nfWithLabel)+'</div></div>';
   } else {
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochain vol</div><div class="status-sub">À renseigner — aucun vol à venir enregistré.</div></div>';
   }
@@ -9532,7 +9533,29 @@ function renderDocuments(){
 function toggleDocOpen(id){
   S.openDocType = S.openDocType===id ? null : id; renderContent();
 }
-function saveDocField(docId, key, val){ if(!S.documents[docId]) S.documents[docId]={}; S.documents[docId][key]=val; save(); }
+var _docFieldSyncTimers = {};
+function saveDocField(docId, key, val){
+  if(!S.documents[docId]) S.documents[docId]={};
+  S.documents[docId][key]=val;
+  save();
+  // Les notes Billets étaient auparavant uniquement locales. Une écriture granulaire
+  // évite aussi qu'un voyageur réécrive les autres documents avec un snapshot ancien.
+  if(docId==='tickets' && key==='notes' && sb && CURRENT_TRIP){
+    var timerKey=docId+'__'+key;
+    if(_docFieldSyncTimers[timerKey]) clearTimeout(_docFieldSyncTimers[timerKey]);
+    _docFieldSyncTimers[timerKey]=setTimeout(async function(){
+      try{
+        var r=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__document__tickets__notes',data:{value:val},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'});
+        if(r&&r.error) throw r.error;
+      }catch(e){
+        console.error('[PlaniTrip] sync ticket notes:',e);
+        alert("La note n'a pas pu être synchronisée. Vérifie ta connexion.");
+      }finally{
+        delete _docFieldSyncTimers[timerKey];
+      }
+    },400);
+  }
+}
 
 // ── Triple-select Jour/Mois/Année générique (remplace <input type="date"> natif,
 // dont le rendu iOS impose sa propre taille de police non maîtrisable en CSS) ──
@@ -9581,6 +9604,7 @@ function renderFlightsList(flights){
   var cards = flights.map(function(f, i){
     var dateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'Date non renseignée';
     var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
+    var timesLabel = f.departureTime || f.arrivalTime ? ('Départ '+(f.departureTime||'—')+' · Arrivée '+(f.arrivalTime||'—')) : '';
     var fParticipants = (f.participants && f.participants.length) ? f.participants : people;
     var namesLabel = fParticipants.length>=people.length ? 'Tous les voyageurs' : fParticipants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
     return '<div class="more-row" style="align-items:flex-start;padding:9px 0;cursor:pointer" onclick="editFlight('+i+')">'
@@ -9588,6 +9612,8 @@ function renderFlightsList(flights){
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(f.from||'?')+' → '+escHtml(f.to||'?')+'</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+dateLabel+'</div>'
+      +(timesLabel?'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+escHtml(timesLabel)+'</div>':'')
+      +(f.notes?'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+escHtml(f.notes)+'</div>':'')
       +'<div style="font-size:11.5px;color:var(--accent);margin-bottom:2px">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</div>'
       +linkHtml
       +'</div>'
@@ -9612,10 +9638,12 @@ function renderFlightsList(flights){
     +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date du vol</span>'
     +dateTripleHTML('newFlightDate', editingFlight?(editingFlight.date||''):'')
     +'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de départ</div><input id="newFlightDepartureTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'" style="width:100%;box-sizing:border-box"></div><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure d’arrivée</div><input id="newFlightArrivalTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'" style="width:100%;box-sizing:border-box"></div></div>'
     +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" value="'+(editingFlight?escHtml(editingFlight.link||''):'')+'" style="width:100%;margin-top:6px">'
+    +'<textarea id="newFlightNotes" class="ef-input" placeholder="Notes du vol (optionnel)" style="min-height:70px;width:100%;margin-top:6px">'+(editingFlight?escHtml(editingFlight.notes||''):'')+'</textarea>'
     +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
     +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
-    +'<button onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
+    +'<button id="saveFlightBtn" onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
     +(editingFlight?'<div onclick="cancelEditFlight()" style="text-align:center;margin-top:8px;font-size:12.5px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Annuler</div>':'');
 
   return '<div class="info-card" style="padding:10px 12px">'
@@ -9654,34 +9682,52 @@ function cancelEditFlight(){
   save();
   renderContent();
 }
-function saveFlight(){
+async function saveFlight(){
   var from = document.getElementById('newFlightFrom').value.trim();
   var to = document.getElementById('newFlightTo').value.trim();
   var date = document.getElementById('newFlightDate-hidden').value;
+  var departureTime = document.getElementById('newFlightDepartureTime').value;
+  var arrivalTime = document.getElementById('newFlightArrivalTime').value;
   var link = document.getElementById('newFlightLink').value.trim();
+  var notes = document.getElementById('newFlightNotes').value.trim();
   if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
+  if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour enregistrer ce vol.'); return; }
   if(!S.documents.tickets) S.documents.tickets = {};
   if(!S.documents.tickets.flightsList) S.documents.tickets.flightsList = [];
   var people = getPeopleList();
   var participants = (S.newFlightParticipants && S.newFlightParticipants.length) ? S.newFlightParticipants.slice() : people.slice();
 
+  var saveBtn=document.getElementById('saveFlightBtn');
+  var flightId=S.editingFlightId||Date.now();
+  var flightPayload={id:flightId,from:from,to:to,date:date,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants};
+  var metaPayload={departureTime:departureTime,arrivalTime:arrivalTime,notes:notes};
+  try{
+    if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='…'; }
+    var flightWrite;
+    if(S.editingFlightId){
+      flightWrite=await sb.from('flights').update({from_place:from,to_place:to,flight_date:date||null,link:link||null,participants:participants}).eq('id',flightId);
+    }else{
+      var myEmail=(CURRENT_USER&&CURRENT_USER.email)||'';
+      flightWrite=await sb.from('flights').insert({id:flightId,trip_id:CURRENT_TRIP.id,from_place:from,to_place:to,flight_date:date||null,link:link||null,participants:participants,created_by:myEmail});
+    }
+    if(flightWrite&&flightWrite.error) throw flightWrite.error;
+    var metaWrite=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__flight__'+flightId,data:metaPayload,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'});
+    if(metaWrite&&metaWrite.error) throw metaWrite.error;
+  }catch(e){
+    console.error('[PlaniTrip] save flight:',e);
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=S.editingFlightId?'Enregistrer les modifications':'+ Ajouter un vol'; }
+    alert("Le vol n'a pas pu être enregistré. Vérifie ta connexion et réessaie.");
+    return;
+  }
+
   if(S.editingFlightId){
     var idx = S.documents.tickets.flightsList.findIndex(function(f){ return f.id===S.editingFlightId; });
     if(idx>-1){
-      var editId = S.editingFlightId;
-      S.documents.tickets.flightsList[idx] = {id:editId, from:from, to:to, date:date, link:link, participants:participants};
-      if(sb && CURRENT_TRIP){
-        sb.from('flights').update({from_place:from, to_place:to, flight_date:date||null, link:link||null, participants:participants}).eq('id', editId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update flights:', r.error); } });
-      }
+      S.documents.tickets.flightsList[idx] = flightPayload;
     }
     S.editingFlightId = null;
   } else {
-    var newId = Date.now();
-    var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
-    S.documents.tickets.flightsList.push({id:newId, from:from, to:to, date:date, link:link, participants:participants});
-    if(sb && CURRENT_TRIP){
-      sb.from('flights').insert({id:newId, trip_id:CURRENT_TRIP.id, from_place:from, to_place:to, flight_date:date||null, link:link||null, participants:participants, created_by:myEmail}).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] insert flights:', r.error); } });
-    }
+    S.documents.tickets.flightsList.push(flightPayload);
   }
   S.newFlightParticipants = people.slice();
   save();
@@ -9708,8 +9754,13 @@ async function loadFlights(){
   if(!S.documents.tickets) S.documents.tickets = {};
   // Serveur autoritaire : reconstruction complète de la liste des vols.
   S.documents.tickets.flightsList = (data||[]).map(function(row){
-    return {id:row.id, from:row.from_place, to:row.to_place, date:row.flight_date, link:row.link, participants:row.participants||[]};
-  }).sort(function(a,b){ return (a.date||'')<(b.date||'') ? -1 : ((a.date||'')>(b.date||'') ? 1 : 0); });
+    var meta=(S.flightMeta&&S.flightMeta[String(row.id)])||{};
+    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[]};
+  }).sort(function(a,b){
+    var ak=(a.date||'')+' '+(a.departureTime||'');
+    var bk=(b.date||'')+' '+(b.departureTime||'');
+    return ak<bk?-1:(ak>bk?1:0);
+  });
   save();
 }
 
@@ -13719,6 +13770,18 @@ async function loadActivityDetails(){
         if(!S.travelerBudgets) S.travelerBudgets={};
         S.travelerBudgets[cid] = row.data;
       }
+    } else if(row.detail_key.indexOf('__planitrip__flight__')===0){
+      var flightId = row.detail_key.slice('__planitrip__flight__'.length);
+      if(flightId && row.data && typeof row.data === 'object'){
+        if(!S.flightMeta) S.flightMeta={};
+        S.flightMeta[flightId]=row.data;
+      }
+    } else if(row.detail_key==='__planitrip__document__tickets__notes'){
+      var ticketNotes=row.data;
+      var ticketNotesValue=(ticketNotes&&typeof ticketNotes==='object'&&Object.prototype.hasOwnProperty.call(ticketNotes,'value'))?ticketNotes.value:ticketNotes;
+      if(!S.documents) S.documents={};
+      if(!S.documents.tickets) S.documents.tickets={};
+      S.documents.tickets.notes=typeof ticketNotesValue==='string'?ticketNotesValue:'';
     } else {
       window._customDetails[row.detail_key] = row.data;
       if(_isCustomStableKey(row.detail_key) && row.data && typeof row.data === 'object'){
