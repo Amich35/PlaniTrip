@@ -13512,16 +13512,14 @@ async function loadBudgetEntries(){
     console.error('[PlaniTrip] loadBudgetEntries:',error);
     return; // ne jamais interpréter une requête échouée comme un serveur vide
   }
-  // Le serveur fait autorité : reconstruction depuis Supabase à chaque chargement.
-  // On garde uniquement les dépenses locales pas encore synchronisées (id absent côté serveur),
-  // en excluant celles marquées comme supprimées via tombstone (voir markDeletedTombstone) —
-  // sinon une suppression non encore persistée dans le gros blob localStorage pourrait ressusciter.
+  // P0-A : le serveur fait pleinement autorité après une lecture réussie.
+  // Les créations étant désormais server-first, aucune dépense locale absente du serveur
+  // ne doit être conservée : sinon un autre voyageur ressuscite une dépense supprimée.
   var serverMap = {};
   (data||[]).forEach(function(row){
     serverMap[row.id] = {id:row.id,country:row.country_id,city:row.city,activity:row.activity,category:row.category,desc:row.description,amount:row.amount,person:row.person_label,personLabel:row.person_label,participants:row.participants||null,splits:row.splits||null,date:row.entry_date};
   });
-  var deletedIds = getDeletedTombstones('expenses');
-  S.expenses = (S.expenses||[]).filter(function(e){ return !(e.id in serverMap) && deletedIds.indexOf(e.id)===-1; }).concat(Object.values(serverMap));
+  S.expenses = Object.values(serverMap);
   save();
 }
 async function loadFeedSeenState(){
