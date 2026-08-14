@@ -10219,17 +10219,28 @@ function toggleFeedReactorsView(postId){
   window._feedExpandedReactions[postId] = !window._feedExpandedReactions[postId];
   renderContent();
 }
-function toggleFeedImportant(postId){
+var _feedImportantInFlight = {};
+async function toggleFeedImportant(postId){
+  if(_feedImportantInFlight[postId]) return;
   var post = (S.feedPosts||[]).find(function(p){ return p.id===postId; });
   if(!post) return;
-  post.important = !post.important;
+  var nextImportant=!post.important;
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ toast('Connexion requise pour modifier cette publication'); return; }
+  _feedImportantInFlight[postId]=true;
+  try{
+    var r=await sb.from('feed_posts').update({important:nextImportant}).eq('id',postId).eq('trip_id',CURRENT_TRIP.id).select('id').maybeSingle();
+    if(r&&r.error) throw r.error;
+    if(!r||!r.data) throw new Error('Publication introuvable sur le serveur');
+  }catch(err){
+    console.error('[PlaniTrip] update feed_posts important:',err);
+    toast('Impossible de modifier le statut Important');
+    delete _feedImportantInFlight[postId];
+    return;
+  }
+  post.important = nextImportant;
   save();
   renderContent();
-  if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').update({important:post.important}).eq('id', postId).then(function(r){
-      if(r&&r.error) console.error('[PlaniTrip] update feed_posts important:', r.error);
-    });
-  }
+  delete _feedImportantInFlight[postId];
 }
 var _feedDeleteInFlight = {};
 function removeFeedPost(postId){
