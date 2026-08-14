@@ -10180,20 +10180,39 @@ async function addFeedPost(){
   renderContent();
   _feedPostCreateInFlight=false;
 }
-function toggleFeedReaction(postId){
-  var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
+var _feedReactionInFlight = {};
+async function toggleFeedReaction(postId){
+  var myEmail = canonicalPerson((CURRENT_USER && CURRENT_USER.email) || '');
   if(!myEmail) return;
+  var syncKey=postId+'__'+myEmail;
+  if(_feedReactionInFlight[syncKey]) return;
   var post = (S.feedPosts||[]).find(function(p){return p.id===postId;});
   if(!post) return;
   if(!post.reactions) post.reactions=[];
   var idx = post.reactions.map(canonicalPerson).indexOf(myEmail);
+  var nextActive=idx===-1;
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ toast('Connexion requise pour réagir à cette publication'); return; }
+  _feedReactionInFlight[syncKey]=true;
+  try{
+    var markerKey='__planitrip__feedReaction__'+postId+'__'+encodeURIComponent(myEmail);
+    var r=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:markerKey,data:{postId:postId,email:myEmail,active:nextActive},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'});
+    if(r&&r.error) throw r.error;
+  }catch(err){
+    console.error('[PlaniTrip] sync feed reaction:',err);
+    toast('Impossible de modifier cette réaction');
+    delete _feedReactionInFlight[syncKey];
+    return;
+  }
   if(idx>-1) post.reactions.splice(idx,1); else post.reactions.push(myEmail);
   save();
   renderContent();
   updateFeedBadge();
-  if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').update({reactions:post.reactions}).eq('id', postId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] update feed_posts reactions:', r.error); } });
-  }
+  // Miroir legacy pour les anciennes versions ; les marqueurs granulaires restent autoritaires.
+  try{
+    var legacy=await sb.from('feed_posts').update({reactions:post.reactions}).eq('id',postId).eq('trip_id',CURRENT_TRIP.id);
+    if(legacy&&legacy.error) console.warn('[PlaniTrip] legacy feed reaction mirror:',legacy.error);
+  }catch(legacyErr){ console.warn('[PlaniTrip] legacy feed reaction mirror:',legacyErr); }
+  delete _feedReactionInFlight[syncKey];
 }
 function toggleFeedReactorsView(postId){
   if(!window._feedExpandedReactions) window._feedExpandedReactions={};
@@ -10228,6 +10247,10 @@ function removeFeedPost(postId){
       delete _feedDeleteInFlight[postId];
       return;
     }
+    try{
+      var reactionCleanup=await sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).like('detail_key','__planitrip__feedReaction__'+postId+'__%');
+      if(reactionCleanup&&reactionCleanup.error) console.warn('[PlaniTrip] cleanup feed reactions:',reactionCleanup.error);
+    }catch(cleanupErr){ console.warn('[PlaniTrip] cleanup feed reactions:',cleanupErr); }
     S.feedPosts = (S.feedPosts||[]).filter(function(p){return p.id!==postId;});
     save();
     renderContent();
@@ -10241,6 +10264,22 @@ async function loadFeedPosts(){
   S.feedPosts = (data||[]).map(function(row){
     return {id:row.id, author:row.author_email, text:row.text||'', photo:row.photo_data||null, photoCaption:row.photo_caption||'', createdAt:row.created_at, reactions:row.reactions||[], tagged:row.tagged||[], important:!!row.important};
   });
+  // Les lignes granulaires par publication/voyageur évitent que deux réactions
+  // simultanées réécrivent et perdent toute la liste legacy.
+  try{
+    var granular=await sb.from('activity_details').select('data').eq('trip_id',CURRENT_TRIP.id).like('detail_key','__planitrip__feedReaction__%');
+    if(granular&&granular.error) throw granular.error;
+    (granular.data||[]).forEach(function(row){
+      var marker=row.data||{};
+      var post=(S.feedPosts||[]).find(function(p){return p.id===marker.postId;});
+      var email=canonicalPerson(marker.email||'');
+      if(!post||!email) return;
+      if(!post.reactions) post.reactions=[];
+      var reactionIdx=post.reactions.map(canonicalPerson).indexOf(email);
+      if(marker.active&&reactionIdx===-1) post.reactions.push(email);
+      if(!marker.active&&reactionIdx>-1) post.reactions.splice(reactionIdx,1);
+    });
+  }catch(granularErr){ console.error('[PlaniTrip] load granular feed reactions:',granularErr); }
   save();
   updateFeedBadge();
 }
