@@ -1,0 +1,29 @@
+name: Move budget select-all button
+on:
+  push:
+    paths:
+      - .github/workflows/move-budget-select-all.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply patch
+        env:
+          PATCH_B64: ZGlmZiAtLWdpdCBhL2luZGV4Lmh0bWwgYi9pbmRleC5odG1sCmluZGV4IGVlNjhiZDQuLjNkZTY4NmIgMTAwNjQ0Ci0tLSBhL2luZGV4Lmh0bWwKKysrIGIvaW5kZXguaHRtbApAQCAtOTE1Miw3ICs5MTUyLDggQEAgZnVuY3Rpb24gcmVuZGVyU3BsaXRSb3dzKHRvdGFsQW10U3RyKXsKICAgICAgICsnPC9kaXY+JzsKICAgfSkuam9pbignJyk7CiAgIHJldHVybiAnPGRpdiBpZD0ic3BsaXRSb3dzV3JhcCIgY2xhc3M9ImVmLXJvdyIgc3R5bGU9ImZsZXgtZGlyZWN0aW9uOmNvbHVtbjthbGlnbi1pdGVtczpzdHJldGNoO3BhZGRpbmc6MnB4IDAgMCI+JwotICAgICsnPGRpdiBzdHlsZT0iZGlzcGxheTpmbGV4O2p1c3RpZnktY29udGVudDpzcGFjZS1iZXR3ZWVuO2FsaWduLWl0ZW1zOmNlbnRlcjtwYWRkaW5nOjAgMnB4IDZweCI+PHNwYW4gc3R5bGU9ImZvbnQtc2l6ZToxM3B4O2ZvbnQtd2VpZ2h0OjYwMDtjb2xvcjp2YXIoLS1pbmstc3VidGxlKSI+RGl2aXNlcjwvc3Bhbj48ZGl2IHN0eWxlPSJkaXNwbGF5OmZsZXg7YWxpZ24taXRlbXM6Y2VudGVyO2dhcDo4cHgiPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTJweDtjb2xvcjp2YXIoLS1pbmstc3VidGxlKSI+w4lnYWxlbWVudCBwYXIgZMOpZmF1dDwvc3Bhbj48YnV0dG9uIHR5cGU9ImJ1dHRvbiIgaWQ9InNwbGl0QWxsQnRuIiBvbmNsaWNrPSJ0b2dnbGVTcGxpdEFsbFBhcnRpY2lwYW50cygpIiBhcmlhLXByZXNzZWQ9IicrKGFyZUFsbFNwbGl0UGFydGljaXBhbnRzU2VsZWN0ZWQoKT8ndHJ1ZSc6J2ZhbHNlJykrJyIgc3R5bGU9ImJvcmRlcjowO2JvcmRlci1yYWRpdXM6OTk5cHg7cGFkZGluZzo2cHggMTJweDtmb250OmluaGVyaXQ7Zm9udC1zaXplOjEycHg7Zm9udC13ZWlnaHQ6NzAwO2N1cnNvcjpwb2ludGVyO2JhY2tncm91bmQ6JysoYXJlQWxsU3BsaXRQYXJ0aWNpcGFudHNTZWxlY3RlZCgpPyd2YXIoLS1hY2NlbnQpJzondmFyKC0tc2FuZC1kZWVwKScpKyc7Y29sb3I6JysoYXJlQWxsU3BsaXRQYXJ0aWNpcGFudHNTZWxlY3RlZCgpPycjZmZmJzondmFyKC0taW5rKScpKyciPlRvdXM8L2J1dHRvbj48L2Rpdj48L2Rpdj4nCisgICAgKyc8ZGl2IHN0eWxlPSJkaXNwbGF5OmZsZXg7anVzdGlmeS1jb250ZW50OnNwYWNlLWJldHdlZW47YWxpZ24taXRlbXM6Y2VudGVyO3BhZGRpbmc6MCAycHggNnB4Ij48c3BhbiBzdHlsZT0iZm9udC1zaXplOjEzcHg7Zm9udC13ZWlnaHQ6NjAwO2NvbG9yOnZhcigtLWluay1zdWJ0bGUpIj5EaXZpc2VyPC9zcGFuPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTJweDtjb2xvcjp2YXIoLS1pbmstc3VidGxlKSI+w4lnYWxlbWVudCBwYXIgZMOpZmF1dDwvc3Bhbj48L2Rpdj4nCisgICAgKyc8ZGl2IHN0eWxlPSJkaXNwbGF5OmZsZXg7anVzdGlmeS1jb250ZW50OmZsZXgtc3RhcnQ7cGFkZGluZzowIDAgOHB4Ij48YnV0dG9uIHR5cGU9ImJ1dHRvbiIgaWQ9InNwbGl0QWxsQnRuIiBvbmNsaWNrPSJ0b2dnbGVTcGxpdEFsbFBhcnRpY2lwYW50cygpIiBhcmlhLXByZXNzZWQ9IicrKGFyZUFsbFNwbGl0UGFydGljaXBhbnRzU2VsZWN0ZWQoKT8ndHJ1ZSc6J2ZhbHNlJykrJyIgc3R5bGU9ImJvcmRlcjowO2JvcmRlci1yYWRpdXM6OTk5cHg7cGFkZGluZzo2cHggMTJweDtmb250OmluaGVyaXQ7Zm9udC1zaXplOjEycHg7Zm9udC13ZWlnaHQ6NzAwO2N1cnNvcjpwb2ludGVyO2JhY2tncm91bmQ6JysoYXJlQWxsU3BsaXRQYXJ0aWNpcGFudHNTZWxlY3RlZCgpPyd2YXIoLS1hY2NlbnQpJzondmFyKC0tc2FuZC1kZWVwKScpKyc7Y29sb3I6JysoYXJlQWxsU3BsaXRQYXJ0aWNpcGFudHNTZWxlY3RlZCgpPycjZmZmJzondmFyKC0taW5rKScpKyciPlRvdXM8L2J1dHRvbj48L2Rpdj4nCiAgICAgKyc8ZGl2IHN0eWxlPSJiYWNrZ3JvdW5kOnZhcigtLXBhcmNobWVudCk7Ym9yZGVyLXJhZGl1czoxNHB4O292ZXJmbG93OmhpZGRlbjtib3gtc2hhZG93OnZhcigtLXNoYWRvdy1zbSkiPicrcm93cysnPC9kaXY+PC9kaXY+JzsKIH0KIGZ1bmN0aW9uIHBhcnNlQW10KHYpeyBpZih2PT09dW5kZWZpbmVkfHx2PT09bnVsbHx8dj09PScnKSByZXR1cm4gTmFOOyByZXR1cm4gcGFyc2VGbG9hdChTdHJpbmcodikucmVwbGFjZSgnLCcsJy4nKSk7IH0K
+        run: |
+          printf '%s' "$PATCH_B64" | base64 -d > /tmp/move-budget-select-all.patch
+          git apply --check /tmp/move-budget-select-all.patch
+          git apply /tmp/move-budget-select-all.patch
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/move-budget-select-all.yml
+          git add index.html
+          git commit -m "fix: move budget select-all above travelers"
+          git push origin main
