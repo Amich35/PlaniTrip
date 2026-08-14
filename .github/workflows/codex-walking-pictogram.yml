@@ -1,0 +1,26 @@
+name: Apply walking pictogram
+on:
+  push:
+    paths:
+      - .github/workflows/codex-walking-pictogram.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply verified patch
+        shell: bash
+        run: |
+          printf '%s' 'ZGlmZiAtLWdpdCBhL2luZGV4Lmh0bWwgYi9pbmRleC5odG1sCmluZGV4IGQxN2NiY2QuLjEzYjc0ZjcgMTAwNjQ0Ci0tLSBhL2luZGV4Lmh0bWwKKysrIGIvaW5kZXguaHRtbApAQCAtMTMxNzUsNyArMTMxNzUsNyBAQCB2YXIgSUNPTl9QQVRIUyA9IHsKICAgYnVzOiAnPHBhdGggZD0iTTQgMTdWNmEyIDIgMCAwIDEgMi0yaDEyYTIgMiAwIDAgMSAyIDJ2MTEiLz48cGF0aCBkPSJNNCAxMmgxNiIvPjxwYXRoIGQ9Ik00IDE3aDE2Ii8+PGNpcmNsZSBjeD0iNy41IiBjeT0iMTkuNSIgcj0iMS41Ii8+PGNpcmNsZSBjeD0iMTYuNSIgY3k9IjE5LjUiIHI9IjEuNSIvPicsCiAgICd0cmFpbi1mcm9udCc6ICc8cmVjdCB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHg9IjQiIHk9IjMiIHJ4PSIyIi8+PHBhdGggZD0iTTQgMTFoMTYiLz48cGF0aCBkPSJtOCAxOS0yIDMiLz48cGF0aCBkPSJtMTggMjItMi0zIi8+PHBhdGggZD0iTTggMTVoLjAxIi8+PHBhdGggZD0iTTE2IDE1aC4wMSIvPicsCiAgICd0cmFtLWZyb250JzogJzxyZWN0IHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgeD0iNCIgeT0iMyIgcng9IjIiLz48cGF0aCBkPSJNNCAxMWgxNiIvPjxwYXRoIGQ9Ik04IDMgNiAxIi8+PHBhdGggZD0ibTE2IDMgMi0yIi8+PHBhdGggZD0iTTkgN2g2Ii8+PHBhdGggZD0ibTggMTktMiAzIi8+PHBhdGggZD0ibTE4IDIyLTItMyIvPicsCi0gICdwZXJzb24td2Fsa2luZyc6ICc8Y2lyY2xlIGN4PSIxMy41IiBjeT0iMy41IiByPSIyIiBmaWxsPSJjdXJyZW50Q29sb3IiIHN0cm9rZT0ibm9uZSIvPjxwYXRoIGQ9Im0xMC41IDggMi41LTEuNSAxLjggNC41IDQuMiAyLjMiIHN0cm9rZS13aWR0aD0iMi44Ii8+PHBhdGggZD0ibTEwLjcgOC0yLjggMy41LS43IDQiIHN0cm9rZS13aWR0aD0iMi44Ii8+PHBhdGggZD0ibTEzLjcgMTEtMi41IDUtMy43IDQuNSIgc3Ryb2tlLXdpZHRoPSIzIi8+PHBhdGggZD0ibTExLjIgMTYgMy44IDQuNSIgc3Ryb2tlLXdpZHRoPSIzIi8+JywKKyAgJ3BlcnNvbi13YWxraW5nJzogJzxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIiBkPSJNMTMuNSA1LjVhMiAyIDAgMSAwIDAtNCAyIDIgMCAwIDAgMCA0Wk05LjkgOC45IDcuMSAyM2gyLjFsMS44LTggMiAydjZoMnYtNy41bC0yLjEtMiAuNi0zQTcuMyA3LjMgMCAwIDAgMTkgMTJ2LTJjLTEuNyAwLTMuMS0uOS0zLjgtMi4ybC0xLTEuNkEyLjEgMi4xIDAgMCAwIDEyLjQgNWMtLjMgMC0uNS4xLS44LjFMNiA3LjVWMTJoMlY4LjhsMS45LS45WiIvPicsCiAgIHJvdXRlOiAnPGNpcmNsZSBjeD0iNiIgY3k9IjE5IiByPSIzIi8+PHBhdGggZD0iTTkgMTloNS41YTMuNSAzLjUgMCAwIDAgMC03aC01YTMuNSAzLjUgMCAwIDEgMC03SDE1Ii8+PGNpcmNsZSBjeD0iMTgiIGN5PSI1IiByPSIzIi8+JywKICAgJ2hlYXJ0LXB1bHNlJzogJzxwYXRoIGQ9Ik0xOSAxNGMxLjUtMS41IDMtMy41IDMtNmE1IDUgMCAwIDAtOS0zIDUgNSAwIDAgMC05IDNjMCA1IDYgOC41IDkgMTIgMS0xIDItMiAzLTMiLz48cG9seWxpbmUgcG9pbnRzPSIzLjUgMTAuNSA2IDEwLjUgNy41IDggOS41IDEzIDExIDEwLjUgMTIuNSAxMC41Ii8+JywKICAgaW5mbzogJzxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PGxpbmUgeDE9IjEyIiB5MT0iMTYiIHgyPSIxMiIgeTI9IjEyIi8+PGxpbmUgeDE9IjEyIiB5MT0iOCIgeDI9IjEyLjAxIiB5Mj0iOCIvPicsCg==' | base64 -d > /tmp/planitrip.patch
+          git apply --check /tmp/planitrip.patch
+          git apply /tmp/planitrip.patch
+          rm .github/workflows/codex-walking-pictogram.yml
+          git config user.name "Codex"
+          git config user.email "codex@users.noreply.github.com"
+          git add index.html .github/workflows/codex-walking-pictogram.yml
+          git commit -m "Reproduit le pictogramme de marche de la maquette"
+          git push origin main
