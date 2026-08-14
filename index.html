@@ -2395,20 +2395,39 @@ function setTab(tab){
   renderContent();
   document.getElementById('mainContent').scrollTop=0;
 }
-function toggleAct(k){
+var _doneSyncInFlight = {};
+async function toggleAct(k){
+  if(_doneSyncInFlight[k]) return;
+  if(!S.done) S.done={};
+  var prevHadDone = Object.prototype.hasOwnProperty.call(S.done,k);
+  var prevDone = S.done[k];
   var wasUndone = !S.done[k];
   S.done[k]=!S.done[k];
   save();
-  // Lot 5A : synchroniser S.done vers Supabase pour que le statut "Fait" soit partagé
-  // entre voyageurs et survive à un reload depuis le serveur.
-  if(sb && CURRENT_TRIP){
-    if(_isCustomStableKey(k)){
-      _syncActivityState(k, CURRENT_TRIP.id);
-    } else {
-      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',data:S.done,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync done:',r.error); });
+  renderContent();
+  // P1-A : conserver l'UI optimistic, mais attendre réellement Supabase et rollbacker en cas d'échec.
+  if(sb && CURRENT_TRIP && CURRENT_TRIP.id){
+    _doneSyncInFlight[k]=true;
+    try{
+      if(_isCustomStableKey(k)){
+        await _syncActivityState(k, CURRENT_TRIP.id);
+      } else {
+        var r = await sb.from('activity_details').upsert(
+          {trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',data:S.done,updated_at:new Date().toISOString()},
+          {onConflict:'trip_id,detail_key'}
+        );
+        if(r && r.error) throw r.error;
+      }
+    }catch(e){
+      console.error('[PlaniTrip] sync done:',e);
+      if(prevHadDone) S.done[k]=prevDone; else delete S.done[k];
+      save(); renderContent();
+      alert('Impossible de modifier le statut Fait pour le moment.');
+      return;
+    }finally{
+      delete _doneSyncInFlight[k];
     }
   }
-  renderContent();
   // Peak moment: animate the check if just completed
   if(wasUndone && S.done[k]){
     setTimeout(function(){
@@ -2421,7 +2440,7 @@ function toggleAct(k){
     }, 30);
   }
 }
-async function toggleFavorite(k){
+function toggleFavorite(k){
   if(!S.favorites) S.favorites={};
   if(!toggleFavorite._inFlight) toggleFavorite._inFlight={};
   if(toggleFavorite._inFlight[k]) return false;
