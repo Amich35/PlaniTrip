@@ -1,12 +1,11 @@
 from pathlib import Path
-import re
 p=Path('index.html')
 s=p.read_text(encoding='utf-8')
-pattern=r"function toggleAct\(k\)\{.*?\n\}\nfunction toggleFavorite\(k\)\{"
-m=re.search(pattern,s,re.S)
-assert m, 'toggleAct block not found'
-old=m.group(0)
-assert old.count("__planitrip__done")==1, 'unexpected done sync shape'
+start=s.find('function toggleAct(k){')
+end=s.find('function toggleFavorite(k){', start)
+assert start>=0 and end>start, f'toggleAct bounds not found: {start}, {end}'
+old=s[start:end]
+assert old.count("__planitrip__done")==1, f'unexpected done sync shape: {old.count("__planitrip__done")}'
 new="""var _doneSyncInFlight = {};
 async function toggleAct(k){
   if(_doneSyncInFlight[k]) return;
@@ -52,8 +51,8 @@ async function toggleAct(k){
     }, 30);
   }
 }
-function toggleFavorite(k){"""
-s=s[:m.start()]+new+s[m.end():]
+"""
+s=s[:start]+new+s[end:]
 assert s.count('async function toggleAct(k)')==1
 assert s.count('var _doneSyncInFlight = {}')==1
 p.write_text(s,encoding='utf-8')
