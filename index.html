@@ -2356,14 +2356,14 @@ function getC(){return COUNTRIES.find(c=>c.id===S.country);}
 function setCountry(id){
   S.country=id;
   S.tab='country';
-  if(!S.countryDetailTab) S.countryDetailTab='guide';
+  if(!S.countryDetailTab) S.countryDetailTab='lieux';
   save();
   renderContent();
 }
 function openCountryDetail(id, subTab){
   S.country=id;
   S.tab='country';
-  S.countryDetailTab=subTab||'guide';
+  S.countryDetailTab=subTab||'lieux';
   save();
   renderContent();
   document.getElementById('mainContent').scrollTop=0;
@@ -8622,7 +8622,7 @@ function getCountryImageQuery(c){
 
 // ── COUNTRY DETAIL SHELL (cover header + Guide/Lieux/Carte sub-tabs) ──
 function renderCountryDetailShell(c, innerHtml){
-  var sub = S.countryDetailTab||'guide';
+  var sub = S.countryDetailTab||'lieux';
   var query = getCountryImageQuery(c);
   var status = getCountryStatus(c.id);
   var allBaseActs = c.cities.reduce(function(s,city){
@@ -8693,7 +8693,7 @@ function renderCountriesScreen(){
       : c.cities.slice(0,2).map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
     return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg country-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
-      +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'guide\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
+      +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
       +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
@@ -12687,7 +12687,7 @@ function renderContent(){
   else if(S.tab==='today')html=renderToday();
   else if(S.tab==='countries')html=renderCountriesScreen();
   else if(S.tab==='country'){
-    var sub=S.countryDetailTab||'guide';
+    var sub=S.countryDetailTab||'lieux';
     if(sub==='lieux')html=renderCountryDetailShell(c, renderItinerary(c, true));
     else if(sub==='carte')html=renderCountryDetailShell(c, renderMap(c));
     else html=renderCountryDetailShell(c, renderGuide(c));
