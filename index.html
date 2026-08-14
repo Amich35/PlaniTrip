@@ -1801,7 +1801,7 @@ function loadState(){
       return parsed;
     }
   }catch(e){}
-  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
+  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},movements:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
 }
 function markDeletedTombstone(kind, id){
   // "Tombstone" : mémorise dans une clé localStorage minuscule et séparée qu'un élément a été
@@ -7744,6 +7744,129 @@ function toggleLieuxAiGen(countryId){
   save();
   renderContent();
 }
+
+// ── DÉPLACEMENTS ──────────────────────────────────────────────────────────
+// Un déplacement est un objet collectif autonome. Les modèles intégrés servent de
+// point de départ ; dès la première édition, la copie Supabase devient autoritaire.
+if(!S.movements) S.movements={};
+var _movementDraft=null;
+
+function movementUid(prefix){
+  if(window.crypto&&crypto.randomUUID) return (prefix||'mv_')+crypto.randomUUID();
+  return (prefix||'mv_')+Date.now()+'_'+Math.floor(Math.random()*1000000);
+}
+function movementModeIcon(mode){
+  var m=String(mode||'').toLowerCase();
+  if(m.indexOf('marche')>-1) return '🚶';
+  if(m.indexOf('métro')>-1||m.indexOf('metro')>-1) return 'Ⓜ️';
+  if(m.indexOf('bus')>-1) return '🚌';
+  if(m.indexOf('avion')>-1||m.indexOf('vol')>-1) return '✈️';
+  return '🚆';
+}
+function builtinMovementsForCountry(countryId){
+  if(countryId!=='jp') return [];
+  var osakaAccom=(Array.isArray(S.accom&&S.accom.jp_Osaka)?S.accom.jp_Osaka:[])[0];
+  var osakaDestination=osakaAccom&&osakaAccom.name ? osakaAccom.name : 'Logement Osaka';
+  return [
+    {id:'jp_kix_osaka_accom',countryId:'jp',origin:'Kansai-Airport Station',destination:osakaDestination,date:'',departureTime:'',arrivalTime:'',status:'incomplete',durationMin:56,costPerPersonJPY:1310,peopleCount:2,notes:'Tarifs et durées estimés à vérifier selon l’horaire.',source:'builtin',legs:[
+      {id:'kix_tennoji',mode:'Train',line:'Kansai-Airport Rapid · Kansaikuko Line → Hanwa Line',direction:'Kyobashi',from:'Kansai-Airport Station',to:'Tennōji Station',durationMin:43,stops:'9',costJPY:1080,instruction:'Rester dans le même véhicule.'},
+      {id:'tennoji_walk',mode:'Marche',line:'Correspondance',direction:'',from:'Quais JR Tennōji',to:'Osaka Metro · Tanimachi Line',durationMin:8,stops:'',costJPY:0,instruction:'Suivre les indications Osaka Metro.'},
+      {id:'tennoji_tanimachi6',mode:'Métro',line:'Tanimachi Line',direction:'Dainichi',from:'Tennōji (T27)',to:'Tanimachi 6-chome (T24)',durationMin:5,stops:'3',costJPY:230,instruction:''},
+      {id:'tanimachi6_accom',mode:'Marche',line:'À compléter',direction:'',from:'Tanimachi 6-chome',to:osakaDestination,durationMin:'',stops:'',costJPY:0,instruction:'Renseigner l’adresse du logement.'}
+    ]},
+    {id:'jp_osaka_kyoto',countryId:'jp',origin:osakaDestination,destination:'Kyoto Station',date:'',departureTime:'',arrivalTime:'',status:'incomplete',durationMin:48,costPerPersonJPY:820,peopleCount:2,notes:'Durée totale estimée entre 45 et 50 minutes.',source:'builtin',legs:[
+      {id:'tanimachi6_higashiumeda',mode:'Métro',line:'Tanimachi Line',direction:'Dainichi',from:'Tanimachi 6-chome (T24)',to:'Higashi-Umeda (T20)',durationMin:10,stops:'5',costJPY:240,instruction:''},
+      {id:'umeda_walk',mode:'Marche',line:'Correspondance',direction:'',from:'Higashi-Umeda',to:'JR Osaka Station',durationMin:7,stops:'',costJPY:0,instruction:'Suivre les passages souterrains vers JR Osaka Station.'},
+      {id:'osaka_kyoto_jr',mode:'Train',line:'JR Kyoto Line · Special Rapid (Shinkaisoku)',direction:'Kyoto',from:'Osaka Station',to:'Kyoto Station',durationMin:29,stops:'',costJPY:580,instruction:'Trajet direct, sans changement.'},
+      {id:'kyoto_accom',mode:'Marche',line:'À compléter',direction:'',from:'Kyoto Station',to:'Logement Kyoto',durationMin:'',stops:'',costJPY:0,instruction:'Renseigner le logement ou la destination finale.'}
+    ]}
+  ];
+}
+function movementsForCountry(countryId){
+  var merged={};
+  builtinMovementsForCountry(countryId).forEach(function(m){merged[m.id]=m;});
+  Object.keys(S.movements||{}).forEach(function(id){
+    var m=S.movements[id];
+    if(m&&m.countryId===countryId) merged[id]=m;
+  });
+  return Object.values(merged).filter(function(m){return !m.archived;});
+}
+function movementMissingCount(m){
+  return (m.legs||[]).filter(function(l){return !l.from||!l.to||String(l.line||'').toLowerCase()==='à compléter';}).length;
+}
+function renderMovementsSection(countryId){
+  var list=movementsForCountry(countryId);
+  var cards=list.map(function(m){
+    var missing=movementMissingCount(m);
+    var icons=(m.legs||[]).map(function(l){return movementModeIcon(l.mode);}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(' ');
+    var meta=[];
+    if(m.durationMin) meta.push('≈ '+m.durationMin+' min');
+    if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null) meta.push('≈ '+Number(m.costPerPersonJPY).toLocaleString('fr-FR')+' ¥/pers.');
+    return '<div class="info-card" onclick="openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')" style="cursor:pointer;padding:14px 16px">'
+      +'<div style="display:flex;align-items:flex-start;gap:11px"><div style="font-size:20px;line-height:1.2">'+(icons||'🚆')+'</div><div style="flex:1;min-width:0">'
+      +'<div style="font-size:14px;font-weight:700;color:var(--ink)">'+escHtml(m.origin||'Départ')+' → '+escHtml(m.destination||'Arrivée')+'</div>'
+      +'<div style="font-size:11.5px;color:var(--ink-muted);margin-top:4px">'+escHtml(meta.join(' · ')||'Détails à compléter')+'</div>'
+      +(missing?'<div style="display:inline-flex;margin-top:7px;padding:3px 8px;border-radius:10px;background:rgba(196,131,58,.12);color:#9A641E;font-size:10.5px;font-weight:700">'+missing+' étape'+(missing>1?'s':'')+' à compléter</div>':'<div style="display:inline-flex;margin-top:7px;padding:3px 8px;border-radius:10px;background:rgba(45,106,79,.10);color:var(--accent);font-size:10.5px;font-weight:700">'+(m.status==='booked'?'Réservé':'Prévu')+'</div>')
+      +'</div><span data-icon="chevron-right" data-icon-size="15" style="color:var(--ink-subtle);margin-top:4px"></span></div></div>';
+  }).join('');
+  return '<div class="section"><div class="section-header"><div class="section-title">Déplacements</div><div class="section-meta">'+list.length+' trajet'+(list.length>1?'s':'')+'</div></div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'+cards+'</div>'
+    +'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button></div>';
+}
+function openMovementModal(id,countryId){
+  var found=id?movementsForCountry(countryId).find(function(m){return m.id===id;}):null;
+  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:'',destination:'',date:'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',legs:[]};
+  renderMovementModalBody();
+  var saveBtn=document.getElementById('movementModalSaveBtn');
+  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Enregistrer';}
+  document.getElementById('movementModal').classList.add('open');
+}
+function closeMovementModal(){ document.getElementById('movementModal').classList.remove('open'); _movementDraft=null; }
+function movementDraftFromInputs(){
+  if(!_movementDraft) return;
+  ['origin','destination','date','departureTime','arrivalTime','status','durationMin','costPerPersonJPY','notes'].forEach(function(k){var el=document.getElementById('mv_'+k);if(el)_movementDraft[k]=el.value;});
+  (_movementDraft.legs||[]).forEach(function(l,i){
+    ['mode','line','direction','from','to','durationMin','stops','costJPY','instruction'].forEach(function(k){var el=document.getElementById('mvl_'+i+'_'+k);if(el)l[k]=el.value;});
+  });
+}
+function renderMovementModalBody(){
+  var m=_movementDraft;if(!m)return;
+  var legs=(m.legs||[]).map(function(l,i){return '<div style="padding:12px;border-radius:var(--r12);background:var(--sand);margin-bottom:9px">'
+    +'<div style="display:flex;align-items:center;margin-bottom:8px"><strong style="font-size:12px">Étape '+(i+1)+'</strong><button onclick="removeMovementLeg('+i+')" style="margin-left:auto;border:none;background:transparent;color:var(--red-muted);font-size:12px">Retirer</button></div>'
+    +'<div class="ef-row" style="gap:7px"><select class="ef-select" id="mvl_'+i+'_mode" style="flex:0 0 105px"><option'+(l.mode==='Train'?' selected':'')+'>Train</option><option'+(l.mode==='Métro'?' selected':'')+'>Métro</option><option'+(l.mode==='Marche'?' selected':'')+'>Marche</option><option'+(l.mode==='Bus'?' selected':'')+'>Bus</option><option'+(l.mode==='Avion'?' selected':'')+'>Avion</option><option'+(l.mode==='Autre'?' selected':'')+'>Autre</option></select><input class="ef-input" id="mvl_'+i+'_line" placeholder="Ligne ou instruction" value="'+escHtml(l.line||'')+'" style="flex:1;min-width:0"></div>'
+    +'<div class="ef-row" style="gap:7px"><input class="ef-input" id="mvl_'+i+'_from" placeholder="Départ" value="'+escHtml(l.from||'')+'"><input class="ef-input" id="mvl_'+i+'_to" placeholder="Arrivée" value="'+escHtml(l.to||'')+'"></div>'
+    +'<div class="ef-row" style="gap:7px"><input class="ef-input" id="mvl_'+i+'_direction" placeholder="Direction" value="'+escHtml(l.direction||'')+'"><input class="ef-input" id="mvl_'+i+'_durationMin" type="number" inputmode="numeric" placeholder="Minutes" value="'+escHtml(l.durationMin==null?'':l.durationMin)+'"><input class="ef-input" id="mvl_'+i+'_costJPY" type="number" inputmode="numeric" placeholder="¥ / pers." value="'+escHtml(l.costJPY==null?'':l.costJPY)+'"></div>'
+    +'<div class="ef-row" style="gap:7px"><input class="ef-input" id="mvl_'+i+'_stops" placeholder="Arrêts" value="'+escHtml(l.stops||'')+'"><input class="ef-input" id="mvl_'+i+'_instruction" placeholder="Conseil pratique" value="'+escHtml(l.instruction||'')+'" style="flex:2"></div></div>';}).join('');
+  document.getElementById('movementModalTitle').textContent=(m.source==='manual'&&!movementsForCountry(m.countryId).some(function(x){return x.id===m.id;}))?'Ajouter un déplacement':'Modifier le déplacement';
+  document.getElementById('movementModalBody').innerHTML='<div class="ef-row" style="gap:8px"><input class="ef-input" id="mv_origin" placeholder="Point de départ" value="'+escHtml(m.origin||'')+'"><input class="ef-input" id="mv_destination" placeholder="Destination" value="'+escHtml(m.destination||'')+'"></div>'
+    +'<div class="ef-row" style="gap:8px"><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'"><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'"><input class="ef-input" id="mv_arrivalTime" type="time" value="'+escHtml(m.arrivalTime||'')+'"></div>'
+    +'<div class="ef-row" style="gap:8px"><select class="ef-select" id="mv_status"><option value="incomplete"'+(m.status==='incomplete'?' selected':'')+'>À compléter</option><option value="planned"'+(m.status==='planned'?' selected':'')+'>Prévu</option><option value="booked"'+(m.status==='booked'?' selected':'')+'>Réservé</option></select><input class="ef-input" id="mv_durationMin" type="number" inputmode="numeric" placeholder="Durée totale (min)" value="'+escHtml(m.durationMin==null?'':m.durationMin)+'"><input class="ef-input" id="mv_costPerPersonJPY" type="number" inputmode="numeric" placeholder="¥ / pers." value="'+escHtml(m.costPerPersonJPY==null?'':m.costPerPersonJPY)+'"></div>'
+    +'<textarea class="ef-input" id="mv_notes" rows="2" placeholder="Notes pratiques" style="width:100%;box-sizing:border-box;resize:none">'+escHtml(m.notes||'')+'</textarea>'
+    +'<div style="font-size:12px;font-weight:700;margin:14px 0 8px">Étapes</div>'+legs
+    +'<button onclick="addMovementLeg()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--accent);font-weight:600">＋ Ajouter une étape</button>'
+    +(movementsForCountry(m.countryId).some(function(x){return x.id===m.id;})?'<button onclick="archiveMovement()" style="width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Supprimer ce déplacement</button>':'');
+}
+function addMovementLeg(){movementDraftFromInputs();_movementDraft.legs.push({id:movementUid('leg_'),mode:'Train',line:'',direction:'',from:'',to:'',durationMin:'',stops:'',costJPY:'',instruction:''});renderMovementModalBody();}
+function removeMovementLeg(i){movementDraftFromInputs();_movementDraft.legs.splice(i,1);renderMovementModalBody();}
+async function persistMovement(next){
+  if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
+  next.source='manual';next.updatedAt=new Date().toISOString();
+  var r=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__movement__'+next.id,data:next,updated_at:next.updatedAt},{onConflict:'trip_id,detail_key'});
+  if(r&&r.error) throw r.error;
+}
+async function saveMovementModal(){
+  movementDraftFromInputs();
+  if(!_movementDraft.origin||!_movementDraft.destination){alert('Renseigne le départ et la destination.');return;}
+  var btn=document.getElementById('movementModalSaveBtn');btn.disabled=true;btn.textContent='Enregistrement…';
+  try{var next=JSON.parse(JSON.stringify(_movementDraft));await persistMovement(next);S.movements[next.id]=next;save();closeMovementModal();renderContent();}
+  catch(e){console.error('[PlaniTrip] save movement:',e);alert('Impossible d’enregistrer ce déplacement pour le moment.');btn.disabled=false;btn.textContent='Enregistrer';}
+}
+async function archiveMovement(){
+  if(!_movementDraft||!confirm('Supprimer ce déplacement ?'))return;
+  var next=JSON.parse(JSON.stringify(_movementDraft));next.archived=true;
+  try{await persistMovement(next);S.movements[next.id]=next;save();closeMovementModal();renderContent();}
+  catch(e){console.error('[PlaniTrip] archive movement:',e);alert('Impossible de supprimer ce déplacement pour le moment.');}
+}
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
   var tripStarted = _depart ? (new Date() >= _depart) : false;
@@ -7845,6 +7968,7 @@ function renderItinerary(c, embedded){
     +'<div class="cover-pills"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
     +weatherSection
+    +renderMovementsSection(c.id)
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'
     +'<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px">'
     +(aiHasActiveKey()
@@ -13951,6 +14075,12 @@ async function loadActivityDetails(){
         if(!S.flightMeta) S.flightMeta={};
         S.flightMeta[flightId]=row.data;
       }
+    } else if(row.detail_key.indexOf('__planitrip__movement__')===0){
+      var movementId = row.detail_key.slice('__planitrip__movement__'.length);
+      if(movementId && row.data && typeof row.data === 'object'){
+        if(!S.movements) S.movements={};
+        S.movements[movementId]=row.data;
+      }
     } else if(row.detail_key.indexOf('__planitrip__checklist__')===0){
       var checklistKey=(row.data&&row.data.key)||row.detail_key.slice('__planitrip__checklist__'.length);
       if(checklistKey){
@@ -17312,6 +17442,16 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div id="accomModalBody"></div>
     <button class="modal-cta" onclick="saveAccomModal()">Enregistrer</button>
     <div style="text-align:center;margin-top:4px"><span onclick="document.getElementById('accomModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
+<div class="share-modal" id="movementModal" onclick="if(event.target.id==='movementModal') closeMovementModal();">
+  <div class="share-sheet" style="max-height:88vh;max-height:88dvh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="movementModalTitle">Déplacement</div>
+    <div id="movementModalBody"></div>
+    <button class="modal-cta" id="movementModalSaveBtn" onclick="saveMovementModal()">Enregistrer</button>
+    <button class="modal-cancel-btn" onclick="closeMovementModal()">Annuler</button>
   </div>
 </div>
 
