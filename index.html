@@ -1924,33 +1924,42 @@ function _isCustomStableKey(k){
   return typeof k === 'string' && k.indexOf('_sid_') !== -1;
 }
 
-// Upsert granulaire d'une ligne <actKey>__state dans activity_details.
-// N'écrit QUE les champs de planning de cette activité, pas un blob global.
-// Guard updated_at : si le serveur a une version plus récente (cas de concurrence),
-// on fait un merge silencieux champ par champ — la valeur serveur gagne pour les
-// champs non présents dans le patch courant.
-async function _syncActivityState(actKey, tripId){
+// Les built-in ont une clé stable dans les données de base et peuvent donc utiliser
+// le même stockage granulaire que les custom _sid_. Les custom legacy _cN restent
+// volontairement sur les blobs historiques : leur index n'est pas une identité stable.
+function _usesGranularActivityState(k){
+  return typeof k === 'string' && (_isCustomStableKey(k) || !/_c\d+$/.test(k));
+}
+
+// Upsert granulaire d'une ligne <actKey>__state__<field> dans activity_details.
+// Chaque champ possède sa propre ligne : deux voyageurs peuvent donc modifier en
+// parallèle deux activités, ou deux champs différents d'une même activité.
+async function _syncActivityState(actKey, tripId, fields){
   if(!sb || !tripId) return;
-  // Snapshot COMPLET depuis S — une seule écriture atomique.
-  // Pas de select préalable : S est la source de vérité après save().
-  // Les callers composites (savePlanningModal) doivent appeler les setters
-  // avec {sync:false} puis awaiter UN seul _syncActivityState final.
-  var state = {};
-  if(S.actDate     && S.actDate[actKey]     !== undefined) state.date      = S.actDate[actKey];
-  if(S.actMoment   && S.actMoment[actKey]   !== undefined) state.moment    = S.actMoment[actKey];
-  if(S.actTimeStart&& S.actTimeStart[actKey]!== undefined) state.timeStart = S.actTimeStart[actKey];
-  if(S.actTimeEnd  && S.actTimeEnd[actKey]  !== undefined) state.timeEnd   = S.actTimeEnd[actKey];
-  if(S.actCategory && S.actCategory[actKey] !== undefined) state.category  = S.actCategory[actKey];
-  if(S.done        && S.done[actKey]        !== undefined) state.done      = S.done[actKey];
-  if(!Object.keys(state).length) return;
-  var r = await sb.from('activity_details')
-    .upsert({trip_id:tripId, detail_key:actKey+'__state', data:state, updated_at:new Date().toISOString()},
-            {onConflict:'trip_id,detail_key'});
-  if(r && r.error){
-    console.error('[PlaniTrip] _syncActivityState:', r.error);
-    throw r.error; // permet au caller de détecter l'échec et de ne pas annoncer un succès
+  var maps = {
+    date:S.actDate, moment:S.actMoment, timeStart:S.actTimeStart,
+    timeEnd:S.actTimeEnd, time:S.actTime, category:S.actCategory,
+    day:S.actDay, done:S.done
+  };
+  var requested = Array.isArray(fields) && fields.length ? fields : Object.keys(maps);
+  var now = new Date().toISOString();
+  var writes = requested.filter(function(field){ return maps[field]; }).map(function(field){
+    var hasValue = Object.prototype.hasOwnProperty.call(maps[field], actKey);
+    return sb.from('activity_details').upsert({
+      trip_id:tripId,
+      detail_key:actKey+'__state__'+field,
+      data:{value:hasValue ? maps[field][actKey] : null, deleted:!hasValue},
+      updated_at:now
+    }, {onConflict:'trip_id,detail_key'});
+  });
+  if(!writes.length) return;
+  var results = await Promise.all(writes);
+  var failed = results.find(function(r){ return r && r.error; });
+  if(failed){
+    console.error('[PlaniTrip] _syncActivityState:', failed.error);
+    throw failed.error;
   }
-  return r;
+  return results;
 }
 // ── FIN PHASE S HELPERS ──────────────────────────────────────────────────────
 
@@ -2409,8 +2418,8 @@ async function toggleAct(k){
   if(sb && CURRENT_TRIP && CURRENT_TRIP.id){
     _doneSyncInFlight[k]=true;
     try{
-      if(_isCustomStableKey(k)){
-        await _syncActivityState(k, CURRENT_TRIP.id);
+      if(_usesGranularActivityState(k)){
+        await _syncActivityState(k, CURRENT_TRIP.id, ['done']);
       } else {
         var r = await sb.from('activity_details').upsert(
           {trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',data:S.done,updated_at:new Date().toISOString()},
@@ -2720,7 +2729,7 @@ async function saveDateChange(){
   if(btn){ btn.disabled=true; btn.textContent='…'; }
   setActivityDate(actKey, val, {sync:false});
   try{
-    if(_isCustomStableKey(actKey)) await _syncActivityState(actKey, CURRENT_TRIP.id);
+    if(_usesGranularActivityState(actKey)) await _syncActivityState(actKey, CURRENT_TRIP.id, ['date']);
     else await _syncPlanningBlobs(actKey, CURRENT_TRIP.id);
   }catch(e){
     console.error('[PlaniTrip] saveDateChange sync:', e);
@@ -4636,14 +4645,20 @@ function removeDay(ck) {
   if(nonAll.length === 0) return;
   const last = nonAll[nonAll.length-1];
   // Désassigner les activités qui avaient ce jour
-  Object.keys(S.actDay).forEach(function(k){ if(S.actDay[k]===last && k.indexOf(ck+'_')===0) delete S.actDay[k]; });
+  var changedKeys=[];
+  Object.keys(S.actDay).forEach(function(k){
+    if(S.actDay[k]===last && k.indexOf(ck+'_')===0){ delete S.actDay[k]; changedKeys.push(k); }
+  });
   // Retirer le jour de la liste
   const idx = days.indexOf(last);
   if(idx>-1) days.splice(idx,1);
   if(S.activeDay[ck]===last) S.activeDay[ck]= days.length>1 ? days[days.length-1] : 'Tous';
   save(); renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    changedKeys.filter(_usesGranularActivityState).forEach(function(k){ _syncActivityState(k,CURRENT_TRIP.id,['day']); });
+    if(changedKeys.some(function(k){ return !_usesGranularActivityState(k); })){
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    }
   }
 }
 function setActiveDay(ck, day){
@@ -4665,7 +4680,8 @@ function assignDay(actKey, ck, day) {
   save();
   renderContent();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+    if(_usesGranularActivityState(actKey)) _syncActivityState(actKey,CURRENT_TRIP.id,['day']);
+    else sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDay',data:S.actDay,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
   }
 }
 
@@ -6959,8 +6975,8 @@ function setActMoment(actKey, momentKey, opts){
   save();
   if(opts && opts.sync === false) return;
   if(sb && CURRENT_TRIP){
-    if(_isCustomStableKey(actKey)){
-      _syncActivityState(actKey, CURRENT_TRIP.id);
+    if(_usesGranularActivityState(actKey)){
+      _syncActivityState(actKey, CURRENT_TRIP.id, ['moment']);
     } else {
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actMoment',data:S.actMoment,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actMoment:', r.error); });
     }
@@ -6971,7 +6987,11 @@ function setActSuggestedTime(actKey, val){
   S.actTime[actKey] = (val||'').trim();
   save();
   if(sb && CURRENT_TRIP){
-    sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+    if(_usesGranularActivityState(actKey)){
+      _syncActivityState(actKey, CURRENT_TRIP.id, ['time']);
+    } else {
+      sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',data:S.actTime,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTime:', r.error); });
+    }
   }
 }
 // Plage horaire structurée (début/fin en HH:MM). Le texte libre reste un fallback (S.actTime)
@@ -6988,8 +7008,8 @@ function setActTimeRange(actKey, start, end, freeText, opts){
   save();
   if(opts && opts.sync === false) return;
   if(sb && CURRENT_TRIP){
-    if(_isCustomStableKey(actKey)){
-      _syncActivityState(actKey, CURRENT_TRIP.id);
+    if(_usesGranularActivityState(actKey)){
+      _syncActivityState(actKey, CURRENT_TRIP.id, ['timeStart','timeEnd','time']);
     } else {
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart',data:S.actTimeStart,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeStart:', r.error); });
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',data:S.actTimeEnd,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(r){ if(r&&r.error) console.error('[PlaniTrip] sync actTimeEnd:', r.error); });
@@ -7049,10 +7069,10 @@ function clearPlanningTime(){
   document.getElementById('planningModalTimeStart').value = '';
   document.getElementById('planningModalTimeEnd').value = '';
 }
-// P0.8-A : sync awaité des blobs planning pour les activités built-in.
+// P0.8-A : sync awaité des blobs planning pour les activités legacy _cN.
 // Regroupe en un seul Promise.all les upserts de date/moment/horaires
 // qui étaient auparavant fire-and-forget dans chaque setter individuel.
-// N'est appelé que si !_isCustomStableKey(actKey) — les _sid_ passent par _syncActivityState.
+// N'est appelé que pour les legacy _cN — les built-in et _sid_ passent par l'état granulaire.
 async function _syncPlanningBlobs(actKey, tripId){
   if(!sb || !tripId) return;
   var now = new Date().toISOString();
@@ -7079,7 +7099,7 @@ async function savePlanningModal(){
     if(endEl){ endEl.value = ''; endEl.style.borderColor = 'var(--red-muted)'; setTimeout(function(){ endEl.style.borderColor=''; }, 1200); }
   }
   var actKey = _planningModalActKey;
-  var isStable = _isCustomStableKey(actKey);
+  var usesGranularState = _usesGranularActivityState(actKey);
   // P0.3/P0.8-A — batch local sans sync intermédiaire dans tous les cas
   var btn = document.getElementById('planningModalSaveBtn');
   // 1. Désactiver le bouton avant toute mutation
@@ -7088,7 +7108,7 @@ async function savePlanningModal(){
   if(dateEl) setActivityDate(actKey, dateVal, {sync:false});
   setActMoment(actKey, finalMoment, {sync:false});
   setActTimeRange(actKey, startVal, endVal, '', {sync:false});
-  // 3. Sync Supabase awaité — _syncActivityState pour _sid_, _syncPlanningBlobs pour built-in
+  // 3. Sync Supabase awaité — état granulaire pour built-in/_sid_, blobs pour legacy _cN
   if(!sb || !CURRENT_TRIP){
     if(btn){ btn.disabled = false; btn.textContent = 'Enregistrer'; }
     var _noConnEl = document.getElementById('planningModalErr');
@@ -7096,9 +7116,9 @@ async function savePlanningModal(){
     return;
   }
   try{
-    if(isStable){
-      // P0.3 : une seule écriture granulaire par actKey
-      await _syncActivityState(actKey, CURRENT_TRIP.id);
+    if(usesGranularState){
+      // P1-B : une ligne indépendante par champ modifié
+      await _syncActivityState(actKey, CURRENT_TRIP.id, ['date','moment','timeStart','timeEnd','time']);
     } else {
       // P0.8-A : 5 upserts blobs regroupés dans 1 Promise.all awaité
       await _syncPlanningBlobs(actKey, CURRENT_TRIP.id);
@@ -7305,11 +7325,11 @@ var _catSyncInFlight = false;
 // pour éviter toute dépendance à _categoryModalActKey après un await.
 async function syncActCategory(actKey){
   if(!sb || !CURRENT_TRIP) throw new Error('offline');
-  if(_isCustomStableKey(actKey)){
-    // _sid_ : écriture granulaire via __state
-    await _syncActivityState(actKey, CURRENT_TRIP.id);
+  if(_usesGranularActivityState(actKey)){
+    // _sid_ et built-in : écriture granulaire du seul champ modifié
+    await _syncActivityState(actKey, CURRENT_TRIP.id, ['category']);
   } else {
-    // built-in / legacy : blob global (architecture actuelle conservée)
+    // legacy _cN : blob global historique conservé
     var r = await sb.from('activity_details').upsert(
       {trip_id:CURRENT_TRIP.id, detail_key:'__planitrip__actCategory', data:S.actCategory, updated_at:new Date().toISOString()},
       {onConflict:'trip_id,detail_key'}
@@ -8377,7 +8397,7 @@ async function saveInlineActivityDate(input, actKey){
   input.dataset.syncing='1'; input.disabled=true;
   setActivityDate(actKey, val, {sync:false});
   try{
-    if(_isCustomStableKey(actKey)) await _syncActivityState(actKey, CURRENT_TRIP.id);
+    if(_usesGranularActivityState(actKey)) await _syncActivityState(actKey, CURRENT_TRIP.id, ['date']);
     else await _syncPlanningBlobs(actKey, CURRENT_TRIP.id);
   }catch(e){
     console.error('[PlaniTrip] inline date sync:', e);
@@ -8407,8 +8427,8 @@ function setActivityDate(actKey, dateVal, opts){
   renderContent();
   if(opts && opts.sync === false) return; // caller gère le sync
   if(sb && CURRENT_TRIP){
-    if(_isCustomStableKey(actKey)){
-      _syncActivityState(actKey, CURRENT_TRIP.id);
+    if(_usesGranularActivityState(actKey)){
+      _syncActivityState(actKey, CURRENT_TRIP.id, ['date']);
     } else {
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actDate',data:S.actDate,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
     }
@@ -13531,6 +13551,7 @@ async function loadActivityDetails(){
     }
   });
   var _detailFieldRows = [];
+  var _activityStateFieldRows = [];
   var _cityTrashRows = [];
   var _deletedActRows = [];
   var _deletedCityRows = [];
@@ -13541,6 +13562,9 @@ async function loadActivityDetails(){
     var _dfMarker = '__detail__';
     var _dfPos = row.detail_key.lastIndexOf(_dfMarker);
     if(_dfPos > 0){ _detailFieldRows.push(row); return; }
+    var _asfMarker = '__state__';
+    var _asfPos = row.detail_key.lastIndexOf(_asfMarker);
+    if(_asfPos > 0){ _activityStateFieldRows.push(row); return; }
     // Clés spéciales : dates et jours assignés aux activités — serveur autoritaire
     if(row.detail_key === '__planitrip__actDate'){
       if(row.data && typeof row.data === 'object'){ S.actDate = row.data; }
@@ -13691,7 +13715,9 @@ async function loadActivityDetails(){
       if(state.moment    !== undefined){ if(!S.actMoment)    S.actMoment={};    S.actMoment[actKey]    = state.moment; }
       if(state.timeStart !== undefined){ if(!S.actTimeStart) S.actTimeStart={}; S.actTimeStart[actKey] = state.timeStart; }
       if(state.timeEnd   !== undefined){ if(!S.actTimeEnd)   S.actTimeEnd={};   S.actTimeEnd[actKey]   = state.timeEnd; }
+      if(state.time      !== undefined){ if(!S.actTime)      S.actTime={};      S.actTime[actKey]      = state.time; }
       if(state.category  !== undefined){ if(!S.actCategory)  S.actCategory={};  S.actCategory[actKey]  = state.category; }
+      if(state.day       !== undefined){ if(!S.actDay)       S.actDay={};       S.actDay[actKey]       = state.day; }
       if(state.done      !== undefined){ if(!S.done)         S.done={};         S.done[actKey]         = state.done; }
     } else if(dk.indexOf('__alias__act__') === 0 && state.name){
       // Alias de nom d'activité partagé (built-in ou custom) — Supabase autoritaire
@@ -13704,6 +13730,25 @@ async function loadActivityDetails(){
       if(!S.cityNames) S.cityNames = {};
       S.cityNames[_aliasCk] = state.name;
     }
+  });
+  // P1-B : les lignes par champ sont appliquées en dernier. Elles évitent qu'un
+  // changement de date réécrive une catégorie obsolète, même sur la même activité.
+  var _stateMaps = {
+    date:'actDate', moment:'actMoment', timeStart:'actTimeStart',
+    timeEnd:'actTimeEnd', time:'actTime', category:'actCategory',
+    day:'actDay', done:'done'
+  };
+  _activityStateFieldRows.forEach(function(row){
+    var marker = '__state__';
+    var pos = row.detail_key.lastIndexOf(marker);
+    var actKey = row.detail_key.slice(0,pos);
+    var field = row.detail_key.slice(pos+marker.length);
+    var mapName = _stateMaps[field];
+    if(!actKey || !mapName) return;
+    if(!S[mapName]) S[mapName]={};
+    var payload = row.data;
+    if(payload && payload.deleted){ delete S[mapName][actKey]; }
+    else if(payload && Object.prototype.hasOwnProperty.call(payload,'value')) S[mapName][actKey]=payload.value;
   });
   S.customDetails = window._customDetails;
   save();
