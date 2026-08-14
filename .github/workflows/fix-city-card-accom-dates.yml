@@ -1,0 +1,29 @@
+name: Fix city card accommodation dates
+on:
+  push:
+    paths:
+      - .github/workflows/fix-city-card-accom-dates.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply patch
+        env:
+          PATCH_B64: ZGlmZiAtLWdpdCBhL2luZGV4Lmh0bWwgYi9pbmRleC5odG1sCmluZGV4IDNkZTY4NmIuLmNiNzU2NWUgMTAwNjQ0Ci0tLSBhL2luZGV4Lmh0bWwKKysrIGIvaW5kZXguaHRtbApAQCAtNTY5Myw3ICs1NjkzLDE2IEBAIGZ1bmN0aW9uIGNpdHlTdGF5UmFuZ2UoY2spewogICByZXR1cm4gKHN0YXJ0ICYmIGVuZCkgPyB7c3RhcnQ6c3RhcnQsIGVuZDplbmR9IDogbnVsbDsKIH0KIGZ1bmN0aW9uIGZtdENpdHlTdGF5TGluZShjayl7Ci0gIHZhciByYW5nZSA9IGNpdHlTdGF5UmFuZ2UoY2spOworICAvLyBTdXIgbGVzIGNhcnRlcyBWaWxsZSwgYWZmaWNoZXIgZW4gcHJpb3JpdMOpIGxlcyBkYXRlcyByw6llbGxlbWVudCBlbnJlZ2lzdHLDqWVzCisgIC8vIHN1ciBsZXMgbG9nZW1lbnRzLiBTLmNpdHlEYXRlcyByZXN0ZSB1biByZXBsaSBwb3VyIGxlcyB2aWxsZXMgc2FucyBsb2dlbWVudCBkYXTDqS4KKyAgdmFyIHN0YXJ0PW51bGwsIGVuZD1udWxsOworICB2YXIgYWNjb21MaXN0ID0gQXJyYXkuaXNBcnJheShTLmFjY29tICYmIFMuYWNjb21bY2tdKSA/IFMuYWNjb21bY2tdIDogW107CisgIGFjY29tTGlzdC5mb3JFYWNoKGZ1bmN0aW9uKGEpeworICAgIGlmKCFhLnN0YXJ0IHx8ICFhLmVuZCkgcmV0dXJuOworICAgIGlmKCFzdGFydCB8fCBhLnN0YXJ0PHN0YXJ0KSBzdGFydD1hLnN0YXJ0OworICAgIGlmKCFlbmQgfHwgYS5lbmQ+ZW5kKSBlbmQ9YS5lbmQ7CisgIH0pOworICB2YXIgcmFuZ2UgPSAoc3RhcnQgJiYgZW5kKSA/IHtzdGFydDpzdGFydCwgZW5kOmVuZH0gOiBjaXR5U3RheVJhbmdlKGNrKTsKICAgaWYoIXJhbmdlKSByZXR1cm4gbnVsbDsKICAgdmFyIGQxID0gbmV3IERhdGUocmFuZ2Uuc3RhcnQrJ1QwMDowMDowMCcpLCBkMiA9IG5ldyBEYXRlKHJhbmdlLmVuZCsnVDAwOjAwOjAwJyk7CiAgIHZhciBuaWdodHMgPSBNYXRoLnJvdW5kKChkMi1kMSkvODY0MDAwMDApOwo=
+        run: |
+          printf '%s' "$PATCH_B64" | base64 -d > /tmp/city-card-dates.patch
+          git apply --check /tmp/city-card-dates.patch
+          git apply /tmp/city-card-dates.patch
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-city-card-accom-dates.yml
+          git add index.html
+          git commit -m "fix: show accommodation dates on city cards"
+          git push origin main
