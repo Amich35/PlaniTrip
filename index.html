@@ -2490,19 +2490,37 @@ async function toggleFavorite(k){
   }
 }
 function toggleCity(k){S.openCities[k]=!S.openCities[k];save();renderContent();}
-function toggleCL(k){
-  S.checklist[k]=!S.checklist[k];
-  save();
-  if(sb && CURRENT_TRIP){
-    var countryId = k.split('_')[0];
-    if(S.checklist[k]){
-      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
-      sb.from('checklist_items').insert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    } else {
-      sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    }
+async function toggleCL(k){
+  if(!toggleCL._inFlight) toggleCL._inFlight={};
+  if(toggleCL._inFlight[k]) return false;
+  if(!sb || !CURRENT_TRIP){
+    toast('Connexion requise pour modifier la checklist');
+    return false;
   }
-  renderContent();
+  var nextChecked=!S.checklist[k];
+  toggleCL._inFlight[k]=true;
+  try{
+    var countryId = k.split('_')[0];
+    var r;
+    if(nextChecked){
+      var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
+      r=await sb.from('checklist_items').upsert({trip_id:CURRENT_TRIP.id,key:k,country_id:countryId,added_by_label:who},{onConflict:'trip_id,key'});
+    } else {
+      r=await sb.from('checklist_items').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',k);
+    }
+    if(r&&r.error) throw r.error;
+    if(nextChecked) S.checklist[k]=true;
+    else delete S.checklist[k];
+    save();
+    renderContent();
+    return true;
+  }catch(err){
+    console.error('[PlaniTrip] checklist sync error:',err);
+    toast('Impossible de modifier la checklist');
+    return false;
+  }finally{
+    delete toggleCL._inFlight[k];
+  }
 }
 
 // ── MAP LOGIC ────────────────────────────────────────────────
@@ -13665,7 +13683,11 @@ async function loadFavorites(){
 }
 async function loadChecklist(){
   if(!sb || !CURRENT_TRIP) return;
-  var {data} = await sb.from('checklist_items').select('key').eq('trip_id',CURRENT_TRIP.id);
+  var {data,error} = await sb.from('checklist_items').select('key').eq('trip_id',CURRENT_TRIP.id);
+  if(error){
+    console.error('[PlaniTrip] load checklist error:',error);
+    return; // conserve l'état local si le serveur n'a pas répondu
+  }
   // Serveur autoritaire : reconstruction complète — un item décoché par un autre voyageur
   // doit se décocher localement aussi.
   S.checklist = {};
