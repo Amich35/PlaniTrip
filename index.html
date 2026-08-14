@@ -8153,7 +8153,7 @@ function renderToday(){
     var nfWithLabel = nfParticipants.length>=nfPeople.length ? '' : (' · avec '+nfParticipants.filter(function(p){return canonicalPerson(p)!==myEmailFlight;}).map(function(p){return personDisplayName(p,'Toi');}).join(', '));
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Prochain vol')+'</div>'
       +'<div class="status-main">'+escHtml(nf.from||'?')+' → '+escHtml(nf.to||'?')+'</div>'
-      +'<div class="status-sub">'+nfDate+nfTime+(nf.link?' · billet enregistré':'')+escHtml(nfWithLabel)+'</div></div>';
+      +'<div class="status-sub">'+nfDate+nfTime+escHtml(nfWithLabel)+'</div></div>';
   } else {
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Prochain vol</div><div class="status-sub">À renseigner — aucun vol à venir enregistré.</div></div>';
   }
@@ -9358,7 +9358,7 @@ const DOC_TYPES=[
   {id:'passport', icon:'file-text', label:'Passeport', fields:[{k:'number',lbl:"Numéro"},{k:'expiry',lbl:"Date d'expiration"},{k:'notes',lbl:'Notes',area:true}]},
   {id:'visa', icon:'check-square', label:'Visa', fields:[]},
   {id:'insurance', icon:'heart-pulse', label:'Assurance', fields:[{k:'provider',lbl:'Assureur'},{k:'policy',lbl:'N° de police'},{k:'notes',lbl:'Contact urgence / notes',area:true}]},
-  {id:'tickets', icon:'plane', label:'Billets', fields:[{k:'notes',lbl:'Notes',area:true}]},
+  {id:'tickets', icon:'plane', label:'Billets', fields:[]},
   {id:'vaccines', icon:'syringe', label:'Vaccins', fields:[]},
 ];
 function renderVaccinesBlock(){
@@ -9533,29 +9533,7 @@ function renderDocuments(){
 function toggleDocOpen(id){
   S.openDocType = S.openDocType===id ? null : id; renderContent();
 }
-var _docFieldSyncTimers = {};
-function saveDocField(docId, key, val){
-  if(!S.documents[docId]) S.documents[docId]={};
-  S.documents[docId][key]=val;
-  save();
-  // Les notes Billets étaient auparavant uniquement locales. Une écriture granulaire
-  // évite aussi qu'un voyageur réécrive les autres documents avec un snapshot ancien.
-  if(docId==='tickets' && key==='notes' && sb && CURRENT_TRIP){
-    var timerKey=docId+'__'+key;
-    if(_docFieldSyncTimers[timerKey]) clearTimeout(_docFieldSyncTimers[timerKey]);
-    _docFieldSyncTimers[timerKey]=setTimeout(async function(){
-      try{
-        var r=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__document__tickets__notes',data:{value:val},updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'});
-        if(r&&r.error) throw r.error;
-      }catch(e){
-        console.error('[PlaniTrip] sync ticket notes:',e);
-        alert("La note n'a pas pu être synchronisée. Vérifie ta connexion.");
-      }finally{
-        delete _docFieldSyncTimers[timerKey];
-      }
-    },400);
-  }
-}
+function saveDocField(docId, key, val){ if(!S.documents[docId]) S.documents[docId]={}; S.documents[docId][key]=val; save(); }
 
 // ── Triple-select Jour/Mois/Année générique (remplace <input type="date"> natif,
 // dont le rendu iOS impose sa propre taille de police non maîtrisable en CSS) ──
@@ -9605,7 +9583,6 @@ function renderFlightsList(flights){
     var departureDateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'non renseignée';
     var arrivalDateLabel = f.arrivalDate ? new Date(f.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : '';
     var dateLabel = 'Départ '+departureDateLabel+(arrivalDateLabel?' · Arrivée '+arrivalDateLabel:'');
-    var linkHtml = f.link ? '<a href="'+escHtml(f.link)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);font-size:12px;text-decoration:none;font-weight:600">Voir le billet ↗</a>' : '';
     var timesLabel = f.departureTime || f.arrivalTime ? ('Départ '+(f.departureTime||'—')+' · Arrivée '+(f.arrivalTime||'—')) : '';
     var fParticipants = (f.participants && f.participants.length) ? f.participants : people;
     var namesLabel = fParticipants.length>=people.length ? 'Tous les voyageurs' : fParticipants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
@@ -9615,9 +9592,7 @@ function renderFlightsList(flights){
       +'<div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(f.from||'?')+' → '+escHtml(f.to||'?')+'</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+dateLabel+'</div>'
       +(timesLabel?'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+escHtml(timesLabel)+'</div>':'')
-      +(f.notes?'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+escHtml(f.notes)+'</div>':'')
       +'<div style="font-size:11.5px;color:var(--accent);margin-bottom:2px">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</div>'
-      +linkHtml
       +'</div>'
       +'<span style="color:var(--ink-subtle);margin-top:2px" onclick="event.stopPropagation();editFlight('+i+')">'+svgIcon('pencil',14)+'</span>'
       +'<button onclick="event.stopPropagation();removeFlight('+i+')" style="border:none;background:none;color:var(--red-muted);font-size:16px;cursor:pointer;flex-shrink:0;margin-left:4px">×</button>'
@@ -9645,8 +9620,6 @@ function renderFlightsList(flights){
     +dateTripleHTML('newFlightArrivalDate', editingFlight?(editingFlight.arrivalDate||''):'')
     +'</div>'
     +'<div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de départ</div><input id="newFlightDepartureTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'" style="width:100%;box-sizing:border-box"></div><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure d’arrivée</div><input id="newFlightArrivalTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'" style="width:100%;box-sizing:border-box"></div></div>'
-    +'<input id="newFlightLink" class="ef-input" placeholder="Lien du billet (optionnel)" value="'+(editingFlight?escHtml(editingFlight.link||''):'')+'" style="width:100%;margin-top:6px">'
-    +'<textarea id="newFlightNotes" class="ef-input" placeholder="Notes du vol (optionnel)" style="min-height:70px;width:100%;margin-top:6px">'+(editingFlight?escHtml(editingFlight.notes||''):'')+'</textarea>'
     +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
     +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
     +'<button id="saveFlightBtn" onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
@@ -9695,8 +9668,6 @@ async function saveFlight(){
   var arrivalDate = document.getElementById('newFlightArrivalDate-hidden').value;
   var departureTime = document.getElementById('newFlightDepartureTime').value;
   var arrivalTime = document.getElementById('newFlightArrivalTime').value;
-  var link = document.getElementById('newFlightLink').value.trim();
-  var notes = document.getElementById('newFlightNotes').value.trim();
   if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
   if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour enregistrer ce vol.'); return; }
   if(!S.documents.tickets) S.documents.tickets = {};
@@ -9706,16 +9677,21 @@ async function saveFlight(){
 
   var saveBtn=document.getElementById('saveFlightBtn');
   var flightId=S.editingFlightId||Date.now();
+  var existingFlight=S.editingFlightId?S.documents.tickets.flightsList.find(function(f){return f.id===S.editingFlightId;}):null;
+  // Les champs ont été retirés de l'interface, mais leurs anciennes valeurs sont
+  // conservées silencieusement pour qu'une modification ne détruise aucune donnée.
+  var link=existingFlight?(existingFlight.link||''):'';
+  var notes=existingFlight?(existingFlight.notes||''):'';
   var flightPayload={id:flightId,from:from,to:to,date:date,arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants};
   var metaPayload={arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,notes:notes};
   try{
     if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='…'; }
     var flightWrite;
     if(S.editingFlightId){
-      flightWrite=await sb.from('flights').update({from_place:from,to_place:to,flight_date:date||null,link:link||null,participants:participants}).eq('id',flightId);
+      flightWrite=await sb.from('flights').update({from_place:from,to_place:to,flight_date:date||null,participants:participants}).eq('id',flightId);
     }else{
       var myEmail=(CURRENT_USER&&CURRENT_USER.email)||'';
-      flightWrite=await sb.from('flights').insert({id:flightId,trip_id:CURRENT_TRIP.id,from_place:from,to_place:to,flight_date:date||null,link:link||null,participants:participants,created_by:myEmail});
+      flightWrite=await sb.from('flights').insert({id:flightId,trip_id:CURRENT_TRIP.id,from_place:from,to_place:to,flight_date:date||null,participants:participants,created_by:myEmail});
     }
     if(flightWrite&&flightWrite.error) throw flightWrite.error;
     var metaWrite=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__flight__'+flightId,data:metaPayload,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'});
