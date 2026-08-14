@@ -1,0 +1,26 @@
+name: Apply walking icon
+on:
+  push:
+    paths:
+      - .github/workflows/codex-walking-icon.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply verified patch
+        shell: bash
+        run: |
+          printf '%s' 'ZGlmZiAtLWdpdCBhL2luZGV4Lmh0bWwgYi9pbmRleC5odG1sCmluZGV4IDI0MGJlMjguLjc3OWFkOGUgMTAwNjQ0Ci0tLSBhL2luZGV4Lmh0bWwKKysrIGIvaW5kZXguaHRtbApAQCAtNzgwNyw3ICs3ODA3LDcgQEAgZnVuY3Rpb24gbW92ZW1lbnRVaWQocHJlZml4KXsKIH0KIGZ1bmN0aW9uIG1vdmVtZW50TW9kZUljb24obW9kZSl7CiAgIHZhciBtPVN0cmluZyhtb2RlfHwnJykudG9Mb3dlckNhc2UoKTsKLSAgaWYobS5pbmRleE9mKCdtYXJjaGUnKT4tMSkgcmV0dXJuIHN2Z0ljb24oJ3BlcnNvbi1zdGFuZGluZycsMTYpOworICBpZihtLmluZGV4T2YoJ21hcmNoZScpPi0xKSByZXR1cm4gc3ZnSWNvbigncGVyc29uLXdhbGtpbmcnLDE2KTsKICAgaWYobS5pbmRleE9mKCdtw6l0cm8nKT4tMXx8bS5pbmRleE9mKCdtZXRybycpPi0xKSByZXR1cm4gc3ZnSWNvbigndHJhbS1mcm9udCcsMTYpOwogICBpZihtLmluZGV4T2YoJ2J1cycpPi0xKSByZXR1cm4gc3ZnSWNvbignYnVzJywxNik7CiAgIGlmKG0uaW5kZXhPZignYXZpb24nKT4tMXx8bS5pbmRleE9mKCd2b2wnKT4tMSkgcmV0dXJuIHN2Z0ljb24oJ3BsYW5lJywxNik7CkBAIC0xMzE3NSw3ICsxMzE3NSw3IEBAIHZhciBJQ09OX1BBVEhTID0gewogICBidXM6ICc8cGF0aCBkPSJNNCAxN1Y2YTIgMiAwIDAgMSAyLTJoMTJhMiAyIDAgMCAxIDIgMnYxMSIvPjxwYXRoIGQ9Ik00IDEyaDE2Ii8+PHBhdGggZD0iTTQgMTdoMTYiLz48Y2lyY2xlIGN4PSI3LjUiIGN5PSIxOS41IiByPSIxLjUiLz48Y2lyY2xlIGN4PSIxNi41IiBjeT0iMTkuNSIgcj0iMS41Ii8+JywKICAgJ3RyYWluLWZyb250JzogJzxyZWN0IHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgeD0iNCIgeT0iMyIgcng9IjIiLz48cGF0aCBkPSJNNCAxMWgxNiIvPjxwYXRoIGQ9Im04IDE5LTIgMyIvPjxwYXRoIGQ9Im0xOCAyMi0yLTMiLz48cGF0aCBkPSJNOCAxNWguMDEiLz48cGF0aCBkPSJNMTYgMTVoLjAxIi8+JywKICAgJ3RyYW0tZnJvbnQnOiAnPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiB4PSI0IiB5PSIzIiByeD0iMiIvPjxwYXRoIGQ9Ik00IDExaDE2Ii8+PHBhdGggZD0iTTggMyA2IDEiLz48cGF0aCBkPSJtMTYgMyAyLTIiLz48cGF0aCBkPSJNOSA3aDYiLz48cGF0aCBkPSJtOCAxOS0yIDMiLz48cGF0aCBkPSJtMTggMjItMi0zIi8+JywKLSAgJ3BlcnNvbi1zdGFuZGluZyc6ICc8Y2lyY2xlIGN4PSIxMiIgY3k9IjUiIHI9IjEiLz48cGF0aCBkPSJtOSAyMCAzLTYgMyA2Ii8+PHBhdGggZD0ibTYgOCA2IDIgNi0yIi8+PHBhdGggZD0iTTEyIDEwdjQiLz4nLAorICAncGVyc29uLXdhbGtpbmcnOiAnPGNpcmNsZSBjeD0iMTQiIGN5PSI0IiByPSIyIi8+PHBhdGggZD0ibTYgMTIgMy0zIDMgMSAyIDMiLz48cGF0aCBkPSJtMTIgMTAtMiA2LTMgNiIvPjxwYXRoIGQ9Im0xMCAxNiA0IDEgMyA1Ii8+PHBhdGggZD0ibTE0IDEzIDIgMiAzIDEiLz4nLAogICByb3V0ZTogJzxjaXJjbGUgY3g9IjYiIGN5PSIxOSIgcj0iMyIvPjxwYXRoIGQ9Ik05IDE5aDUuNWEzLjUgMy41IDAgMCAwIDAtN2gtNWEzLjUgMy41IDAgMCAxIDAtN0gxNSIvPjxjaXJjbGUgY3g9IjE4IiBjeT0iNSIgcj0iMyIvPicsCiAgICdoZWFydC1wdWxzZSc6ICc8cGF0aCBkPSJNMTkgMTRjMS41LTEuNSAzLTMuNSAzLTZhNSA1IDAgMCAwLTktMyA1IDUgMCAwIDAtOSAzYzAgNSA2IDguNSA5IDEyIDEtMSAyLTIgMy0zIi8+PHBvbHlsaW5lIHBvaW50cz0iMy41IDEwLjUgNiAxMC41IDcuNSA4IDkuNSAxMyAxMSAxMC41IDEyLjUgMTAuNSIvPicsCiAgIGluZm86ICc8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjxsaW5lIHgxPSIxMiIgeTE9IjE2IiB4Mj0iMTIiIHkyPSIxMiIvPjxsaW5lIHgxPSIxMiIgeTE9IjgiIHgyPSIxMi4wMSIgeTI9IjgiLz4nLAo=' | base64 -d > /tmp/planitrip.patch
+          git apply --check /tmp/planitrip.patch
+          git apply /tmp/planitrip.patch
+          rm .github/workflows/codex-walking-icon.yml
+          git config user.name "Codex"
+          git config user.email "codex@users.noreply.github.com"
+          git add index.html .github/workflows/codex-walking-icon.yml
+          git commit -m "Affiche une icône de marche explicite"
+          git push origin main
