@@ -9619,7 +9619,7 @@ function renderFlightsList(flights){
     +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date d’arrivée</span>'
     +dateTripleHTML('newFlightArrivalDate', editingFlight?(editingFlight.arrivalDate||''):'')
     +'</div>'
-    +'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:8px"><div style="min-width:0;overflow:hidden"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de départ</div><input id="newFlightDepartureTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'" style="display:block;width:100%;min-width:0;max-width:100%;height:44px;box-sizing:border-box;padding:0 10px;-webkit-appearance:none;appearance:none;color-scheme:light"></div><div style="min-width:0;overflow:hidden"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure d’arrivée</div><input id="newFlightArrivalTime" class="ef-input" type="time" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'" style="display:block;width:100%;min-width:0;max-width:100%;height:44px;box-sizing:border-box;padding:0 10px;-webkit-appearance:none;appearance:none;color-scheme:light"></div></div>'
+    +'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:8px"><div style="min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de départ</div><input id="newFlightDepartureTime" class="ef-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'" style="display:block;width:100%;min-width:0;max-width:100%;height:44px;box-sizing:border-box;padding:0 10px;text-align:center"></div><div style="min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure d’arrivée</div><input id="newFlightArrivalTime" class="ef-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'" style="display:block;width:100%;min-width:0;max-width:100%;height:44px;box-sizing:border-box;padding:0 10px;text-align:center"></div></div>'
     +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
     +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
     +'<button id="saveFlightBtn" onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
@@ -9661,14 +9661,30 @@ function cancelEditFlight(){
   save();
   renderContent();
 }
+function normalizeFlightTimeValue(value){
+  var s=String(value||'').trim();
+  if(!s) return '';
+  s=s.replace(/[hH.]/,':').replace(/\s/g,'');
+  if(/^\d{3,4}$/.test(s)) s=s.slice(0,s.length-2)+':'+s.slice(-2);
+  var m=s.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return null;
+  var h=parseInt(m[1],10), min=parseInt(m[2],10);
+  if(h<0||h>23||min<0||min>59) return null;
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+function formatFlightTimeInput(el){
+  var normalized=normalizeFlightTimeValue(el&&el.value);
+  if(el&&normalized!==null) el.value=normalized;
+}
 async function saveFlight(){
   var from = document.getElementById('newFlightFrom').value.trim();
   var to = document.getElementById('newFlightTo').value.trim();
   var date = document.getElementById('newFlightDate-hidden').value;
   var arrivalDate = document.getElementById('newFlightArrivalDate-hidden').value;
-  var departureTime = document.getElementById('newFlightDepartureTime').value;
-  var arrivalTime = document.getElementById('newFlightArrivalTime').value;
+  var departureTime = normalizeFlightTimeValue(document.getElementById('newFlightDepartureTime').value);
+  var arrivalTime = normalizeFlightTimeValue(document.getElementById('newFlightArrivalTime').value);
   if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
+  if(departureTime===null || arrivalTime===null){ alert('Saisis les heures au format HH:MM, par exemple 08:35.'); return; }
   if(!sb || !CURRENT_TRIP){ alert('Connexion requise pour enregistrer ce vol.'); return; }
   if(!S.documents.tickets) S.documents.tickets = {};
   if(!S.documents.tickets.flightsList) S.documents.tickets.flightsList = [];
