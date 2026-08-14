@@ -3919,6 +3919,7 @@ function _computeShiftedActDates(ck, oldRange, newRange){
 async function saveAccom(ck) {
   const name    = document.getElementById('am_name')?.value||'';
   const link    = document.getElementById('am_link')?.value||'';
+  const address = document.getElementById('am_address')?.value||'';
   const start   = document.getElementById('am_start')?.value||'';
   const end     = document.getElementById('am_end')?.value||'';
   const checkin = document.getElementById('am_checkin')?.value||'';
@@ -3936,7 +3937,7 @@ async function saveAccom(ck) {
     var existing = currentList.find(function(e){ return e.id===thisId; });
     // Object.assign préserve sharedBy et toute propriété non éditée (fix bug pré-existant)
     var entry = Object.assign({}, existing||{}, {
-      id:thisId, name:name, link:link, start:start, end:end,
+      id:thisId, name:name, link:link, address:address, start:start, end:end,
       nights:nights, checkin:checkin, checkout:checkout, note:note, status:status
     });
     var idx = currentList.findIndex(function(e){ return e.id===thisId; });
@@ -4138,6 +4139,7 @@ function openAccomModal(ck, id){
   document.getElementById('accomModalBody').innerHTML =
     '<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_name" type="text" placeholder="Nom (ex : Hotel Gracery Osaka)" style="width:100%" value="'+escHtml(a.name||'')+'"/></div>'
     +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_link" type="url" placeholder="Lien Booking / Airbnb / autre" style="width:100%" value="'+escHtml(a.link||'')+'"/></div>'
+    +'<div class="ef-row" style="margin-bottom:8px"><input class="ef-input" id="am_address" type="text" placeholder="Adresse du logement" style="width:100%" value="'+escHtml(a.address||'')+'"/></div>'
     +'<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="am_start" type="date"'+accomDateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.start||(cityStay&&cityStay.start)||'')+'"/></div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="am_end" type="date"'+accomDateBounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" oninput="updateAccomNightsDisplay()" value="'+escHtml(a.end||(cityStay&&cityStay.end)||'')+'"/></div></div>'
     +'<div class="ef-row" style="margin-bottom:8px;display:flex;gap:8px;align-items:flex-end">'
@@ -4199,7 +4201,7 @@ function renderAccomCard(ck) {
       +travelersRow
       +'<div style="display:flex;gap:6px;margin-top:8px">'
       +'<button onclick="event.stopPropagation();openAccomModal(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(a.id)+'\')" style="flex:1;padding:7px;border-radius:var(--r8);font-size:11.5px;font-weight:600;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir réservation</button>'
-      +'<button onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom'+i+'\',\''+esc((a.name||'').replace(/\x27/g,"\\\x27"))+'\')" style="flex:1;padding:7px;border-radius:var(--r8);font-size:11.5px;font-weight:600;border:none;background:var(--sand-deep);color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
+      +'<button data-map-query="'+esc(a.address||a.name||'Logement')+'" onclick="event.stopPropagation();openMap(\''+jsStrEsc(ck)+'_accom'+i+'\',this.getAttribute(\'data-map-query\'))" style="flex:1;padding:7px;border-radius:var(--r8);font-size:11.5px;font-weight:600;border:none;background:var(--sand-deep);color:var(--ink);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">Voir sur la carte</button>'
       +'</div>'
       +'</div>';
   }).join('');
