@@ -2440,7 +2440,7 @@ async function toggleAct(k){
     }, 30);
   }
 }
-function toggleFavorite(k){
+async function toggleFavorite(k){
   if(!S.favorites) S.favorites={};
   if(!toggleFavorite._inFlight) toggleFavorite._inFlight={};
   if(toggleFavorite._inFlight[k]) return false;
