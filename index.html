@@ -10212,14 +10212,26 @@ function toggleFeedImportant(postId){
     });
   }
 }
+var _feedDeleteInFlight = {};
 function removeFeedPost(postId){
-  showConfirm('Supprimer cette publication ?', function(){
+  showConfirm('Supprimer cette publication ?', async function(){
+    if(_feedDeleteInFlight[postId]) return;
+    if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ toast('Connexion requise pour supprimer cette publication'); return; }
+    _feedDeleteInFlight[postId]=true;
+    try{
+      var r=await sb.from('feed_posts').delete().eq('id',postId).eq('trip_id',CURRENT_TRIP.id).select('id').maybeSingle();
+      if(r&&r.error) throw r.error;
+      if(!r||!r.data) throw new Error('Publication introuvable sur le serveur');
+    }catch(err){
+      console.error('[PlaniTrip] delete feed_posts:',err);
+      toast('Impossible de supprimer cette publication');
+      delete _feedDeleteInFlight[postId];
+      return;
+    }
     S.feedPosts = (S.feedPosts||[]).filter(function(p){return p.id!==postId;});
     save();
     renderContent();
-    if(sb && CURRENT_TRIP){
-      sb.from('feed_posts').delete().eq('id', postId).then(function(r){ if(r&&r.error){ console.error('[PlaniTrip] delete feed_posts:', r.error); } });
-    }
+    delete _feedDeleteInFlight[postId];
   }, 'Supprimer');
 }
 async function loadFeedPosts(){
