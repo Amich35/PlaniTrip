@@ -9080,6 +9080,39 @@ function toggleSplitParticipant(idx){
   var cell = document.getElementById('splitAmtCell_'+idx);
   if(cell) cell.style.display = checked ? 'flex' : 'none';
   save();
+  updateSplitAllButton();
+  refreshSplitAmounts();
+}
+function areAllSplitParticipantsSelected(){
+  var people = SPLIT_PEOPLE_CACHE.length ? SPLIT_PEOPLE_CACHE : getPeopleList();
+  return people.length>0 && people.every(function(p){ return (S.expParticipants||[]).indexOf(p)>-1; });
+}
+function updateSplitAllButton(){
+  var btn = document.getElementById('splitAllBtn');
+  if(!btn) return;
+  var allSelected = areAllSplitParticipantsSelected();
+  btn.style.background = allSelected ? 'var(--accent)' : 'var(--sand-deep)';
+  btn.style.color = allSelected ? '#fff' : 'var(--ink)';
+  btn.textContent = 'Tous';
+  btn.setAttribute('aria-pressed', allSelected ? 'true' : 'false');
+}
+function toggleSplitAllParticipants(){
+  var people = SPLIT_PEOPLE_CACHE.length ? SPLIT_PEOPLE_CACHE.slice() : getPeopleList();
+  var selectAll = !areAllSplitParticipantsSelected();
+  S.expParticipants = selectAll ? people : [];
+  S.expSplitOverrides = {};
+  people.forEach(function(p, idx){
+    var checked = S.expParticipants.indexOf(p)>-1;
+    var circle = document.getElementById('splitCircle_'+idx);
+    if(circle){
+      circle.style.background = checked ? 'var(--accent)' : 'var(--sand-deep)';
+      circle.textContent = checked ? '✓' : '';
+    }
+    var cell = document.getElementById('splitAmtCell_'+idx);
+    if(cell) cell.style.display = checked ? 'flex' : 'none';
+  });
+  save();
+  updateSplitAllButton();
   refreshSplitAmounts();
 }
 function onSplitInput(idx, val){
@@ -9102,7 +9135,7 @@ function refreshSplitAmounts(){
 function renderSplitRows(totalAmtStr){
   var people = getPeopleList();
   SPLIT_PEOPLE_CACHE = people;
-  if(!S.expParticipants || !S.expParticipants.length) S.expParticipants = people.slice();
+  if(!Array.isArray(S.expParticipants)) S.expParticipants = people.slice();
   if(!S.expSplitOverrides) S.expSplitOverrides = {};
   var amt = parseAmt(totalAmtStr)||0;
   var computed = computeFinalSplits(amt, S.expParticipants, S.expSplitOverrides);
@@ -9119,7 +9152,7 @@ function renderSplitRows(totalAmtStr){
       +'</div>';
   }).join('');
   return '<div id="splitRowsWrap" class="ef-row" style="flex-direction:column;align-items:stretch;padding:2px 0 0">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 6px"><span style="font-size:13px;font-weight:600;color:var(--ink-subtle)">Diviser</span><span style="font-size:12px;color:var(--ink-subtle)">Également par défaut</span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 6px"><span style="font-size:13px;font-weight:600;color:var(--ink-subtle)">Diviser</span><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--ink-subtle)">Également par défaut</span><button type="button" id="splitAllBtn" onclick="toggleSplitAllParticipants()" aria-pressed="'+(areAllSplitParticipantsSelected()?'true':'false')+'" style="border:0;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:'+(areAllSplitParticipantsSelected()?'var(--accent)':'var(--sand-deep)')+';color:'+(areAllSplitParticipantsSelected()?'#fff':'var(--ink)')+'">Tous</button></div></div>'
     +'<div style="background:var(--parchment);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-sm)">'+rows+'</div></div>';
 }
 function parseAmt(v){ if(v===undefined||v===null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
@@ -9264,7 +9297,8 @@ async function addExpGlobal(){
   if(isNaN(amt)||amt<=0)return;
   var dateEl = document.getElementById('eDate');
   var expDate=(dateEl && dateEl.value) ? dateEl.value : toLocalISODate(new Date());
-  var participants = (S.expParticipants&&S.expParticipants.length)?S.expParticipants.slice():getPeopleList();
+  var participants = Array.isArray(S.expParticipants)?S.expParticipants.slice():getPeopleList();
+  if(!participants.length){ alert('Sélectionne au moins un voyageur concerné.'); return; }
   var splits = computeFinalSplits(amt, participants, S.expSplitOverrides||{});
 
   // person_label = identité EMAIL de la personne sélectionnée dans le dropdown (S.expPerson),
