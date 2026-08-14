@@ -4948,7 +4948,8 @@ function duplicateActivity(cityKey, actKey, actName, isCustom, origIdx, targetCi
     if(window._customDetails[newActKey]){
       sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id, detail_key:newActKey, data:window._customDetails[newActKey], updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); });
     }
-    if(S.actCategory){ sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',data:S.actCategory,updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync error:',_r.error); }); }
+    // La catégorie éventuelle sera persistée sous la clé _sid_ par
+    // _migrateToStableKeyAfterSync après confirmation de l'INSERT.
     // Lot 5A : actMoment et actTime ne sont plus copiés — pas d'upsert nécessaire.
   }
 }
@@ -5137,29 +5138,12 @@ async function _migrateToStableKeyAfterSync(cityKey, legacyActKey, sid){
   if(!sb || !CURRENT_TRIP) return;
   var tid = CURRENT_TRIP.id;
   var now = new Date().toISOString();
-  // P0.9 — Blobs globaux : ré-upsert awaité des blobs qui contiennent la clé stable.
-  // Sans ce bloc, les blobs Supabase gardaient la clé _cN et les données disparaissaient
-  // au reload (le renderer cherche _sid_UUID, ne trouve rien dans les blobs _cN).
+  // P1-B — Une fois l'identité stable connue, persister directement ses champs
+  // granulaires. Ne jamais réécrire les blobs globaux depuis le cache local : une
+  // duplication/restauration ne doit pas pouvoir écraser l'activité d'un autre voyageur.
   if(migratedLocally){
-    var _blobDefs = [
-      {key:'__planitrip__actDate',      data:S.actDate},
-      {key:'__planitrip__actMoment',    data:S.actMoment},
-      {key:'__planitrip__actTimeStart', data:S.actTimeStart},
-      {key:'__planitrip__actTimeEnd',   data:S.actTimeEnd},
-      {key:'__planitrip__actTime',      data:S.actTime},
-      {key:'__planitrip__actCategory',  data:S.actCategory},
-      {key:'__planitrip__actDay',       data:S.actDay},
-      {key:'__planitrip__done',         data:S.done},
-    ];
-    var _blobsToSync = _blobDefs.filter(function(b){ return b.data && b.data[stableKey] !== undefined; });
-    if(_blobsToSync.length){
-      try{
-        var _results = await Promise.all(_blobsToSync.map(function(b){
-          return sb.from('activity_details').upsert({trip_id:tid,detail_key:b.key,data:b.data,updated_at:now},{onConflict:'trip_id,detail_key'});
-        }));
-        _results.forEach(function(r,i){ if(r&&r.error) console.error('[PlaniTrip] migrate blob '+_blobsToSync[i].key+':', r.error); });
-      } catch(e){ console.error('[PlaniTrip] _migrateToStableKeyAfterSync blobs:', e); }
-    }
+    try{ await _syncActivityState(stableKey, tid); }
+    catch(e){ console.error('[PlaniTrip] _migrateToStableKeyAfterSync state:', e); }
   }
   // Fiche détaillée : si une ligne existe déjà sous la clé legacy côté serveur, la recopier
   // sous la clé stable puis supprimer l'ancienne — jamais l'inverse (pas de perte de données).
