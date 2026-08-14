@@ -10044,21 +10044,31 @@ function openEditPostTextModal(postId){
   if(input) input.value = post.text || post.photoCaption || '';
   document.getElementById('editPostTextModal').classList.add('open');
 }
-function saveEditPostText(){
+var _feedEditInFlight = {};
+async function saveEditPostText(){
   var post = (S.feedPosts||[]).find(function(p){return p.id===_editPostTextPostId;});
   if(!post) return;
+  if(_feedEditInFlight[post.id+'_text']) return;
   var input = document.getElementById('edit-post-text-input');
   var val = (input.value||'').trim();
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ toast('Connexion requise pour modifier cette publication'); return; }
+  _feedEditInFlight[post.id+'_text']=true;
+  try{
+    var r=await sb.from('feed_posts').update({text:val||null,photo_caption:null}).eq('id',post.id).eq('trip_id',CURRENT_TRIP.id).select('id').maybeSingle();
+    if(r&&r.error) throw r.error;
+    if(!r||!r.data) throw new Error('Publication introuvable sur le serveur');
+  }catch(err){
+    console.warn('[PlaniTrip] update feed post text:',err);
+    toast('Impossible de modifier cette publication');
+    delete _feedEditInFlight[post.id+'_text'];
+    return;
+  }
   post.text = val;
   post.photoCaption = ''; // fusion : le texte est désormais l'unique description
   save();
   document.getElementById('editPostTextModal').classList.remove('open');
   renderContent();
-  if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').update({text: val||null, photo_caption:null}).eq('id', post.id).then(function(r){
-      if(r && r.error) console.warn('[PlaniTrip] update feed post text:', r.error);
-    });
-  }
+  delete _feedEditInFlight[post.id+'_text'];
 }
 var _editCaptionPostId = '';
 function openEditCaptionModal(postId){
@@ -10071,20 +10081,29 @@ function openEditCaptionModal(postId){
   if(input) input.value = post.photoCaption || '';
   document.getElementById('editCaptionModal').classList.add('open');
 }
-function saveEditCaption(){
+async function saveEditCaption(){
   var post = (S.feedPosts||[]).find(function(p){return p.id===_editCaptionPostId;});
   if(!post) return;
+  if(_feedEditInFlight[post.id+'_caption']) return;
   var input = document.getElementById('edit-caption-input');
   var val = (input.value||'').trim();
+  if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ toast('Connexion requise pour modifier cette publication'); return; }
+  _feedEditInFlight[post.id+'_caption']=true;
+  try{
+    var r=await sb.from('feed_posts').update({photo_caption:val||null}).eq('id',post.id).eq('trip_id',CURRENT_TRIP.id).select('id').maybeSingle();
+    if(r&&r.error) throw r.error;
+    if(!r||!r.data) throw new Error('Publication introuvable sur le serveur');
+  }catch(err){
+    console.warn('[PlaniTrip] update photo_caption:',err);
+    toast('Impossible de modifier cette publication');
+    delete _feedEditInFlight[post.id+'_caption'];
+    return;
+  }
   post.photoCaption = val;
   save();
   document.getElementById('editCaptionModal').classList.remove('open');
   renderContent();
-  if(sb && CURRENT_TRIP){
-    sb.from('feed_posts').update({photo_caption: val||null}).eq('id', post.id).then(function(r){
-      if(r && r.error) console.warn('[PlaniTrip] update photo_caption:', r.error);
-    });
-  }
+  delete _feedEditInFlight[post.id+'_caption'];
 }
 function handleFeedPhotoSelected(e){
   var file = e.target.files && e.target.files[0];
