@@ -905,7 +905,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .flight-time-input::-webkit-datetime-edit{display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:0;}
 .flight-time-input[value=""]::-webkit-datetime-edit{color:var(--ink-muted);font-weight:400;}
 .flight-date-input:focus,.flight-time-input:focus{outline:none!important;background:#fff!important;border-color:rgba(45,106,79,.3)!important;}
-.flight-field-clear{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:rgba(29,29,31,.1);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;margin-left:-4px;}
+.flight-field-clear{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:rgba(29,29,31,.1);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;margin-left:-4px;visibility:hidden;}
+.flight-field-clear.visible{visibility:visible;}
 .flight-modal-sheet{position:relative;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;padding:24px 18px calc(24px + env(safe-area-inset-bottom));}
 .flight-modal-close{position:absolute;right:14px;top:16px;width:30px;height:30px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .flight-modal-sheet .modal-title{font-size:20px;margin:4px 38px 18px 0;}
@@ -9337,9 +9338,10 @@ function intercountryFlightDuration(f){
 }
 function openIntercountryFlight(flightId){
   var flights=(S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[],flight=flights.find(function(f){return String(f.id)===String(flightId);});
-  if(!flight)return;S.tab='documents';S.openDocType='tickets';S.editingFlightId=flight.id;
+  if(!flight)return;
+  S.openDocType='tickets';S.editingFlightId=flight.id;
   var activeParticipants=activeFlightParticipants(flight.participants);S.newFlightParticipants=flightParticipantsSpecified(flight)?activeParticipants:getActiveTravelerList();
-  save();renderContent();setTimeout(function(){renderFlightModalBody(flight);document.getElementById('flightModal').classList.add('open');},0);
+  renderFlightModalBody(flight);document.getElementById('flightModal').classList.add('open');
 }
 function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.editingFlightId=null;S.newFlightParticipants=[];save();renderContent();setTimeout(openNewFlightModal,0);}
 var _intercountryModePair=null;
@@ -10434,11 +10436,10 @@ function renderFlightModalBody(editingFlight){
     var b = document.createElement('button');
     b.type = 'button';
     b.id = cfg.btnId;
-    b.className = 'flight-field-clear';
+    b.className = 'flight-field-clear' + (cfg.hasVal ? ' visible' : '');
     b.innerHTML = svgIcon('x', 11);
-    b.style.display = cfg.hasVal ? 'flex' : 'none';
     b.onclick = function(){ clearFlightField(cfg.inputId, cfg.btnId); };
-    input.addEventListener('change', function(){ b.style.display = this.value ? 'flex' : 'none'; });
+    input.addEventListener('change', function(){ b.className = 'flight-field-clear' + (this.value ? ' visible' : ''); });
     input.parentNode.insertBefore(b, input.nextSibling);
   });
 }
@@ -10451,7 +10452,7 @@ function clearFlightField(inputId, btnId){
   var el = document.getElementById(inputId);
   if(el){ el.value = ''; }
   var btn = document.getElementById(btnId);
-  if(btn) btn.style.display = 'none';
+  if(btn) btn.className = 'flight-field-clear';
 }
 function normalizeFlightTimeValue(value){
   var s=String(value||'').trim();
