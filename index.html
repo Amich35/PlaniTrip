@@ -2592,24 +2592,23 @@ async function postChangeEvent(entityType, action, opts){
 var _ceEvents = [];
 var _ceLoaded = false;
 async function loadChangeEvents(){
-  if(!sb || !CURRENT_TRIP || !CURRENT_USER) return;
+  if(!sb || !CURRENT_TRIP || !CURRENT_USER || !CURRENT_USER.id) return;
   try{
-    // Événements du voyage des 30 derniers jours
+    var myId = CURRENT_USER.id;
+    // Exclure ses propres événements directement dans la query Supabase
     var {data:events} = await sb.from('change_events')
       .select('*')
       .eq('trip_id', CURRENT_TRIP.id)
+      .neq('actor_user_id', myId)
       .gte('created_at', new Date(Date.now() - 30*24*60*60*1000).toISOString())
       .order('created_at', {ascending:false})
       .limit(100);
     // Événements dismissés par cet utilisateur
     var {data:dismissed} = await sb.from('change_events_dismissed')
       .select('event_id')
-      .eq('user_id', CURRENT_USER.id);
+      .eq('user_id', myId);
     var dismissedIds = new Set((dismissed||[]).map(function(d){return d.event_id;}));
-    // Filtrer les propres événements + les dismissés
-    _ceEvents = (events||[]).filter(function(e){
-      return e.actor_user_id !== CURRENT_USER.id && !dismissedIds.has(e.id);
-    });
+    _ceEvents = (events||[]).filter(function(e){ return !dismissedIds.has(e.id); });
     _ceLoaded = true;
     _updateCeBadge();
   } catch(e){ console.warn('[PlaniTrip] loadChangeEvents:', e); }
@@ -2681,7 +2680,20 @@ function _renderCePanel(){
   var inner = events.length === 0
     ? '<div style="padding:32px 0;text-align:center;color:var(--ink-muted);font-size:13px">Aucune activité récente</div>'
     : events.map(function(e){
-        var summary = escHtml(e.summary || (e.actor_label + ' a modifié ' + e.entity_type));
+        // Reconstruire le texte depuis actor_label (jamais depuis summary qui peut contenir "Toi")
+        var actor = escHtml(e.actor_label || 'Quelqu\'un');
+        var actionMap = {add:'a ajouté', update:'a modifié', delete:'a supprimé', restore:'a restauré'};
+        var entityMap = {activity:'une activité', city:'une ville', accommodation:'un logement',
+          flight:'un vol', movement:'un déplacement', budget:'une dépense',
+          checklist:'la checklist', feed:'une publication', country:'un pays'};
+        var actionText = actionMap[e.action] || 'a modifié';
+        var entityText = entityMap[e.entity_type] || e.entity_type;
+        var label = e.entity_label ? ' · ' + escHtml(e.entity_label) : '';
+        // Pour le budget inclure le montant depuis meta si disponible
+        if(e.entity_type==='budget' && e.meta && e.meta.amount){
+          label = ' · ' + escHtml(String(e.meta.amount)) + (e.meta.desc ? ' · '+escHtml(e.meta.desc) : '');
+        }
+        var summary = actor + ' ' + actionText + ' ' + entityText + label;
         var time = _ceRelativeTime(e.created_at);
         var link = e.deep_link
           ? '<button onclick="closeCePanel();'+escHtml(e.deep_link)+'" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
