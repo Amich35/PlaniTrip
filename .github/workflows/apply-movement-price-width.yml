@@ -1,0 +1,26 @@
+name: Apply movement price width
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/apply-movement-price-width.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply patch
+        shell: bash
+        run: |
+          echo 'ZGlmZiAtLWdpdCBhL2luZGV4Lmh0bWwgYi9pbmRleC5odG1sCmluZGV4IDQzOTBjZDMuLjJjNjM4YzIgMTAwNjQ0Ci0tLSBhL2luZGV4Lmh0bWwKKysrIGIvaW5kZXguaHRtbApAQCAtNjc0LDYgKzY3NCw3IEBAIGlucHV0OmZvY3VzLHNlbGVjdDpmb2N1c3tvdXRsaW5lOm5vbmU7Ym9yZGVyLWNvbG9yOnZhcigtLWFjY2VudCkgIWltcG9ydGFudDtib3gtCiAubXYtb3ZlcnZpZXctaXRlbXtkaXNwbGF5OmlubGluZS1mbGV4O2FsaWduLWl0ZW1zOmNlbnRlcjtnYXA6NHB4O3doaXRlLXNwYWNlOm5vd3JhcDt9CiAubXYtb3ZlcnZpZXctaXRlbSBzdmd7d2lkdGg6MTNweDtoZWlnaHQ6MTNweDtmbGV4LXNocmluazowO30KIC5tdi1jdXJyZW5jeS1zZWxlY3R7Ym9yZGVyOm5vbmU7YmFja2dyb3VuZDp0cmFuc3BhcmVudDtjb2xvcjp2YXIoLS1hY2NlbnQpO2ZvbnQtc2l6ZToxMC41cHg7Zm9udC13ZWlnaHQ6NzUwO3BhZGRpbmc6MCAxNHB4IDAgMDttaW4td2lkdGg6NTRweDt9CisubXYtc3VtbWFyeS1jZWxsIC5tdi1jdXJyZW5jeS1zZWxlY3R7bWluLXdpZHRoOjM4cHg7bWF4LXdpZHRoOjQ2cHg7cGFkZGluZy1yaWdodDozcHg7ZmxleDowIDAgYXV0bzt9CiAubXYtc3RlcC1jdXJyZW5jeXttaW4td2lkdGg6MzhweDtwYWRkaW5nLXJpZ2h0OjRweDt9CiAubXYtcHJpY2Utcm93e2Rpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpjZW50ZXI7Z2FwOjVweDttaW4td2lkdGg6MDt9CiAubXYtcHJpY2Utcm93IC5lZi1pbnB1dHtmbGV4OjE7bWluLXdpZHRoOjA7fQo=' | base64 -d > /tmp/movement-price-width.patch
+          git apply /tmp/movement-price-width.patch
+          rm .github/workflows/apply-movement-price-width.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/apply-movement-price-width.yml
+          git commit -m "Élargit le montant du prix par personne"
+          git push origin main
