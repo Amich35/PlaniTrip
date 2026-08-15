@@ -2696,7 +2696,7 @@ function _renderCePanel(){
         var summary = actor + ' ' + actionText + ' ' + entityText + label;
         var time = _ceRelativeTime(e.created_at);
         var link = e.deep_link
-          ? '<button onclick="closeCePanel();'+escHtml(e.deep_link)+'" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
+          ? '<button onclick="ceSeeEvent(\''+e.id+'\',\''+e.deep_link.replace(/'/g,"\\'")+'\')" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
           : '';
         return '<div class="ce-item" data-id="'+escHtml(e.id)+'">'
           +'<span class="ce-item-icon">'+_ceEntityIcon(e.entity_type)+'</span>'
@@ -2712,6 +2712,15 @@ function _renderCePanel(){
   // Bouton Tout supprimer
   var allBtn = document.getElementById('ce-dismiss-all');
   if(allBtn) allBtn.style.display = events.length > 0 ? 'block' : 'none';
+}
+
+// Voir un événement : dismiss + navigation
+function ceSeeEvent(eventId, deepLink){
+  dismissChangeEvent(eventId); // dismiss immédiatement
+  closeCePanel();
+  if(deepLink){
+    try{ eval(deepLink); } catch(e){ console.warn('[PlaniTrip] ceSeeEvent deepLink:', e); }
+  }
 }
 
 // Ouvrir/fermer le panel
