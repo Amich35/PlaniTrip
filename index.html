@@ -2695,8 +2695,9 @@ function _renderCePanel(){
         }
         var summary = actor + ' ' + actionText + ' ' + entityText + label;
         var time = _ceRelativeTime(e.created_at);
+        if(e.deep_link) _ceDeepLinks[e.id] = e.deep_link;
         var link = e.deep_link
-          ? '<button onclick="ceSeeEvent(\''+e.id+'\',\''+e.deep_link.replace(/'/g,"\\'")+'\')" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
+          ? '<button onclick="ceSeeEvent(\''+escHtml(e.id)+'\')" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
           : '';
         return '<div class="ce-item" data-id="'+escHtml(e.id)+'">'
           +'<span class="ce-item-icon">'+_ceEntityIcon(e.entity_type)+'</span>'
@@ -2714,9 +2715,13 @@ function _renderCePanel(){
   if(allBtn) allBtn.style.display = events.length > 0 ? 'block' : 'none';
 }
 
+// Map des deepLinks par event id — évite les problèmes d'échappement dans onclick
+var _ceDeepLinks = {};
+
 // Voir un événement : dismiss + navigation
-function ceSeeEvent(eventId, deepLink){
-  dismissChangeEvent(eventId); // dismiss immédiatement
+function ceSeeEvent(eventId){
+  var deepLink = _ceDeepLinks[eventId];
+  dismissChangeEvent(eventId);
   closeCePanel();
   if(deepLink){
     try{ eval(deepLink); } catch(e){ console.warn('[PlaniTrip] ceSeeEvent deepLink:', e); }
