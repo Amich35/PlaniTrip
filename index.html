@@ -865,9 +865,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .flight-schedule-grid{display:grid;grid-template-columns:1fr;gap:10px;}
 .flight-stop-card{min-width:0;border:1px solid rgba(100,70,30,.12);border-radius:var(--r16);background:#fff;padding:13px 14px;}
 .flight-stop-title{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:750;color:var(--ink-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.8px;}
-.flight-stop-fields{display:grid;grid-template-columns:minmax(0,1fr) 108px;column-gap:14px;align-items:center;}
-.flight-date-input,.flight-time-input{display:block;width:100%;min-width:0;height:48px!important;min-height:48px!important;margin:0!important;padding:0 13px!important;border-radius:var(--r12)!important;background:var(--sand,#F5F5F3)!important;border:1px solid rgba(100,70,30,.09)!important;color:var(--ink)!important;box-sizing:border-box;font:600 14px -apple-system,BlinkMacSystemFont,sans-serif!important;}
-.flight-time-input{text-align:center;font-size:15px!important;}
+.flight-stop-fields{display:flex;gap:14px;align-items:center;min-width:0;}
+.flight-date-input,.flight-time-input{display:block;min-width:0!important;height:48px!important;min-height:48px!important;margin:0!important;padding:0 13px!important;border-radius:var(--r12)!important;background:var(--sand,#F5F5F3)!important;border:1px solid rgba(100,70,30,.09)!important;color:var(--ink)!important;box-sizing:border-box;font:600 14px -apple-system,BlinkMacSystemFont,sans-serif!important;}
+.flight-date-input{flex:1 1 0;width:0!important;max-width:calc(100% - 122px);-webkit-appearance:none;appearance:none;overflow:hidden;}
+.flight-date-input::-webkit-date-and-time-value{text-align:center;min-width:0;}
+.flight-time-input{flex:0 0 108px;width:108px!important;text-align:center;font-size:15px!important;}
 .flight-date-input:focus,.flight-time-input:focus{outline:none!important;background:#fff!important;border-color:rgba(45,106,79,.3)!important;}
 .flight-modal-sheet{position:relative;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;padding:24px 18px calc(24px + env(safe-area-inset-bottom));}
 .flight-modal-close{position:absolute;right:14px;top:16px;width:30px;height:30px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
