@@ -362,6 +362,18 @@ html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-beh
 .cf-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .country-card-list{display:flex;flex-direction:column;gap:12px;}
 .country-card{display:flex;align-items:center;gap:14px;background:#fff;border-radius:var(--r22);padding:14px;box-shadow:0 2px 12px rgba(29,29,31,0.07);cursor:pointer;transition:transform 0.18s,box-shadow 0.18s;}
+.country-connection{position:relative;margin:-4px 14px;padding-left:25px;}
+.country-connection:before{content:'';position:absolute;left:10px;top:-9px;bottom:-9px;width:1.5px;background:rgba(45,106,79,.32);}
+.country-connection-card{position:relative;background:rgba(255,255,255,.78);border:1px solid rgba(100,70,30,.12);border-radius:var(--r16);padding:10px 12px;cursor:pointer;}
+.country-connection-icon{position:absolute;left:-28px;top:11px;width:27px;height:27px;border-radius:50%;border:1.5px solid var(--accent);background:var(--parchment);color:var(--accent);display:flex;align-items:center;justify-content:center;z-index:1;}
+.country-connection-icon.missing{border-style:dashed;color:var(--status-upcoming);border-color:var(--status-upcoming);}
+.country-connection-head{display:flex;align-items:center;gap:8px;min-width:0;}
+.country-connection-route{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.country-connection-summary{font-size:10.5px;color:var(--ink-muted);margin-top:4px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.country-connection-status{font-size:9.5px;font-weight:700;color:var(--accent);background:rgba(45,106,79,.09);padding:2px 6px;border-radius:8px;}
+.country-connection-status.missing{color:var(--status-upcoming);background:var(--status-upcoming-pale);}
+.country-connection-detail{margin-top:9px;padding-top:9px;border-top:1px solid rgba(29,29,31,.06);font-size:10.5px;color:var(--ink-muted);line-height:1.45;}
+.country-connection-action{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:8px;padding:8px;border:none;border-radius:10px;background:rgba(45,106,79,.08);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;}
 .country-card:active{transform:scale(0.985);box-shadow:0 1px 6px rgba(29,29,31,0.05);}
 .cc-thumb{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
 .city-thumb{width:104px;height:104px;border-radius:18px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
@@ -9191,6 +9203,49 @@ function openDocumentType(docId){
   renderContent();
 }
 
+function intercountryDateDistance(isoA,isoB){
+  if(!isoA||!isoB)return Infinity;
+  return Math.abs(new Date(isoA+'T00:00:00')-new Date(isoB+'T00:00:00'))/86400000;
+}
+function intercountryFlightAssignments(countries){
+  var flights=((S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[]).filter(function(f){return f&&f.date;});
+  var used={},assigned={};
+  (countries||[]).slice(0,-1).forEach(function(country,index){
+    var currentRange=getCountryDateRange(country),nextRange=getCountryDateRange(countries[index+1]),best=null,bestDistance=Infinity;
+    flights.forEach(function(f){
+      if(used[String(f.id)])return;
+      var distance=Math.min(intercountryDateDistance(f.date,currentRange&&currentRange.end),intercountryDateDistance(f.date,nextRange&&nextRange.start));
+      if(distance<=2&&distance<bestDistance){best=f;bestDistance=distance;}
+    });
+    if(best){assigned[index]=best;used[String(best.id)]=true;}
+  });
+  return assigned;
+}
+function intercountryFlightDuration(f){
+  if(!f||!f.departureTime||!f.arrivalTime)return'';
+  var startDate=f.date||f.arrivalDate,endDate=f.arrivalDate||f.date;if(!startDate||!endDate)return'';
+  var start=new Date(startDate+'T'+f.departureTime+':00'),end=new Date(endDate+'T'+f.arrivalTime+':00');
+  if(end<start&&startDate===endDate)end=new Date(end.getTime()+86400000);
+  var minutes=Math.round((end-start)/60000);return minutes>=0?movementFormatDuration(minutes,{durationMin:minutes}):'';
+}
+function openIntercountryFlight(flightId){
+  var flights=(S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[],flight=flights.find(function(f){return String(f.id)===String(flightId);});
+  if(!flight)return;S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=flight.id;
+  S.newFlightParticipants=flight&&flight.participants&&flight.participants.length?flight.participants.slice():getPeopleList();
+  save();renderContent();
+}
+function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=null;S.newFlightParticipants=getPeopleList();save();renderContent();}
+function toggleIntercountryConnection(key){if(!S.intercountryOpen)S.intercountryOpen={};S.intercountryOpen[key]=!S.intercountryOpen[key];save();renderContent();}
+function renderIntercountryConnection(fromCountry,toCountry,index,flight){
+  var key=fromCountry.id+'__'+toCountry.id,open=!!(S.intercountryOpen&&S.intercountryOpen[key]);
+  if(!flight)return '<div class="country-connection"><div class="country-connection-card" onclick="addIntercountryTransport()"><span class="country-connection-icon missing">'+svgIcon('plane',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span>'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status missing">À renseigner</span><span>Ajouter le vol entre les pays</span></div></div></div>';
+  var complete=!!(flight.date&&flight.departureTime&&flight.arrivalTime),dateLabel=flight.date?new Date(flight.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'',duration=intercountryFlightDuration(flight),summary=[];
+  if(dateLabel)summary.push(dateLabel);if(duration)summary.push(duration);if(flight.departureTime)summary.push(flight.departureTime+(flight.arrivalTime?' → '+flight.arrivalTime:''));
+  var people=(flight.participants&&flight.participants.length)?flight.participants:[],peopleLabel=people.length?(people.length>=getPeopleList().length?'Tous les voyageurs':people.map(function(p){return personDisplayName(p,'Toi');}).join(', ')):'';
+  var detail=open?'<div class="country-connection-detail"><div>'+escHtml(flight.from||'Départ')+' → '+escHtml(flight.to||'Arrivée')+'</div>'+(flight.arrivalDate&&flight.arrivalDate!==flight.date?'<div>Arrivée le '+escHtml(new Date(flight.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'}))+'</div>':'')+(peopleLabel?'<div>'+svgIcon('users',11)+' '+escHtml(peopleLabel)+'</div>':'')+'<button class="country-connection-action" onclick="event.stopPropagation();openIntercountryFlight(\''+jsStrEsc(String(flight.id))+'\')">Voir la fiche du vol '+svgIcon('arrow-right',12)+'</button></div>':'';
+  return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon('plane',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(complete?'':' missing')+'">'+(complete?'Vol renseigné':'À compléter')+'</span><span>'+escHtml(summary.join(' · ')||'Informations du vol à compléter')+'</span></div>'+detail+'</div></div>';
+}
+
 function renderCountriesScreen(){
   var ts = getTripStatus();
   const totalDays=COUNTRIES.reduce(function(s,c){return s+c.days;},0);
@@ -9214,18 +9269,21 @@ function renderCountriesScreen(){
 
   var list = COUNTRIES;
 
-  var cardsHTML = list.map(function(c){
+  var flightAssignments=intercountryFlightAssignments(list);
+  var cardsHTML = list.map(function(c,countryIndex){
     var status = getCountryStatus(c.id);
     var citiesPreview = c.cities.length<=2
       ? c.cities.map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')
       : c.cities.slice(0,2).map(function(ci){return _cityDisplayName(c.id+'_'+ci.city,ci);}).join(', ')+' +'+(c.cities.length-2);
     var imgQuery = getCountryImageQuery(c);
-    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg country-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
+    var card='<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg country-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="archiveCurrentCountry(\''+c.id+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCountryDetail(\''+c.id+'\',\'lieux\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
       +'<div class="cc-thumb" data-img-query="'+escHtml(imgQuery)+'"><span class="cc-thumb-flag">'+c.flag+'</span></div>'
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
       +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
       +'</div></div>';
+    if(countryIndex<list.length-1)card+=renderIntercountryConnection(c,list[countryIndex+1],countryIndex,flightAssignments[countryIndex]);
+    return card;
   }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
 
   var archivedCount = ((typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.archived_countries) || []).length;
