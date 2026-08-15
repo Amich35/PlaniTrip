@@ -1934,6 +1934,9 @@ function save(){
         var _anVal = S.actNames && Object.keys(S.actNames).length ? JSON.stringify(S.actNames) : null;
         if(_anVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_actNames', _anVal);
         else localStorage.removeItem(CURRENT_STORAGE_KEY+'_actNames');
+        if(CURRENT_USER && CURRENT_USER.id){
+          localStorage.setItem(CURRENT_STORAGE_KEY+'_converter_'+CURRENT_USER.id,JSON.stringify({amt:S.convAmt||{},dir:S.convDir||{}}));
+        }
       }catch(_e){}
     }
   }catch(e){}
@@ -2362,6 +2365,8 @@ function ensureStateDefaults(){
   if(!S.feedPosts) S.feedPosts=[];
   if(!S.feedLastSeenAt) S.feedLastSeenAt=null;
   if(!S.feedSeenReactionCounts) S.feedSeenReactionCounts={};
+  if(!S.convAmt) S.convAmt={};
+  if(!S.convDir) S.convDir={};
 }
 ensureStateDefaults();
 
@@ -14632,6 +14637,22 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
       if(_parsedActNames && typeof _parsedActNames === 'object'){
         if(!S.actNames) S.actNames = {};
         Object.assign(S.actNames, _parsedActNames);
+      }
+    }
+  }catch(e){}
+  // État personnel du convertisseur : petite clé dédiée, indépendante du gros blob
+  // du voyage et isolée par utilisateur sur un appareil partagé.
+  try{
+    if(CURRENT_USER && CURRENT_USER.id){
+      var _savedConverter=localStorage.getItem(namespacedKey+'_converter_'+CURRENT_USER.id);
+      if(_savedConverter){
+        var _parsedConverter=JSON.parse(_savedConverter);
+        if(_parsedConverter&&typeof _parsedConverter==='object'){
+          S.convAmt=(_parsedConverter.amt&&typeof _parsedConverter.amt==='object')?_parsedConverter.amt:{};
+          S.convDir=(_parsedConverter.dir&&typeof _parsedConverter.dir==='object')?_parsedConverter.dir:{};
+        }
+      }else{
+        localStorage.setItem(namespacedKey+'_converter_'+CURRENT_USER.id,JSON.stringify({amt:S.convAmt||{},dir:S.convDir||{}}));
       }
     }
   }catch(e){}
