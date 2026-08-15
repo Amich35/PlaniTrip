@@ -2696,7 +2696,9 @@ function _renderCePanel(){
         var summary = actor + ' ' + actionText + ' ' + entityText + label;
         var time = _ceRelativeTime(e.created_at);
         if(e.deep_link) _ceDeepLinks[e.id] = e.deep_link;
-        var itemClick = e.deep_link ? ' onclick="ceSeeEvent(\''+escHtml(e.id)+'\')" style="cursor:pointer"' : '';
+        var itemClick = e.deep_link
+          ? ' onclick="ceSeeEvent(\''+escHtml(e.id)+'\')" style="cursor:pointer"'
+          : ' onclick="dismissChangeEvent(\''+escHtml(e.id)+'\')" style="cursor:pointer"';
         return '<div class="ce-item"'+itemClick+' data-id="'+escHtml(e.id)+'">'
           +'<span class="ce-item-icon">'+_ceEntityIcon(e.entity_type)+'</span>'
           +'<div class="ce-item-body">'
