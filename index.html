@@ -2544,7 +2544,12 @@ ensureStateDefaults();
 // Identité de l'acteur courant
 function _ceActorLabel(){
   if(!CURRENT_USER) return 'Quelqu\'un';
-  return personDisplayName(CURRENT_USER.email, 'Toi');
+  // Ne jamais utiliser selfLabel ici — ce label est stocké en DB et lu par d'autres voyageurs
+  if(PROFILES_MAP && PROFILES_MAP[CURRENT_USER.email] && PROFILES_MAP[CURRENT_USER.email] !== CURRENT_USER.email){
+    return PROFILES_MAP[CURRENT_USER.email];
+  }
+  var local = CURRENT_USER.email.split('@')[0].split(/[._-]+/)[0];
+  return local ? local.charAt(0).toUpperCase()+local.slice(1) : CURRENT_USER.email;
 }
 
 // Clé de regroupement : même acteur + même entité dans les 5 dernières minutes
@@ -4431,7 +4436,7 @@ async function saveAccom(ck) {
       entityId: ck,
       entityLabel: name || ck,
       summary: _ceActorLabel() + (_isNew ? ' a ajouté un logement' : ' a modifié un logement') + (name ? ' · ' + name : ''),
-      deepLink: 'S.tab=\'countries\';S.currentCityKey=\''+ck+'\';save();renderContent();',
+      deepLink: 'openCityDetail(\''+ck+'\');setTimeout(function(){var el=document.querySelector(\'.accom-header\');if(el)el.scrollIntoView({behavior:\'smooth\',block:\'start\'});},300);',
       meta: {cityKey: ck, name: name}
     });
   }
