@@ -2888,6 +2888,9 @@ async function toggleAct(k){
       delete _doneSyncInFlight[k];
     }
   }
+  // Événement collaboratif statut fait
+  var _actDisplayName = (window._customDetails&&window._customDetails[k]&&window._customDetails[k].n) || k;
+  postChangeEvent('activity', S.done[k]?'update':'update', {entityId:k, entityLabel:_actDisplayName, summary:_ceActorLabel()+(S.done[k]?' a marqué fait : ':' a démarqué fait : ')+_actDisplayName, deepLink:'openCityDetail(\''+k.split('_').slice(0,-1).join('_')+'\');'});
   // Peak moment: animate the check if just completed
   if(wasUndone && S.done[k]){
     setTimeout(function(){
@@ -7122,7 +7125,7 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
     save(); renderContent();
     syncDeletedActs();
   }
-  if(_skipConfirm){ _doDelete(); } else { showConfirm('Mettre « '+label+' » à la corbeille ? Tu pourras restaurer cette activité à tout moment depuis la Corbeille.', function(){
+  if(_skipConfirm){ _doDelete(); postChangeEvent('activity','delete',{entityId:cityKey,entityLabel:label,summary:_ceActorLabel()+' a mis à la corbeille : '+label,deepLink:'openCityDetail(\''+cityKey+'\');'}); } else { showConfirm('Mettre « '+label+' » à la corbeille ? Tu pourras restaurer cette activité à tout moment depuis la Corbeille.', function(){
     var _a=isCustom ? (S.customActs[cityKey]||[])[index] : null;
     // Legacy _cN : conserver le flow historique, sans inventer de clé stable.
     if(isCustom && (!_a || !_a._sid)){ _doDelete(); return; }
@@ -7177,6 +7180,7 @@ function restoreActivity(cityKey, trashIndex) {
     if(_ts.coords) COORDS[newActKey] = _ts.coords.slice();
     unmarkDeletedTombstone('activities', cityKey+'||'+item.n);
     save(); renderContent();
+    postChangeEvent('activity','restore',{entityId:cityKey,entityLabel:item.n,summary:_ceActorLabel()+' a restauré : '+item.n,deepLink:'openCityDetail(\''+cityKey+'\');'});
     if(sb && CURRENT_TRIP){
       var rpParts = cityKey.split('_');
       var rpCountryId = rpParts[0], rpCityName = rpParts.slice(1).join('_');
@@ -7235,6 +7239,8 @@ function deleteActivityPermanently(cityKey, trashIndex){
     if(_item && _item._softArchived && _actKey) syncActivityTrashMarker(cityKey,_actKey,_item,false);
     save();
     renderContent();
+    var _permLabel = _item && _item.n ? _item.n : 'activité';
+    postChangeEvent('activity','delete',{entityId:cityKey,entityLabel:_permLabel,summary:_ceActorLabel()+' a supprimé définitivement : '+_permLabel});
   }, 'Supprimer définitivement');
 }
 
@@ -8653,7 +8659,7 @@ var _movementTrashBusy={};
 async function archiveMovement(){
   if(!_movementDraft||_movementTrashBusy[_movementDraft.id]||!confirm('Mettre ce déplacement à la corbeille ?'))return;
   var movementId=_movementDraft.id;_movementTrashBusy[movementId]=true;
-  try{var persisted=await loadPersistedMovement(movementId);var next=JSON.parse(JSON.stringify(persisted||_movementDraft));next.archived=true;var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
+  try{var persisted=await loadPersistedMovement(movementId);var next=JSON.parse(JSON.stringify(persisted||_movementDraft));next.archived=true;var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();var _mvArchLabel=(saved.origin&&saved.destination)?saved.origin+' → '+saved.destination:'Déplacement';postChangeEvent('movement','delete',{entityId:saved.id,entityLabel:_mvArchLabel,summary:_ceActorLabel()+' a archivé : '+_mvArchLabel});}
   catch(e){console.error('[PlaniTrip] archive movement:',e);alert('Impossible de mettre ce déplacement à la corbeille pour le moment.');}
   finally{delete _movementTrashBusy[movementId];}
 }
@@ -10753,6 +10759,8 @@ function deleteFlightFromModal(){
     S.editingFlightId=null;
     document.getElementById('flightModal').classList.remove('open');
     save(); renderContent();
+    var _flDelLabel = (removed.from&&removed.to) ? removed.from+' → '+removed.to : 'Vol';
+    postChangeEvent('flight','delete',{entityLabel:_flDelLabel,summary:_ceActorLabel()+' a supprimé le vol : '+_flDelLabel,deepLink:'S.tab=\'documents\';S.openDocType=\'tickets\';save();renderContent();'});
     if(sb && CURRENT_TRIP && removed && removed.id){
       sb.from('flights').delete().eq('id',removed.id).then(function(r){if(r&&r.error)console.error('[PlaniTrip] delete flight:',r.error);});
     }
@@ -11226,6 +11234,7 @@ async function addFeedPost(){
       r=await sb.from('feed_posts').insert(feedRow);
     }
     if(r&&r.error) throw r.error;
+    postChangeEvent('feed','add',{entityId:String(newId),entityLabel:text?text.slice(0,60):null,summary:_ceActorLabel()+' a publié dans le Fil',deepLink:'S.tab=\'feed\';save();renderContent();'});
   }catch(err){
     console.error('[PlaniTrip] insert feed_posts:',err);
     toast('Impossible de publier pour le moment');
@@ -11850,6 +11859,7 @@ function delExp(id){
     S.expenses=S.expenses.filter(function(e){return e.id!==id;});
     markDeletedTombstone('expenses',id);
     save();renderContent();
+    postChangeEvent('budget','delete',{entityId:String(id),summary:_ceActorLabel()+' a supprimé une dépense',deepLink:'S.tab=\'budget\';save();renderContent();'});
   }, 'Supprimer');
 }
 function markAsReimbursed(fromPerson, toPerson, amount){
@@ -12168,6 +12178,7 @@ async function archiveCitySoft(countryId, cityName){
   if(!existing) S.cityTrash.push(entry);
   S.deletedCities[countryId+'||'+cityName] = true;
   rebuildCountriesFromState(); save(); renderContent();
+  postChangeEvent('city','delete',{entityId:countryId+'_'+cityName,entityLabel:cityName,summary:_ceActorLabel()+' a archivé la ville : '+cityName});
 }
 async function restoreCitySoft(trashId){
   var idx = S.cityTrash.findIndex(function(t){return t.id===trashId;});
