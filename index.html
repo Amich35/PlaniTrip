@@ -2696,17 +2696,14 @@ function _renderCePanel(){
         var summary = actor + ' ' + actionText + ' ' + entityText + label;
         var time = _ceRelativeTime(e.created_at);
         if(e.deep_link) _ceDeepLinks[e.id] = e.deep_link;
-        var link = e.deep_link
-          ? '<button onclick="ceSeeEvent(\''+escHtml(e.id)+'\')" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
-          : '';
-        return '<div class="ce-item" data-id="'+escHtml(e.id)+'">'
+        var itemClick = e.deep_link ? ' onclick="ceSeeEvent(\''+escHtml(e.id)+'\')" style="cursor:pointer"' : '';
+        return '<div class="ce-item"'+itemClick+' data-id="'+escHtml(e.id)+'">'
           +'<span class="ce-item-icon">'+_ceEntityIcon(e.entity_type)+'</span>'
           +'<div class="ce-item-body">'
             +'<div class="ce-item-summary">'+summary+'</div>'
             +'<div class="ce-item-time">'+escHtml(time)+'</div>'
           +'</div>'
-          +link
-          +'<button class="ce-item-dismiss" onclick="dismissChangeEvent(\''+escHtml(e.id)+'\')" aria-label="Ignorer">'+svgIcon('x',12)+'</button>'
+          +'<button class="ce-item-dismiss" onclick="event.stopPropagation();dismissChangeEvent(\''+escHtml(e.id)+'\')" aria-label="Ignorer">'+svgIcon('x',12)+'</button>'
           +'</div>';
       }).join('');
   document.getElementById('ce-panel-list').innerHTML = inner;
