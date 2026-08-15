@@ -9343,7 +9343,7 @@ function openIntercountryFlight(flightId){
   var activeParticipants=activeFlightParticipants(flight.participants);S.newFlightParticipants=flightParticipantsSpecified(flight)?activeParticipants:getActiveTravelerList();
   renderFlightModalBody(flight);document.getElementById('flightModal').classList.add('open');
 }
-function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.editingFlightId=null;S.newFlightParticipants=[];save();renderContent();setTimeout(openNewFlightModal,0);}
+function addIntercountryTransport(){S.openDocType='tickets';S.editingFlightId=null;S.newFlightParticipants=[];setTimeout(openNewFlightModal,0);}
 var _intercountryModePair=null;
 function openIntercountryModePicker(fromCountryId,toCountryId){
   var from=COUNTRIES.find(function(c){return c.id===fromCountryId;}),to=COUNTRIES.find(function(c){return c.id===toCountryId;});if(!from||!to)return;
