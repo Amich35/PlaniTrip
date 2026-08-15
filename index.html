@@ -4420,6 +4420,8 @@ async function saveAccom(ck) {
     }
     // Commit local après succès Supabase
     S.accom[ck] = nextAccomList;
+    var _btn3 = document.querySelector('#accomModal .modal-cta');
+    if(_btn3){ _btn3.disabled=false; _btn3.textContent='Enregistrer'; }
     save();
     renderContent();
     document.getElementById('accomModal').classList.remove('open');
