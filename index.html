@@ -683,15 +683,15 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-duration-row .ef-input{flex:1;min-width:0;}
 .mv-duration-select{border:none;background:transparent;color:var(--accent);font-size:10.5px;font-weight:750;padding:0 12px 0 0;min-width:42px;}
 .mv-location-wrap{position:relative;display:block;min-width:0;}
-.mv-location-suggestions{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1px solid rgba(100,70,30,.16);border-radius:14px;box-shadow:0 10px 28px rgba(29,29,31,.14);max-height:230px;overflow-y:auto;padding:5px;}
+.mv-location-suggestions{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1px solid rgba(100,70,30,.16);border-radius:14px;box-shadow:0 10px 28px rgba(29,29,31,.14);max-height:230px;max-width:100%;box-sizing:border-box;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;padding:5px;}
 .mv-location-suggestions.open{display:block;}
 .mv-location-group{padding:7px 9px 4px;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-subtle);font-weight:750;}
-.mv-location-option{width:100%;border:none;background:transparent;border-radius:10px;padding:8px 9px;display:flex;align-items:center;gap:9px;text-align:left;color:var(--ink);}
+.mv-location-option{width:100%;max-width:100%;min-width:0;box-sizing:border-box;border:none;background:transparent;border-radius:10px;padding:8px 9px;display:flex;align-items:flex-start;gap:9px;text-align:left;color:var(--ink);overflow:hidden;}
 .mv-location-option:active{background:var(--sand);}
 .mv-location-option svg{width:15px;height:15px;color:var(--accent);flex-shrink:0;}
-.mv-location-option-copy{min-width:0;}
-.mv-location-option-title{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.mv-location-option-sub{font-size:10px;color:var(--ink-muted);margin-top:1px;}
+.mv-location-option-copy{display:block;flex:1;min-width:0;overflow:hidden;}
+.mv-location-option-title{display:block;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mv-location-option-sub{display:block;font-size:10px;color:var(--ink-muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .mv-route-field .mv-location-suggestions{left:-5px;right:-5px;}
 .mv-coherence{display:flex;align-items:flex-start;gap:7px;margin:8px 0 0;padding:8px 10px;border-radius:11px;background:var(--status-upcoming-pale);color:var(--status-upcoming);font-size:10.5px;line-height:1.35;}
 .mv-coherence button{margin-left:auto;border:none;background:transparent;color:var(--status-upcoming);font-weight:750;padding:0;flex-shrink:0;}
@@ -8056,8 +8056,7 @@ function renderMovementsSection(countryId){
 function toggleMovementAccordion(id){if(!S.uiAccordion)S.uiAccordion={};var k='movement_'+id;S.uiAccordion[k]=!S.uiAccordion[k];save();renderContent();}
 function openMovementModal(id,countryId){
   var found=id?movementsForCountry(countryId).find(function(m){return m.id===id;}):null;
-  var prefill=movementPrefill(countryId);
-  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:prefill.origin,destination:prefill.destination,originRef:prefill.originRef,destinationRef:prefill.destinationRef,date:prefill.date||'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',legs:[]};
+  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:'',destination:'',originRef:'',destinationRef:'',date:'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',legs:[]};
   if(!_movementDraft.priceCurrencyMode)_movementDraft.priceCurrencyMode='LOCAL';
   if(_movementDraft.costManualOverride==null)_movementDraft.costManualOverride=false;
   if(!_movementDraft.durationUnit)_movementDraft.durationUnit='min';
@@ -8113,6 +8112,21 @@ function movementTotalPriceChanged(){
 function updateMovementScheduleField(field,value){
   if(!_movementDraft||['date','departureTime','arrivalTime'].indexOf(field)<0)return;
   _movementDraft[field]=value||'';
+  if(field==='departureTime'||field==='arrivalTime')updateMovementDurationFromTimes();
+}
+function updateMovementDurationFromTimes(){
+  if(!_movementDraft||!_movementDraft.departureTime||!_movementDraft.arrivalTime)return;
+  var departure=String(_movementDraft.departureTime).split(':'),arrival=String(_movementDraft.arrivalTime).split(':');
+  if(departure.length<2||arrival.length<2)return;
+  var departureMinutes=Number(departure[0])*60+Number(departure[1]),arrivalMinutes=Number(arrival[0])*60+Number(arrival[1]);
+  if(!isFinite(departureMinutes)||!isFinite(arrivalMinutes))return;
+  var duration=arrivalMinutes-departureMinutes;
+  if(duration<0)duration+=24*60;
+  _movementDraft.durationMin=duration;
+  _movementDraft.durationUnit='min';
+  var input=document.getElementById('mv_durationDisplay'),unit=document.getElementById('mv_durationUnit');
+  if(input)input.value=duration;
+  if(unit){unit.value='min';unit.dataset.previous='min';}
 }
 function resetMovementDate(button){
   if(!_movementDraft)return;
