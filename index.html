@@ -7933,7 +7933,10 @@ function movementFormatCost(value,m,perPerson){
 function movementCalculatedCost(m){
   return (m.legs||[]).reduce(function(total,l){var n=parseAmt(l.costJPY);return total+(isNaN(n)?0:n);},0);
 }
-function movementDurationUnit(item){return item&&item.durationUnit==='hour'?'hour':'min';}
+function movementDurationUnit(item){
+  var minutes=parseAmt(item&&item.durationMin);
+  return item&&(item.durationUnit==='hour'||(!isNaN(minutes)&&minutes>=60))?'hour':'min';
+}
 function movementDurationDisplay(value,item){
   var n=parseAmt(value);if(isNaN(n))return '';
   return movementDurationUnit(item)==='hour'?Math.round((n/60)*100)/100:n;
@@ -8123,10 +8126,10 @@ function updateMovementDurationFromTimes(){
   var duration=arrivalMinutes-departureMinutes;
   if(duration<0)duration+=24*60;
   _movementDraft.durationMin=duration;
-  _movementDraft.durationUnit='min';
+  _movementDraft.durationUnit=duration>=60?'hour':'min';
   var input=document.getElementById('mv_durationDisplay'),unit=document.getElementById('mv_durationUnit');
-  if(input)input.value=duration;
-  if(unit){unit.value='min';unit.dataset.previous='min';}
+  if(input)input.value=duration>=60?Math.round((duration/60)*100)/100:duration;
+  if(unit){unit.value=_movementDraft.durationUnit;unit.dataset.previous=_movementDraft.durationUnit;}
 }
 function resetMovementDate(button){
   if(!_movementDraft)return;
