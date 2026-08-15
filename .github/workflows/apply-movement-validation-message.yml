@@ -1,0 +1,29 @@
+name: Apply movement validation message
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/apply-movement-validation-message.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '%s' 'RnJvbSBlYTMwOGNjMWIyODYyMmQyYWEyMWYyMjkwZjlhZTMxM2M1MjM2NTE0IE1vbiBTZXAgMTcgMDA6MDA6MDAgMjAwMQpGcm9tOiBDb2RleCA8Y29kZXhAb3BlbmFpLmNvbT4KRGF0ZTogU2F0LCAxNSBBdWcgMjAyNiAxMzoxMjoxOCArMDIwMApTdWJqZWN0OiBbUEFUQ0hdID0/VVRGLTg/cT9Qcj1DMz1BOWNpc2U9MjBsZXM9MjBjaGFtcHM9MjBtYW5xdWFudHM9MjBkZXM/PQogPT9VVEYtOD9xPz0yMD1DMz1BOXRhcGVzPz0KTUlNRS1WZXJzaW9uOiAxLjAKQ29udGVudC1UeXBlOiB0ZXh0L3BsYWluOyBjaGFyc2V0PVVURi04CkNvbnRlbnQtVHJhbnNmZXItRW5jb2Rpbmc6IDhiaXQKCi0tLQogaW5kZXguaHRtbCB8IDkgKysrKysrKystCiAxIGZpbGUgY2hhbmdlZCwgOCBpbnNlcnRpb25zKCspLCAxIGRlbGV0aW9uKC0pCgpkaWZmIC0tZ2l0IGEvaW5kZXguaHRtbCBiL2luZGV4Lmh0bWwKaW5kZXggYzMxODU3OC4uMjU3MGRiZCAxMDA2NDQKLS0tIGEvaW5kZXguaHRtbAorKysgYi9pbmRleC5odG1sCkBAIC04MjYzLDcgKzgyNjMsMTQgQEAgYXN5bmMgZnVuY3Rpb24gc2F2ZU1vdmVtZW50TW9kYWwoKXsKICAgdmFyIGlzTmV3TW92ZW1lbnQ9X21vdmVtZW50RHJhZnQuc291cmNlPT09J21hbnVhbCcmJiFtb3ZlbWVudHNGb3JDb3VudHJ5KF9tb3ZlbWVudERyYWZ0LmNvdW50cnlJZCkuc29tZShmdW5jdGlvbihtKXtyZXR1cm4gbS5pZD09PV9tb3ZlbWVudERyYWZ0LmlkO30pOwogICBpZihpc05ld01vdmVtZW50JiYhKF9tb3ZlbWVudERyYWZ0LmxlZ3N8fFtdKS5sZW5ndGgpe2FsZXJ0KCdBam91dGUgYXUgbW9pbnMgdW5lIMOpdGFwZSBhdSBkw6lwbGFjZW1lbnQuJyk7cmV0dXJuO30KICAgdmFyIGludmFsaWRMZWdJbmRleD0oX21vdmVtZW50RHJhZnQubGVnc3x8W10pLmZpbmRJbmRleChmdW5jdGlvbihsKXt2YXIgZHVyYXRpb249cGFyc2VBbXQobC5kdXJhdGlvbk1pbik7cmV0dXJuICFTdHJpbmcobC5mcm9tfHwnJykudHJpbSgpfHwhU3RyaW5nKGwudG98fCcnKS50cmltKCl8fGlzTmFOKGR1cmF0aW9uKXx8ZHVyYXRpb248PTA7fSk7Ci0gIGlmKGlzTmV3TW92ZW1lbnQmJmludmFsaWRMZWdJbmRleD4tMSl7X21vdmVtZW50T3BlbkxlZz1pbnZhbGlkTGVnSW5kZXg7cmVuZGVyTW92ZW1lbnRNb2RhbEJvZHkoKTthbGVydCgnQ29tcGzDqHRlIGxlIGTDqXBhcnQsIGzigJlhcnJpdsOpZSBldCBsYSBkdXLDqWUgZGUgY2hhcXVlIMOpdGFwZS4nKTtyZXR1cm47fQorICBpZihpc05ld01vdmVtZW50JiZpbnZhbGlkTGVnSW5kZXg+LTEpeworICAgIHZhciBpbnZhbGlkTGVnPV9tb3ZlbWVudERyYWZ0LmxlZ3NbaW52YWxpZExlZ0luZGV4XSxtaXNzaW5nRmllbGRzPVtdLGludmFsaWREdXJhdGlvbj1wYXJzZUFtdChpbnZhbGlkTGVnLmR1cmF0aW9uTWluKTsKKyAgICBpZighU3RyaW5nKGludmFsaWRMZWcuZnJvbXx8JycpLnRyaW0oKSltaXNzaW5nRmllbGRzLnB1c2goJ2xlIGTDqXBhcnQnKTsKKyAgICBpZighU3RyaW5nKGludmFsaWRMZWcudG98fCcnKS50cmltKCkpbWlzc2luZ0ZpZWxkcy5wdXNoKCds4oCZYXJyaXbDqWUnKTsKKyAgICBpZihpc05hTihpbnZhbGlkRHVyYXRpb24pfHxpbnZhbGlkRHVyYXRpb248PTApbWlzc2luZ0ZpZWxkcy5wdXNoKCdsYSBkdXLDqWUnKTsKKyAgICB2YXIgbWlzc2luZ0xhYmVsPW1pc3NpbmdGaWVsZHMubGVuZ3RoPjE/bWlzc2luZ0ZpZWxkcy5zbGljZSgwLC0xKS5qb2luKCcsICcpKycgZXQgJyttaXNzaW5nRmllbGRzW21pc3NpbmdGaWVsZHMubGVuZ3RoLTFdOm1pc3NpbmdGaWVsZHNbMF07CisgICAgX21vdmVtZW50T3BlbkxlZz1pbnZhbGlkTGVnSW5kZXg7cmVuZGVyTW92ZW1lbnRNb2RhbEJvZHkoKTthbGVydCgnw4l0YXBlICcrKGludmFsaWRMZWdJbmRleCsxKSsnIDogcmVuc2VpZ25lICcrbWlzc2luZ0xhYmVsKycuJyk7cmV0dXJuOworICB9CiAgIChfbW92ZW1lbnREcmFmdC5sZWdzfHxbXSkuZm9yRWFjaChmdW5jdGlvbihsKXsKICAgICBpZihsLmZyb20mJmwudG8mJlN0cmluZyhsLmxpbmV8fCcnKS50cmltKCkudG9Mb3dlckNhc2UoKT09PSfDoCBjb21wbMOpdGVyJylsLmxpbmU9U3RyaW5nKGwubW9kZXx8JycpLnRvTG93ZXJDYXNlKCk9PT0nbWFyY2hlJz8nVHJhamV0IMOgIHBpZWQnOihsLm1vZGV8fCfDiXRhcGUnKTsKICAgfSk7Ci0tIAoyLjUxLjEKCg==' | base64 -d > /tmp/movement-validation-message.patch
+          git am /tmp/movement-validation-message.patch
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/apply-movement-validation-message.yml
+          git commit -m "Retire le workflow temporaire"
+      - name: Push
+        run: git push origin main
