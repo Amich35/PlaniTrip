@@ -837,15 +837,43 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ct-date-select{width:100%;box-sizing:border-box;appearance:none;-webkit-appearance:none;-moz-appearance:none;background:var(--sand,#F5F5F3);border:1px solid transparent;border-radius:var(--r12);padding:9px 16px 9px 8px;text-align:center;text-align-last:center;font-size:14px;font-weight:700;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:background 0.2s cubic-bezier(0.34,1.56,0.64,1),border-color 0.2s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.2s cubic-bezier(0.34,1.56,0.64,1),transform 0.2s cubic-bezier(0.34,1.56,0.64,1);}
 .ct-date-select:focus{outline:none;background:#FFFFFF;border-color:rgba(45,106,79,0.32);box-shadow:0 3px 10px rgba(29,29,31,0.07);transform:translateY(-1px);}
 .ct-date-chevron{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--ink-subtle);opacity:0.55;pointer-events:none;}
-.flight-form{margin-top:8px;display:flex;flex-direction:column;gap:8px;}
-.flight-route-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
-.flight-schedule-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
-.flight-stop-card{min-width:0;border:1px solid rgba(100,70,30,.12);border-radius:var(--r16);background:#fff;padding:9px;}
-.flight-stop-title{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:750;color:var(--ink-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
-.flight-stop-card .ct-date-field-row{gap:3px;}
-.flight-stop-card .ct-date-select{font-size:10.5px;padding:7px 9px 7px 3px;border-radius:9px;}
-.flight-stop-card .ct-date-chevron{right:3px;}
-.flight-time-input{width:100%;height:36px!important;min-height:36px!important;margin-top:6px;padding:0 8px!important;text-align:center;font-size:13px!important;box-sizing:border-box;}
+.flights-list{display:flex;flex-direction:column;gap:10px;}
+.flights-list-head{display:flex;align-items:flex-end;justify-content:space-between;padding:0 2px 2px;}
+.flights-list-title{font-size:13px;font-weight:750;color:var(--ink);}
+.flights-list-count{font-size:11.5px;color:var(--ink-subtle);}
+.flight-card{background:#fff;border:1px solid rgba(100,70,30,.11);border-radius:var(--r16);box-shadow:0 2px 9px rgba(29,29,31,.035);overflow:hidden;}
+.flight-card-head{width:100%;border:none;background:transparent;display:flex;align-items:flex-start;gap:10px;padding:14px;text-align:left;cursor:pointer;font-family:inherit;color:inherit;}
+.flight-card-icon{width:30px;height:30px;border-radius:50%;background:rgba(45,106,79,.09);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.flight-card-main{flex:1;min-width:0;}
+.flight-card-route{font-size:14px;font-weight:700;color:var(--ink);line-height:1.3;}
+.flight-card-schedule{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;margin-top:6px;font-size:11.5px;color:var(--ink-muted);line-height:1.35;}
+.flight-card-schedule-arrow{color:var(--accent);display:inline-flex;}
+.flight-card-travelers{display:flex;align-items:center;gap:4px;margin-top:7px;font-size:11.5px;color:var(--accent);line-height:1.3;}
+.flight-card-chevron{color:var(--ink-subtle);display:flex;align-items:center;margin-top:7px;transition:transform .18s ease;transform:rotate(90deg);flex-shrink:0;}
+.flight-card.open .flight-card-chevron{transform:rotate(-90deg);}
+.flight-card-detail{border-top:1px solid rgba(100,70,30,.09);padding:11px 14px 13px;margin:0 14px;}
+.flight-card-duration{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11.5px;color:var(--ink-muted);}
+.flight-card-duration strong{font-size:12px;color:var(--ink);font-weight:650;}
+.flight-card-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px;}
+.flight-card-action{height:38px;border-radius:var(--r12);border:1px solid rgba(100,70,30,.11);background:#fff;color:var(--accent);font:650 11.5px -apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;}
+.flight-card-action.danger{color:var(--red-muted);}
+.flight-add-btn{width:100%;height:46px;border-radius:var(--r14);border:1px dashed rgba(45,106,79,.35);background:transparent;color:var(--accent);font:650 12.5px -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.flight-form{display:flex;flex-direction:column;gap:12px;}
+.flight-route-row{display:grid;grid-template-columns:1fr;gap:10px;}
+.flight-route-field{position:relative;}
+.flight-route-label{position:absolute;left:14px;top:9px;font-size:9.5px;font-weight:750;letter-spacing:.8px;text-transform:uppercase;color:var(--ink-subtle);pointer-events:none;}
+.flight-route-field .ef-input{width:100%;height:58px;padding:23px 14px 7px;font-size:15px;box-sizing:border-box;}
+.flight-schedule-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+.flight-stop-card{min-width:0;border:1px solid rgba(100,70,30,.12);border-radius:var(--r16);background:#fff;padding:13px 14px;}
+.flight-stop-title{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:750;color:var(--ink-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.8px;}
+.flight-stop-fields{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:10px;align-items:center;}
+.flight-date-input,.flight-time-input{width:100%;height:48px!important;min-height:48px!important;margin:0;padding:0 12px!important;border-radius:var(--r12)!important;background:var(--sand,#F5F5F3)!important;border:1px solid transparent!important;color:var(--ink)!important;box-sizing:border-box;font:600 14px -apple-system,BlinkMacSystemFont,sans-serif!important;}
+.flight-time-input{text-align:center;font-size:16px!important;}
+.flight-date-input:focus,.flight-time-input:focus{outline:none!important;background:#fff!important;border-color:rgba(45,106,79,.3)!important;}
+.flight-modal-sheet{position:relative;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;padding:24px 18px calc(24px + env(safe-area-inset-bottom));}
+.flight-modal-close{position:absolute;right:14px;top:16px;width:30px;height:30px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.flight-modal-sheet .modal-title{font-size:20px;margin:4px 38px 18px 0;}
+.flight-modal-sheet .modal-cta{height:50px;margin-top:14px;}
 .flight-travelers{border:1px solid rgba(100,70,30,.12);border-radius:var(--r12);background:#fff;overflow:hidden;}
 .flight-travelers summary{list-style:none;display:flex;align-items:center;gap:7px;padding:10px 11px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--ink);}
 .flight-travelers summary::-webkit-details-marker{display:none;}
@@ -9269,11 +9297,11 @@ function intercountryFlightDuration(f){
 }
 function openIntercountryFlight(flightId){
   var flights=(S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[],flight=flights.find(function(f){return String(f.id)===String(flightId);});
-  if(!flight)return;S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=flight.id;
+  if(!flight)return;S.tab='documents';S.openDocType='tickets';S.editingFlightId=flight.id;
   var activeParticipants=activeFlightParticipants(flight.participants);S.newFlightParticipants=flightParticipantsSpecified(flight)?activeParticipants:getActiveTravelerList();
-  save();renderContent();
+  save();renderContent();setTimeout(function(){renderFlightModalBody(flight);document.getElementById('flightModal').classList.add('open');},0);
 }
-function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=null;S.newFlightParticipants=[];save();renderContent();}
+function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.editingFlightId=null;S.newFlightParticipants=[];save();renderContent();setTimeout(openNewFlightModal,0);}
 var _intercountryModePair=null;
 function openIntercountryModePicker(fromCountryId,toCountryId){
   var from=COUNTRIES.find(function(c){return c.id===fromCountryId;}),to=COUNTRIES.find(function(c){return c.id===toCountryId;});if(!from||!to)return;
@@ -10290,54 +10318,30 @@ function renderFlightsList(flights){
   var people = getActiveTravelerList();
   if(!Array.isArray(S.newFlightParticipants)) S.newFlightParticipants=[];
   var cards = flights.map(function(f, i){
-    var departureDateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'non renseignée';
-    var arrivalDateLabel = f.arrivalDate ? new Date(f.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : '';
-    var dateLabel = 'Départ '+departureDateLabel+(arrivalDateLabel?' · Arrivée '+arrivalDateLabel:'');
-    var timesLabel = f.departureTime || f.arrivalTime ? ('Départ '+(f.departureTime||'—')+' · Arrivée '+(f.arrivalTime||'—')) : '';
+    var departureDateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : 'Date à renseigner';
+    var arrivalDateLabel = f.arrivalDate ? new Date(f.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : '';
+    var departureLabel=departureDateLabel+(f.departureTime?' '+f.departureTime:'');
+    var arrivalLabel=(arrivalDateLabel||departureDateLabel)+(f.arrivalTime?' '+f.arrivalTime:'');
     var fParticipants = flightParticipantsSpecified(f) ? activeFlightParticipants(f.participants) : people;
     var namesLabel = fParticipants.length>=people.length ? 'Tous les voyageurs' : fParticipants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
     if(!fParticipants.length) namesLabel='Voyageurs non renseignés';
-    return '<div class="more-row" style="align-items:flex-start;padding:9px 0;cursor:pointer" onclick="editFlight('+i+')">'
-      +'<span style="margin-top:2px">'+svgIcon('plane',16)+'</span>'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:13.5px;font-weight:600;color:var(--ink)">'+escHtml(f.from||'?')+' → '+escHtml(f.to||'?')+'</div>'
-      +'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+dateLabel+'</div>'
-      +(timesLabel?'<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:2px">'+escHtml(timesLabel)+'</div>':'')
-      +'<div style="font-size:11.5px;color:var(--accent);margin-bottom:2px">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</div>'
-      +'</div>'
-      +'<span style="color:var(--ink-subtle);margin-top:2px" onclick="event.stopPropagation();editFlight('+i+')">'+svgIcon('pencil',14)+'</span>'
-      +'<button onclick="event.stopPropagation();removeFlight('+i+')" style="border:none;background:none;color:var(--red-muted);font-size:16px;cursor:pointer;flex-shrink:0;margin-left:4px">×</button>'
+    var open=String(S.expandedFlightId||'')===String(f.id),duration=intercountryFlightDuration(f)||'Non calculée';
+    return '<div class="flight-card'+(open?' open':'')+'">'
+      +'<button type="button" class="flight-card-head" onclick="toggleFlightCard(\''+jsStrEsc(String(f.id))+'\')">'
+      +'<span class="flight-card-icon">'+svgIcon('plane',15)+'</span><span class="flight-card-main">'
+      +'<span class="flight-card-route">'+escHtml(f.from||'Départ')+' → '+escHtml(f.to||'Arrivée')+'</span>'
+      +'<span class="flight-card-schedule"><span>'+escHtml(departureLabel)+'</span><span class="flight-card-schedule-arrow">'+svgIcon('arrow-right',11)+'</span><span>'+escHtml(arrivalLabel)+'</span></span>'
+      +'<span class="flight-card-travelers">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</span></span>'
+      +'<span class="flight-card-chevron">'+svgIcon('chevron-right',15)+'</span></button>'
+      +(open?'<div class="flight-card-detail"><div class="flight-card-duration"><span>'+svgIcon('clock',12)+' Durée totale</span><strong>'+escHtml(duration)+'</strong></div><div class="flight-card-actions"><button class="flight-card-action" onclick="editFlight('+i+')">'+svgIcon('pencil',13)+' Modifier</button><button class="flight-card-action danger" onclick="removeFlight('+i+')">'+svgIcon('trash-2',13)+' Supprimer</button></div></div>':'')
       +'</div>';
   }).join('');
-
-  var participantChips = people.map(function(p){
-    var checked = S.newFlightParticipants.indexOf(p)>-1;
-    return '<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleFlightParticipant(\''+jsStrEsc(p)+'\',this)">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';
-  }).join('');
-  var selectedNames=S.newFlightParticipants.map(function(p){return personDisplayName(p,'Toi');}),participantSummary=selectedNames.length?selectedNames.join(', '):'Non renseigné';
-
-  var editingFlight = S.editingFlightId ? flights.find(function(f){ return f.id===S.editingFlightId; }) : null;
-  var formOpen = !!S.flightFormOpen;
-  var formHTML = '<div class="flight-form"><div class="flight-route-row">'
-    +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" value="'+(editingFlight?escHtml(editingFlight.from||''):'')+'" style="min-width:0">'
-    +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'" style="min-width:0">'
-    +'</div><div class="flight-schedule-grid">'
-    +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('plane-takeoff',13)+' Départ</div>'+dateTripleHTML('newFlightDate', editingFlight?(editingFlight.date||''):'')+'<input id="newFlightDepartureTime" class="ef-input flight-time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'"></div>'
-    +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('plane-landing',13)+' Arrivée</div>'+dateTripleHTML('newFlightArrivalDate', editingFlight?(editingFlight.arrivalDate||''):'')+'<input id="newFlightArrivalTime" class="ef-input flight-time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'"></div></div>'
-    +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details>'
-    +'<button id="saveFlightBtn" onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
-    +(editingFlight?'<div onclick="cancelEditFlight()" style="text-align:center;margin-top:2px;font-size:12px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Annuler</div>':'')+'</div>';
-
-  return '<div class="info-card" style="padding:10px 12px">'
-    +'<div class="ic-header" style="justify-content:space-between;cursor:pointer;margin-bottom:4px" onclick="toggleFlightForm()"><span>Vols</span><span style="transform:rotate('+(formOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
-    +(cards || '<div style="font-size:12.5px;color:var(--ink-muted);padding:4px 0 8px">Aucun vol ajouté.</div>')
-    +(formOpen ? formHTML : '')
-    +'</div>';
+  return '<div class="flights-list"><div class="flights-list-head"><span class="flights-list-title">Vols</span><span class="flights-list-count">'+flights.length+' vol'+(flights.length>1?'s':'')+'</span></div>'
+    +(cards || '<div class="info-card" style="font-size:12.5px;color:var(--ink-muted);padding:14px">Aucun vol ajouté.</div>')
+    +'<button type="button" class="flight-add-btn" onclick="openNewFlightModal()">'+svgIcon('plus',14)+' Ajouter un vol</button></div>';
 }
-function toggleFlightForm(){
-  if(!S.flightFormOpen&&!S.editingFlightId)S.newFlightParticipants=[];
-  S.flightFormOpen = !S.flightFormOpen;
-  save();
+function toggleFlightCard(flightId){
+  S.expandedFlightId=String(S.expandedFlightId||'')===String(flightId)?null:flightId;
   renderContent();
 }
 function toggleFlightParticipant(p,button){
@@ -10354,17 +10358,34 @@ function editFlight(index){
   var f = flights[index];
   if(!f) return;
   S.editingFlightId = f.id;
-  S.flightFormOpen = true;
   var people = getActiveTravelerList();
   S.newFlightParticipants = flightParticipantsSpecified(f) ? activeFlightParticipants(f.participants) : people.slice();
-  save();
-  renderContent();
+  renderFlightModalBody(f);
+  document.getElementById('flightModal').classList.add('open');
+}
+function openNewFlightModal(){
+  S.editingFlightId=null;
+  S.newFlightParticipants=[];
+  renderFlightModalBody(null);
+  document.getElementById('flightModal').classList.add('open');
+}
+function renderFlightModalBody(editingFlight){
+  var people=getActiveTravelerList();
+  var participantChips=people.map(function(p){var checked=S.newFlightParticipants.indexOf(p)>-1;return '<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleFlightParticipant(\''+jsStrEsc(p)+'\',this)">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';}).join('');
+  var selectedNames=S.newFlightParticipants.map(function(p){return personDisplayName(p,'Toi');}),participantSummary=selectedNames.length?selectedNames.join(', '):'Non renseigné';
+  document.getElementById('flightModalTitle').textContent=editingFlight?'Modifier le vol':'Ajouter un vol';
+  document.getElementById('flightModalBody').innerHTML='<div class="flight-form"><div class="flight-route-row">'
+    +'<label class="flight-route-field"><span class="flight-route-label">De</span><input id="newFlightFrom" class="ef-input" placeholder="Lieu de départ" value="'+(editingFlight?escHtml(editingFlight.from||''):'')+'"></label>'
+    +'<label class="flight-route-field"><span class="flight-route-label">À</span><input id="newFlightTo" class="ef-input" placeholder="Destination" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'"></label></div>'
+    +'<div class="flight-schedule-grid"><div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('calendar',13)+' Départ</div><div class="flight-stop-fields"><input id="newFlightDate" class="flight-date-input" type="date" value="'+(editingFlight?escHtml(editingFlight.date||''):'')+'"><input id="newFlightDepartureTime" class="flight-time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'"></div></div>'
+    +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('calendar',13)+' Arrivée</div><div class="flight-stop-fields"><input id="newFlightArrivalDate" class="flight-date-input" type="date" value="'+(editingFlight?escHtml(editingFlight.arrivalDate||''):'')+'"><input id="newFlightArrivalTime" class="flight-time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'"></div></div></div>'
+    +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details></div>';
+  var btn=document.getElementById('saveFlightBtn');if(btn)btn.textContent=editingFlight?'Enregistrer les modifications':'Ajouter le vol';
 }
 function cancelEditFlight(){
   S.editingFlightId = null;
   S.newFlightParticipants = [];
-  save();
-  renderContent();
+  document.getElementById('flightModal').classList.remove('open');
 }
 function normalizeFlightTimeValue(value){
   var s=String(value||'').trim();
@@ -10384,8 +10405,8 @@ function formatFlightTimeInput(el){
 async function saveFlight(){
   var from = document.getElementById('newFlightFrom').value.trim();
   var to = document.getElementById('newFlightTo').value.trim();
-  var date = document.getElementById('newFlightDate-hidden').value;
-  var arrivalDate = document.getElementById('newFlightArrivalDate-hidden').value;
+  var date = document.getElementById('newFlightDate').value;
+  var arrivalDate = document.getElementById('newFlightArrivalDate').value;
   var departureTime = normalizeFlightTimeValue(document.getElementById('newFlightDepartureTime').value);
   var arrivalTime = normalizeFlightTimeValue(document.getElementById('newFlightArrivalTime').value);
   if(!from || !to){ alert('Merci de renseigner au moins la ville de départ et d\'arrivée.'); return; }
@@ -10434,6 +10455,7 @@ async function saveFlight(){
     S.documents.tickets.flightsList.push(flightPayload);
   }
   S.newFlightParticipants = [];
+  document.getElementById('flightModal').classList.remove('open');
   save();
   renderContent();
 }
@@ -18049,6 +18071,17 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div id="transportModeRoute" style="font-size:12px;color:var(--ink-muted);margin-top:-6px"></div>
     <div class="transport-mode-grid" id="transportModeChoices"></div>
     <button class="modal-cancel-btn" onclick="closeIntercountryModePicker()">Annuler</button>
+  </div>
+</div>
+
+<div class="share-modal" id="flightModal" onclick="if(event.target.id==='flightModal') cancelEditFlight();">
+  <div class="share-sheet flight-modal-sheet">
+    <div class="modal-handle"></div>
+    <button type="button" class="flight-modal-close" onclick="cancelEditFlight()" aria-label="Fermer">✕</button>
+    <div class="modal-title" id="flightModalTitle">Vol</div>
+    <div id="flightModalBody"></div>
+    <button class="modal-cta" id="saveFlightBtn" onclick="saveFlight()">Enregistrer</button>
+    <button class="modal-cancel-btn" onclick="cancelEditFlight()">Annuler</button>
   </div>
 </div>
 
