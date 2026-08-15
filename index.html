@@ -8263,7 +8263,14 @@ async function saveMovementModal(){
   var isNewMovement=_movementDraft.source==='manual'&&!movementsForCountry(_movementDraft.countryId).some(function(m){return m.id===_movementDraft.id;});
   if(isNewMovement&&!(_movementDraft.legs||[]).length){alert('Ajoute au moins une étape au déplacement.');return;}
   var invalidLegIndex=(_movementDraft.legs||[]).findIndex(function(l){var duration=parseAmt(l.durationMin);return !String(l.from||'').trim()||!String(l.to||'').trim()||isNaN(duration)||duration<=0;});
-  if(isNewMovement&&invalidLegIndex>-1){_movementOpenLeg=invalidLegIndex;renderMovementModalBody();alert('Complète le départ, l’arrivée et la durée de chaque étape.');return;}
+  if(isNewMovement&&invalidLegIndex>-1){
+    var invalidLeg=_movementDraft.legs[invalidLegIndex],missingFields=[],invalidDuration=parseAmt(invalidLeg.durationMin);
+    if(!String(invalidLeg.from||'').trim())missingFields.push('le départ');
+    if(!String(invalidLeg.to||'').trim())missingFields.push('l’arrivée');
+    if(isNaN(invalidDuration)||invalidDuration<=0)missingFields.push('la durée');
+    var missingLabel=missingFields.length>1?missingFields.slice(0,-1).join(', ')+' et '+missingFields[missingFields.length-1]:missingFields[0];
+    _movementOpenLeg=invalidLegIndex;renderMovementModalBody();alert('Étape '+(invalidLegIndex+1)+' : renseigne '+missingLabel+'.');return;
+  }
   (_movementDraft.legs||[]).forEach(function(l){
     if(l.from&&l.to&&String(l.line||'').trim().toLowerCase()==='à compléter')l.line=String(l.mode||'').toLowerCase()==='marche'?'Trajet à pied':(l.mode||'Étape');
   });
