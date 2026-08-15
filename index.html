@@ -10424,6 +10424,7 @@ function renderFlightModalBody(editingFlight){
     +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('calendar',13)+' Arrivée</div><div class="flight-stop-fields"><input id="newFlightArrivalDate" class="flight-date-input" type="date" value="'+(editingFlight?escHtml(editingFlight.arrivalDate||''):'')+'"><input id="newFlightArrivalTime" class="flight-time-input" type="time" style="-webkit-appearance:none;appearance:none" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'"></div></div></div>'
     +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details></div>';
   var btn=document.getElementById('saveFlightBtn');if(btn)btn.textContent=editingFlight?'Enregistrer les modifications':'Ajouter le vol';
+  var delBtn=document.getElementById('flightDeleteBtn');if(delBtn)delBtn.style.display=editingFlight?'block':'none';
   // Inject clear buttons after each date/time input
   [
     {inputId:'newFlightDate',      btnId:'btnClearDate',    hasVal:!!(editingFlight&&editingFlight.date)},
@@ -10447,6 +10448,22 @@ function cancelEditFlight(){
   S.editingFlightId = null;
   S.newFlightParticipants = [];
   document.getElementById('flightModal').classList.remove('open');
+}
+function deleteFlightFromModal(){
+  if(!S.editingFlightId) return;
+  var flights=(S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[];
+  var idx=flights.findIndex(function(f){return String(f.id)===String(S.editingFlightId);});
+  if(idx<0) return;
+  showConfirm('Supprimer ce vol ?', function(){
+    var removed=flights[idx];
+    flights.splice(idx,1);
+    S.editingFlightId=null;
+    document.getElementById('flightModal').classList.remove('open');
+    save(); renderContent();
+    if(sb && CURRENT_TRIP && removed && removed.id){
+      sb.from('flights').delete().eq('id',removed.id).then(function(r){if(r&&r.error)console.error('[PlaniTrip] delete flight:',r.error);});
+    }
+  }, 'Supprimer');
 }
 function clearFlightField(inputId, btnId){
   var el = document.getElementById(inputId);
@@ -18149,6 +18166,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-title" id="flightModalTitle">Vol</div>
     <div id="flightModalBody"></div>
     <button class="modal-cta" id="saveFlightBtn" onclick="saveFlight()">Enregistrer</button>
+    <button id="flightDeleteBtn" onclick="deleteFlightFromModal()" style="display:none;width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-size:14px;font-weight:600;cursor:pointer">Supprimer ce vol</button>
     <button class="modal-cancel-btn" onclick="cancelEditFlight()">Annuler</button>
   </div>
 </div>
