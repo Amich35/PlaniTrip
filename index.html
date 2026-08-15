@@ -8211,6 +8211,12 @@ async function persistMovement(next){
   if(!r||!r.data||!r.data.data||typeof r.data.data!=='object') throw new Error('Enregistrement non confirmé par le serveur');
   return r.data.data;
 }
+async function loadPersistedMovement(id){
+  if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
+  var r=await sb.from('activity_details').select('data').eq('trip_id',CURRENT_TRIP.id).eq('detail_key','__planitrip__movement__'+id).maybeSingle();
+  if(r&&r.error) throw r.error;
+  return r&&r.data&&r.data.data&&typeof r.data.data==='object'?r.data.data:null;
+}
 async function saveMovementModal(){
   movementDraftFromInputs();
   if(!_movementDraft.origin||!_movementDraft.destination){alert('Renseigne le départ et la destination.');return;}
@@ -8225,10 +8231,10 @@ async function saveMovementModal(){
 var _movementTrashBusy={};
 async function archiveMovement(){
   if(!_movementDraft||_movementTrashBusy[_movementDraft.id]||!confirm('Mettre ce déplacement à la corbeille ?'))return;
-  var next=JSON.parse(JSON.stringify(_movementDraft));next.archived=true;_movementTrashBusy[next.id]=true;
-  try{var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
+  var movementId=_movementDraft.id;_movementTrashBusy[movementId]=true;
+  try{var persisted=await loadPersistedMovement(movementId);var next=JSON.parse(JSON.stringify(persisted||_movementDraft));next.archived=true;var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
   catch(e){console.error('[PlaniTrip] archive movement:',e);alert('Impossible de mettre ce déplacement à la corbeille pour le moment.');}
-  finally{delete _movementTrashBusy[next.id];}
+  finally{delete _movementTrashBusy[movementId];}
 }
 async function restoreMovement(id,countryId){
   if(_movementTrashBusy[id])return;var current=S.movements&&S.movements[id];if(!current)return;_movementTrashBusy[id]=true;
