@@ -8008,7 +8008,7 @@ function movementLocationSuggestions(countryId){
   var c=COUNTRIES.find(function(x){return x.id===countryId;});
   if(c)getCityOrder(countryId).forEach(function(idx){var city=c.cities[idx],ck=countryId+'_'+city.city;add(_cityDisplayName(ck,city),'Villes',c.name,'city:'+ck,'map-pin');(S.accom&&S.accom[ck]||[]).forEach(function(a){add(a.name,'Logements',_cityDisplayName(ck,city),'accom:'+ck+':'+(a.id||a.name),'bed');if(a.address)add(a.address,'Logements',(a.name||'Adresse du logement'),'address:'+ck+':'+(a.id||a.name),'map-pin');});});
   var flights=(S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[];flights.forEach(function(f){add(f.from,'Transports','Aéroport ou gare · vol','flight:'+f.id+':from','plane');add(f.to,'Transports','Aéroport ou gare · vol','flight:'+f.id+':to','plane');});
-  Object.keys(S.movements||{}).forEach(function(id){var m=S.movements[id];if(m&&m.countryId===countryId){add(m.origin,'Lieux récents','Déjà utilisé','movement:'+id+':origin','history');add(m.destination,'Lieux récents','Déjà utilisé','movement:'+id+':destination','history');}});
+  Object.keys(S.movements||{}).forEach(function(id){var m=S.movements[id];if(m&&m.countryId===countryId&&!m.archived&&!m.permanentlyDeleted){add(m.origin,'Lieux récents','Déjà utilisé','movement:'+id+':origin','history');add(m.destination,'Lieux récents','Déjà utilisé','movement:'+id+':destination','history');}});
   return out;
 }
 function movementLocationLabel(ref,fallback){
@@ -8038,6 +8038,9 @@ function movementsForCountry(countryId){
   });
   return Object.values(merged).filter(function(m){return !m.archived;});
 }
+function archivedMovementsForCountry(countryId){
+  return Object.keys(S.movements||{}).map(function(id){return S.movements[id];}).filter(function(m){return m&&m.countryId===countryId&&m.archived&&!m.permanentlyDeleted;});
+}
 function movementMissingCount(m){
   return (m.legs||[]).filter(function(l){return !l.from||!l.to;}).length;
 }
@@ -8063,7 +8066,21 @@ function renderMovementsSection(countryId){
   return '<div class="section"><div class="section-header"><div class="section-title">Déplacements</div><div class="section-meta">'+allList.length+' trajet'+(allList.length>1?'s':'')+'</div></div>'
     +renderMovementDateFilter(countryId,dates,activeDate)
     +'<div style="display:flex;flex-direction:column;gap:8px">'+cards+'</div>'
-    +'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button></div>';
+    +'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>'
+    +movementTrashButtonHTML(countryId)+'</div>';
+}
+function movementTrashButtonHTML(countryId){
+  var count=archivedMovementsForCountry(countryId).length;
+  return '<button onclick="showArchivedMovementsScreen(\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:10px;border-radius:var(--r12);font-size:12.5px;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;gap:5px">'+svgIcon('trash-2',13)+' Corbeille'+(count?' ('+count+')':'')+'</button>';
+}
+function showArchivedMovementsScreen(countryId){S.archivedMovementsCountry=countryId;S.tab='archived-movements';save();renderContent();}
+function renderArchivedMovementsScreen(){
+  var countryId=S.archivedMovementsCountry,c=COUNTRIES.find(function(x){return x.id===countryId;}),items=archivedMovementsForCountry(countryId);
+  var rows=items.length?items.map(function(m){
+    var route=movementLocationLabel(m.originRef,m.origin)+' → '+movementLocationLabel(m.destinationRef,m.destination);
+    return '<div class="more-row" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:12px"><span class="more-row-label">'+escHtml(route)+'</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="restoreMovement(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button><button onclick="deleteMovementPermanently(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')" style="padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer définitivement</button></div></div>';
+  }).join(''):'<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Corbeille vide.</div>';
+  return '<div class="section" style="padding-bottom:20px;padding-top:16px"><div class="more-row" onclick="openCountryDetail(\''+jsStrEsc(countryId)+'\',\'lieux\')" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour'+(c?' à '+escHtml(c.name):'')+'</div><div class="section-title" style="margin-bottom:12px">Corbeille — Déplacements</div><div class="info-card" style="padding:6px">'+rows+'</div></div>';
 }
 function toggleMovementAccordion(id){if(!S.uiAccordion)S.uiAccordion={};var k='movement_'+id;S.uiAccordion[k]=!S.uiAccordion[k];save();renderContent();}
 function openMovementModal(id,countryId){
@@ -8205,11 +8222,25 @@ async function saveMovementModal(){
   try{var next=JSON.parse(JSON.stringify(_movementDraft));var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
   catch(e){console.error('[PlaniTrip] save movement:',e);alert('Impossible d’enregistrer ce déplacement pour le moment.');btn.disabled=false;btn.textContent='Enregistrer';}
 }
+var _movementTrashBusy={};
 async function archiveMovement(){
-  if(!_movementDraft||!confirm('Supprimer ce déplacement ?'))return;
-  var next=JSON.parse(JSON.stringify(_movementDraft));next.archived=true;
+  if(!_movementDraft||_movementTrashBusy[_movementDraft.id]||!confirm('Mettre ce déplacement à la corbeille ?'))return;
+  var next=JSON.parse(JSON.stringify(_movementDraft));next.archived=true;_movementTrashBusy[next.id]=true;
   try{var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
-  catch(e){console.error('[PlaniTrip] archive movement:',e);alert('Impossible de supprimer ce déplacement pour le moment.');}
+  catch(e){console.error('[PlaniTrip] archive movement:',e);alert('Impossible de mettre ce déplacement à la corbeille pour le moment.');}
+  finally{delete _movementTrashBusy[next.id];}
+}
+async function restoreMovement(id,countryId){
+  if(_movementTrashBusy[id])return;var current=S.movements&&S.movements[id];if(!current)return;_movementTrashBusy[id]=true;
+  try{var next=JSON.parse(JSON.stringify(current));next.archived=false;delete next.permanentlyDeleted;var saved=await persistMovement(next);S.movements[id]=saved;save();renderContent();}
+  catch(e){console.error('[PlaniTrip] restore movement:',e);alert('Impossible de restaurer ce déplacement pour le moment.');}
+  finally{delete _movementTrashBusy[id];}
+}
+async function deleteMovementPermanently(id,countryId){
+  if(_movementTrashBusy[id]||!confirm('Supprimer définitivement ce déplacement ? Cette action est irréversible.'))return;var current=S.movements&&S.movements[id];if(!current)return;_movementTrashBusy[id]=true;
+  try{var marker={id:id,countryId:countryId,archived:true,permanentlyDeleted:true,source:current.source||'manual'};var saved=await persistMovement(marker);S.movements[id]=saved;save();renderContent();}
+  catch(e){console.error('[PlaniTrip] permanent movement delete:',e);alert('Impossible de supprimer définitivement ce déplacement pour le moment.');}
+  finally{delete _movementTrashBusy[id];}
 }
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
@@ -13265,7 +13296,7 @@ function updateTopBarSub(){
   el.textContent = name + ' · ' + countryCount + ' pays';
 }
 function syncActiveNavTab(){
-  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var activeId = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='archived-movements'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   var el = document.getElementById('tab-'+activeId);
   if(el) el.classList.add('active');
@@ -13296,6 +13327,7 @@ function renderContent(){
   else if(S.tab==='manage-countries')html=renderManageCountriesScreen();
   else if(S.tab==='archived-cities')html=renderArchivedCitiesScreen();
   else if(S.tab==='archived-activities')html=renderArchivedActivitiesScreen();
+  else if(S.tab==='archived-movements')html=renderArchivedMovementsScreen();
   else if(S.tab==='access-management')html=renderAccessManagementScreen();
   else if(S.tab==='my-account')html=renderMyAccountScreen();
   else html=renderMore();
@@ -13606,10 +13638,10 @@ function removePinFlowApi(){
 }
 
 try{
-  var VALID_TABS = ['home','today','countries','country','cityDetail','favorites','_manageTrip','feed','budget','documents','journal','archived-countries','manage-countries','archived-cities','archived-activities','access-management','my-account','more'];
+  var VALID_TABS = ['home','today','countries','country','cityDetail','favorites','_manageTrip','feed','budget','documents','journal','archived-countries','manage-countries','archived-cities','archived-activities','archived-movements','access-management','my-account','more'];
   S.tab = (S.tab && VALID_TABS.indexOf(S.tab)>-1) ? S.tab : 'home';
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
-  var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
+  var _initActiveTab = (S.tab==='country'||S.tab==='cityDetail'||S.tab==='archived-countries'||S.tab==='archived-cities'||S.tab==='archived-activities'||S.tab==='archived-movements'||S.tab==='manage-countries') ? 'countries' : (S.tab==='documents'||S.tab==='journal'||S.tab==='access-management'||S.tab==='my-account') ? 'more' : S.tab;
   var _initTabEl = document.getElementById('tab-'+_initActiveTab);
   if(_initTabEl) _initTabEl.classList.add('active');
   renderContent();
@@ -17860,7 +17892,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div class="modal-title" id="movementModalTitle">Déplacement</div>
     <div id="movementModalBody"></div>
     <button class="modal-cta" id="movementModalSaveBtn" onclick="saveMovementModal()">Enregistrer</button>
-    <button id="movementModalDeleteBtn" onclick="archiveMovement()" style="display:none;width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Supprimer ce déplacement</button>
+    <button id="movementModalDeleteBtn" onclick="archiveMovement()" style="display:none;width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Mettre à la corbeille</button>
     <button class="modal-cancel-btn" onclick="closeMovementModal()">Annuler</button>
   </div>
 </div>
