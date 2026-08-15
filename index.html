@@ -681,11 +681,6 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-duration-row{display:flex;align-items:center;gap:4px;min-width:0;}
 .mv-duration-row .ef-input{flex:1;min-width:0;}
 .mv-duration-select{border:none;background:transparent;color:var(--accent);font-size:10.5px;font-weight:750;padding:0 12px 0 0;min-width:42px;}
-.mv-list-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-3px 0 10px;}
-.mv-sort-select{border:1px solid rgba(100,70,30,.14);border-radius:999px;background:#fff;color:var(--ink);font-size:11px;font-weight:650;padding:7px 26px 7px 11px;max-width:180px;}
-.mv-order-actions{display:flex;gap:4px;flex-shrink:0;}
-.mv-order-btn{width:30px;height:30px;border:1px solid rgba(100,70,30,.14);border-radius:50%;background:#fff;color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0;}
-.mv-order-btn:disabled{opacity:.25;}
 .mv-location-wrap{position:relative;display:block;min-width:0;}
 .mv-location-suggestions{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1px solid rgba(100,70,30,.16);border-radius:14px;box-shadow:0 10px 28px rgba(29,29,31,.14);max-height:230px;overflow-y:auto;padding:5px;}
 .mv-location-suggestions.open{display:block;}
@@ -1887,7 +1882,7 @@ function loadState(){
       return parsed;
     }
   }catch(e){}
-  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},movements:{},movementSort:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
+  return{country:'jp',tab:'itinerary',done:{},openCities:{},expenses:[],checklist:{},expDesc:'',expAmt:'',expPerson:'André',customActs:{},deletedActs:{},cityOrder:{},customDetails:{},order:{},days:{},actDay:{},activeDay:{},actNames:{},cityNames:{},accom:{},movements:{},movementDateFilter:{},countryOrder:[],favorites:{},documents:{},journal:[],customCountries:[],deletedCountryIds:[],countryEdits:{},addedCities:{},actDate:{},cityDates:{}};
 }
 function markDeletedTombstone(kind, id){
   // "Tombstone" : mémorise dans une clé localStorage minuscule et séparée qu'un élément a été
@@ -1947,6 +1942,9 @@ function save(){
         var _adVal = S.activeDay && Object.keys(S.activeDay).length ? JSON.stringify(S.activeDay) : null;
         if(_adVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_activeDay', _adVal);
         else localStorage.removeItem(CURRENT_STORAGE_KEY+'_activeDay');
+        var _mdfVal = S.movementDateFilter && Object.keys(S.movementDateFilter).length ? JSON.stringify(S.movementDateFilter) : null;
+        if(_mdfVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_movementDateFilter', _mdfVal);
+        else localStorage.removeItem(CURRENT_STORAGE_KEY+'_movementDateFilter');
         var _cnVal = S.cityNames && Object.keys(S.cityNames).length ? JSON.stringify(S.cityNames) : null;
         if(_cnVal) localStorage.setItem(CURRENT_STORAGE_KEY+'_cityNames', _cnVal);
         else localStorage.removeItem(CURRENT_STORAGE_KEY+'_cityNames');
@@ -7972,42 +7970,25 @@ function builtinMovementsForCountry(countryId){
     ]}
   ];
 }
-function movementSortState(countryId){
-  if(!S.movementSort)S.movementSort={};
-  return S.movementSort[countryId]||{mode:'trip',order:[]};
+function movementDates(list){
+  var seen={};return (list||[]).map(function(m){return m.date||'';}).filter(function(date){if(!date||seen[date])return false;seen[date]=true;return true;}).sort();
 }
-function movementDateKey(m){return String((m&&m.date)||'9999-12-31')+' '+String((m&&m.departureTime)||'23:59');}
-function movementTripLocationRank(countryId,label){
-  var needle=String(label||'').trim().toLowerCase();if(!needle)return 9999;
-  var c=COUNTRIES.find(function(x){return x.id===countryId;}),cityRank=999;
-  if(c){getCityOrder(countryId).some(function(idx,pos){var city=c.cities[idx];var ck=countryId+'_'+city.city;var names=[city.city,_cityDisplayName(ck,city)];(S.accom&&S.accom[ck]||[]).forEach(function(a){names.push(a.name,a.address);});if(names.some(function(n){return n&&needle.indexOf(String(n).toLowerCase())>-1;})){cityRank=pos;return true;}return false;});}
-  return cityRank;
+function activeMovementDate(countryId,dates){
+  if(!S.movementDateFilter)S.movementDateFilter={};
+  var raw=S.movementDateFilter[countryId]||'Tous';
+  if(raw!=='Tous'&&dates.indexOf(raw)<0){S.movementDateFilter[countryId]='Tous';return'Tous';}
+  return raw;
 }
-function sortedMovementsForCountry(countryId,list){
-  var state=movementSortState(countryId),copy=(list||[]).slice();
-  if(state.mode==='custom'){
-    var order=state.order||[];return copy.sort(function(a,b){var ai=order.indexOf(a.id),bi=order.indexOf(b.id);if(ai<0)ai=9999;if(bi<0)bi=9999;return ai-bi;});
-  }
-  if(state.mode==='date')return copy.sort(function(a,b){return movementDateKey(a).localeCompare(movementDateKey(b));});
-  return copy.sort(function(a,b){var ar=movementTripLocationRank(countryId,a.origin),br=movementTripLocationRank(countryId,b.origin);if(ar!==br)return ar-br;return movementDateKey(a).localeCompare(movementDateKey(b));});
+function setMovementDateFilter(countryId,date){
+  if(!S.movementDateFilter)S.movementDateFilter={};S.movementDateFilter[countryId]=date;save();
+  try{if(CURRENT_STORAGE_KEY)localStorage.setItem(CURRENT_STORAGE_KEY+'_movementDateFilter',JSON.stringify(S.movementDateFilter));}catch(e){}
+  renderContent();
 }
-async function persistMovementSort(countryId,next){
-  if(!sb||!CURRENT_TRIP)throw new Error('Connexion indisponible');
-  var payload={mode:next.mode||'trip',order:(next.order||[]).slice(),updatedAt:new Date().toISOString()};
-  var r=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__movementOrder__'+countryId,data:payload,updated_at:payload.updatedAt},{onConflict:'trip_id,detail_key'}).select('data').single();
-  if(r&&r.error)throw r.error;if(!r||!r.data||!r.data.data)throw new Error('Ordre non confirmé');return r.data.data;
-}
-async function changeMovementSort(countryId,mode){
-  var current=movementSortState(countryId),list=sortedMovementsForCountry(countryId,movementsForCountry(countryId));
-  var next={mode:mode,order:(current.order&&current.order.length?current.order:list.map(function(m){return m.id;}))};
-  try{var saved=await persistMovementSort(countryId,next);S.movementSort[countryId]=saved;save();renderContent();}
-  catch(e){console.error('[PlaniTrip] movement sort:',e);alert('Impossible d’enregistrer le tri pour le moment.');}
-}
-async function moveMovement(countryId,id,direction){
-  var list=sortedMovementsForCountry(countryId,movementsForCountry(countryId)),order=list.map(function(m){return m.id;}),idx=order.indexOf(id),to=idx+direction;
-  if(idx<0||to<0||to>=order.length)return;var tmp=order[idx];order[idx]=order[to];order[to]=tmp;
-  try{var saved=await persistMovementSort(countryId,{mode:'custom',order:order});S.movementSort[countryId]=saved;save();renderContent();}
-  catch(e){console.error('[PlaniTrip] movement reorder:',e);alert('Impossible d’enregistrer le nouvel ordre.');}
+function renderMovementDateFilter(countryId,dates,active){
+  if(!dates.length)return'';
+  var chips='<button class="cf-day-chip'+(active==='Tous'?' active':'')+'" onclick="setMovementDateFilter(\''+jsStrEsc(countryId)+'\',\'Tous\')"><span class="cf-day-num" style="font-size:12px;font-weight:600">Tout</span></button>';
+  dates.forEach(function(iso){var d=new Date(iso+'T00:00:00'),dayNum=d.toLocaleDateString('fr-FR',{day:'numeric'}),weekday=d.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','');chips+='<button class="cf-day-chip'+(active===iso?' active':'')+'" onclick="setMovementDateFilter(\''+jsStrEsc(countryId)+'\',\''+iso+'\')"><span class="cf-day-num">'+dayNum+'</span><span class="cf-day-lbl">'+weekday+'</span></button>';});
+  return '<div class="cf-filter-card"><div class="cf-filter-row"><span class="cf-filter-icon">'+svgIcon('calendar',16)+'</span><div class="cf-chips">'+chips+'</div></div></div>';
 }
 function movementLocationSuggestions(countryId){
   var out=[],seen={};function add(label,type,sub,ref,icon){label=String(label||'').trim();if(!label)return;var key=label.toLowerCase();if(seen[key])return;seen[key]=true;out.push({label:label,type:type,sub:sub||'',ref:ref||'',icon:icon||'map-pin'});}
@@ -8033,7 +8014,7 @@ function filterMovementSuggestions(field,preserveRef){
   box.innerHTML=items.map(function(x){var h='';if(x.type!==group){group=x.type;h='<div class="mv-location-group">'+escHtml(group)+'</div>';}return h+'<button type="button" class="mv-location-option" onmousedown="event.preventDefault()" onclick="chooseMovementLocation(\''+field+'\',\''+jsStrEsc(x.ref)+'\',\''+jsStrEsc(x.label)+'\')">'+svgIcon(x.icon,15)+'<span class="mv-location-option-copy"><span class="mv-location-option-title">'+escHtml(x.label)+'</span><span class="mv-location-option-sub">'+escHtml(x.sub)+'</span></span></button>';}).join('');box.classList.toggle('open',items.length>0);
 }
 function chooseMovementLocation(field,ref,label){var input=document.getElementById('mv_'+field),box=document.getElementById('mv_'+field+'_suggestions');if(input){input.value=label;input.dataset.ref=ref;}if(box)box.classList.remove('open');}
-function movementPrefill(countryId){var list=sortedMovementsForCountry(countryId,movementsForCountry(countryId)),last=list[list.length-1],c=COUNTRIES.find(function(x){return x.id===countryId;}),origin=last?movementLocationLabel(last.destinationRef,last.destination):'',destination='',destinationRef='',date='';if(c){var used=list.map(function(m){return String(m.destination||'').toLowerCase();});getCityOrder(countryId).some(function(idx){var city=c.cities[idx],ck=countryId+'_'+city.city,label=_cityDisplayName(ck,city);if(used.indexOf(label.toLowerCase())<0){var a=(S.accom&&S.accom[ck]||[])[0],stay=cityStayRange(ck);destination=a&&a.name?a.name:label;destinationRef=a?'accom:'+ck+':'+(a.id||a.name):'city:'+ck;date=stay&&stay.start?stay.start:'';return true;}return false;});}return{origin:origin,originRef:last?(last.destinationRef||''):'',destination:destination,destinationRef:destinationRef,date:date};}
+function movementPrefill(countryId){var list=movementsForCountry(countryId),last=list[list.length-1],c=COUNTRIES.find(function(x){return x.id===countryId;}),origin=last?movementLocationLabel(last.destinationRef,last.destination):'',destination='',destinationRef='',date='';if(c){var used=list.map(function(m){return String(m.destination||'').toLowerCase();});getCityOrder(countryId).some(function(idx){var city=c.cities[idx],ck=countryId+'_'+city.city,label=_cityDisplayName(ck,city);if(used.indexOf(label.toLowerCase())<0){var a=(S.accom&&S.accom[ck]||[])[0],stay=cityStayRange(ck);destination=a&&a.name?a.name:label;destinationRef=a?'accom:'+ck+':'+(a.id||a.name):'city:'+ck;date=stay&&stay.start?stay.start:'';return true;}return false;});}return{origin:origin,originRef:last?(last.destinationRef||''):'',destination:destination,destinationRef:destinationRef,date:date};}
 function movementCoherenceMessage(m,list){var idx=list.findIndex(function(x){return x.id===m.id;});if(idx<0)return'';var prev=list[idx-1],prevTo=prev&&movementLocationLabel(prev.destinationRef,prev.destination),from=movementLocationLabel(m.originRef,m.origin);if(prev&&prevTo&&from&&prevTo.trim().toLowerCase()!==from.trim().toLowerCase())return 'Le trajet précédent arrive à « '+prevTo+' », mais celui-ci part de « '+from+' ».';return'';}
 function movementsForCountry(countryId){
   var merged={};
@@ -8048,8 +8029,9 @@ function movementMissingCount(m){
   return (m.legs||[]).filter(function(l){return !l.from||!l.to;}).length;
 }
 function renderMovementsSection(countryId){
-  var sortState=movementSortState(countryId),list=sortedMovementsForCountry(countryId,movementsForCountry(countryId));
-  var cards=list.map(function(m,listIndex){
+  var allList=movementsForCountry(countryId),dates=movementDates(allList),activeDate=activeMovementDate(countryId,dates);
+  var list=activeDate==='Tous'?allList:allList.filter(function(m){return m.date===activeDate;});
+  var cards=list.map(function(m){
     var accordionKey='movement_'+m.id;
     var open=!!(S.uiAccordion&&S.uiAccordion[accordionKey]);
     var missing=movementMissingCount(m);
@@ -8062,12 +8044,11 @@ function renderMovementsSection(countryId){
       var legMeta=[];if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
       return '<div class="mv-leg-card'+(incomplete?' incomplete':'')+'"><span class="mv-leg-node">'+(incomplete?'':movementModeIcon(l.mode))+'</span><div class="mv-leg-head" style="cursor:default"><span class="mv-leg-number">'+(i+1)+'</span><div class="mv-leg-copy"><div class="mv-leg-title">'+escHtml(incomplete?'Étape à compléter':(l.mode||'Étape'))+'</div><div class="mv-leg-sub">'+escHtml(l.line||'Informations à compléter')+'</div>'+(l.from||l.to?'<div class="mv-leg-route">'+escHtml(l.from||'Départ')+' → '+escHtml(l.to||'Arrivée')+'</div>':'')+(legMeta.length?'<div class="mv-leg-meta">'+escHtml(legMeta.join(' · '))+'</div>':'')+'</div></div></div>';
     }).join('')+'</div>':'';
-    var orderActions=sortState.mode==='custom'?'<span class="mv-order-actions" onclick="event.stopPropagation()"><button class="mv-order-btn" '+(listIndex===0?'disabled':'')+' onclick="moveMovement(\''+jsStrEsc(countryId)+'\',\''+jsStrEsc(m.id)+'\',-1)" aria-label="Monter"><span style="transform:rotate(-90deg);display:flex">'+svgIcon('chevron-right',14)+'</span></button><button class="mv-order-btn" '+(listIndex===list.length-1?'disabled':'')+' onclick="moveMovement(\''+jsStrEsc(countryId)+'\',\''+jsStrEsc(m.id)+'\',1)" aria-label="Descendre"><span style="transform:rotate(90deg);display:flex">'+svgIcon('chevron-right',14)+'</span></button></span>':'';
-    return '<div class="mv-country-card"><div class="mv-country-head" onclick="toggleMovementAccordion(\''+jsStrEsc(m.id)+'\')"><div class="mv-country-route">'+escHtml(movementLocationLabel(m.originRef,m.origin)||'Départ')+' → '+escHtml(movementLocationLabel(m.destinationRef,m.destination)||'Arrivée')+'</div>'+orderActions+'<span data-icon="chevron-right" data-icon-size="15" style="color:var(--ink-subtle);transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')"></span></div>'
+    return '<div class="mv-country-card"><div class="mv-country-head" onclick="toggleMovementAccordion(\''+jsStrEsc(m.id)+'\')"><div class="mv-country-route">'+escHtml(movementLocationLabel(m.originRef,m.origin)||'Départ')+' → '+escHtml(movementLocationLabel(m.destinationRef,m.destination)||'Arrivée')+'</div><span data-icon="chevron-right" data-icon-size="15" style="color:var(--ink-subtle);transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')"></span></div>'
       +(open?'<div class="mv-country-detail"><div class="mv-overview-row" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')"><span class="mv-status-pill'+(m.status==='incomplete'?' incomplete':'')+'">'+(m.status==='booked'?'Réservé':m.status==='planned'?'Prévu':'À compléter')+'</span><span class="mv-overview-meta">'+(meta.join('<span>·</span>')||'Détails à compléter')+'</span></div>'+legs+(missing?'<div class="mv-incomplete-count">'+missing+' étape'+(missing>1?'s':'')+' à compléter</div>':'')+'<button class="mv-inline-edit" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')">Modifier le déplacement</button></div>':'')+'</div>';
   }).join('');
-  return '<div class="section"><div class="section-header"><div class="section-title">Déplacements</div><div class="section-meta">'+list.length+' trajet'+(list.length>1?'s':'')+'</div></div>'
-    +'<div class="mv-list-tools"><span style="font-size:10.5px;color:var(--ink-muted)">'+(sortState.mode==='custom'?'Utilise les flèches pour réordonner':'Ordre mis à jour automatiquement')+'</span><select class="mv-sort-select" onchange="changeMovementSort(\''+jsStrEsc(countryId)+'\',this.value)"><option value="trip"'+(sortState.mode==='trip'?' selected':'')+'>Ordre du voyage</option><option value="date"'+(sortState.mode==='date'?' selected':'')+'>Date et heure</option><option value="custom"'+(sortState.mode==='custom'?' selected':'')+'>Ordre personnalisé</option></select></div>'
+  return '<div class="section"><div class="section-header"><div class="section-title">Déplacements</div><div class="section-meta">'+allList.length+' trajet'+(allList.length>1?'s':'')+'</div></div>'
+    +renderMovementDateFilter(countryId,dates,activeDate)
     +'<div style="display:flex;flex-direction:column;gap:8px">'+cards+'</div>'
     +'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button></div>';
 }
@@ -8149,7 +8130,7 @@ function renderMovementModalBody(){
   var schedule=_movementScheduleOpen?'<div class="mv-schedule"><label class="mv-field"><span class="mv-field-label">Date</span><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'"></label><label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'"></label><label class="mv-field"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mv_arrivalTime" type="time" value="'+escHtml(m.arrivalTime||'')+'"></label></div>':'<button class="mv-schedule-btn" onclick="toggleMovementSchedule()">'+svgIcon('calendar',15)+' Ajouter date et horaires</button>';
   var priceInput='<label class="mv-summary-cell"><span class="mv-field-label">Prix par personne</span><div class="mv-price-row"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>';
   var durationInput='<label class="mv-summary-cell"><span class="mv-field-label">Durée estimée</span><div class="mv-duration-row"><input class="ef-input" id="mv_durationDisplay" type="number" inputmode="decimal" step="0.01" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'" placeholder="0"><select class="mv-duration-select" id="mv_durationUnit" data-previous="'+movementDurationUnit(m)+'" onchange="changeMovementDurationUnit(\'mv_durationDisplay\',this)"><option value="min"'+(movementDurationUnit(m)==='min'?' selected':'')+'>min</option><option value="hour"'+(movementDurationUnit(m)==='hour'?' selected':'')+'>h</option></select></div></label>';
-  var sortedList=sortedMovementsForCountry(m.countryId,movementsForCountry(m.countryId)),coherence=movementCoherenceMessage(m,sortedList);
+  var movementList=movementsForCountry(m.countryId),coherence=movementCoherenceMessage(m,movementList);
   document.getElementById('movementModalBody').innerHTML='<div class="mv-route-head"><span class="mv-route-line"></span><label class="mv-route-field"><span class="mv-label">Départ</span>'+movementLocationInput('origin',movementLocationLabel(m.originRef,m.origin),m.originRef)+'</label><label class="mv-route-field"><span class="mv-label">Destination</span>'+movementLocationInput('destination',movementLocationLabel(m.destinationRef,m.destination),m.destinationRef)+'</label></div>'
     +(coherence?'<div class="mv-coherence">'+svgIcon('triangle-alert',14)+'<span>'+escHtml(coherence)+'</span><button type="button" onclick="linkMovementToPrevious()">Relier</button></div>':'')
     +'<div class="mv-summary"><label class="mv-summary-cell"><span class="mv-field-label">Statut</span><select class="ef-select mv-status-select'+(m.status==='incomplete'?' incomplete':'')+'" id="mv_status" onchange="this.classList.toggle(\'incomplete\',this.value===\'incomplete\')"><option value="incomplete"'+(m.status==='incomplete'?' selected':'')+'>À compléter</option><option value="planned"'+(m.status==='planned'?' selected':'')+'>Prévu</option><option value="booked"'+(m.status==='booked'?' selected':'')+'>Réservé</option></select></label>'+durationInput+priceInput+schedule+'</div>'
@@ -8161,7 +8142,7 @@ function renderMovementModalBody(){
   _movementPriceInputsDirty=false;
 }
 function linkMovementToPrevious(){
-  if(!_movementDraft)return;movementDraftFromInputs(true);var list=sortedMovementsForCountry(_movementDraft.countryId,movementsForCountry(_movementDraft.countryId)),idx=list.findIndex(function(x){return x.id===_movementDraft.id;}),prev=list[idx-1];if(!prev)return;_movementDraft.origin=movementLocationLabel(prev.destinationRef,prev.destination);_movementDraft.originRef=prev.destinationRef||'';renderMovementModalBody();
+  if(!_movementDraft)return;movementDraftFromInputs(true);var list=movementsForCountry(_movementDraft.countryId),idx=list.findIndex(function(x){return x.id===_movementDraft.id;}),prev=list[idx-1];if(!prev)return;_movementDraft.origin=movementLocationLabel(prev.destinationRef,prev.destination);_movementDraft.originRef=prev.destinationRef||'';renderMovementModalBody();
 }
 function toggleMovementLeg(i){movementDraftFromInputs();_movementOpenLeg=_movementOpenLeg===i?null:i;renderMovementModalBody();}
 function toggleMovementSchedule(){movementDraftFromInputs();_movementScheduleOpen=true;renderMovementModalBody();}
@@ -8184,13 +8165,13 @@ async function saveMovementModal(){
   });
   if(_movementDraft.status==='incomplete'&&movementMissingCount(_movementDraft)===0)_movementDraft.status='planned';
   var btn=document.getElementById('movementModalSaveBtn');btn.disabled=true;btn.textContent='Enregistrement…';
-  try{var next=JSON.parse(JSON.stringify(_movementDraft));var saved=await persistMovement(next);S.movements[saved.id]=saved;var sortState=movementSortState(saved.countryId);if(sortState.mode==='custom'&&sortState.order.indexOf(saved.id)<0){var savedSort=await persistMovementSort(saved.countryId,{mode:'custom',order:sortState.order.concat(saved.id)});S.movementSort[saved.countryId]=savedSort;}save();closeMovementModal();renderContent();}
+  try{var next=JSON.parse(JSON.stringify(_movementDraft));var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
   catch(e){console.error('[PlaniTrip] save movement:',e);alert('Impossible d’enregistrer ce déplacement pour le moment.');btn.disabled=false;btn.textContent='Enregistrer';}
 }
 async function archiveMovement(){
   if(!_movementDraft||!confirm('Supprimer ce déplacement ?'))return;
   var next=JSON.parse(JSON.stringify(_movementDraft));next.archived=true;
-  try{var saved=await persistMovement(next);S.movements[saved.id]=saved;var sortState=movementSortState(saved.countryId);if(sortState.order.indexOf(saved.id)>-1){var savedSort=await persistMovementSort(saved.countryId,{mode:sortState.mode,order:sortState.order.filter(function(id){return id!==saved.id;})});S.movementSort[saved.countryId]=savedSort;}save();closeMovementModal();renderContent();}
+  try{var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
   catch(e){console.error('[PlaniTrip] archive movement:',e);alert('Impossible de supprimer ce déplacement pour le moment.');}
 }
 function renderItinerary(c, embedded){
@@ -14439,10 +14420,7 @@ async function loadActivityDetails(){
         S.flightMeta[flightId]=row.data;
       }
     } else if(row.detail_key.indexOf('__planitrip__movementOrder__')===0){
-      var movementOrderCountryId = row.detail_key.slice('__planitrip__movementOrder__'.length);
-      if(movementOrderCountryId && row.data && typeof row.data === 'object'){
-        if(!S.movementSort)S.movementSort={};S.movementSort[movementOrderCountryId]=row.data;
-      }
+      // Ancien réglage d'ordre ignoré : l'affichage utilise désormais un filtre personnel par date.
     } else if(row.detail_key.indexOf('__planitrip__movement__')===0){
       var movementId = row.detail_key.slice('__planitrip__movement__'.length);
       if(movementId && row.data && typeof row.data === 'object'){
@@ -14727,6 +14705,16 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
       if(_parsedActiveDay && typeof _parsedActiveDay === 'object'){
         if(!S.activeDay) S.activeDay = {};
         Object.assign(S.activeDay, _parsedActiveDay);
+      }
+    }
+  }catch(e){}
+  try{
+    var _savedMovementDateFilter = localStorage.getItem(namespacedKey+'_movementDateFilter');
+    if(_savedMovementDateFilter){
+      var _parsedMovementDateFilter = JSON.parse(_savedMovementDateFilter);
+      if(_parsedMovementDateFilter && typeof _parsedMovementDateFilter === 'object'){
+        if(!S.movementDateFilter) S.movementDateFilter = {};
+        Object.assign(S.movementDateFilter, _parsedMovementDateFilter);
       }
     }
   }catch(e){}
