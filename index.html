@@ -11050,7 +11050,7 @@ function renderMiniConverter(c){
     +'</div>'
     +'<button onclick="toggleConvDir(\''+c.id+'\')" title="Inverser" style="width:24px;height:24px;flex-shrink:0;border-radius:50%;border:none;background:transparent;color:var(--ink-subtle);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px">⇄</button>'
     +'<div style="flex:1;min-width:0;background:#fff;border-radius:var(--r8);padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:5px">'
-    +'<span style="font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+resultStr+'</span>'
+    +'<span id="convResultMini_'+c.id+'" style="font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+resultStr+'</span>'
     +'<span style="font-size:10.5px;color:var(--ink-muted);font-weight:600;flex-shrink:0">'+escHtml(toLabel)+'</span>'
     +'</div>'
     +'<button onclick="openRateEditModal(\''+c.id+'\')" title="Modifier le taux" style="width:32px;height:32px;flex-shrink:0;border-radius:var(--r8);border:1px solid rgba(29,29,31,0.09);background:#fff;color:var(--ink-muted);cursor:pointer;display:flex;align-items:center;justify-content:center">'+svgIcon('pencil',14)+'</button>'
@@ -11085,14 +11085,26 @@ function renderConverterCard(c){
     +'</div>'
     +'<div style="text-align:center;color:var(--ink-subtle);font-size:13px;margin:2px 0">↓</div>'
     +'<div style="display:flex;align-items:center;gap:8px">'
-    +'<div style="flex:1;padding:10px 12px;font-size:18px;font-weight:700;color:var(--accent)">'+resultStr+'</div>'
+    +'<div id="convResult_'+c.id+'" style="flex:1;padding:10px 12px;font-size:18px;font-weight:700;color:var(--accent)">'+resultStr+'</div>'
     +'<span style="font-size:13px;color:var(--ink-muted);min-width:36px">'+toLabel+'</span>'
     +'</div>'
     +quickRow
     +'</div>';
 }
 function toggleConvDir(cid){ if(!S.convDir) S.convDir={}; S.convDir[cid]=(S.convDir[cid]==='eur')?'local':'eur'; save(); renderContent(); }
-function updateConvAmt(cid, val){ if(!S.convAmt) S.convAmt={}; S.convAmt[cid]=parseFloat(val)||0; save(); renderContent(); var i=document.getElementById('convAmtMini_'+cid); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);} }
+function updateConvAmt(cid,val){
+  if(!S.convAmt)S.convAmt={};
+  var n=parseAmt(val);if(isNaN(n))n=0;
+  S.convAmt[cid]=n;
+  save();
+  var c=COUNTRIES.find(function(co){return co.id===cid;});if(!c)return;
+  var dir=S.convDir&&S.convDir[cid]||'eur';
+  var result=dir==='eur'?(n*getRate(c)):(n/getRate(c));
+  var resultStr=dir==='eur'?result.toLocaleString('fr-FR',{maximumFractionDigits:0}):result.toLocaleString('fr-FR',{maximumFractionDigits:2});
+  var miniResult=document.getElementById('convResultMini_'+cid);if(miniResult)miniResult.textContent=resultStr;
+  var fullResult=document.getElementById('convResult_'+cid);if(fullResult)fullResult.textContent=resultStr;
+  ['convAmtMini_'+cid,'convAmt_'+cid].forEach(function(id){var el=document.getElementById(id);if(el&&el!==document.activeElement)el.value=n;});
+}
 async function updateCustomRate(cid,val){
   var n=parseFloat(val);if(!n||n<=0)return false;
   var c=COUNTRIES.find(function(co){return co.id===cid;});if(!c)return false;
