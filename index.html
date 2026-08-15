@@ -936,6 +936,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 /* ── Toast succès auteur ── */
 .success-toast{position:fixed;bottom:calc(88px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink,#1D1D1F);color:#fff;font-size:13px;font-weight:500;padding:9px 18px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.18);opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;white-space:nowrap;z-index:600;}
 .success-toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
+.ce-rt-toast{position:fixed;top:calc(env(safe-area-inset-top) + 80px);left:50%;transform:translateX(-50%) translateY(-8px);background:var(--accent,#2D6A4F);color:#fff;font-size:13px;font-weight:500;padding:10px 18px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.18);opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;max-width:340px;text-align:center;z-index:600;}
+.ce-rt-toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
 .flight-modal-sheet{position:relative;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;padding:24px 18px calc(24px + env(safe-area-inset-bottom));}
 .flight-modal-close{position:absolute;right:14px;top:16px;width:30px;height:30px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .flight-modal-sheet .modal-title{font-size:20px;margin:4px 38px 18px 0;}
@@ -1251,6 +1253,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
   </div>
   <!-- Toast succès -->
   <div class="success-toast" id="success-toast"></div>
+  <!-- Toast Realtime notif -->
+  <div class="ce-rt-toast" id="ce-rt-toast"></div>
   <div class="content" id="mainContent"></div>
   <div id="pullRefreshIndicator" style="position:fixed;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;height:0;overflow:hidden;transition:height 0.15s;z-index:60;pointer-events:none;">
     <div style="display:flex;align-items:center;gap:6px;background:var(--parchment);padding:8px 16px;border-radius:20px;box-shadow:var(--shadow-md);margin-top:8px;">
@@ -2766,6 +2770,66 @@ function closeCePanel(){
   var panel = document.getElementById('ce-panel');
   if(panel) panel.classList.remove('open');
 }
+
+// Realtime — souscription aux nouveaux événements collaboratifs
+var _ceRealtimeChannel = null;
+
+function _ceSubscribeRealtime(){
+  if(!sb || !CURRENT_TRIP || !CURRENT_USER) return;
+  // Désabonner le channel précédent si on change de voyage
+  if(_ceRealtimeChannel){
+    sb.removeChannel(_ceRealtimeChannel);
+    _ceRealtimeChannel = null;
+  }
+  _ceRealtimeChannel = sb.channel('change_events:'+CURRENT_TRIP.id)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'change_events',
+      filter: 'trip_id=eq.'+CURRENT_TRIP.id
+    }, function(payload){
+      var e = payload.new;
+      if(!e) return;
+      // Ignorer ses propres événements
+      if(e.actor_user_id === CURRENT_USER.id) return;
+      // Ignorer si déjà dans la liste
+      if(_ceEvents.find(function(x){ return x.id === e.id; })) return;
+      // Ajouter en tête
+      _ceEvents.unshift(e);
+      _updateCeBadge();
+      // Toast discret
+      var actor = e.actor_label || 'Quelqu\'un';
+      var actionMap = {add:'a ajouté', update:'a modifié', delete:'a supprimé', restore:'a restauré'};
+      var entityMap = {activity:'une activité', city:'une ville', accommodation:'un logement',
+        flight:'un vol', movement:'un déplacement', budget:'une dépense',
+        checklist:'la checklist', feed:'une publication', country:'un pays'};
+      var msg = actor + ' ' + (actionMap[e.action]||'a modifié') + ' ' + (entityMap[e.entity_type]||e.entity_type);
+      if(e.entity_label) msg += ' · ' + e.entity_label;
+      _showCeToast(msg);
+      // Si le panel est ouvert, re-rendre
+      var panel = document.getElementById('ce-panel');
+      if(panel && panel.classList.contains('open')){ _renderCePanel(); _ceMarkAllSeen(); _updateCeBadge(); }
+    })
+    .subscribe();
+}
+
+function _ceUnsubscribeRealtime(){
+  if(_ceRealtimeChannel && sb){
+    sb.removeChannel(_ceRealtimeChannel);
+    _ceRealtimeChannel = null;
+  }
+}
+
+// Toast Realtime discret (différent du toast succès auteur)
+function _showCeToast(msg){
+  var t = document.getElementById('ce-rt-toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('visible');
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(function(){ t.classList.remove('visible'); }, 3500);
+}
+
 
 // Toast de confirmation auteur
 function showSuccessToast(msg){
@@ -15447,6 +15511,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   updateFeedBadge();
   await loadProfiles();
   loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
+  _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
   if(!skipAutofillDates) autofillMissingCountryDates();
