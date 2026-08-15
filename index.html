@@ -2620,6 +2620,9 @@ async function dismissChangeEvent(eventId){
   try{
     await sb.from('change_events_dismissed').insert({user_id:CURRENT_USER.id, event_id:eventId});
     _ceEvents = _ceEvents.filter(function(e){return e.id!==eventId;});
+    // Nettoyer aussi le seen local
+    var seen = _ceGetSeen(); delete seen[eventId];
+    try{ localStorage.setItem('_ce_seen', JSON.stringify(seen)); } catch(e){}
     _updateCeBadge();
     _renderCePanel();
   } catch(e){ console.warn('[PlaniTrip] dismissChangeEvent:', e); }
@@ -2637,11 +2640,30 @@ async function dismissAllChangeEvents(){
   } catch(e){ console.warn('[PlaniTrip] dismissAllChangeEvents:', e); }
 }
 
-// Mise à jour du badge numéroté
+// IDs vus — stockés en localStorage (préférence UI personnelle)
+function _ceGetSeen(){
+  try{ return JSON.parse(localStorage.getItem('_ce_seen')||'{}'); } catch(e){ return {}; }
+}
+function _ceMarkSeen(eventId){
+  var seen = _ceGetSeen();
+  seen[eventId] = 1;
+  try{ localStorage.setItem('_ce_seen', JSON.stringify(seen)); } catch(e){}
+}
+function _ceMarkAllSeen(){
+  var seen = _ceGetSeen();
+  _ceEvents.forEach(function(e){ seen[e.id] = 1; });
+  try{ localStorage.setItem('_ce_seen', JSON.stringify(seen)); } catch(e){}
+}
+function _ceUnseenCount(){
+  var seen = _ceGetSeen();
+  return _ceEvents.filter(function(e){ return !seen[e.id]; }).length;
+}
+
+// Mise à jour du badge — ne compte que les non-vus
 function _updateCeBadge(){
   var badge = document.getElementById('ce-badge');
-  var count = _ceEvents.length;
   if(!badge) return;
+  var count = _ceUnseenCount();
   if(count > 0){
     badge.textContent = count > 99 ? '99+' : String(count);
     badge.style.display = 'flex';
@@ -2732,7 +2754,13 @@ function toggleCePanel(){
   if(!panel) return;
   var isOpen = panel.classList.contains('open');
   if(isOpen){ closeCePanel(); }
-  else { panel.classList.add('open'); _renderCePanel(); }
+  else {
+    panel.classList.add('open');
+    _renderCePanel();
+    // Marquer tous les événements visibles comme vus → badge à 0
+    _ceMarkAllSeen();
+    _updateCeBadge();
+  }
 }
 function closeCePanel(){
   var panel = document.getElementById('ce-panel');
