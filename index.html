@@ -837,6 +837,23 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ct-date-select{width:100%;box-sizing:border-box;appearance:none;-webkit-appearance:none;-moz-appearance:none;background:var(--sand,#F5F5F3);border:1px solid transparent;border-radius:var(--r12);padding:9px 16px 9px 8px;text-align:center;text-align-last:center;font-size:14px;font-weight:700;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:background 0.2s cubic-bezier(0.34,1.56,0.64,1),border-color 0.2s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.2s cubic-bezier(0.34,1.56,0.64,1),transform 0.2s cubic-bezier(0.34,1.56,0.64,1);}
 .ct-date-select:focus{outline:none;background:#FFFFFF;border-color:rgba(45,106,79,0.32);box-shadow:0 3px 10px rgba(29,29,31,0.07);transform:translateY(-1px);}
 .ct-date-chevron{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--ink-subtle);opacity:0.55;pointer-events:none;}
+.flight-form{margin-top:8px;display:flex;flex-direction:column;gap:8px;}
+.flight-route-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.flight-schedule-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.flight-stop-card{min-width:0;border:1px solid rgba(100,70,30,.12);border-radius:var(--r16);background:#fff;padding:9px;}
+.flight-stop-title{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:750;color:var(--ink-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+.flight-stop-card .ct-date-field-row{gap:3px;}
+.flight-stop-card .ct-date-select{font-size:10.5px;padding:7px 9px 7px 3px;border-radius:9px;}
+.flight-stop-card .ct-date-chevron{right:3px;}
+.flight-time-input{width:100%;height:36px!important;min-height:36px!important;margin-top:6px;padding:0 8px!important;text-align:center;font-size:13px!important;box-sizing:border-box;}
+.flight-travelers{border:1px solid rgba(100,70,30,.12);border-radius:var(--r12);background:#fff;overflow:hidden;}
+.flight-travelers summary{list-style:none;display:flex;align-items:center;gap:7px;padding:10px 11px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--ink);}
+.flight-travelers summary::-webkit-details-marker{display:none;}
+.flight-travelers-summary{flex:1;min-width:0;color:var(--ink-muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;}
+.flight-travelers[open] .flight-travelers-chevron{transform:rotate(90deg);}
+.flight-travelers-body{padding:0 10px 8px;display:flex;flex-wrap:wrap;gap:6px;}
+.flight-traveler-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 9px;border-radius:14px;border:none;font-size:11.5px;font-weight:650;cursor:pointer;background:var(--sand-deep);color:var(--ink-muted);}
+.flight-traveler-chip.active{background:var(--accent);color:#fff;}
 .ct-days-badge{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--accent);font-weight:600;margin-top:8px;}
 .ct-chips-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .ct-country-chip{display:inline-flex;align-items:center;gap:7px;background:#FFFFFF;border:1px solid #ECEAE4;padding:8px 8px 8px 12px;border-radius:20px;font-size:14px;color:var(--ink);font-weight:500;}
@@ -8752,9 +8769,9 @@ function renderToday(){
     var nfDepartureLine = 'Départ · '+nfDate+' · '+(nf.departureTime||'heure à renseigner');
     var nfArrivalLine = 'Arrivée · '+nfArrivalDate+' · '+(nf.arrivalTime||'heure à renseigner');
     var nfPeople = getActiveTravelerList();
-    var nfParticipants = (nf.participants && nf.participants.length) ? activeFlightParticipants(nf.participants) : nfPeople;
+    var nfParticipants = flightParticipantsSpecified(nf) ? activeFlightParticipants(nf.participants) : nfPeople;
     var nfOtherNames = nfParticipants.filter(function(p){return canonicalPerson(p)!==myEmailFlight;}).map(function(p){return personDisplayName(p,'Toi');}).join(', ');
-    var nfTravelersLine = nfParticipants.length>=nfPeople.length ? 'Tous les voyageurs' : (nfOtherNames ? 'Avec '+nfOtherNames : 'Pour toi');
+    var nfTravelersLine = !nfParticipants.length?'Voyageurs non renseignés':(nfParticipants.length>=nfPeople.length ? 'Tous les voyageurs' : (nfOtherNames ? 'Avec '+nfOtherNames : 'Pour toi'));
     flightCard = '<div class="info-card" style="cursor:pointer" onclick="openDocumentType(\'tickets\')"><div class="ic-header">'+icHeaderChevron('plane','Prochain vol')+'</div>'
       +'<div class="status-main">'+escHtml(nf.from||'?')+' → '+escHtml(nf.to||'?')+'</div>'
       +'<div class="status-sub" style="margin-top:5px">'+escHtml(nfDepartureLine)+'</div>'
@@ -9253,10 +9270,10 @@ function intercountryFlightDuration(f){
 function openIntercountryFlight(flightId){
   var flights=(S.documents&&S.documents.tickets&&S.documents.tickets.flightsList)||[],flight=flights.find(function(f){return String(f.id)===String(flightId);});
   if(!flight)return;S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=flight.id;
-  var activeParticipants=activeFlightParticipants(flight.participants);S.newFlightParticipants=flight&&flight.participants&&flight.participants.length?activeParticipants:getActiveTravelerList();
+  var activeParticipants=activeFlightParticipants(flight.participants);S.newFlightParticipants=flightParticipantsSpecified(flight)?activeParticipants:getActiveTravelerList();
   save();renderContent();
 }
-function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=null;S.newFlightParticipants=getActiveTravelerList();save();renderContent();}
+function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=null;S.newFlightParticipants=[];save();renderContent();}
 var _intercountryModePair=null;
 function openIntercountryModePicker(fromCountryId,toCountryId){
   var from=COUNTRIES.find(function(c){return c.id===fromCountryId;}),to=COUNTRIES.find(function(c){return c.id===toCountryId;});if(!from||!to)return;
@@ -9287,7 +9304,7 @@ function renderIntercountryConnection(fromCountry,toCountry,index,flight,movemen
   if(!flight)return '<div class="country-connection"><div class="country-connection-card" onclick="openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')"><span class="country-connection-icon missing">'+svgIcon('route',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span>'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status missing">À renseigner</span><span>Choisir le mode de transport</span></div></div></div>';
   var complete=!!(flight.date&&flight.departureTime&&flight.arrivalTime),dateLabel=flight.date?new Date(flight.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'',duration=intercountryFlightDuration(flight),summary=[];
   if(dateLabel)summary.push(dateLabel);if(duration)summary.push(duration);if(flight.departureTime)summary.push(flight.departureTime+(flight.arrivalTime?' → '+flight.arrivalTime:''));
-  var activeTravelers=getActiveTravelerList(),people=(flight.participants&&flight.participants.length)?activeFlightParticipants(flight.participants):activeTravelers,peopleLabel=people.length?(people.length>=activeTravelers.length?'Tous les voyageurs':people.map(function(p){return personDisplayName(p,'Toi');}).join(', ')):'Aucun voyageur actif';
+  var activeTravelers=getActiveTravelerList(),people=flightParticipantsSpecified(flight)?activeFlightParticipants(flight.participants):activeTravelers,peopleLabel=people.length?(people.length>=activeTravelers.length?'Tous les voyageurs':people.map(function(p){return personDisplayName(p,'Toi');}).join(', ')):'Voyageurs non renseignés';
   var detail=open?'<div class="country-connection-detail"><div>'+escHtml(flight.from||'Départ')+' → '+escHtml(flight.to||'Arrivée')+'</div>'+(flight.arrivalDate&&flight.arrivalDate!==flight.date?'<div>Arrivée le '+escHtml(new Date(flight.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'}))+'</div>':'')+(peopleLabel?'<div>'+svgIcon('users',11)+' '+escHtml(peopleLabel)+'</div>':'')+'<div class="country-connection-actions"><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryFlight(\''+jsStrEsc(String(flight.id))+'\')">Voir le vol</button><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')">Changer le mode</button></div></div>':'';
   return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon('plane',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(complete?'':' missing')+'">'+(complete?'Vol renseigné':'À compléter')+'</span><span>'+escHtml(summary.join(' · ')||'Informations du vol à compléter')+'</span></div>'+detail+'</div></div>';
 }
@@ -9649,6 +9666,7 @@ function getActiveTravelerList(){
 function activeFlightParticipants(participants){
   var active=getActiveTravelerList();return (participants||[]).map(canonicalPerson).filter(function(p,index,list){return active.indexOf(p)>-1&&list.indexOf(p)===index;});
 }
+function flightParticipantsSpecified(flight){return !!(flight&&(flight.participantsSpecified===true||(flight.participants&&flight.participants.length)));}
 // Budget prévu par pays = somme des budgets/jour de CHAQUE voyageur (le sien s'il l'a défini,
 // sinon la valeur par défaut du pays), multipliée par le nombre de jours.
 // Un voyageur (par email) a-t-il accès à ce pays selon son scope de collaborateur ?
@@ -10270,15 +10288,15 @@ function syncDateTripleGeneric(idPrefix){
 }
 function renderFlightsList(flights){
   var people = getActiveTravelerList();
-  if(!S.newFlightParticipants || !S.newFlightParticipants.length) S.newFlightParticipants = people.slice();
+  if(!Array.isArray(S.newFlightParticipants)) S.newFlightParticipants=[];
   var cards = flights.map(function(f, i){
     var departureDateLabel = f.date ? new Date(f.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : 'non renseignée';
     var arrivalDateLabel = f.arrivalDate ? new Date(f.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}) : '';
     var dateLabel = 'Départ '+departureDateLabel+(arrivalDateLabel?' · Arrivée '+arrivalDateLabel:'');
     var timesLabel = f.departureTime || f.arrivalTime ? ('Départ '+(f.departureTime||'—')+' · Arrivée '+(f.arrivalTime||'—')) : '';
-    var fParticipants = (f.participants && f.participants.length) ? activeFlightParticipants(f.participants) : people;
+    var fParticipants = flightParticipantsSpecified(f) ? activeFlightParticipants(f.participants) : people;
     var namesLabel = fParticipants.length>=people.length ? 'Tous les voyageurs' : fParticipants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
-    if(!fParticipants.length) namesLabel='Aucun voyageur actif';
+    if(!fParticipants.length) namesLabel='Voyageurs non renseignés';
     return '<div class="more-row" style="align-items:flex-start;padding:9px 0;cursor:pointer" onclick="editFlight('+i+')">'
       +'<span style="margin-top:2px">'+svgIcon('plane',16)+'</span>'
       +'<div style="flex:1;min-width:0">'
@@ -10294,29 +10312,21 @@ function renderFlightsList(flights){
 
   var participantChips = people.map(function(p){
     var checked = S.newFlightParticipants.indexOf(p)>-1;
-    return '<span onclick="toggleFlightParticipant(\''+jsStrEsc(p)+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:16px;font-size:12.5px;font-weight:600;cursor:pointer;margin:0 6px 6px 0;background:'+(checked?'var(--accent)':'var(--sand-deep)')+';color:'+(checked?'#fff':'var(--ink-muted)')+'">'
-      +(checked?svgIcon('check',11):'')+' '+escHtml(personDisplayName(p,'Toi'))+'</span>';
+    return '<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleFlightParticipant(\''+jsStrEsc(p)+'\',this)">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';
   }).join('');
+  var selectedNames=S.newFlightParticipants.map(function(p){return personDisplayName(p,'Toi');}),participantSummary=selectedNames.length?selectedNames.join(', '):'Non renseigné';
 
   var editingFlight = S.editingFlightId ? flights.find(function(f){ return f.id===S.editingFlightId; }) : null;
   var formOpen = !!S.flightFormOpen;
-  var formHTML = '<div style="display:flex;gap:6px;margin-top:6px">'
-    +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" value="'+(editingFlight?escHtml(editingFlight.from||''):'')+'" style="flex:1;min-width:0">'
-    +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'" style="flex:1;min-width:0">'
-    +'</div>'
-    +'<div style="display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:8px">'
-    +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date de départ</span>'
-    +dateTripleHTML('newFlightDate', editingFlight?(editingFlight.date||''):'')
-    +'</div>'
-    +'<div style="display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:8px">'
-    +'<span style="text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-muted)">Date d’arrivée</span>'
-    +dateTripleHTML('newFlightArrivalDate', editingFlight?(editingFlight.arrivalDate||''):'')
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:8px"><div style="min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure de départ</div><input id="newFlightDepartureTime" class="ef-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'" style="display:block;width:100%;min-width:0;max-width:100%;height:44px;box-sizing:border-box;padding:0 10px;text-align:center"></div><div style="min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Heure d’arrivée</div><input id="newFlightArrivalTime" class="ef-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'" style="display:block;width:100%;min-width:0;max-width:100%;height:44px;box-sizing:border-box;padding:0 10px;text-align:center"></div></div>'
-    +'<div style="margin-top:10px 0 2px"><span style="font-size:12px;font-weight:600;color:var(--ink-muted)">Qui prend ce vol ?</span></div>'
-    +'<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+participantChips+'</div>'
+  var formHTML = '<div class="flight-form"><div class="flight-route-row">'
+    +'<input id="newFlightFrom" class="ef-input" placeholder="Départ" value="'+(editingFlight?escHtml(editingFlight.from||''):'')+'" style="min-width:0">'
+    +'<input id="newFlightTo" class="ef-input" placeholder="Arrivée" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'" style="min-width:0">'
+    +'</div><div class="flight-schedule-grid">'
+    +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('plane-takeoff',13)+' Départ</div>'+dateTripleHTML('newFlightDate', editingFlight?(editingFlight.date||''):'')+'<input id="newFlightDepartureTime" class="ef-input flight-time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'"></div>'
+    +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('plane-landing',13)+' Arrivée</div>'+dateTripleHTML('newFlightArrivalDate', editingFlight?(editingFlight.arrivalDate||''):'')+'<input id="newFlightArrivalTime" class="ef-input flight-time-input" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" onblur="formatFlightTimeInput(this)" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'"></div></div>'
+    +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details>'
     +'<button id="saveFlightBtn" onclick="saveFlight()" class="ef-btn" style="margin-top:8px;width:100%;text-align:center">'+(editingFlight?'Enregistrer les modifications':'+ Ajouter un vol')+'</button>'
-    +(editingFlight?'<div onclick="cancelEditFlight()" style="text-align:center;margin-top:8px;font-size:12.5px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Annuler</div>':'');
+    +(editingFlight?'<div onclick="cancelEditFlight()" style="text-align:center;margin-top:2px;font-size:12px;color:var(--ink-muted);cursor:pointer;text-decoration:underline">Annuler</div>':'')+'</div>';
 
   return '<div class="info-card" style="padding:10px 12px">'
     +'<div class="ic-header" style="justify-content:space-between;cursor:pointer;margin-bottom:4px" onclick="toggleFlightForm()"><span>Vols</span><span style="transform:rotate('+(formOpen?'90deg':'0deg')+');transition:transform 0.2s;color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>'
@@ -10325,16 +10335,18 @@ function renderFlightsList(flights){
     +'</div>';
 }
 function toggleFlightForm(){
+  if(!S.flightFormOpen&&!S.editingFlightId)S.newFlightParticipants=[];
   S.flightFormOpen = !S.flightFormOpen;
   save();
   renderContent();
 }
-function toggleFlightParticipant(p){
-  if(!S.newFlightParticipants) S.newFlightParticipants = getActiveTravelerList();
+function toggleFlightParticipant(p,button){
+  if(!Array.isArray(S.newFlightParticipants)) S.newFlightParticipants=[];
   var idx = S.newFlightParticipants.indexOf(p);
   if(idx>-1) S.newFlightParticipants.splice(idx,1); else S.newFlightParticipants.push(p);
+  if(button){var active=idx===-1;button.classList.toggle('active',active);button.innerHTML=(active?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'));}
+  var summary=document.getElementById('flightTravelersSummary');if(summary)summary.textContent=S.newFlightParticipants.length?S.newFlightParticipants.map(function(x){return personDisplayName(x,'Toi');}).join(', '):'Non renseigné';
   save();
-  renderContent();
 }
 
 function editFlight(index){
@@ -10344,13 +10356,13 @@ function editFlight(index){
   S.editingFlightId = f.id;
   S.flightFormOpen = true;
   var people = getActiveTravelerList();
-  S.newFlightParticipants = (f.participants && f.participants.length) ? activeFlightParticipants(f.participants) : people.slice();
+  S.newFlightParticipants = flightParticipantsSpecified(f) ? activeFlightParticipants(f.participants) : people.slice();
   save();
   renderContent();
 }
 function cancelEditFlight(){
   S.editingFlightId = null;
-  S.newFlightParticipants = getActiveTravelerList();
+  S.newFlightParticipants = [];
   save();
   renderContent();
 }
@@ -10382,7 +10394,7 @@ async function saveFlight(){
   if(!S.documents.tickets) S.documents.tickets = {};
   if(!S.documents.tickets.flightsList) S.documents.tickets.flightsList = [];
   var people = getActiveTravelerList();
-  var participants = (S.newFlightParticipants && S.newFlightParticipants.length) ? activeFlightParticipants(S.newFlightParticipants) : people.slice();
+  var participants = activeFlightParticipants(Array.isArray(S.newFlightParticipants)?S.newFlightParticipants:[]);
 
   var saveBtn=document.getElementById('saveFlightBtn');
   var flightId=S.editingFlightId||Date.now();
@@ -10391,8 +10403,8 @@ async function saveFlight(){
   // conservées silencieusement pour qu'une modification ne détruise aucune donnée.
   var link=existingFlight?(existingFlight.link||''):'';
   var notes=existingFlight?(existingFlight.notes||''):'';
-  var flightPayload={id:flightId,from:from,to:to,date:date,arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants};
-  var metaPayload={arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,notes:notes};
+  var flightPayload={id:flightId,from:from,to:to,date:date,arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants,participantsSpecified:true};
+  var metaPayload={arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,notes:notes,participantsSpecified:true};
   try{
     if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='…'; }
     var flightWrite;
@@ -10421,7 +10433,7 @@ async function saveFlight(){
   } else {
     S.documents.tickets.flightsList.push(flightPayload);
   }
-  S.newFlightParticipants = people.slice();
+  S.newFlightParticipants = [];
   save();
   renderContent();
 }
@@ -10447,7 +10459,7 @@ async function loadFlights(){
   // Serveur autoritaire : reconstruction complète de la liste des vols.
   S.documents.tickets.flightsList = (data||[]).map(function(row){
     var meta=(S.flightMeta&&S.flightMeta[String(row.id)])||{};
-    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,arrivalDate:meta.arrivalDate||'',departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[]};
+    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,arrivalDate:meta.arrivalDate||'',departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[],participantsSpecified:meta.participantsSpecified===true||(row.participants||[]).length>0};
   }).sort(function(a,b){
     var ak=(a.date||'')+' '+(a.departureTime||'');
     var bk=(b.date||'')+' '+(b.departureTime||'');
