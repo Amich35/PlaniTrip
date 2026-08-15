@@ -6880,6 +6880,9 @@ function openCityDatesModal(ck, cityLabel){
     '<div class="ef-row" style="margin-bottom:8px;gap:10px"><div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Arrivée</div><input class="ef-input" id="guideModalDateStart" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(startVal||'')+'"/></div>'
     +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Départ</div><input class="ef-input" id="guideModalDateEnd" type="date" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none" value="'+escHtml(cur.end?endVal:'')+'"/></div></div>';
   _guideModalSaveFn = saveCityDatesModal;
+  // Réinitialiser le CTA avant ouverture
+  var _cityDatesCtaBtn = document.querySelector('#guideItemModal .modal-cta');
+  if(_cityDatesCtaBtn){ _cityDatesCtaBtn.disabled = false; _cityDatesCtaBtn.textContent = 'Enregistrer'; }
   document.getElementById('guideItemModal').classList.add('open');
   wireDateRangeSync('guideModalDateStart', 'guideModalDateEnd');
   var _btnRow = document.querySelector('#guideItemModal .share-sheet > div[style*="display:flex"]');
