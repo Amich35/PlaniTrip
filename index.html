@@ -907,6 +907,35 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .flight-date-input:focus,.flight-time-input:focus{outline:none!important;background:#fff!important;border-color:rgba(45,106,79,.3)!important;}
 .flight-field-clear{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:rgba(29,29,31,.1);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;margin-left:-4px;visibility:hidden;}
 .flight-field-clear.visible{visibility:visible;}
+
+/* ── Change Events — clochette ── */
+.ce-bell-btn{position:relative;width:36px;height:36px;border-radius:50%;border:none;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);flex-shrink:0;}
+.ce-badge{position:absolute;top:-1px;right:-1px;min-width:16px;height:16px;border-radius:8px;background:var(--red-muted,#E76F51);border:1.5px solid var(--sand,#F8F6F2);font-size:9px;font-weight:700;color:#fff;display:none;align-items:center;justify-content:center;padding:0 3px;}
+
+/* ── Change Events — panel ── */
+.ce-panel{position:fixed;top:0;right:0;bottom:0;left:0;z-index:500;pointer-events:none;}
+.ce-panel.open{pointer-events:all;}
+.ce-panel-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0);transition:background 0.2s;}
+.ce-panel.open .ce-panel-backdrop{background:rgba(0,0,0,0.3);}
+.ce-panel-sheet{position:absolute;top:0;right:0;bottom:0;width:min(360px,100vw);background:var(--parchment,#F8F6F2);box-shadow:-4px 0 24px rgba(0,0,0,0.12);transform:translateX(100%);transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);display:flex;flex-direction:column;}
+.ce-panel.open .ce-panel-sheet{transform:translateX(0);}
+.ce-panel-header{display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top)) 16px 12px;border-bottom:1px solid rgba(29,29,31,0.08);}
+.ce-panel-title{font-size:17px;font-weight:700;color:var(--ink);}
+.ce-panel-close{width:32px;height:32px;border-radius:50%;border:none;background:rgba(29,29,31,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-muted);}
+.ce-panel-list{flex:1;overflow-y:auto;padding:8px 0;}
+.ce-dismiss-all-btn{width:calc(100% - 32px);margin:0 16px 16px;padding:11px;border:none;border-radius:var(--r12);background:rgba(29,29,31,0.06);color:var(--red-muted,#E76F51);font-size:13px;font-weight:600;cursor:pointer;}
+
+/* ── Change Events — item ── */
+.ce-item{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(29,29,31,0.06);background:#fff;margin:0 0 1px;}
+.ce-item-icon{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(45,106,79,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-top:2px;}
+.ce-item-body{flex:1;min-width:0;}
+.ce-item-summary{font-size:13px;font-weight:500;color:var(--ink);line-height:1.35;}
+.ce-item-time{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+.ce-item-dismiss{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:rgba(29,29,31,0.08);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;margin-top:2px;}
+
+/* ── Toast succès auteur ── */
+.success-toast{position:fixed;bottom:calc(88px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink,#1D1D1F);color:#fff;font-size:13px;font-weight:500;padding:9px 18px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.18);opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;white-space:nowrap;z-index:600;}
+.success-toast.visible{opacity:1;transform:translateX(-50%) translateY(0);}
 .flight-modal-sheet{position:relative;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;padding:24px 18px calc(24px + env(safe-area-inset-bottom));}
 .flight-modal-close{position:absolute;right:14px;top:16px;width:30px;height:30px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .flight-modal-sheet .modal-title{font-size:20px;margin:4px 38px 18px 0;}
@@ -1201,9 +1230,27 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <button class="search-icon-btn" onclick="openSearch()"><span class="icon" id="ni-search"></span></button>
+      <button class="ce-bell-btn" onclick="toggleCePanel()" aria-label="Activité récente">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="ce-badge" id="ce-badge"></span>
+      </button>
       <button class="access-pill" onclick="showAccessManagementScreen()" style="display:flex;align-items:center;gap:6px;"><span class="icon icon-sm" id="ni-share"></span> Voyageurs</button>
     </div>
   </div>
+  <!-- Panel Activité récente -->
+  <div class="ce-panel" id="ce-panel">
+    <div class="ce-panel-backdrop" onclick="closeCePanel()"></div>
+    <div class="ce-panel-sheet">
+      <div class="ce-panel-header">
+        <span class="ce-panel-title">Activité récente</span>
+        <button class="ce-panel-close" onclick="closeCePanel()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="ce-panel-list" id="ce-panel-list"></div>
+      <button class="ce-dismiss-all-btn" id="ce-dismiss-all" onclick="dismissAllChangeEvents()" style="display:none">Tout supprimer</button>
+    </div>
+  </div>
+  <!-- Toast succès -->
+  <div class="success-toast" id="success-toast"></div>
   <div class="content" id="mainContent"></div>
   <div id="pullRefreshIndicator" style="position:fixed;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;height:0;overflow:hidden;transition:height 0.15s;z-index:60;pointer-events:none;">
     <div style="display:flex;align-items:center;gap:6px;background:var(--parchment);padding:8px 16px;border-radius:20px;box-shadow:var(--shadow-md);margin-top:8px;">
@@ -2489,6 +2536,189 @@ function ensureStateDefaults(){
   if(!S.convDir) S.convDir={};
 }
 ensureStateDefaults();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHANGE EVENTS — journal collaboratif
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Identité de l'acteur courant
+function _ceActorLabel(){
+  if(!CURRENT_USER) return 'Quelqu\'un';
+  return personDisplayName(CURRENT_USER.email, 'Toi');
+}
+
+// Clé de regroupement : même acteur + même entité dans les 5 dernières minutes
+function _ceGroupKey(entityType, entityId){
+  var slot = Math.floor(Date.now() / (5*60*1000)); // fenêtre 5 min
+  return (CURRENT_TRIP ? CURRENT_TRIP.id : '') + '|' + (CURRENT_USER ? CURRENT_USER.id : '') + '|' + entityType + '|' + (entityId||'') + '|' + slot;
+}
+
+// Écriture dans change_events — fire-and-forget (ne doit jamais bloquer l'écriture métier)
+async function postChangeEvent(entityType, action, opts){
+  opts = opts || {};
+  if(!sb || !CURRENT_TRIP || !CURRENT_USER) return;
+  try{
+    var gk = _ceGroupKey(entityType, opts.entityId||'');
+    // Regroupement : si même group_key récente, on ne reposte pas
+    var existing = await sb.from('change_events')
+      .select('id')
+      .eq('trip_id', CURRENT_TRIP.id)
+      .eq('group_key', gk)
+      .gte('created_at', new Date(Date.now() - 5*60*1000).toISOString())
+      .maybeSingle();
+    if(existing && existing.data) return; // déjà groupé
+    await sb.from('change_events').insert({
+      trip_id:       CURRENT_TRIP.id,
+      actor_user_id: CURRENT_USER.id,
+      actor_label:   _ceActorLabel(),
+      action:        action,
+      entity_type:   entityType,
+      entity_id:     opts.entityId   || null,
+      entity_label:  opts.entityLabel|| null,
+      summary:       opts.summary    || null,
+      deep_link:     opts.deepLink   || null,
+      meta:          opts.meta       || null,
+      group_key:     gk
+    });
+  } catch(e){ console.warn('[PlaniTrip] postChangeEvent:', e); }
+}
+
+// Chargement des événements non-dismissed pour l'utilisateur courant
+var _ceEvents = [];
+var _ceLoaded = false;
+async function loadChangeEvents(){
+  if(!sb || !CURRENT_TRIP || !CURRENT_USER) return;
+  try{
+    // Événements du voyage des 30 derniers jours
+    var {data:events} = await sb.from('change_events')
+      .select('*')
+      .eq('trip_id', CURRENT_TRIP.id)
+      .gte('created_at', new Date(Date.now() - 30*24*60*60*1000).toISOString())
+      .order('created_at', {ascending:false})
+      .limit(100);
+    // Événements dismissés par cet utilisateur
+    var {data:dismissed} = await sb.from('change_events_dismissed')
+      .select('event_id')
+      .eq('user_id', CURRENT_USER.id);
+    var dismissedIds = new Set((dismissed||[]).map(function(d){return d.event_id;}));
+    // Filtrer les propres événements + les dismissés
+    _ceEvents = (events||[]).filter(function(e){
+      return e.actor_user_id !== CURRENT_USER.id && !dismissedIds.has(e.id);
+    });
+    _ceLoaded = true;
+    _updateCeBadge();
+  } catch(e){ console.warn('[PlaniTrip] loadChangeEvents:', e); }
+}
+
+// Dismiss un événement (swipe ou bouton)
+async function dismissChangeEvent(eventId){
+  if(!sb || !CURRENT_USER) return;
+  try{
+    await sb.from('change_events_dismissed').insert({user_id:CURRENT_USER.id, event_id:eventId});
+    _ceEvents = _ceEvents.filter(function(e){return e.id!==eventId;});
+    _updateCeBadge();
+    _renderCePanel();
+  } catch(e){ console.warn('[PlaniTrip] dismissChangeEvent:', e); }
+}
+
+// Dismiss tout
+async function dismissAllChangeEvents(){
+  if(!sb || !CURRENT_USER || !_ceEvents.length) return;
+  try{
+    var rows = _ceEvents.map(function(e){return {user_id:CURRENT_USER.id, event_id:e.id};});
+    await sb.from('change_events_dismissed').insert(rows);
+    _ceEvents = [];
+    _updateCeBadge();
+    _renderCePanel();
+  } catch(e){ console.warn('[PlaniTrip] dismissAllChangeEvents:', e); }
+}
+
+// Mise à jour du badge numéroté
+function _updateCeBadge(){
+  var badge = document.getElementById('ce-badge');
+  var count = _ceEvents.length;
+  if(!badge) return;
+  if(count > 0){
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Formatage de la date relative
+function _ceRelativeTime(isoStr){
+  var ms = Date.now() - new Date(isoStr).getTime();
+  var min = Math.floor(ms/60000);
+  if(min < 1) return 'à l\'instant';
+  if(min < 60) return 'il y a ' + min + ' min';
+  var h = Math.floor(min/60);
+  if(h < 24) return 'il y a ' + h + 'h';
+  var d = Math.floor(h/24);
+  if(d < 7) return 'il y a ' + d + 'j';
+  return new Date(isoStr).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+}
+
+// Icône par entity_type
+function _ceEntityIcon(entityType){
+  var map = {
+    activity:'zap', city:'map-pin', accommodation:'bed', flight:'plane',
+    movement:'route', budget:'coins', checklist:'check-square', feed:'message-circle', country:'globe'
+  };
+  return svgIcon(map[entityType]||'bell', 14);
+}
+
+// Rendu du panel Activité récente
+function _renderCePanel(){
+  var panel = document.getElementById('ce-panel');
+  if(!panel) return;
+  var events = _ceEvents;
+  var inner = events.length === 0
+    ? '<div style="padding:32px 0;text-align:center;color:var(--ink-muted);font-size:13px">Aucune activité récente</div>'
+    : events.map(function(e){
+        var summary = escHtml(e.summary || (e.actor_label + ' a modifié ' + e.entity_type));
+        var time = _ceRelativeTime(e.created_at);
+        var link = e.deep_link
+          ? '<button onclick="closeCePanel();'+escHtml(e.deep_link)+'" style="flex-shrink:0;padding:5px 10px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer">Voir</button>'
+          : '';
+        return '<div class="ce-item" data-id="'+escHtml(e.id)+'">'
+          +'<span class="ce-item-icon">'+_ceEntityIcon(e.entity_type)+'</span>'
+          +'<div class="ce-item-body">'
+            +'<div class="ce-item-summary">'+summary+'</div>'
+            +'<div class="ce-item-time">'+escHtml(time)+'</div>'
+          +'</div>'
+          +link
+          +'<button class="ce-item-dismiss" onclick="dismissChangeEvent(\''+escHtml(e.id)+'\')" aria-label="Ignorer">'+svgIcon('x',12)+'</button>'
+          +'</div>';
+      }).join('');
+  document.getElementById('ce-panel-list').innerHTML = inner;
+  // Bouton Tout supprimer
+  var allBtn = document.getElementById('ce-dismiss-all');
+  if(allBtn) allBtn.style.display = events.length > 0 ? 'block' : 'none';
+}
+
+// Ouvrir/fermer le panel
+function toggleCePanel(){
+  var panel = document.getElementById('ce-panel');
+  if(!panel) return;
+  var isOpen = panel.classList.contains('open');
+  if(isOpen){ closeCePanel(); }
+  else { panel.classList.add('open'); _renderCePanel(); }
+}
+function closeCePanel(){
+  var panel = document.getElementById('ce-panel');
+  if(panel) panel.classList.remove('open');
+}
+
+// Toast de confirmation auteur
+function showSuccessToast(msg){
+  var t = document.getElementById('success-toast');
+  if(!t) return;
+  t.textContent = msg || 'Modification enregistrée';
+  t.classList.add('visible');
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(function(){ t.classList.remove('visible'); }, 2500);
+}
 
 function rebuildCountriesFromState(){
   COUNTRIES.length = 0;
@@ -4193,6 +4423,15 @@ async function saveAccom(ck) {
     save();
     renderContent();
     document.getElementById('accomModal').classList.remove('open');
+    showSuccessToast('Logement enregistré');
+    var _isNew = !existing;
+    postChangeEvent('accommodation', _isNew ? 'add' : 'update', {
+      entityId: ck,
+      entityLabel: name || ck,
+      summary: _ceActorLabel() + (_isNew ? ' a ajouté un logement' : ' a modifié un logement') + (name ? ' · ' + name : ''),
+      deepLink: 'S.tab=\'countries\';S.currentCityKey=\''+ck+'\';save();renderContent();',
+      meta: {cityKey: ck, name: name}
+    });
   }
 
   // Chevauchement avec un autre logement de la même ville — désormais
@@ -4303,6 +4542,8 @@ function deleteAccomEntry(ck, id){
     S.accom[ck] = nextAccomList;
     save();
     renderContent();
+    showSuccessToast('Logement supprimé');
+    postChangeEvent('accommodation', 'delete', {entityId:ck, summary: _ceActorLabel()+' a supprimé un logement', meta:{cityKey:ck}});
   }, 'Supprimer');
 }
 
@@ -5359,6 +5600,14 @@ async function _createActivityCore(cityKey, val, opts){
       if(_pendingState.hasInitialDetails && window._customDetails && window._customDetails[_stableKey]){
         sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_stableKey,data:window._customDetails[_stableKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
       }
+      // Événement collaboratif
+      postChangeEvent('activity', 'add', {
+        entityId: _stableKey,
+        entityLabel: val,
+        summary: _ceActorLabel() + ' a ajouté une activité · ' + val,
+        deepLink: 'S.tab=\'countries\';S.currentCityKey=\''+cityKey+'\';save();renderContent();',
+        meta: {cityKey: cityKey, actKey: _stableKey, name: val}
+      });
     }
   }
 }
@@ -8362,7 +8611,11 @@ async function saveMovementModal(){
   });
   if(_movementDraft.status==='incomplete'&&movementMissingCount(_movementDraft)===0)_movementDraft.status='planned';
   var btn=document.getElementById('movementModalSaveBtn');btn.disabled=true;btn.textContent='Enregistrement…';
-  try{var next=JSON.parse(JSON.stringify(_movementDraft));var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();}
+  try{var next=JSON.parse(JSON.stringify(_movementDraft));var saved=await persistMovement(next);S.movements[saved.id]=saved;save();closeMovementModal();renderContent();
+    showSuccessToast(isNewMovement ? 'Déplacement ajouté' : 'Déplacement modifié');
+    var _mvLabel = (saved.origin||'')+(saved.destination?' → '+saved.destination:'');
+    postChangeEvent('movement', isNewMovement ? 'add' : 'update', {entityId:saved.id, entityLabel:_mvLabel, summary: _ceActorLabel()+(isNewMovement?' a ajouté un déplacement':' a modifié un déplacement')+(saved.origin?' · '+_mvLabel:''), meta:{origin:saved.origin, destination:saved.destination}});
+  }
   catch(e){console.error('[PlaniTrip] save movement:',e);alert('Impossible d’enregistrer ce déplacement pour le moment.');btn.disabled=false;btn.textContent='Enregistrer';}
 }
 var _movementTrashBusy={};
@@ -10132,6 +10385,14 @@ async function addExpGlobal(){
   S.editingExpenseId=null;
   S.expDesc='';S.expAmt='';S.expCountry=country;S.expCity='';S.expActivity='';S.expSplitOverrides={};S.expDate='';
   save();renderContent();closeAddExpenseModal();
+  var _expLabel = (desc||'Dépense') + ' · ' + (amt ? String(amt)+' '+(getCurrencySymbol(COUNTRIES.find(function(c){return c.id===country;}))||'') : '');
+  showSuccessToast(editingId ? 'Dépense modifiée' : 'Dépense ajoutée');
+  postChangeEvent('budget', editingId ? 'update' : 'add', {
+    entityId: String(newId),
+    entityLabel: _expLabel,
+    summary: _ceActorLabel() + (editingId ? ' a modifié une dépense · ' : ' a ajouté une dépense · ') + _expLabel,
+    meta: {country:country, city:city, amount:amt, desc:desc}
+  });
 }
 
 // ── DOCUMENTS ────────────────────────────────────────────────
@@ -10502,6 +10763,7 @@ async function saveFlight(){
   var participants = activeFlightParticipants(Array.isArray(S.newFlightParticipants)?S.newFlightParticipants:[]);
 
   var saveBtn=document.getElementById('saveFlightBtn');
+  var _isEditingFlight = !!S.editingFlightId;
   var flightId=S.editingFlightId||Date.now();
   var existingFlight=S.editingFlightId?S.documents.tickets.flightsList.find(function(f){return f.id===S.editingFlightId;}):null;
   // Les champs ont été retirés de l'interface, mais leurs anciennes valeurs sont
@@ -10542,6 +10804,14 @@ async function saveFlight(){
   document.getElementById('flightModal').classList.remove('open');
   save();
   renderContent();
+  var _flightLabel = (from&&to) ? from+' → '+to : 'Vol';
+  showSuccessToast(_isEditingFlight ? 'Vol modifié' : 'Vol ajouté');
+  postChangeEvent('flight', _isEditingFlight ? 'update' : 'add', {
+    entityId: String(flightId),
+    entityLabel: _flightLabel,
+    summary: _ceActorLabel() + (_isEditingFlight ? ' a modifié le vol ' : ' a ajouté le vol ') + _flightLabel,
+    meta: {from:from, to:to, date:date}
+  });
 }
 function removeFlight(index){
   if(!S.documents.tickets || !S.documents.tickets.flightsList) return;
@@ -15104,6 +15374,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   await loadFeedSeenState();
   updateFeedBadge();
   await loadProfiles();
+  loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
   if(!skipAutofillDates) autofillMissingCountryDates();
