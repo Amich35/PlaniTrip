@@ -7955,7 +7955,7 @@ function movementFormatDuration(value,item){
   var minutes=parseAmt(value);if(isNaN(minutes))return '';
   if(minutes<60)return Number(minutes).toLocaleString('fr-FR',{maximumFractionDigits:2})+' min';
   var totalMinutes=Math.round(minutes),wholeHours=Math.floor(totalMinutes/60),remainingMinutes=totalMinutes%60;
-  return wholeHours+' h'+(remainingMinutes?' '+remainingMinutes:'');
+  return wholeHours+'h'+(remainingMinutes?String(remainingMinutes).padStart(2,'0'):'');
 }
 function changeMovementDurationUnit(inputId,selectEl){
   var input=document.getElementById(inputId);if(!input)return;
