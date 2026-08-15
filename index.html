@@ -2698,7 +2698,7 @@ function _renderCePanel(){
         if(e.deep_link) _ceDeepLinks[e.id] = e.deep_link;
         var itemClick = e.deep_link
           ? ' onclick="ceSeeEvent(\''+escHtml(e.id)+'\')" style="cursor:pointer"'
-          : ' onclick="dismissChangeEvent(\''+escHtml(e.id)+'\')" style="cursor:pointer"';
+          : ' style="cursor:default"';
         return '<div class="ce-item"'+itemClick+' data-id="'+escHtml(e.id)+'">'
           +'<span class="ce-item-icon">'+_ceEntityIcon(e.entity_type)+'</span>'
           +'<div class="ce-item-body">'
@@ -2720,7 +2720,6 @@ var _ceDeepLinks = {};
 // Voir un événement : dismiss + navigation
 function ceSeeEvent(eventId){
   var deepLink = _ceDeepLinks[eventId];
-  dismissChangeEvent(eventId);
   closeCePanel();
   if(deepLink){
     try{ eval(deepLink); } catch(e){ console.warn('[PlaniTrip] ceSeeEvent deepLink:', e); }
