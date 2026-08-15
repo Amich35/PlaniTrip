@@ -10840,6 +10840,7 @@ async function saveFlight(){
     entityId: String(flightId),
     entityLabel: _flightLabel,
     summary: _ceActorLabel() + (_isEditingFlight ? ' a modifié le vol ' : ' a ajouté le vol ') + _flightLabel,
+    deepLink: 'S.tab=\'documents\';S.openDocType=\'tickets\';save();renderContent();',
     meta: {from:from, to:to, date:date}
   });
 }
