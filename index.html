@@ -10422,6 +10422,7 @@ async function addExpGlobal(){
     entityId: String(newId),
     entityLabel: _expLabel,
     summary: _ceActorLabel() + (editingId ? ' a modifié une dépense · ' : ' a ajouté une dépense · ') + _expLabel,
+    deepLink: 'S.tab=\'budget\';save();renderContent();',
     meta: {country:country, city:city, amount:amt, desc:desc}
   });
 }
