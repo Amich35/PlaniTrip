@@ -8544,9 +8544,9 @@ function renderArchivedActivitiesScreen(){
   var rows = items.length
     ? items.map(function(item,ti){
         var name = item._builtinIndex!==undefined ? ((city&&city.acts[item._builtinIndex])||{}).n||'Activité supprimée' : (item.n||'Activité supprimée');
-        return '<div class="more-row"><span class="more-row-label">'+escHtml(name)+'</span>'
-          +'<button onclick="restoreActivity(\''+jsStrEsc(ck)+'\','+ti+')" style="padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button>'
-          +'<button onclick="deleteActivityPermanently(\''+jsStrEsc(ck)+'\','+ti+')" style="margin-left:6px;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer définitivement</button></div>';
+        return '<div class="more-row" style="display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;padding:10px 4px"><span class="more-row-label" style="min-width:0;overflow:hidden;text-overflow:ellipsis">'+escHtml(name)+'</span>'
+          +'<button onclick="restoreActivity(\''+jsStrEsc(ck)+'\','+ti+')" style="white-space:nowrap;padding:6px 12px;border-radius:10px;border:1px solid rgba(45,106,79,0.3);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600">Restaurer</button>'
+          +'<button onclick="deleteActivityPermanently(\''+jsStrEsc(ck)+'\','+ti+')" style="white-space:nowrap;padding:6px 10px;border-radius:10px;border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-size:12px;font-weight:600">Supprimer</button></div>';
       }).join('')
     : '<div style="padding:24px 4px;text-align:center;color:var(--ink-muted);font-size:13px">Corbeille vide.</div>';
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
