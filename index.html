@@ -905,6 +905,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .flight-time-input::-webkit-datetime-edit{display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:0;}
 .flight-time-input[value=""]::-webkit-datetime-edit{color:var(--ink-muted);font-weight:400;}
 .flight-date-input:focus,.flight-time-input:focus{outline:none!important;background:#fff!important;border-color:rgba(45,106,79,.3)!important;}
+.flight-field-clear{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:none;background:rgba(29,29,31,.1);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;margin-left:-4px;}
 .flight-modal-sheet{position:relative;max-height:92vh;max-height:92dvh;overflow-y:auto;overflow-x:hidden;padding:24px 18px calc(24px + env(safe-area-inset-bottom));}
 .flight-modal-close{position:absolute;right:14px;top:16px;width:30px;height:30px;border:none;border-radius:50%;background:var(--sand-deep);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .flight-modal-sheet .modal-title{font-size:20px;margin:4px 38px 18px 0;}
@@ -10420,11 +10421,36 @@ function renderFlightModalBody(editingFlight){
     +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('calendar',13)+' Arrivée</div><div class="flight-stop-fields"><input id="newFlightArrivalDate" class="flight-date-input" type="date" value="'+(editingFlight?escHtml(editingFlight.arrivalDate||''):'')+'"><input id="newFlightArrivalTime" class="flight-time-input" type="time" style="-webkit-appearance:none;appearance:none" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'"></div></div></div>'
     +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details></div>';
   var btn=document.getElementById('saveFlightBtn');if(btn)btn.textContent=editingFlight?'Enregistrer les modifications':'Ajouter le vol';
+  // Inject clear buttons after each date/time input
+  [
+    {inputId:'newFlightDate',      btnId:'btnClearDate',    hasVal:!!(editingFlight&&editingFlight.date)},
+    {inputId:'newFlightDepartureTime', btnId:'btnClearDepTime', hasVal:!!(editingFlight&&editingFlight.departureTime)},
+    {inputId:'newFlightArrivalDate',   btnId:'btnClearArrDate', hasVal:!!(editingFlight&&editingFlight.arrivalDate)},
+    {inputId:'newFlightArrivalTime',   btnId:'btnClearArrTime', hasVal:!!(editingFlight&&editingFlight.arrivalTime)}
+  ].forEach(function(cfg){
+    var input = document.getElementById(cfg.inputId);
+    if(!input) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = cfg.btnId;
+    b.className = 'flight-field-clear';
+    b.innerHTML = svgIcon('x', 11);
+    b.style.display = cfg.hasVal ? 'flex' : 'none';
+    b.onclick = function(){ clearFlightField(cfg.inputId, cfg.btnId); };
+    input.addEventListener('change', function(){ b.style.display = this.value ? 'flex' : 'none'; });
+    input.parentNode.insertBefore(b, input.nextSibling);
+  });
 }
 function cancelEditFlight(){
   S.editingFlightId = null;
   S.newFlightParticipants = [];
   document.getElementById('flightModal').classList.remove('open');
+}
+function clearFlightField(inputId, btnId){
+  var el = document.getElementById(inputId);
+  if(el){ el.value = ''; }
+  var btn = document.getElementById(btnId);
+  if(btn) btn.style.display = 'none';
 }
 function normalizeFlightTimeValue(value){
   var s=String(value||'').trim();
