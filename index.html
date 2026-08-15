@@ -843,7 +843,6 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .flights-list-count{font-size:11.5px;color:var(--ink-subtle);}
 .flight-card{background:#fff;border:1px solid rgba(100,70,30,.11);border-radius:var(--r16);box-shadow:0 2px 9px rgba(29,29,31,.035);overflow:hidden;}
 .flight-card-head{width:100%;border:none;background:transparent;display:flex;align-items:flex-start;gap:10px;padding:14px;text-align:left;cursor:pointer;font-family:inherit;color:inherit;}
-.flight-card-icon{width:30px;height:30px;border-radius:50%;background:rgba(45,106,79,.09);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .flight-card-main{flex:1;min-width:0;}
 .flight-card-route{font-size:14px;font-weight:700;color:var(--ink);line-height:1.3;}
 .flight-card-schedule{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;margin-top:6px;font-size:11.5px;color:var(--ink-muted);line-height:1.35;}
@@ -10328,7 +10327,7 @@ function renderFlightsList(flights){
     var open=String(S.expandedFlightId||'')===String(f.id),duration=intercountryFlightDuration(f)||'Non calculée';
     return '<div class="flight-card'+(open?' open':'')+'">'
       +'<button type="button" class="flight-card-head" onclick="toggleFlightCard(\''+jsStrEsc(String(f.id))+'\')">'
-      +'<span class="flight-card-icon">'+svgIcon('plane',15)+'</span><span class="flight-card-main">'
+      +'<span class="flight-card-main">'
       +'<span class="flight-card-route">'+escHtml(f.from||'Départ')+' → '+escHtml(f.to||'Arrivée')+'</span>'
       +'<span class="flight-card-schedule"><span>'+escHtml(departureLabel)+'</span><span class="flight-card-schedule-arrow">'+svgIcon('arrow-right',11)+'</span><span>'+escHtml(arrivalLabel)+'</span></span>'
       +'<span class="flight-card-travelers">'+svgIcon('users',11)+' '+escHtml(namesLabel)+'</span></span>'
