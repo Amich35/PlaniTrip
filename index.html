@@ -9369,13 +9369,18 @@ function renderIntercountryConnection(fromCountry,toCountry,index,flight,movemen
 
 function renderCountriesScreen(){
   var ts = getTripStatus();
-  const totalDays=COUNTRIES.reduce(function(s,c){return s+c.days;},0);
-  const tripDay=Math.max(1, Math.min(totalDays, ts.elapsedDays+1));
-  const tripPct=totalDays>0?Math.round((tripDay/totalDays)*100):0;
+  var globalStart=(typeof CURRENT_TRIP!=='undefined'&&CURRENT_TRIP&&CURRENT_TRIP.start_date)||'';
+  var globalEnd=(typeof CURRENT_TRIP!=='undefined'&&CURRENT_TRIP&&CURRENT_TRIP.end_date)||'';
+  var globalDuration=globalStart&&globalEnd?Math.round((new Date(globalEnd+'T00:00:00')-new Date(globalStart+'T00:00:00'))/86400000):0;
+  const totalDays=globalDuration>0?globalDuration:COUNTRIES.reduce(function(s,c){return s+c.days;},0);
+  var journeyElapsed=ts.elapsedDays;
+  if(globalDuration>0){var journeyToday=new Date();journeyToday.setHours(0,0,0,0);journeyElapsed=Math.round((journeyToday-new Date(globalStart+'T00:00:00'))/86400000);}
+  const tripDay=Math.max(1,Math.min(totalDays,journeyElapsed+1));
+  const tripPct=totalDays>0?Math.round((Math.max(0,Math.min(totalDays,journeyElapsed))/totalDays)*100):0;
   var tripRecap=COUNTRIES.length+' pays';
-  var journeyStatus=ts.elapsedDays<0?'Départ dans '+Math.abs(ts.elapsedDays)+' jours':(ts.elapsedDays>=totalDays?'Voyage terminé':'Jour '+tripDay+' sur '+totalDays);
-  var journeyProgress=ts.elapsedDays<0?0:tripPct;
-  var journeyHead='<div class="countries-journey-head"><div class="countries-journey-head-main"><div><div class="countries-journey-title">Votre itinéraire</div><div class="countries-journey-meta">'+tripRecap+' · '+totalDays+' jours</div></div><div class="countries-journey-countdown">'+svgIcon(ts.elapsedDays<0?'plane':'map-pin',14)+' '+journeyStatus+'</div></div><div class="countries-journey-progress"><span style="width:'+journeyProgress+'%"></span></div></div>';
+  var journeyStatus=journeyElapsed<0?'Départ dans '+Math.abs(journeyElapsed)+' jours':(journeyElapsed>=totalDays?'Voyage terminé':'Jour '+tripDay+' sur '+totalDays);
+  var journeyProgress=journeyElapsed<0?0:tripPct;
+  var journeyHead='<div class="countries-journey-head"><div class="countries-journey-head-main"><div><div class="countries-journey-title">Votre itinéraire</div><div class="countries-journey-meta">'+tripRecap+' · '+totalDays+' jours</div></div><div class="countries-journey-countdown">'+svgIcon(journeyElapsed<0?'plane':'map-pin',14)+' '+journeyStatus+'</div></div><div class="countries-journey-progress"><span style="width:'+journeyProgress+'%"></span></div></div>';
 
   var list = COUNTRIES;
 
