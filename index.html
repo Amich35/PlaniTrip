@@ -374,6 +374,12 @@ html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-beh
 .country-connection-status.missing{color:var(--status-upcoming);background:var(--status-upcoming-pale);}
 .country-connection-detail{margin-top:9px;padding-top:9px;border-top:1px solid rgba(29,29,31,.06);font-size:10.5px;color:var(--ink-muted);line-height:1.45;}
 .country-connection-action{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:8px;padding:8px;border:none;border-radius:10px;background:rgba(45,106,79,.08);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;}
+.country-connection-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.country-connection-actions .country-connection-action{margin-top:0;}
+.transport-mode-sheet{background:var(--parchment);border-radius:var(--r24) var(--r24) 0 0;padding:24px 20px calc(28px + env(safe-area-inset-bottom));width:100%;max-width:430px;box-shadow:0 -4px 32px rgba(100,70,30,.12);}
+.transport-mode-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:16px;}
+.transport-mode-btn{border:1px solid rgba(100,70,30,.13);background:#fff;border-radius:var(--r16);padding:14px 12px;display:flex;align-items:center;gap:9px;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;}
+.transport-mode-btn span:first-child{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(45,106,79,.08);color:var(--accent);}
 .country-card:active{transform:scale(0.985);box-shadow:0 1px 6px rgba(29,29,31,0.05);}
 .cc-thumb{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;}
 .city-thumb{width:104px;height:104px;border-radius:18px;background:linear-gradient(135deg,#2D6A4F,#1F4D39) center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
@@ -7916,6 +7922,8 @@ function movementModeIcon(mode){
   if(m.indexOf('marche')>-1) return svgIcon('person-walking',16);
   if(m.indexOf('métro')>-1||m.indexOf('metro')>-1) return svgIcon('tram-front',16);
   if(m.indexOf('bus')>-1) return svgIcon('bus',16);
+  if(m.indexOf('ferry')>-1) return svgIcon('ship',16);
+  if(m.indexOf('voiture')>-1) return svgIcon('car',16);
   if(m.indexOf('avion')>-1||m.indexOf('vol')>-1) return svgIcon('plane',16);
   if(m.indexOf('train')>-1) return svgIcon('train-front',16);
   return svgIcon('route',16);
@@ -8130,6 +8138,7 @@ function movementDraftFromInputs(skipPrices){
     var costEl=document.getElementById('mvl_'+i+'_costDisplay');
     if(!skipPrices&&costEl)l.costJPY=movementDisplayToLocal(costEl.value,_movementDraft);
   });
+  if(_movementDraft.scope==='intercountry'&&_movementDraft.legs&&_movementDraft.legs.length===1)_movementDraft.primaryMode=_movementDraft.legs[0].mode||_movementDraft.primaryMode;
   if(!skipPrices&&!_movementDraft.costManualOverride)_movementDraft.costPerPersonJPY=movementCalculatedCost(_movementDraft);
 }
 function changeMovementCurrency(mode){
@@ -8184,7 +8193,7 @@ function renderMovementModalBody(){
   var legs='<div class="mv-timeline">'+(m.legs||[]).map(function(l,i){
     var open=_movementOpenLeg===i;var incomplete=!l.from||!l.to;var legMeta=[];if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
     var fields=open?'<div class="mv-leg-fields">'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Mode de transport</span><select class="ef-select" id="mvl_'+i+'_mode"><option'+(l.mode==='Train'?' selected':'')+'>Train</option><option'+(l.mode==='Métro'?' selected':'')+'>Métro</option><option'+(l.mode==='Marche'?' selected':'')+'>Marche</option><option'+(l.mode==='Bus'?' selected':'')+'>Bus</option><option'+(l.mode==='Avion'?' selected':'')+'>Avion</option><option'+(l.mode==='Autre'?' selected':'')+'>Autre</option></select></label>'
+      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Mode de transport</span><select class="ef-select" id="mvl_'+i+'_mode"><option'+(l.mode==='Train'?' selected':'')+'>Train</option><option'+(l.mode==='Métro'?' selected':'')+'>Métro</option><option'+(l.mode==='Marche'?' selected':'')+'>Marche</option><option'+(l.mode==='Bus'?' selected':'')+'>Bus</option><option'+(l.mode==='Ferry'?' selected':'')+'>Ferry</option><option'+(l.mode==='Voiture'?' selected':'')+'>Voiture</option><option'+(l.mode==='Avion'?' selected':'')+'>Avion</option><option'+(l.mode==='Autre'?' selected':'')+'>Autre</option></select></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Ligne</span><input class="ef-input" id="mvl_'+i+'_line" value="'+escHtml(l.line||'')+'"></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Départ</span><input class="ef-input" id="mvl_'+i+'_from" value="'+escHtml(l.from||'')+'"></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mvl_'+i+'_to" value="'+escHtml(l.to||'')+'"></label>'
@@ -9221,6 +9230,12 @@ function intercountryFlightAssignments(countries){
   });
   return assigned;
 }
+function intercountryMovementForPair(fromCountryId,toCountryId){
+  return Object.keys(S.movements||{}).map(function(id){return S.movements[id];}).find(function(m){return m&&m.scope==='intercountry'&&m.fromCountryId===fromCountryId&&m.toCountryId===toCountryId&&!m.archived&&!m.permanentlyDeleted;})||null;
+}
+function intercountryModeIconName(mode){
+  var value=String(mode||'').toLowerCase();if(value==='avion')return'plane';if(value==='train')return'train-front';if(value==='bus')return'bus';if(value==='ferry')return'ship';if(value==='voiture')return'car';return'route';
+}
 function intercountryFlightDuration(f){
   if(!f||!f.departureTime||!f.arrivalTime)return'';
   var startDate=f.date||f.arrivalDate,endDate=f.arrivalDate||f.date;if(!startDate||!endDate)return'';
@@ -9235,14 +9250,38 @@ function openIntercountryFlight(flightId){
   save();renderContent();
 }
 function addIntercountryTransport(){S.tab='documents';S.openDocType='tickets';S.flightFormOpen=true;S.editingFlightId=null;S.newFlightParticipants=getPeopleList();save();renderContent();}
+var _intercountryModePair=null;
+function openIntercountryModePicker(fromCountryId,toCountryId){
+  var from=COUNTRIES.find(function(c){return c.id===fromCountryId;}),to=COUNTRIES.find(function(c){return c.id===toCountryId;});if(!from||!to)return;
+  _intercountryModePair={fromCountryId:fromCountryId,toCountryId:toCountryId};
+  document.getElementById('transportModeRoute').textContent=from.name+' → '+to.name;
+  var modes=['Avion','Train','Bus','Ferry','Voiture','Autre'];
+  document.getElementById('transportModeChoices').innerHTML=modes.map(function(mode){return '<button type="button" class="transport-mode-btn" onclick="chooseIntercountryMode(\''+mode+'\')"><span>'+svgIcon(intercountryModeIconName(mode),16)+'</span><span>'+mode+'</span></button>';}).join('');
+  document.getElementById('transportModeModal').classList.add('open');
+}
+function closeIntercountryModePicker(){document.getElementById('transportModeModal').classList.remove('open');_intercountryModePair=null;}
+async function chooseIntercountryMode(mode){
+  if(!_intercountryModePair)return;var pair=_intercountryModePair,from=COUNTRIES.find(function(c){return c.id===pair.fromCountryId;}),to=COUNTRIES.find(function(c){return c.id===pair.toCountryId;}),existing=intercountryMovementForPair(pair.fromCountryId,pair.toCountryId);closeIntercountryModePicker();
+  if(mode==='Avion'){
+    if(existing){if(!confirm('Remplacer cette liaison par un vol ? Le déplacement actuel sera placé dans la corbeille.'))return;try{var archived=JSON.parse(JSON.stringify(existing));archived.archived=true;var saved=await persistMovement(archived);S.movements[saved.id]=saved;save();}catch(e){console.error('[PlaniTrip] replace intercountry movement:',e);alert('Impossible de changer le mode de transport pour le moment.');return;}}
+    var index=COUNTRIES.findIndex(function(c){return c.id===pair.fromCountryId;}),flight=intercountryFlightAssignments(COUNTRIES)[index];if(flight)openIntercountryFlight(flight.id);else addIntercountryTransport();return;
+  }
+  if(existing){openMovementModal(existing.id,existing.countryId);_movementDraft.primaryMode=mode;if(_movementDraft.legs&&_movementDraft.legs.length===1)_movementDraft.legs[0].mode=mode;_movementOpenLeg=0;renderMovementModalBody();return;}
+  openMovementModal(null,pair.fromCountryId);
+  _movementDraft.scope='intercountry';_movementDraft.fromCountryId=pair.fromCountryId;_movementDraft.toCountryId=pair.toCountryId;_movementDraft.primaryMode=mode;_movementDraft.origin=from.name;_movementDraft.destination=to.name;
+  _movementDraft.legs=[{id:movementUid('leg_'),mode:mode,line:'',direction:'',from:from.name,to:to.name,durationMin:'',durationUnit:'min',stops:'',costJPY:'',instruction:''}];_movementOpenLeg=0;renderMovementModalBody();
+}
 function toggleIntercountryConnection(key){if(!S.intercountryOpen)S.intercountryOpen={};S.intercountryOpen[key]=!S.intercountryOpen[key];save();renderContent();}
-function renderIntercountryConnection(fromCountry,toCountry,index,flight){
+function renderIntercountryConnection(fromCountry,toCountry,index,flight,movement){
   var key=fromCountry.id+'__'+toCountry.id,open=!!(S.intercountryOpen&&S.intercountryOpen[key]);
-  if(!flight)return '<div class="country-connection"><div class="country-connection-card" onclick="addIntercountryTransport()"><span class="country-connection-icon missing">'+svgIcon('plane',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span>'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status missing">À renseigner</span><span>Ajouter le vol entre les pays</span></div></div></div>';
+  if(movement){var movementMode=movement.primaryMode||((movement.legs||[])[0]&&movement.legs[0].mode)||'Autre',movementSummary=[];if(movement.date)movementSummary.push(new Date(movement.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}));if(movement.durationMin)movementSummary.push(movementFormatDuration(movement.durationMin,movement));if(movement.costPerPersonJPY!==''&&movement.costPerPersonJPY!=null)movementSummary.push(movementFormatCost(movement.costPerPersonJPY,movement,true));var movementComplete=movementMissingCount(movement)===0&&movement.durationMin;
+    var movementDetail=open?'<div class="country-connection-detail"><div>'+escHtml(movement.origin||fromCountry.name)+' → '+escHtml(movement.destination||toCountry.name)+'</div><div>'+(movement.legs||[]).length+' étape'+((movement.legs||[]).length>1?'s':'')+'</div><div class="country-connection-actions"><button class="country-connection-action" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(movement.id)+'\',\''+jsStrEsc(movement.countryId)+'\')">Modifier</button><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')">Changer le mode</button></div></div>':'';
+    return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon(intercountryModeIconName(movementMode),14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(movementComplete?'':' missing')+'">'+escHtml(movementMode)+(movementComplete?'':' · À compléter')+'</span><span>'+escHtml(movementSummary.join(' · ')||'Informations à compléter')+'</span></div>'+movementDetail+'</div></div>';}
+  if(!flight)return '<div class="country-connection"><div class="country-connection-card" onclick="openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')"><span class="country-connection-icon missing">'+svgIcon('route',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span>'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status missing">À renseigner</span><span>Choisir le mode de transport</span></div></div></div>';
   var complete=!!(flight.date&&flight.departureTime&&flight.arrivalTime),dateLabel=flight.date?new Date(flight.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'',duration=intercountryFlightDuration(flight),summary=[];
   if(dateLabel)summary.push(dateLabel);if(duration)summary.push(duration);if(flight.departureTime)summary.push(flight.departureTime+(flight.arrivalTime?' → '+flight.arrivalTime:''));
   var people=(flight.participants&&flight.participants.length)?flight.participants:[],peopleLabel=people.length?(people.length>=getPeopleList().length?'Tous les voyageurs':people.map(function(p){return personDisplayName(p,'Toi');}).join(', ')):'';
-  var detail=open?'<div class="country-connection-detail"><div>'+escHtml(flight.from||'Départ')+' → '+escHtml(flight.to||'Arrivée')+'</div>'+(flight.arrivalDate&&flight.arrivalDate!==flight.date?'<div>Arrivée le '+escHtml(new Date(flight.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'}))+'</div>':'')+(peopleLabel?'<div>'+svgIcon('users',11)+' '+escHtml(peopleLabel)+'</div>':'')+'<button class="country-connection-action" onclick="event.stopPropagation();openIntercountryFlight(\''+jsStrEsc(String(flight.id))+'\')">Voir la fiche du vol '+svgIcon('arrow-right',12)+'</button></div>':'';
+  var detail=open?'<div class="country-connection-detail"><div>'+escHtml(flight.from||'Départ')+' → '+escHtml(flight.to||'Arrivée')+'</div>'+(flight.arrivalDate&&flight.arrivalDate!==flight.date?'<div>Arrivée le '+escHtml(new Date(flight.arrivalDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long'}))+'</div>':'')+(peopleLabel?'<div>'+svgIcon('users',11)+' '+escHtml(peopleLabel)+'</div>':'')+'<div class="country-connection-actions"><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryFlight(\''+jsStrEsc(String(flight.id))+'\')">Voir le vol</button><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')">Changer le mode</button></div></div>':'';
   return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon('plane',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(complete?'':' missing')+'">'+(complete?'Vol renseigné':'À compléter')+'</span><span>'+escHtml(summary.join(' · ')||'Informations du vol à compléter')+'</span></div>'+detail+'</div></div>';
 }
 
@@ -9282,7 +9321,7 @@ function renderCountriesScreen(){
       +'<div class="cc-body"><div class="cc-name">'+c.name+'</div><div class="cc-sub">'+citiesPreview+'</div></div>'
       +'<span class="cc-status cc-status-'+status+'"><span class="cc-status-dot"></span>'+_countryStatusLabel(status)+'</span>'
       +'</div></div>';
-    if(countryIndex<list.length-1)card+=renderIntercountryConnection(c,list[countryIndex+1],countryIndex,flightAssignments[countryIndex]);
+    if(countryIndex<list.length-1)card+=renderIntercountryConnection(c,list[countryIndex+1],countryIndex,flightAssignments[countryIndex],intercountryMovementForPair(c.id,list[countryIndex+1].id));
     return card;
   }).join('') || '<div class="search-empty">Aucun pays ne correspond.</div>';
 
@@ -17970,6 +18009,16 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <div id="accomModalBody"></div>
     <button class="modal-cta" onclick="saveAccomModal()">Enregistrer</button>
     <div style="text-align:center;margin-top:4px"><span onclick="document.getElementById('accomModal').classList.remove('open')" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Annuler</span></div>
+  </div>
+</div>
+
+<div class="share-modal" id="transportModeModal" onclick="if(event.target.id==='transportModeModal') closeIntercountryModePicker();">
+  <div class="transport-mode-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Mode de transport</div>
+    <div id="transportModeRoute" style="font-size:12px;color:var(--ink-muted);margin-top:-6px"></div>
+    <div class="transport-mode-grid" id="transportModeChoices"></div>
+    <button class="modal-cancel-btn" onclick="closeIntercountryModePicker()">Annuler</button>
   </div>
 </div>
 
