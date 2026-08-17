@@ -10363,12 +10363,12 @@ function computeBalances(){
     } else {
       var parts = (e.participants && e.participants.length) ? e.participants.map(canonicalPerson).filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
       if(!parts.length) parts = people.slice();
-      var per = e.amount / parts.length;
+      var per = parseFloat(e.amount) / parts.length;
       sharesMap = {}; parts.forEach(function(p){ sharesMap[p]=per; });
     }
     Object.keys(sharesMap).forEach(function(p){ if(people.indexOf(p)>-1) share[p] = (share[p]||0) + sharesMap[p]; });
     var payer = canonicalPerson(e.personLabel || e.person);
-    if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + e.amount;
+    if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + (parseFloat(e.amount)||0);
   });
   // Calculer les balances brutes depuis les vraies dépenses
   var balanceMap = {};
@@ -10380,7 +10380,7 @@ function computeBalances(){
   S.expenses.filter(function(e){return e.category==='reimbursement';}).forEach(function(e){
     var from = canonicalPerson(e.personLabel || e.person);
     var to = e.participants && e.participants[0] ? canonicalPerson(e.participants[0]) : null;
-    var amt = e.amount || 0;
+    var amt = parseFloat(e.amount) || 0;
     if(from && people.indexOf(from)>-1) balanceMap[from] = (balanceMap[from]||0) + amt;
     if(to   && people.indexOf(to)>-1)   balanceMap[to]   = (balanceMap[to]||0)   - amt;
   });
