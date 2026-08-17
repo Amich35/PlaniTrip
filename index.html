@@ -10351,10 +10351,10 @@ function computeBalances(){
   var people = getPeopleList();
   var paid = {}, share = {};
   people.forEach(function(p){paid[p]=0;share[p]=0;});
-  S.expenses.forEach(function(e){
+  // Vraies dépenses uniquement — les remboursements sont traités séparément
+  S.expenses.filter(function(e){return e.category!=='reimbursement';}).forEach(function(e){
     var sharesMap;
     if(e.splits && typeof e.splits==='object' && Object.keys(e.splits).length){
-      // Canonicalise chaque clé de split (fusionne un ancien pseudo brut avec l'email réel)
       sharesMap = {};
       Object.keys(e.splits).forEach(function(k){
         var ck = canonicalPerson(k);
@@ -10370,8 +10370,22 @@ function computeBalances(){
     var payer = canonicalPerson(e.personLabel || e.person);
     if(payer && people.indexOf(payer)>-1) paid[payer] = (paid[payer]||0) + e.amount;
   });
+  // Calculer les balances brutes depuis les vraies dépenses
+  var balanceMap = {};
+  people.forEach(function(p){ balanceMap[p] = (paid[p]||0) - (share[p]||0); });
+  // Appliquer les remboursements comme transferts directs
+  // from (débiteur qui rembourse) → to (créditeur qui reçoit)
+  // from a remboursé → sa dette diminue (balance monte)
+  // to a reçu → sa créance diminue (balance descend)
+  S.expenses.filter(function(e){return e.category==='reimbursement';}).forEach(function(e){
+    var from = canonicalPerson(e.personLabel || e.person);
+    var to = e.participants && e.participants[0] ? canonicalPerson(e.participants[0]) : null;
+    var amt = e.amount || 0;
+    if(from && people.indexOf(from)>-1) balanceMap[from] = (balanceMap[from]||0) + amt;
+    if(to   && people.indexOf(to)>-1)   balanceMap[to]   = (balanceMap[to]||0)   - amt;
+  });
   return people.map(function(p){
-    return {person:p, paid:paid[p]||0, share:share[p]||0, balance:(paid[p]||0)-(share[p]||0)};
+    return {person:p, paid:paid[p]||0, share:share[p]||0, balance:balanceMap[p]||0};
   });
 }
 function simplifyDebts(balances){
