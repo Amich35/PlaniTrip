@@ -8790,7 +8790,7 @@ function renderItinerary(c, embedded){
     const accomList = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
     const stayLine = fmtCityStayLine(ck);
     const periodLine = stayLine || '<span style="color:var(--ink-subtle)">Dates à définir</span>';
-    const accomNameLine = accomList.length===1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+escHtml(accomList[0].name||'')+'</div>')
+    const accomNameLine = accomList.length===1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden">'+svgIcon('bed',12)+'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"> '+escHtml(accomList[0].name||'')+'</span></div>')
       : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+', '+getEnglishCountryName(c.name);
 
