@@ -9877,7 +9877,7 @@ function renderBudgetOverview(){
         +fabHTML;
     } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
-      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0) - S.expenses.filter(function(e){return e.category==='reimbursement'&&e.country===c2.id;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0) - S.expenses.filter(function(e){return e.category==='reimbursement' && e.country===c2.id;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
       var cBudget = getCountryPlannedBudget(c2);
       var cExps = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var byDate = {};
@@ -9908,7 +9908,7 @@ function renderBudgetOverview(){
     } else {
     var rows = COUNTRIES.map(function(c){
       // Barre de progression = dépenses TOTALES du groupe dans ce pays / budget prévu pour ce pays (cohérent avec la fiche détail)
-      var countrySpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var countrySpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0) - S.expenses.filter(function(e){return e.category==='reimbursement' && e.country===c.id;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
       var budget = getCountryPlannedBudget(c);
       var pReal = budget>0 ? Math.round((countrySpent/budget)*100) : 0;
       var isOver = pReal>100;
