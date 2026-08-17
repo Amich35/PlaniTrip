@@ -9132,7 +9132,7 @@ function renderToday(){
     return a._origIdx - b._origIdx;
   });
   var myEmailToday = (CURRENT_USER && CURRENT_USER.email) || '';
-  var todaySpent = S.expenses.filter(function(e){return e.date===todayStr && canonicalPerson(e.personLabel||e.person)===myEmailToday && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+  var todaySpent = S.expenses.filter(function(e){return e.date===todayStr && canonicalPerson(e.personLabel||e.person)===myEmailToday && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0) - S.expenses.filter(function(e){return e.category==='reimbursement'&&e.participants&&canonicalPerson(e.participants[0])===myEmailToday&&e.date===todayStr;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
   var budgetDaily = c ? getMyCountryDailyBudget(c) : 0;
 
   // ── Hero simple (sans indicateurs) ──
@@ -9826,7 +9826,7 @@ function renderProgressRing(pct, size, stroke, color, trackColor, textColor, lab
 }
 function renderBudgetOverview(){
   var sub = S.budgetSubTab||'resume';
-  var totalSpent = S.expenses.filter(function(e){return e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+  var totalSpent = _totalNetSpent();
   var totalBudget = COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
   var pct = totalBudget>0 ? Math.min(100, Math.round((totalSpent/totalBudget)*100)) : 0;
   var tabsHTML = ['resume','remb'].map(function(t){
@@ -9877,7 +9877,7 @@ function renderBudgetOverview(){
         +fabHTML;
     } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
-      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0) - S.expenses.filter(function(e){return e.category==='reimbursement'&&e.country===c2.id;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
       var cBudget = getCountryPlannedBudget(c2);
       var cExps = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var byDate = {};
@@ -9908,7 +9908,7 @@ function renderBudgetOverview(){
     } else {
     var rows = COUNTRIES.map(function(c){
       // Barre de progression = dépenses TOTALES du groupe dans ce pays / budget prévu pour ce pays (cohérent avec la fiche détail)
-      var countrySpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+      var countrySpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
       var budget = getCountryPlannedBudget(c);
       var pReal = budget>0 ? Math.round((countrySpent/budget)*100) : 0;
       var isOver = pReal>100;
@@ -9923,14 +9923,15 @@ function renderBudgetOverview(){
     var paidBalances = computeBalances();
     var myLabel3 = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
     var paidRows = paidBalances.filter(function(b){return b.paid>0;}).sort(function(a,b){return b.paid-a.paid;}).map(function(b){
+      var netAmt = _netSpent(b.person);
       return '<div onclick="S.budgetPersonView=\''+escHtml(b.person).replace(/'/g,"\\'")+'\';save();renderContent();" style="display:flex;align-items:center;justify-content:space-between;padding:8px 2px;cursor:pointer">'
         +'<div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">'+escHtml(b.person===myLabel3?'Moi':personDisplayName(b.person))+'</span></div>'
-        +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(b.paid)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
+        +'<span style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;font-weight:700;color:var(--ink)">'+fmtEUR(netAmt)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></span>'
         +'</div>';
     }).join('');
     // ── Carte "Mes depenses vs Total groupe" : un seul encart moderne, degrade, texte adaptatif ──
     var myLabelDash = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
-    var mySpent = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===myLabelDash && e.category!=='reimbursement';}).reduce(function(s,e){return s+e.amount;},0);
+    var mySpent = _netSpent(myLabelDash);
     var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
     var nbTravelers = 1 + ((typeof CURRENT_COLLABORATORS !== 'undefined' && CURRENT_COLLABORATORS ? CURRENT_COLLABORATORS.length : 0));
     var dashRow;
@@ -10346,6 +10347,22 @@ function syncExpAmt(which, rateNum){
     }
   }
   refreshSplitAmounts();
+}
+// Dépense nette d'une personne = ce qu'elle a avancé - remboursements reçus
+function _netSpent(personEmail){
+  var paid = S.expenses
+    .filter(function(e){ return e.category!=='reimbursement' && canonicalPerson(e.personLabel||e.person)===personEmail; })
+    .reduce(function(s,e){ return s+(parseFloat(e.amount)||0); }, 0);
+  var received = S.expenses
+    .filter(function(e){ return e.category==='reimbursement' && e.participants && canonicalPerson(e.participants[0])===personEmail; })
+    .reduce(function(s,e){ return s+(parseFloat(e.amount)||0); }, 0);
+  return Math.max(0, paid - received);
+}
+// Total net du groupe = somme des dépenses brutes (les remboursements ne changent pas le total groupe)
+function _totalNetSpent(){
+  return S.expenses
+    .filter(function(e){ return e.category!=='reimbursement'; })
+    .reduce(function(s,e){ return s+(parseFloat(e.amount)||0); }, 0);
 }
 function computeBalances(){
   var people = getPeopleList();
