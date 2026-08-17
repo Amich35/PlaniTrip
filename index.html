@@ -11943,7 +11943,22 @@ async function updateCustomRate(cid,val){
   }
 }
 function delExp(id){
-  showConfirm('Supprimer cette dépense ?', async function(){
+  var exp = S.expenses.find(function(e){ return e.id===id; });
+  // Détecter les remboursements liés à cette dépense
+  // Un remboursement est lié si : payeur dépense = bénéficiaire remboursement ET participant dépense = payeur remboursement
+  var linkedReimbs = exp ? S.expenses.filter(function(e){
+    if(e.category !== 'reimbursement') return false;
+    var reimbFrom = canonicalPerson(e.personLabel || e.person);
+    var reimbTo = e.participants && e.participants[0] ? canonicalPerson(e.participants[0]) : null;
+    var expPayer = canonicalPerson(exp.personLabel || exp.person);
+    var expParts = (exp.participants || []).map(canonicalPerson);
+    return reimbTo === expPayer && expParts.indexOf(reimbFrom) > -1;
+  }) : [];
+  var confirmMsg = 'Supprimer cette dépense ?';
+  if(linkedReimbs.length > 0){
+    confirmMsg = 'Cette dépense a '+linkedReimbs.length+' remboursement'+(linkedReimbs.length>1?'s':'')+' associé'+(linkedReimbs.length>1?'s':'')+' ('+fmtEUR(linkedReimbs.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0))+'). Veux-tu aussi les supprimer ?';
+  }
+  showConfirm(confirmMsg, async function(){
     var syncKey='delete_'+id;
     if(_expenseSyncInFlight[syncKey]) return;
     if(!sb || !CURRENT_TRIP || !CURRENT_TRIP.id){ alert('Connexion requise pour supprimer cette dépense.'); return; }
@@ -11951,6 +11966,12 @@ function delExp(id){
     try{
       var r=await sb.from('budget_entries').delete().eq('id',id).eq('trip_id',CURRENT_TRIP.id);
       if(r&&r.error) throw r.error;
+      // Supprimer aussi les remboursements liés
+      if(linkedReimbs.length > 0){
+        var reimbIds = linkedReimbs.map(function(e){ return e.id; });
+        await sb.from('budget_entries').delete().in('id', reimbIds).eq('trip_id',CURRENT_TRIP.id);
+        reimbIds.forEach(function(rid){ S.expenses = S.expenses.filter(function(e){ return e.id !== rid; }); });
+      }
     }catch(err){
       console.error('[PlaniTrip] delete budget entry:',err);
       alert('Impossible de supprimer cette dépense pour le moment.');
@@ -11962,7 +11983,7 @@ function delExp(id){
     markDeletedTombstone('expenses',id);
     save();renderContent();
     postChangeEvent('budget','delete',{entityId:String(id),summary:_ceActorLabel()+' a supprimé une dépense',deepLink:'S.tab=\'budget\';save();renderContent();'});
-  }, 'Supprimer');
+  }, linkedReimbs.length > 0 ? 'Supprimer tout' : 'Supprimer');
 }
 function markAsReimbursed(fromPerson, toPerson, amount){
   showConfirm('Confirmer que '+personDisplayName(fromPerson)+' a remboursé '+fmtEUR(amount)+' à '+personDisplayName(toPerson)+' ?', async function(){
