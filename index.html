@@ -10348,7 +10348,7 @@ function syncExpAmt(which, rateNum){
   }
   refreshSplitAmounts();
 }
-// Dépense nette d'une personne = ce qu'elle a avancé - remboursements reçus
+// Dépense nette d'une personne = avancé - reçu + remboursé (ce qu'elle a payé en tout)
 function _netSpent(personEmail){
   var paid = S.expenses
     .filter(function(e){ return e.category!=='reimbursement' && canonicalPerson(e.personLabel||e.person)===personEmail; })
@@ -10356,7 +10356,10 @@ function _netSpent(personEmail){
   var received = S.expenses
     .filter(function(e){ return e.category==='reimbursement' && e.participants && canonicalPerson(e.participants[0])===personEmail; })
     .reduce(function(s,e){ return s+(parseFloat(e.amount)||0); }, 0);
-  return Math.max(0, paid - received);
+  var reimbursed = S.expenses
+    .filter(function(e){ return e.category==='reimbursement' && canonicalPerson(e.personLabel||e.person)===personEmail; })
+    .reduce(function(s,e){ return s+(parseFloat(e.amount)||0); }, 0);
+  return Math.max(0, paid - received + reimbursed);
 }
 // Total net du groupe = somme des dépenses brutes (les remboursements ne changent pas le total groupe)
 function _totalNetSpent(){
