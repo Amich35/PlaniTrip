@@ -551,6 +551,22 @@ html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-beh
 .cf-cat-chip.active{background:var(--accent-pale);color:var(--accent);}
 @keyframes cfListFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 .cf-act-list{animation:cfListFade 220ms cubic-bezier(0.34,1.56,0.64,1);}
+.checkinout-marker{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:14px;margin-bottom:8px;}
+.checkinout-marker--in{background:rgba(45,106,79,0.08);}
+.checkinout-marker--out{background:rgba(244,162,97,0.10);}
+.checkinout-marker__icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.checkinout-marker--in .checkinout-marker__icon{background:rgba(45,106,79,0.12);}
+.checkinout-marker--in .checkinout-marker__icon svg,.checkinout-marker--in .checkinout-marker__icon [data-icon]{color:var(--accent);}
+.checkinout-marker--out .checkinout-marker__icon{background:rgba(244,162,97,0.18);}
+.checkinout-marker--out .checkinout-marker__icon svg,.checkinout-marker--out .checkinout-marker__icon [data-icon]{color:#F4A261;}
+.checkinout-marker__info{flex:1;min-width:0;}
+.checkinout-marker__label{font-size:12px;font-weight:700;letter-spacing:0.2px;}
+.checkinout-marker--in .checkinout-marker__label{color:var(--accent);}
+.checkinout-marker--out .checkinout-marker__label{color:#F4A261;}
+.checkinout-marker__hotel{font-size:12px;color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.checkinout-marker__time{font-size:12px;font-weight:600;flex-shrink:0;}
+.checkinout-marker--in .checkinout-marker__time{color:var(--accent);}
+.checkinout-marker--out .checkinout-marker__time{color:#F4A261;}
 .planning-group-header{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-subtle);display:flex;align-items:center;gap:6px;margin:16px 0 8px 12px;}
 .planning-group-header:first-child{margin-top:0;}
 .planning-group-header--muted{opacity:0.5;}
@@ -8057,6 +8073,50 @@ async function clearCategoriesForAct(){
   }
 }
 
+// Génère les items check-in / check-out pour les logements d'une ville.
+// Retourne un tableau d'objets {html, dateVal, timeSort, moment} compatibles avec
+// le tri existant de baseActsItems (dateVal ISO + timeSort HH:MM pour position dans le fil).
+function _buildCheckinMarkerItems(ck){
+  var list = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
+  var items = [];
+  list.forEach(function(a){
+    if(!a) return;
+    var hotelName = escHtml(a.name || 'Logement');
+    // Check-in
+    if(a.start){
+      var ciTime = a.checkin || '';
+      var ciSort = ciTime || '23:59'; // sans heure : fin de journée par défaut
+      var ciMoment = ciTime ? getDayPeriod(ciTime) || 'evening' : 'evening';
+      var ciLabel = ciTime ? ciTime.replace(':','h').replace(/^(\d+h)00$/,'$1') : '—';
+      var ciHtml = '<div class="checkinout-marker checkinout-marker--in">'
+        +'<div class="checkinout-marker__icon">'+svgIcon('log-in',14)+'</div>'
+        +'<div class="checkinout-marker__info">'
+        +'<div class="checkinout-marker__label">Check-in</div>'
+        +'<div class="checkinout-marker__hotel">'+hotelName+'</div>'
+        +'</div>'
+        +'<div class="checkinout-marker__time">'+escHtml(ciLabel)+'</div>'
+        +'</div>';
+      items.push({html:ciHtml, dateVal:a.start, timeSort:ciSort, moment:ciMoment, _isMarker:true});
+    }
+    // Check-out
+    if(a.end){
+      var coTime = a.checkout || '';
+      var coSort = coTime || '00:00'; // sans heure : début de journée par défaut
+      var coMoment = coTime ? getDayPeriod(coTime) || 'morning' : 'morning';
+      var coLabel = coTime ? coTime.replace(':','h').replace(/^(\d+h)00$/,'$1') : '—';
+      var coHtml = '<div class="checkinout-marker checkinout-marker--out">'
+        +'<div class="checkinout-marker__icon">'+svgIcon('log-out',14)+'</div>'
+        +'<div class="checkinout-marker__info">'
+        +'<div class="checkinout-marker__label">Check-out</div>'
+        +'<div class="checkinout-marker__hotel">'+hotelName+'</div>'
+        +'</div>'
+        +'<div class="checkinout-marker__time">'+escHtml(coLabel)+'</div>'
+        +'</div>';
+      items.push({html:coHtml, dateVal:a.end, timeSort:coSort, moment:coMoment, _isMarker:true});
+    }
+  });
+  return items;
+}
 function renderCityPanelContentBody(c, city){
     var momentAccent = {morning:'#E29B5E', noon:'#4E8B72', afternoon:'#6FA3E0', evening:'#8A8A8E'};
     var momentBg = {morning:'#FBF1E8', noon:'#F2F7F4', afternoon:'#EDF3FC', evening:'#F1EFEA'};
@@ -8147,6 +8207,7 @@ function renderCityPanelContentBody(c, city){
     // filtrée sur un jour précis — en vue "Tout", il mélangerait visuellement des activités de
     // jours différents sous un même bandeau "MATIN". La vue "Tout" devient donc une liste plate,
     // chaque carte portant déjà sa propre temporalité complète via timeCapsuleHTML (Lot 2).
+    var _checkinMarkers = _buildCheckinMarkerItems(ck);
     var baseActsHTML;
     if(activeDay==='Tous'){
       // Tri stable : date de rendu -> heure de début -> moment (repli) -> ordre existant en cas
@@ -8154,19 +8215,21 @@ function renderCityPanelContentBody(c, city){
       // S.actTimeStart, getActMoment) — aucune nouvelle logique temporelle n'est recréée ici.
       var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
       var _flatItems = baseActsItems.map(function(item, idx){ item._origIdx = idx; return item; });
+      // Injecter les markers check-in/out dans le fil "Tous"
+      _checkinMarkers.forEach(function(m){ _flatItems.push(m); });
       _flatItems.sort(function(a, b){
         var aDate = a.dateVal || '';
         var bDate = b.dateVal || '';
         if(aDate !== bDate) return aDate < bDate ? -1 : 1;
-        var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
-        var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+        var aStart = a._isMarker ? a.timeSort : ((S.actTimeStart && S.actTimeStart[a.actKey]) || '');
+        var bStart = b._isMarker ? b.timeSort : ((S.actTimeStart && S.actTimeStart[b.actKey]) || '');
         if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
         if(aStart && !bStart) return -1;
         if(!aStart && bStart) return 1;
         var aMoment = _momentSortRank[a.moment||''] ?? 4;
         var bMoment = _momentSortRank[b.moment||''] ?? 4;
         if(aMoment !== bMoment) return aMoment - bMoment;
-        return a._origIdx - b._origIdx; // égalité totale : ordre stable existant
+        return (a._origIdx||0) - (b._origIdx||0); // égalité totale : ordre stable existant
       });
       baseActsHTML = _flatItems.map(function(it){ return it.html; }).join('');
     } else {
@@ -8174,6 +8237,10 @@ function renderCityPanelContentBody(c, city){
       // groupes vides masqués.
       var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
       baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
+      // Injecter les markers check-in/out filtrés sur le jour actif
+      _checkinMarkers.forEach(function(m){
+        if(m.dateVal === activeDay) momentGroups[m.moment||'morning'].push(m);
+      });
       // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
       // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
       // sans heure gardent leur position relative issue de l'ordre existant (manuel ou par défaut),
@@ -8182,8 +8249,8 @@ function renderCityPanelContentBody(c, city){
       // c'était l'incohérence signalée dans ce lot.
       Object.keys(momentGroups).forEach(function(mk){
         momentGroups[mk].sort(function(a, b){
-          var aStart = (S.actTimeStart && S.actTimeStart[a.actKey]) || '';
-          var bStart = (S.actTimeStart && S.actTimeStart[b.actKey]) || '';
+          var aStart = a._isMarker ? a.timeSort : ((S.actTimeStart && S.actTimeStart[a.actKey]) || '');
+          var bStart = b._isMarker ? b.timeSort : ((S.actTimeStart && S.actTimeStart[b.actKey]) || '');
           if(aStart && bStart && aStart!==bStart) return aStart<bStart ? -1 : 1;
           if(aStart && !bStart) return -1;
           if(!aStart && bStart) return 1;
