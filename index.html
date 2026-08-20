@@ -4602,7 +4602,16 @@ async function saveAccom(ck) {
   if(start && end){
     var countryIdCheck = ck.split('_')[0];
     var countryCheck = COUNTRIES.find(function(co){return co.id===countryIdCheck;});
-    var countryRangeCheck = countryCheck ? getCountryDateRange(countryCheck) : null;
+    // Recalcul depuis cityDates pour refléter les changements récents de dates de villes
+    var countryRangeCheck = (function(){
+      var s=null, e=null;
+      (countryCheck&&countryCheck.cities||[]).forEach(function(city){
+        var r = cityStayRange(countryIdCheck+'_'+city.city);
+        if(r){ if(!s||r.start<s) s=r.start; if(!e||r.end>e) e=r.end; }
+      });
+      if(s&&e) return {start:s,end:e};
+      return countryCheck ? getCountryDateRange(countryCheck) : null;
+    })();
     if(countryRangeCheck && (start<countryRangeCheck.start || end>countryRangeCheck.end)){
       alert('Ces dates doivent rester comprises dans le séjour du pays ('+fmtDateRangeFr(countryRangeCheck.start,countryRangeCheck.end)+').');
       return;
@@ -6349,7 +6358,7 @@ async function editCityDateRange(ck, startVal, endVal){
 // manuellement (c.dateStart/dateEnd) uniquement si aucune ville n'a encore de dates.
 function getCountryDateRange(c){
   if(!c) return null;
-  // Toujours recalculer depuis S.cityDates pour refléter les changements sans rechargement
+  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
   var start=null, end=null;
   (c.cities||[]).forEach(function(city){
     var range = cityStayRange(c.id+'_'+city.city);
@@ -6359,8 +6368,6 @@ function getCountryDateRange(c){
     }
   });
   if(start && end) return {start:start, end:end};
-  // Fallback sur les dates statiques uniquement si aucune ville n'a de dates
-  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
   return null;
 }
 function cityStayRange(ck){
