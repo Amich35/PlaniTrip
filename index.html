@@ -1398,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v18';
+var APP_BUILD = '2026-08-20·sha:checkin-moment-color-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8105,7 +8105,7 @@ async function clearCategoriesForAct(){
 // Génère les items check-in / check-out pour les logements d'une ville.
 // Retourne un tableau d'objets {html, dateVal, timeSort, moment} compatibles avec
 // le tri existant de baseActsItems (dateVal ISO + timeSort HH:MM pour position dans le fil).
-function _buildCheckinMarkerItems(ck){
+function _buildCheckinMarkerItems(ck, momentBg){
   var list = Array.isArray(S.accom && S.accom[ck]) ? S.accom[ck] : [];
   var items = [];
   list.forEach(function(a){
@@ -8117,7 +8117,8 @@ function _buildCheckinMarkerItems(ck){
       var ciSort = ciTime || '23:59'; // sans heure : fin de journée par défaut
       var ciMoment = ciTime ? getDayPeriod(ciTime) || 'evening' : 'evening';
       var ciLabel = ciTime ? ciTime.replace(':','h').replace(/^(\d+h)00$/,'$1') : '—';
-      var ciHtml = '<div class="checkinout-marker checkinout-marker--in">'
+      var ciBg = (momentBg && momentBg[ciMoment]) || '#F1EFEA';
+      var ciHtml = '<div class="checkinout-marker checkinout-marker--in" style="background:'+ciBg+'">'
         +'<div class="checkinout-marker__icon">'+svgIcon('log-in',14)+'</div>'
         +'<div class="checkinout-marker__info">'
         +'<div class="checkinout-marker__label">Check-in</div>'
@@ -8133,7 +8134,8 @@ function _buildCheckinMarkerItems(ck){
       var coSort = coTime || '00:00'; // sans heure : début de journée par défaut
       var coMoment = coTime ? getDayPeriod(coTime) || 'morning' : 'morning';
       var coLabel = coTime ? coTime.replace(':','h').replace(/^(\d+h)00$/,'$1') : '—';
-      var coHtml = '<div class="checkinout-marker checkinout-marker--out">'
+      var coBg = (momentBg && momentBg[coMoment]) || '#F1EFEA';
+      var coHtml = '<div class="checkinout-marker checkinout-marker--out" style="background:'+coBg+'">'
         +'<div class="checkinout-marker__icon">'+svgIcon('log-out',14)+'</div>'
         +'<div class="checkinout-marker__info">'
         +'<div class="checkinout-marker__label">Check-out</div>'
@@ -8236,7 +8238,7 @@ function renderCityPanelContentBody(c, city){
     // filtrée sur un jour précis — en vue "Tout", il mélangerait visuellement des activités de
     // jours différents sous un même bandeau "MATIN". La vue "Tout" devient donc une liste plate,
     // chaque carte portant déjà sa propre temporalité complète via timeCapsuleHTML (Lot 2).
-    var _checkinMarkers = _buildCheckinMarkerItems(ck);
+    var _checkinMarkers = _buildCheckinMarkerItems(ck, momentBg);
     var baseActsHTML;
     if(activeDay==='Tous'){
       // Tri stable : date de rendu -> heure de début -> moment (repli) -> ordre existant en cas
