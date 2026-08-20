@@ -1398,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:checkin-moment-color-v1';
+var APP_BUILD = '2026-08-20·sha:freeblocks-datalayer-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -2547,6 +2547,7 @@ function ensureStateDefaults(){
   if(!S.countryEdits) S.countryEdits={};
   if(!S.addedCities) S.addedCities={};
   if(!S.accom) S.accom={};
+  if(!S.freeBlocks) S.freeBlocks={};
   if(!S.actDate) S.actDate={};
   if(!S.cityDates) S.cityDates={};
   if(!S.customPhotos) S.customPhotos={};
@@ -4474,6 +4475,8 @@ function closeDetail(){ document.getElementById('detailModal').classList.remove(
 // ── ACCOMMODATION ─────────────────────────────────────────────
 // S.accom = { 'jp_Kyoto': {link:'...', price:'', nights:'', type:''} }
 if(!S.accom) S.accom={};
+// S.freeBlocks = { 'jp_Kyoto': [{id, type:'free'|'meal'|'dayoff', name, date, timeStart, timeEnd}] }
+if(!S.freeBlocks) S.freeBlocks={};
 if(!S.actDate) S.actDate={};
 if(!S.cityDates) S.cityDates={};
 
@@ -15548,6 +15551,71 @@ async function loadAccommodations(){
   });
   save();
 }
+async function loadFreeBlocks(){
+  if(!sb || !CURRENT_TRIP) return;
+  var {data} = await sb.from('free_blocks').select('*').eq('trip_id',CURRENT_TRIP.id);
+  // Serveur autoritaire : reconstruction complète.
+  S.freeBlocks = {};
+  (data||[]).forEach(function(row){
+    var d = row.data;
+    S.freeBlocks[row.city_key] = Array.isArray(d) ? d : [];
+  });
+  save();
+}
+// Enregistre un bloc (temps libre / repas à définir / journée libre) pour une ville.
+// block = {id, type, name, date, timeStart, timeEnd} — id généré si absent (nouveau bloc).
+async function saveFreeBlock(ck, block){
+  if(!Array.isArray(S.freeBlocks[ck])) S.freeBlocks[ck]=[];
+  var thisId = block.id || ('f'+Date.now()+Math.floor(Math.random()*1000));
+  var entry = Object.assign({}, block, {id:thisId});
+  var currentList = S.freeBlocks[ck];
+  var idx = currentList.findIndex(function(e){ return e.id===thisId; });
+  var nextList = idx>-1
+    ? currentList.map(function(e,i){ return i===idx ? entry : e; })
+    : currentList.concat([entry]);
+  if(!sb || !CURRENT_TRIP){
+    alert('Connexion requise pour enregistrer.');
+    return;
+  }
+  try{
+    var countryId = ck.split('_')[0];
+    var _r = await sb.from('free_blocks').upsert(
+      {trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:nextList, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,city_key'}
+    );
+    if(_r && _r.error) throw _r.error;
+  } catch(e){
+    console.error('[PlaniTrip] saveFreeBlock upsert:', e);
+    alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
+    return;
+  }
+  S.freeBlocks[ck] = nextList;
+  save();
+  renderContent();
+}
+async function deleteFreeBlock(ck, id){
+  if(!Array.isArray(S.freeBlocks[ck])) return;
+  var nextList = S.freeBlocks[ck].filter(function(e){ return e.id!==id; });
+  if(!sb || !CURRENT_TRIP){
+    alert('Connexion requise pour supprimer.');
+    return;
+  }
+  try{
+    var countryId = ck.split('_')[0];
+    var _r = await sb.from('free_blocks').upsert(
+      {trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:nextList, updated_at:new Date().toISOString()},
+      {onConflict:'trip_id,city_key'}
+    );
+    if(_r && _r.error) throw _r.error;
+  } catch(e){
+    console.error('[PlaniTrip] deleteFreeBlock upsert:', e);
+    alert('Erreur de suppression — vérifie ta connexion et réessaie.');
+    return;
+  }
+  S.freeBlocks[ck] = nextList;
+  save();
+  renderContent();
+}
 async function loadCustomPhotos(){
   if(!sb || !CURRENT_TRIP) return;
   var {data} = await sb.from('custom_photos').select('*').eq('trip_id',CURRENT_TRIP.id);
@@ -15724,6 +15792,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   await loadCountrySettings();
   await loadActivityDetails();
   await loadAccommodations();
+  await loadFreeBlocks();
   await loadCustomPhotos();
   await loadFlights();
   await loadFeedPosts();
