@@ -581,6 +581,15 @@ html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-beh
 .checkinout-marker__time{font-size:12px;font-weight:600;flex-shrink:0;}
 .checkinout-marker--in .checkinout-marker__time{color:var(--accent);}
 .checkinout-marker--out .checkinout-marker__time{color:#F4A261;}
+.free-marker{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:14px;margin-top:6px;margin-bottom:8px;background:transparent;border:1.5px dashed rgba(29,29,31,0.16);}
+.free-marker__icon{width:28px;height:28px;border-radius:8px;background:var(--sand-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--ink-subtle);}
+.free-marker__info{flex:1;min-width:0;}
+.free-marker__label{font-size:12px;font-weight:700;letter-spacing:0.2px;color:var(--ink-muted);}
+.free-marker__sub{font-size:12px;color:var(--ink-subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.free-marker__time{font-size:12px;font-weight:600;color:var(--ink-muted);flex-shrink:0;}
+.free-marker__cta{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;flex-shrink:0;background:rgba(45,106,79,0.1);color:var(--accent);cursor:pointer;margin-left:4px;}
+.free-marker__del{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--ink-subtle);cursor:pointer;margin-left:4px;}
+.free-marker__del:active{background:var(--sand-deep);}
 .planning-group-header{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-subtle);display:flex;align-items:center;gap:6px;margin:16px 0 8px 12px;}
 .planning-group-header:first-child{margin-top:0;}
 .planning-group-header--muted{opacity:0.5;}
@@ -1398,7 +1407,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:freeblocks-datalayer-v1';
+var APP_BUILD = '2026-08-20·sha:freeblocks-render-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8151,6 +8160,48 @@ function _buildCheckinMarkerItems(ck, momentBg){
   });
   return items;
 }
+function _buildFreeBlockItems(ck){
+  var list = Array.isArray(S.freeBlocks && S.freeBlocks[ck]) ? S.freeBlocks[ck] : [];
+  var items = [];
+  var typeLabels = {free:'Temps libre', meal:'Repas', dayoff:'Journée libre'};
+  var typeIcons = {free:'clock', meal:'utensils-crossed', dayoff:'calendar-x'};
+  list.forEach(function(b){
+    if(!b || !b.date) return;
+    var label = escHtml(b.name || typeLabels[b.type] || 'Bloc');
+    var sub = '';
+    if(b.type==='meal' && !b.name){ sub = 'Restaurant à définir'; }
+    else if(b.type==='dayoff'){ sub = 'Aucune activité planifiée'; }
+    var timeLabel = '';
+    if(b.timeStart && b.timeEnd){ timeLabel = b.timeStart.replace(':','h')+'–'+b.timeEnd.replace(':','h'); }
+    else if(b.timeStart){ timeLabel = b.timeStart.replace(':','h'); }
+    var sort = b.timeStart || (b.type==='dayoff' ? '00:00' : '12:00');
+    var moment = b.timeStart ? (getDayPeriod(b.timeStart) || '') : '';
+    var cta = (b.type==='meal') ? '<div class="free-marker__cta" onclick="event.stopPropagation();openAddActivityModalFromFreeBlock(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(b.id)+'\',\''+jsStrEsc(b.name||'Repas')+'\')">+ Choisir</div>' : '';
+    var html = '<div class="free-marker">'
+      +'<div class="free-marker__icon">'+svgIcon(typeIcons[b.type]||'circle',14)+'</div>'
+      +'<div class="free-marker__info">'
+      +'<div class="free-marker__label">'+label+'</div>'
+      +(sub?'<div class="free-marker__sub">'+escHtml(sub)+'</div>':'')
+      +'</div>'
+      +(timeLabel?'<div class="free-marker__time">'+escHtml(timeLabel)+'</div>':'')
+      +cta
+      +'<div class="free-marker__del" onclick="event.stopPropagation();confirmDeleteFreeBlock(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(b.id)+'\')">'+svgIcon('x',12)+'</div>'
+      +'</div>';
+    items.push({html:html, dateVal:b.date, timeSort:sort, moment:moment, _isMarker:true});
+  });
+  return items;
+}
+function confirmDeleteFreeBlock(ck, id){
+  showConfirm('Supprimer ce bloc ?', function(){ deleteFreeBlock(ck, id); }, 'Supprimer', 'Annuler');
+}
+function openAddActivityModalFromFreeBlock(ck, blockId, name){
+  openAddActivityModal(ck);
+  setTimeout(function(){
+    var nameInput = document.getElementById('guideModalActName');
+    if(nameInput){ nameInput.value = name; nameInput.dispatchEvent(new Event('input')); }
+  }, 50);
+  deleteFreeBlock(ck, blockId);
+}
 function renderCityPanelContentBody(c, city){
     var momentAccent = {morning:'#E29B5E', noon:'#4E8B72', afternoon:'#6FA3E0', evening:'#8A8A8E'};
     var momentBg = {morning:'#FBF1E8', noon:'#F2F7F4', afternoon:'#EDF3FC', evening:'#F1EFEA'};
@@ -8242,6 +8293,7 @@ function renderCityPanelContentBody(c, city){
     // jours différents sous un même bandeau "MATIN". La vue "Tout" devient donc une liste plate,
     // chaque carte portant déjà sa propre temporalité complète via timeCapsuleHTML (Lot 2).
     var _checkinMarkers = _buildCheckinMarkerItems(ck, momentBg);
+    var _freeBlockItems = _buildFreeBlockItems(ck);
     var baseActsHTML;
     if(activeDay==='Tous'){
       // Tri stable : date de rendu -> heure de début -> moment (repli) -> ordre existant en cas
@@ -8249,8 +8301,9 @@ function renderCityPanelContentBody(c, city){
       // S.actTimeStart, getActMoment) — aucune nouvelle logique temporelle n'est recréée ici.
       var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
       var _flatItems = baseActsItems.map(function(item, idx){ item._origIdx = idx; return item; });
-      // Injecter les markers check-in/out dans le fil "Tous"
+      // Injecter les markers check-in/out et les blocs libres dans le fil "Tous"
       _checkinMarkers.forEach(function(m){ _flatItems.push(m); });
+      _freeBlockItems.forEach(function(m){ _flatItems.push(m); });
       _flatItems.sort(function(a, b){
         var aDate = a.dateVal || '';
         var bDate = b.dateVal || '';
@@ -8271,9 +8324,12 @@ function renderCityPanelContentBody(c, city){
       // groupes vides masqués.
       var momentGroups = {morning:[], noon:[], afternoon:[], evening:[], '':[]};
       baseActsItems.forEach(function(item){ momentGroups[item.moment||''].push(item); });
-      // Injecter les markers check-in/out filtrés sur le jour actif
+      // Injecter les markers check-in/out et les blocs libres filtrés sur le jour actif
       _checkinMarkers.forEach(function(m){
         if(m.dateVal === activeDay) momentGroups[m.moment||'morning'].push(m);
+      });
+      _freeBlockItems.forEach(function(m){
+        if(m.dateVal === activeDay) momentGroups[m.moment||''].push(m);
       });
       // Tri chronologique à l'intérieur de chaque groupe de moment (Lot 1 §14/§15) : les activités
       // ayant une heure de début précise sont triées par ordre croissant ; celles du même groupe
