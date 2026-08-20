@@ -1385,7 +1385,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-10·sha:p08a-4c';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3251,11 +3251,11 @@ function openActionMenu(el){
   var items = [
     {icon:'pencil',   label:'Modifier la fiche',                        action:'edit'},
     {icon:'history',  label:'Planifier',                                action:'plan'},
-    {icon:'compass',  label:'Changer la cat\u00e9gorie',                action:'category'},
+    {icon:'compass',  label:'Changer la catégorie',                action:'category'},
     {icon:'calendar', label:'Changer la date',                          action:'date'},
     {icon:'star',     label:isFav?'Retirer des favoris':'Ajouter aux favoris', action:'fav'},
     {icon:'repeat',   label:'Dupliquer',                                action:'duplicate'},
-    {icon:'map',      label:'D\u00e9placer vers une autre ville',       action:'moveCity'},
+    {icon:'map',      label:'Déplacer vers une autre ville',       action:'moveCity'},
     {icon:'trash-2',  label:'Mettre à la corbeille',                   action:'delete', danger:true}
   ];
   document.getElementById('actionMenuTitle').textContent = actName;
@@ -3428,7 +3428,7 @@ function openDetail(actKey, actName, cityKey) {
     // visible dans la capsule temporelle de la carte et dans les chips de filtre).
     if(timeVal) return {label:timeVal, hasInfo:true};
     if(mo) return {label:mo.label, hasInfo:true};
-    return {label:'Horaire non d\u00e9fini', hasInfo:true};
+    return {label:'Horaire non défini', hasInfo:true};
   }
   function refreshActionButtons(){
     var dateBtn = document.getElementById('detailDateBtn');
@@ -3493,7 +3493,7 @@ function openDetail(actKey, actName, cityKey) {
   // Si aucune fiche n'existe encore : lance l'IA si une clé est configurée, sinon les sections
   // ci-dessous s'affichent directement en mode édition (fallback manuel sans IA).
   if(!hasAnyDetail && aiHasActiveKey()){
-    html += '<div class="detail-section" id="detailAiStatus"><div class="detail-text">G\u00e9n\u00e9ration des d\u00e9tails avec l\'IA\u2026</div></div>';
+    html += '<div class="detail-section" id="detailAiStatus"><div class="detail-text">Génération des détails avec l\'IA\u2026</div></div>';
     fetchActivityDetailAI(cityKey, actName, actKey);
   }
 
@@ -3521,10 +3521,10 @@ function openDetail(actKey, actName, cityKey) {
   // Infos pratiques (quickInfo)
   if(_isEditable){
     var _qFields = [
-      {key:'duration',        icon:'history',      label:'Dur\u00e9e conseill\u00e9e', placeholder:'ex\u00a0: 1h30'},
-      {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: t\u00f4t le matin'},
-      {key:'bookingRequired', icon:'check-square', label:'R\u00e9servation',        placeholder:'Oui / Non / Recommand\u00e9'},
-      {key:'address',         icon:'map-pin',      label:'Adresse',           placeholder:'Adresse pr\u00e9cise', full:true},
+      {key:'duration',        icon:'history',      label:'Durée conseillée', placeholder:'ex\u00a0: 1h30'},
+      {key:'bestTime',        icon:'sparkles',     label:'Meilleur moment',   placeholder:'ex\u00a0: tôt le matin'},
+      {key:'bookingRequired', icon:'check-square', label:'Réservation',        placeholder:'Oui / Non / Recommandé'},
+      {key:'address',         icon:'map-pin',      label:'Adresse',           placeholder:'Adresse précise', full:true},
       {key:'tag',             icon:'landmark',     label:'Type de lieu',      placeholder:'ex\u00a0: Temple, Restaurant\u2026', full:true}
     ];
     // Horaires d'ouverture du LIEU uniquement (jamais le planning personnel — voir S.actDate /
@@ -3541,7 +3541,7 @@ function openDetail(actKey, actName, cityKey) {
       +'<input type="time" value="'+_hOpenVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'open\',this.value)"/>'
       +'<input type="time" value="'+_hCloseVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'close\',this.value)"/>'
       +'</div>'
-      +'<input type="text" placeholder="Jours de fermeture (optionnel), ex\u00a0: Ferm\u00e9 lundi" value="'+_hClosedDaysVal+'" style="'+_inStyle2+'" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'closedDays\',this.value)"/>'
+      +'<input type="text" placeholder="Jours de fermeture (optionnel), ex\u00a0: Fermé lundi" value="'+_hClosedDaysVal+'" style="'+_inStyle2+'" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'closedDays\',this.value)"/>'
       +'</div>';
     var _qBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">'+_hoursBody;
     _qFields.forEach(function(f){
@@ -4128,7 +4128,7 @@ function buildQuickInfoHTML(d){
         var iconBorder = (isHoursItem && isClosedNow) ? quickCardIconBorder : 'rgba(45,106,79,0.18)';
         return '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px">'
           +'<span style="width:38px;height:38px;border-radius:50%;border:1px solid '+iconBorder+';display:flex;align-items:center;justify-content:center;color:'+iconColor+'">'+svgIcon(item.icon,17)+'</span>'
-          +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Lieu ferm\u00e9':'Lieu ouvert'):item.label)+'</span>'
+          +'<span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-subtle);font-weight:600">'+escHtml(isHoursItem?(isClosedNow?'Lieu fermé':'Lieu ouvert'):item.label)+'</span>'
           +'<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(item.value)+'</span>'
           +'</div>';
       }).join('')
@@ -8289,7 +8289,7 @@ function renderCityPanelContentBody(c, city){
         } else {
           // Lot 3 §3 : libellé renommé "Horaire non défini" — l'activité a déjà une date connue
           // dans cette vue Jour, "Non planifié" était sémantiquement trompeur.
-          var header2 = '<div class="planning-group-header planning-group-header--muted">Horaire non d\u00e9fini</div>';
+          var header2 = '<div class="planning-group-header planning-group-header--muted">Horaire non défini</div>';
           return header2+items.map(function(it){return it.html;}).join('');
         }
       }).join('');
@@ -8953,24 +8953,24 @@ function renderItinerary(c, embedded){
     +'<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px">'
     +(aiHasActiveKey()
       ? '<div class="info-card">'
-        +'<div class="ic-header" style="color:var(--accent);cursor:pointer" onclick="toggleLieuxAiGen(\''+jsStrEsc(c.id)+'\')">G\u00e9n\u00e9rer avec l\'IA <span data-icon="chevron-right" data-icon-size="12" style="margin-left:auto;transition:transform .2s ease;transform:rotate('+((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id])?'90deg':'0deg')+')"></span></div>'
+        +'<div class="ic-header" style="color:var(--accent);cursor:pointer" onclick="toggleLieuxAiGen(\''+jsStrEsc(c.id)+'\')">Générer avec l\'IA <span data-icon="chevron-right" data-icon-size="12" style="margin-left:auto;transition:transform .2s ease;transform:rotate('+((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id])?'90deg':'0deg')+')"></span></div>'
         +((S.uiAccordion&&S.uiAccordion['lieuxAiGen_'+c.id]) ?
           ('<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
           +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',false)" '
           +'style="padding:10px 8px;border-radius:var(--r12);border:none;background:var(--accent);'
           +'color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
-          +'Villes + activit\u00e9s</button>'
+          +'Villes + activités</button>'
           +'<button onclick="generateProgramForCountryUI(\''+jsStrEsc(c.id)+'\',true)" '
           +'style="padding:10px 8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,0.3);'
           +'background:transparent;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">'
           +'Villes seules</button>'
           +'</div>'
-          +'<div class="status-sub" style="margin-top:8px">Villes et activit\u00e9s \u00e0 partir des dates du pays \u2014 \u00e0 v\u00e9rifier.</div>')
+          +'<div class="status-sub" style="margin-top:8px">Villes et activités \u00e0 partir des dates du pays \u2014 \u00e0 vérifier.</div>')
           : '')
         +'</div>'
       : '<div class="info-card">'
-        +'<div class="ic-header" style="color:var(--accent)">G\u00e9n\u00e9rer avec l\'IA</div>'
-        +'<div class="status-sub">Cl\u00e9 API requise \u2014 <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
+        +'<div class="ic-header" style="color:var(--accent)">Générer avec l\'IA</div>'
+        +'<div class="status-sub">Clé API requise \u2014 <span style="color:var(--accent);cursor:pointer;font-weight:600" onclick="showMyAccountScreen()">configure-la dans Mon compte</span>.</div>'
         +'</div>'
     )
     +'</div>'
@@ -9911,8 +9911,12 @@ function renderProgressRing(pct, size, stroke, color, trackColor, textColor, lab
 function renderBudgetOverview(){
   var sub = S.budgetSubTab||'resume';
   var totalSpent = _totalNetSpent();
-  var totalBudget = COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
-  var pct = totalBudget>0 ? Math.min(100, Math.round((totalSpent/totalBudget)*100)) : 0;
+  var budgetQuotidien = COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
+  var budgetPonctuel = S.expenses.filter(function(e){return e.category==='flight'||e.category==='lodging';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+  var budgetTotal = budgetQuotidien + budgetPonctuel;
+  var totalBudget = budgetTotal;
+  var nbVoyageurs = getPeopleList().length || 1;
+  var pct = budgetTotal>0 ? Math.min(100, Math.round((totalSpent/budgetTotal)*100)) : 0;
   var tabsHTML = ['resume','remb'].map(function(t){
     var lbl = t==='resume'?'Dépenses':'Remboursements';
     return '<button class="cf-tab'+(sub===t?' active':'')+'" onclick="setBudgetSubTab(\''+t+'\')">'+lbl+'</button>';
@@ -10019,9 +10023,29 @@ function renderBudgetOverview(){
     var mySharePct = totalSpent>0 ? Math.min(100, Math.round((mySpent/totalSpent)*100)) : 0;
     var nbTravelers = 1 + ((typeof CURRENT_COLLABORATORS !== 'undefined' && CURRENT_COLLABORATORS ? CURRENT_COLLABORATORS.length : 0));
     var dashRow;
-    if(nbTravelers >= 2){
-      dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'        +'<div style="display:flex;align-items:flex-end;gap:16px">'        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Mes dépenses</div>'        +'<div style="display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-size:34px;font-weight:700;letter-spacing:-1px">'+fmtEUR(mySpent)+'</span><span style="color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',18)+'</span></div></div>'        +'<div style="width:1px;align-self:stretch;background:rgba(255,255,255,0.18)"></div>'        +'<div style="flex:1;text-align:right"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total groupe</div>'        +'<div style="font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-top:6px;color:rgba(255,255,255,0.92)">'+fmtEUR(totalSpent)+'</div></div>'        +'</div>'        +'<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+mySharePct+'%;background:#95D5B2;border-radius:2px"></div></div>'        +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">Tu représentes '+mySharePct+'% des dépenses du groupe</div>'        +'</div>';    } else {
-      dashRow = '<div onclick="S.budgetPersonView=\''+escHtml(myLabelDash).replace(/'/g,"\\'")+'\';save();renderContent();" style="cursor:pointer;border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'        +'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Total dépenses</div>'        +'<div style="display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-size:34px;font-weight:700;letter-spacing:-1px">'+fmtEUR(totalSpent)+'</span><span style="color:rgba(255,255,255,0.45)">'+svgIcon('chevron-right',18)+'</span></div>'        +(totalBudget>0 ? '<div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);overflow:hidden"><div style="height:100%;width:'+Math.min(100,pct)+'%;background:#95D5B2;border-radius:2px"></div></div>'        +'<div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:6px">'+pct+'% du budget prévu ('+fmtEUR(totalBudget)+')</div>' : '')        +'</div>';    }    body = dashRow
+    dashRow = '<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff">'        +'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">Budget total</div>'        +'<div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;flex-wrap:wrap">'        +'<span style="font-size:36px;font-weight:700;letter-spacing:-1px">'+fmtEUR(budgetTotal)+'</span>'        +(nbVoyageurs>1 ? '<span style="font-size:14px;font-weight:500;color:rgba(255,255,255,0.5)">/ '+fmtEUR(Math.round(budgetTotal/nbVoyageurs))+' par tête</span>' : '')        +'</div>'        +'<div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px">Dépensé : '+fmtEUR(totalSpent)+' · Restant : '+fmtEUR(Math.max(0,budgetTotal-totalSpent))+'</div>'        +'<div style="margin-top:14px;height:5px;border-radius:2.5px;background:rgba(255,255,255,0.18);overflow:hidden"><div style="height:100%;width:'+Math.min(100,pct)+'%;background:#95D5B2;border-radius:2.5px"></div></div>'        +'<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:11px;color:rgba(255,255,255,0.45)">'+pct+'% dépensé</span><span style="font-size:11px;color:rgba(255,255,255,0.45)">'+fmtEUR(budgetQuotidien)+' quotidien + '+fmtEUR(budgetPonctuel)+' ponctuel</span></div>'        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">'        +'<div style="background:rgba(255,255,255,0.1);border-radius:12px;padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.3px;color:rgba(255,255,255,0.5);font-weight:500">Ponctuel</div><div style="font-size:18px;font-weight:700;margin-top:2px;letter-spacing:-0.3px">'+fmtEUR(budgetPonctuel)+'</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:1px">Vols + logements</div></div>'        +'<div style="background:rgba(255,255,255,0.1);border-radius:12px;padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.3px;color:rgba(255,255,255,0.5);font-weight:500">Quotidien</div><div style="font-size:18px;font-weight:700;margin-top:2px;letter-spacing:-0.3px">'+fmtEUR(budgetQuotidien)+'</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:1px">'+fmtEUR(Math.round(budgetQuotidien/(COUNTRIES.reduce(function(s,c){return s+c.days;},0)||1)))+' /j en moy.</div></div>'        +'</div>'        +'</div>';
+    var ponctuelItems = S.expenses.filter(function(e){return e.category==='flight'||e.category==='lodging';}).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+    var ponctuelHTML = '';
+    if(ponctuelItems.length){
+      var flightRows = ponctuelItems.filter(function(e){return e.category==='flight';}).map(function(e){
+        var c3=COUNTRIES.find(function(co){return co.id===e.country;});
+        return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon('send',14)+'</span><span style="font-size:14px;margin-right:2px">'+(c3?c3.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||'Vol')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+      }).join('');
+      var lodgingRows = ponctuelItems.filter(function(e){return e.category==='lodging';}).map(function(e){
+        var c3=COUNTRIES.find(function(co){return co.id===e.country;});
+        return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon('home',14)+'</span><span style="font-size:14px;margin-right:2px">'+(c3?c3.flag:'')+'</span><span class="ee-desc">'+escHtml(e.desc||'Logement')+'</span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+      }).join('');
+      ponctuelHTML = '<div class="info-card" style="margin-bottom:14px">'
+        +'<div class="ic-header">Dépenses ponctuelles</div>'
+        +(flightRows ? '<div style="font-size:12px;font-weight:600;color:var(--ink-muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:0.5px">'+svgIcon('send',11)+' Vols</div>'+flightRows : '')
+        +(lodgingRows ? '<div style="font-size:12px;font-weight:600;color:var(--ink-muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:0.5px">'+svgIcon('home',11)+' Logements</div>'+lodgingRows : '')
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--divider)">'
+        +'<span style="font-size:13px;color:var(--ink-muted);font-weight:500">Total ponctuel</span>'
+        +'<span style="font-size:17px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetPonctuel)+'</span>'
+        +'</div></div>';
+    }
+    body = dashRow
+      +ponctuelHTML
       +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
       +fabHTML;
     }
