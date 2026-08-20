@@ -1385,7 +1385,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v6';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v7';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10044,8 +10044,38 @@ function renderBudgetOverview(){
         +'<span style="font-size:17px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetPonctuel)+'</span>'
         +'</div></div>';
     }
+    var quotidienRows = COUNTRIES.map(function(c){
+      var myDaily = getMyCountryDailyBudget(c);
+      var planned = getCountryPlannedBudget(c);
+      var countryQuotidienSpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement' && e.category!=='flight' && e.category!=='lodging';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var qPct = planned>0 ? Math.min(100, Math.round((countryQuotidienSpent/planned)*100)) : 0;
+      var isOver = countryQuotidienSpent>planned && planned>0;
+      var barColor = isOver ? '#E76F51' : '#2D6A4F';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--divider)">'
+        +'<span style="font-size:22px;flex-shrink:0">'+c.flag+'</span>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+        +'<span style="font-size:14px;font-weight:600;color:var(--ink)">'+c.name+'</span>'
+        +'<span style="font-size:14px;font-weight:700;color:var(--ink);flex-shrink:0">'+fmtEUR(planned)+'</span>'
+        +'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">'
+        +'<span style="font-size:12px;color:var(--ink-muted)">'+fmtEUR(myDaily)+'/j · '+c.days+'j</span>'
+        +(planned>0 ? '<span style="font-size:12px;color:var(--ink-muted)">'+fmtEUR(countryQuotidienSpent)+' dépensé</span>' : '')
+        +'</div>'
+        +(planned>0 ? '<div style="margin-top:5px;height:3px;border-radius:2px;background:var(--sand-deep);overflow:hidden"><div style="height:100%;width:'+qPct+'%;background:'+barColor+';border-radius:2px"></div></div>' : '')
+        +'</div>'
+        +'</div>';
+    }).join('');
+    var quotidienCard = '<div class="info-card" style="margin-bottom:14px">'
+      +'<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:4px">Quotidien par pays</div>'
+      +quotidienRows
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--divider)">'
+      +'<span style="font-size:13px;color:var(--ink-muted);font-weight:500">Total quotidien</span>'
+      +'<span style="font-size:17px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetQuotidien)+'</span>'
+      +'</div></div>';
     body = dashRow
       +ponctuelHTML
+      +quotidienCard
       +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
       +fabHTML;
     }
