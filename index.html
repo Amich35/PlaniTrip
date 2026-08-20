@@ -1398,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v10';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v11';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10009,7 +10009,8 @@ function renderBudgetOverview(){
         +renderProgressRing(cPctReal, 72, 7, cOver?'#E76F51':'#95D5B2')
         +'</div></div>'
         +(cExpsPonctuel.length ? '<div style="font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 8px">Dépenses ponctuelles</div>'+cExpsPonctuel.map(function(e){  var whoLabel=canonicalPerson(e.personLabel||e.person||'?');  var catIcon=getExpenseCategoryIcon(e.category);  return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';}).join('') : '')
-        +(cExpsQuotidien.length ? '<div style="font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 8px">Dépenses quotidiennes</div>'+groupsHTML : '<div class="fav-empty">Aucune dépense quotidienne enregistrée.</div>')
+        +'<div style="font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 8px">Dépenses quotidiennes</div>'
+        +(cExpsQuotidien.length ? groupsHTML : '<div class="fav-empty">Aucune dépense quotidienne enregistrée.</div>')
         +fabHTML;
     } else {
     var rows = COUNTRIES.map(function(c){
