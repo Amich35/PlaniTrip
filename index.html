@@ -6376,8 +6376,9 @@ function fmtCityStayLine(ck){
   if(!range) return null;
   var d1 = new Date(range.start+'T00:00:00'), d2 = new Date(range.end+'T00:00:00');
   var nights = Math.round((d2-d1)/86400000);
-  var nightsTxt = nights>0 ? (' • '+nights+(nights===1?' nuit':' nuits')) : '';
-  return fmtDateRangeFr(range.start, range.end)+nightsTxt;
+  var days = nights + 1;
+  var daysTxt = days>0 ? (' • '+days+(days===1?' jour':' jours')) : '';
+  return fmtDateRangeFr(range.start, range.end)+daysTxt;
 }
 function editCountryField(countryId, field, value){
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
