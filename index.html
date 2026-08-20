@@ -4544,6 +4544,11 @@ async function saveAccom(ck) {
     }
     var _btn = document.querySelector('#accomModal .modal-cta');
     if(_btn){ _btn.disabled=true; _btn.textContent='…'; }
+    // Timeout de sécurité : réinitialise le bouton si Supabase ne répond pas
+    var _btnResetTimer = setTimeout(function(){
+      var _btnT = document.querySelector('#accomModal .modal-cta');
+      if(_btnT && _btnT.disabled){ _btnT.disabled=false; _btnT.textContent='Enregistrer'; }
+    }, 15000);
     // Await accommodation — S.actDate non modifié (règle métier : logements ≠ planning)
     try{
       var countryId = ck.split('_')[0];
@@ -4551,8 +4556,10 @@ async function saveAccom(ck) {
         {trip_id:CURRENT_TRIP.id, city_key:ck, country_id:countryId, data:nextAccomList, updated_at:new Date().toISOString()},
         {onConflict:'trip_id,city_key'}
       );
+      clearTimeout(_btnResetTimer);
       if(_r && _r.error) throw _r.error;
     } catch(e){
+      clearTimeout(_btnResetTimer);
       console.error('[PlaniTrip] saveAccom accommodation upsert:', e);
       var _btn2 = document.querySelector('#accomModal .modal-cta');
       if(_btn2){ _btn2.disabled=false; _btn2.textContent='Enregistrer'; }
