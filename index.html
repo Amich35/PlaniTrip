@@ -1407,7 +1407,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:freeblocks-modal-v1';
+var APP_BUILD = '2026-08-20·sha:freeblocks-edit-datefill-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5848,9 +5848,11 @@ var _addActivityModalCk = '';
 var _addActivityModalCats = [];
 var _freeBlockModalCk = null;
 var _freeBlockModalType = null;
-function openFreeBlockModal(ck, type){
+var _freeBlockModalEditId = null;
+function openFreeBlockModal(ck, type, existing){
   _freeBlockModalCk = ck;
   _freeBlockModalType = type;
+  _freeBlockModalEditId = existing ? existing.id : null;
   var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
   var dateBounds = range ? (' min="'+range.start+'" max="'+range.end+'"') : '';
   var titles = {free:'Temps libre', meal:'Repas à définir', dayoff:'Journée libre'};
@@ -5870,10 +5872,31 @@ function openFreeBlockModal(ck, type){
     +timeFieldsHTML;
   _guideModalSaveFn = saveFreeBlockFromModal;
   document.getElementById('guideItemModal').classList.add('open');
+  // Pré-remplissage : édition d'un bloc existant, ou date par défaut selon le filtre Jour actif.
+  var nameEl = document.getElementById('freeBlockName');
+  var dateEl = document.getElementById('freeBlockDate');
+  var startEl = document.getElementById('freeBlockTimeStart');
+  var endEl = document.getElementById('freeBlockTimeEnd');
+  if(existing){
+    if(nameEl) nameEl.value = existing.name || '';
+    if(dateEl) dateEl.value = existing.date || '';
+    if(startEl) startEl.value = existing.timeStart || '';
+    if(endEl) endEl.value = existing.timeEnd || '';
+  } else if(dateEl){
+    var activeDay = S.activeDay && S.activeDay[ck];
+    if(activeDay && activeDay!=='Tous'){ dateEl.value = activeDay; }
+  }
+}
+function editFreeBlock(ck, id){
+  var list = Array.isArray(S.freeBlocks && S.freeBlocks[ck]) ? S.freeBlocks[ck] : [];
+  var block = list.find(function(b){ return b.id===id; });
+  if(!block) return;
+  openFreeBlockModal(ck, block.type, block);
 }
 function saveFreeBlockFromModal(){
   var ck = _freeBlockModalCk;
   var type = _freeBlockModalType;
+  var editId = _freeBlockModalEditId;
   if(!ck || !type) return;
   var name = (document.getElementById('freeBlockName')?.value || '').trim();
   var date = document.getElementById('freeBlockDate')?.value || '';
@@ -5881,7 +5904,7 @@ function saveFreeBlockFromModal(){
   var timeEnd = document.getElementById('freeBlockTimeEnd')?.value || '';
   if(!date){ alert('Merci de choisir une date.'); return; }
   closeGuideItemModal();
-  saveFreeBlock(ck, {type:type, name:name, date:date, timeStart:timeStart, timeEnd:timeEnd});
+  saveFreeBlock(ck, {id:editId||undefined, type:type, name:name, date:date, timeStart:timeStart, timeEnd:timeEnd});
 }
 function openAddActivityModal(ck){
   _addActivityModalCk = ck;
@@ -8214,7 +8237,7 @@ function _buildFreeBlockItems(ck){
     var sort = b.timeStart || (b.type==='dayoff' ? '00:00' : '12:00');
     var moment = b.timeStart ? (getDayPeriod(b.timeStart) || '') : '';
     var cta = (b.type==='meal') ? '<div class="free-marker__cta" onclick="event.stopPropagation();openAddActivityModalFromFreeBlock(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(b.id)+'\',\''+jsStrEsc(b.name||'Repas')+'\')">+ Choisir</div>' : '';
-    var html = '<div class="free-marker">'
+    var html = '<div class="free-marker" onclick="editFreeBlock(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(b.id)+'\')" style="cursor:pointer">'
       +'<div class="free-marker__icon">'+svgIcon(typeIcons[b.type]||'circle',14)+'</div>'
       +'<div class="free-marker__info">'
       +'<div class="free-marker__label">'+label+'</div>'
