@@ -456,6 +456,19 @@ html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-beh
 .bcr-name{font-size:13.5px;font-weight:600;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bcr-amt{font-size:11.5px;color:var(--ink-muted);flex-shrink:0;}
 .bcr-pct{font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0;width:36px;text-align:right;}
+.budget-pills-wrap{overflow-x:auto;display:flex;gap:10px;padding:4px 2px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -20px;padding-left:2px;padding-right:20px;}
+.budget-pills-wrap::-webkit-scrollbar{display:none;}
+.budget-pill{background:var(--parchment);border-radius:18px;padding:14px 16px;min-width:148px;flex-shrink:0;box-shadow:0 1px 6px rgba(0,0,0,0.05),0 0 0 0.5px rgba(0,0,0,0.04);cursor:pointer;}
+.budget-pill.active{box-shadow:0 0 0 1.5px #95D5B2,0 1px 6px rgba(0,0,0,0.06);}
+.bp-flag{font-size:22px;margin-bottom:8px;display:block;}
+.bp-name{font-size:13px;font-weight:600;color:var(--ink);}
+.bp-total{font-size:20px;font-weight:700;color:var(--ink);margin-top:4px;letter-spacing:-0.3px;}
+.bp-divider{height:0.5px;background:var(--divider);margin:8px 0;}
+.bp-mini-row{display:flex;justify-content:space-between;gap:4px;}
+.bp-mini{text-align:center;flex:1;}
+.bp-mini-label{font-size:10px;color:var(--ink-muted);font-weight:500;display:block;}
+.bp-mini-val{font-size:12px;font-weight:700;color:var(--ink);display:block;margin-top:1px;}
+
 
 /* ── SUBPAGE HEADER (Documents / Carnet) ── */
 .subpage-header{display:flex;align-items:center;gap:12px;padding:16px;position:sticky;top:0;background:var(--sand);z-index:10;}
@@ -1385,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v7';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v8';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10076,7 +10089,7 @@ function renderBudgetOverview(){
     body = dashRow
       +ponctuelHTML
       +quotidienCard
-      +'<div class="info-card"><div class="ic-header">Par pays</div>'+rows+'</div>'
+      +'<div class="info-card">'+'<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:12px">Par pays</div>'+'<div class="budget-pills-wrap">'+COUNTRIES.map(function(c){  var cPonctuel = S.expenses.filter(function(e){return e.country===c.id&&(e.category==='flight'||e.category==='lodging');}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);  var cQuotidien = getCountryPlannedBudget(c);  var cVols = S.expenses.filter(function(e){return e.country===c.id&&e.category==='flight';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);  var cTotal = cPonctuel + cQuotidien;  var isCurrentCountry = c.dateStart && c.dateEnd && (new Date().toISOString().slice(0,10)>=c.dateStart && new Date().toISOString().slice(0,10)<=c.dateEnd);  return '<div class="budget-pill'+(isCurrentCountry?' active':'')+'" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'    +'<span class="bp-flag">'+c.flag+'</span>'    +'<div class="bp-name">'+c.name+'</div>'    +'<div class="bp-total">'+fmtEUR(cTotal)+'</div>'    +'<div class="bp-divider"></div>'    +'<div class="bp-mini-row">'    +'<div class="bp-mini"><span class="bp-mini-label">Ponctuel</span><span class="bp-mini-val">'+(cPonctuel>0?fmtEUR(cPonctuel):'—')+'</span></div>'    +'<div class="bp-mini"><span class="bp-mini-label">Quotidien</span><span class="bp-mini-val">'+fmtEUR(cQuotidien)+'</span></div>'    +'</div>'    +'</div>';}).join('')+'</div>'+'</div>'
       +fabHTML;
     }
   } else if(sub==='remb'){
