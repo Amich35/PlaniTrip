@@ -1407,7 +1407,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:freeblocks-edit-datefill-v1';
+var APP_BUILD = '2026-08-20·sha:freeblocks-no-tous-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8361,9 +8361,8 @@ function renderCityPanelContentBody(c, city){
       // S.actTimeStart, getActMoment) — aucune nouvelle logique temporelle n'est recréée ici.
       var _momentSortRank = {morning:0, noon:1, afternoon:2, evening:3, '':4};
       var _flatItems = baseActsItems.map(function(item, idx){ item._origIdx = idx; return item; });
-      // Injecter les markers check-in/out et les blocs libres dans le fil "Tous"
+      // Injecter les markers check-in/out dans le fil "Tous" (les blocs libres restent limités à la vue Jour)
       _checkinMarkers.forEach(function(m){ _flatItems.push(m); });
-      _freeBlockItems.forEach(function(m){ _flatItems.push(m); });
       _flatItems.sort(function(a, b){
         var aDate = a.dateVal || '';
         var bDate = b.dateVal || '';
