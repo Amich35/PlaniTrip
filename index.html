@@ -1398,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v9';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v10';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9978,9 +9978,13 @@ function renderBudgetOverview(){
         +fabHTML;
     } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
-      var cSpent = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0) - S.expenses.filter(function(e){return e.category==='reimbursement' && e.country===c2.id;}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var cSpentPonctuel = S.expenses.filter(function(e){return e.country===c2.id&&(e.category==='flight'||e.category==='lodging');}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var cSpentQuotidien = S.expenses.filter(function(e){return e.country===c2.id&&e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var cSpent = cSpentPonctuel + cSpentQuotidien;
       var cBudget = getCountryPlannedBudget(c2);
-      var cExps = S.expenses.filter(function(e){return e.country===c2.id && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var cExpsQuotidien = S.expenses.filter(function(e){return e.country===c2.id&&e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var cExpsPonctuel = S.expenses.filter(function(e){return e.country===c2.id&&(e.category==='flight'||e.category==='lodging');}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var cExps = cExpsQuotidien;
       var byDate = {};
       var dateOrder = [];
       cExps.forEach(function(e){
@@ -9996,15 +10000,16 @@ function renderBudgetOverview(){
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
-      var cPctReal = cBudget>0 ? Math.round((cSpent/cBudget)*100) : 0;
+      var cPctReal = cBudget>0 ? Math.round((cSpentQuotidien/cBudget)*100) : 0;
       var cOver = cPctReal>100;
       // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
       body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
-        +'<div style="flex:1"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+'</div><div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpent)+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' prévu</div></div>'
+        +'<div style="flex:1">'+'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+'</div>'+'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpentQuotidien)+'</div>'+'<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' quotidien prévu</div>'+(cSpentPonctuel>0 ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);display:flex;justify-content:space-between;align-items:center">'+'<span style="font-size:12px;color:rgba(255,255,255,0.6)">Ponctuel (vols + logements)</span>'+'<span style="font-size:14px;font-weight:700;color:#fff">'+fmtEUR(cSpentPonctuel)+'</span></div>' : '')+'</div>'
         +renderProgressRing(cPctReal, 72, 7, cOver?'#E76F51':'#95D5B2')
         +'</div></div>'
-        +(cExps.length ? groupsHTML : '<div class="fav-empty">Aucune dépense enregistrée pour ce pays.</div>')
+        +(cExpsPonctuel.length ? '<div style="font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 8px">Dépenses ponctuelles</div>'+cExpsPonctuel.map(function(e){  var whoLabel=canonicalPerson(e.personLabel||e.person||'?');  var catIcon=getExpenseCategoryIcon(e.category);  return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';}).join('') : '')
+        +(cExpsQuotidien.length ? '<div style="font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 8px">Dépenses quotidiennes</div>'+groupsHTML : '<div class="fav-empty">Aucune dépense quotidienne enregistrée.</div>')
         +fabHTML;
     } else {
     var rows = COUNTRIES.map(function(c){
