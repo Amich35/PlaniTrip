@@ -1398,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v8';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v9';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9924,7 +9924,7 @@ function renderProgressRing(pct, size, stroke, color, trackColor, textColor, lab
 function renderBudgetOverview(){
   var sub = S.budgetSubTab||'resume';
   var totalSpent = _totalNetSpent();
-  var budgetQuotidien = COUNTRIES.reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
+  var budgetQuotidien = COUNTRIES.filter(function(c){return c.days>=2;}).reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
   var budgetPonctuel = S.expenses.filter(function(e){return e.category==='flight'||e.category==='lodging';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
   var budgetTotal = budgetQuotidien + budgetPonctuel;
   var totalBudget = budgetTotal;
@@ -10057,7 +10057,7 @@ function renderBudgetOverview(){
         +'<span style="font-size:17px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetPonctuel)+'</span>'
         +'</div></div>';
     }
-    var quotidienRows = COUNTRIES.map(function(c){
+    var quotidienRows = COUNTRIES.filter(function(c){return c.days>=2;}).map(function(c){
       var myDaily = getMyCountryDailyBudget(c);
       var planned = getCountryPlannedBudget(c);
       var countryQuotidienSpent = S.expenses.filter(function(e){return e.country===c.id && e.category!=='reimbursement' && e.category!=='flight' && e.category!=='lodging';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
@@ -10089,7 +10089,7 @@ function renderBudgetOverview(){
     body = dashRow
       +ponctuelHTML
       +quotidienCard
-      +'<div class="info-card">'+'<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:12px">Par pays</div>'+'<div class="budget-pills-wrap">'+COUNTRIES.map(function(c){  var cPonctuel = S.expenses.filter(function(e){return e.country===c.id&&(e.category==='flight'||e.category==='lodging');}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);  var cQuotidien = getCountryPlannedBudget(c);  var cVols = S.expenses.filter(function(e){return e.country===c.id&&e.category==='flight';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);  var cTotal = cPonctuel + cQuotidien;  var isCurrentCountry = c.dateStart && c.dateEnd && (new Date().toISOString().slice(0,10)>=c.dateStart && new Date().toISOString().slice(0,10)<=c.dateEnd);  return '<div class="budget-pill'+(isCurrentCountry?' active':'')+'" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'    +'<span class="bp-flag">'+c.flag+'</span>'    +'<div class="bp-name">'+c.name+'</div>'    +'<div class="bp-total">'+fmtEUR(cTotal)+'</div>'    +'<div class="bp-divider"></div>'    +'<div class="bp-mini-row">'    +'<div class="bp-mini"><span class="bp-mini-label">Ponctuel</span><span class="bp-mini-val">'+(cPonctuel>0?fmtEUR(cPonctuel):'—')+'</span></div>'    +'<div class="bp-mini"><span class="bp-mini-label">Quotidien</span><span class="bp-mini-val">'+fmtEUR(cQuotidien)+'</span></div>'    +'</div>'    +'</div>';}).join('')+'</div>'+'</div>'
+      +'<div class="info-card">'+'<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:12px">Par pays</div>'+'<div class="budget-pills-wrap">'+COUNTRIES.filter(function(c){return c.days>=2;}).map(function(c){  var cPonctuel = S.expenses.filter(function(e){return e.country===c.id&&(e.category==='flight'||e.category==='lodging');}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);  var cQuotidien = getCountryPlannedBudget(c);  var cVols = S.expenses.filter(function(e){return e.country===c.id&&e.category==='flight';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);  var cTotal = cPonctuel + cQuotidien;  var isCurrentCountry = c.dateStart && c.dateEnd && (new Date().toISOString().slice(0,10)>=c.dateStart && new Date().toISOString().slice(0,10)<=c.dateEnd);  return '<div class="budget-pill'+(isCurrentCountry?' active':'')+'" onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();">'    +'<span class="bp-flag">'+c.flag+'</span>'    +'<div class="bp-name">'+c.name+'</div>'    +'<div class="bp-total">'+fmtEUR(cTotal)+'</div>'    +'<div class="bp-divider"></div>'    +'<div class="bp-mini-row">'    +'<div class="bp-mini"><span class="bp-mini-label">Ponctuel</span><span class="bp-mini-val">'+(cPonctuel>0?fmtEUR(cPonctuel):'—')+'</span></div>'    +'<div class="bp-mini"><span class="bp-mini-label">Quotidien</span><span class="bp-mini-val">'+fmtEUR(cQuotidien)+'</span></div>'    +'</div>'    +'</div>';}).join('')+'</div>'+'</div>'
       +fabHTML;
     }
   } else if(sub==='remb'){
