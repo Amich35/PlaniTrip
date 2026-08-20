@@ -1398,7 +1398,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:budget-refonte-v14';
+var APP_BUILD = '2026-08-20·sha:budget-refonte-v15';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9978,11 +9978,11 @@ function renderBudgetOverview(){
         +fabHTML;
     } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
-      var cSpentPonctuel = S.expenses.filter(function(e){return e.country===c2.id&&(e.category==='flight'||e.category==='lodging');}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
-      var cSpentQuotidien = S.expenses.filter(function(e){return e.country===c2.id&&e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging';}).reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
       var cBudget = getCountryPlannedBudget(c2);
       var cExpsQuotidien = S.expenses.filter(function(e){return e.country===c2.id&&e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var cExpsPonctuel = S.expenses.filter(function(e){return e.country===c2.id&&(e.category==='flight'||e.category==='lodging');}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var cSpentQuotidien = cExpsQuotidien.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var cSpentPonctuel = cExpsPonctuel.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
       var byDate = {};
       var dateOrder = [];
       cExpsQuotidien.forEach(function(e){
