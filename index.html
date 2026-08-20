@@ -8159,7 +8159,7 @@ function renderCityPanelContentBody(c, city){
           +'</div></div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[k]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(k)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
-          +'<button onclick="event.stopPropagation();openActionMenu(this)" style="width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;z-index:5;flex-shrink:0;">'+'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;pointer-events:none"></span>'+'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;pointer-events:none"></span>'+'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;pointer-events:none"></span>'+'</button>'
+          +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
           +'</div></div></div>';
         return {html:html, moment:actMoment, actKey:k, name:a.n, meta:a.m, dateVal:actDateVal};
       } else {
@@ -8194,7 +8194,7 @@ function renderCityPanelContentBody(c, city){
           +'</div></div>'
           +'<div class="act-actions">'
           +'<button class="fav-btn'+(S.favorites[ck2]?' active':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+jsStrEsc(ck2)+'\')"><span data-icon="star" data-icon-size="15"></span></button>'
-          +'<button onclick="event.stopPropagation();openActionMenu(this)" style="width:32px;height:20px;border-radius:10px;background:rgba(0,0,0,0.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;display:flex;align-items:center;justify-content:center;gap:2px;cursor:pointer;z-index:5;flex-shrink:0;">'+'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;pointer-events:none"></span>'+'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;pointer-events:none"></span>'+'<span style="width:3px;height:3px;border-radius:50%;background:#fff;display:block;pointer-events:none"></span>'+'</button>'
+          +'<button class="map-btn" onclick="event.stopPropagation();openActionMenu(this)">'+svgIcon('ellipsis',14)+'</button>'
           +'</div></div></div>';
         return {html:chtml, moment:caMoment, actKey:ck2, name:ca.n, meta:ca.m, dateVal:cDateVal};
       }
