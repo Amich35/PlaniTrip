@@ -1407,7 +1407,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:freeblocks-render-v1';
+var APP_BUILD = '2026-08-20·sha:freeblocks-modal-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5846,6 +5846,43 @@ function addActivity(cityKey) {
 }
 var _addActivityModalCk = '';
 var _addActivityModalCats = [];
+var _freeBlockModalCk = null;
+var _freeBlockModalType = null;
+function openFreeBlockModal(ck, type){
+  _freeBlockModalCk = ck;
+  _freeBlockModalType = type;
+  var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
+  var dateBounds = range ? (' min="'+range.start+'" max="'+range.end+'"') : '';
+  var titles = {free:'Temps libre', meal:'Repas à définir', dayoff:'Journée libre'};
+  var placeholders = {free:'Nom (optionnel) — ex. Sieste, Piscine', meal:'Nom du repas — ex. Dîner', dayoff:'Nom (optionnel)'};
+  document.getElementById('guideItemModalTitle').textContent = titles[type] || 'Bloc';
+  var timeFieldsHTML = (type!=='dayoff') ?
+    '<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Début (optionnel)</div>'
+    +'<input class="ef-input" id="freeBlockTimeStart" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Fin (optionnel)</div>'
+    +'<input class="ef-input" id="freeBlockTimeEnd" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +'</div>' : '';
+  document.getElementById('guideItemModalBody').innerHTML =
+    '<div style="margin-bottom:10px"><input class="ef-input" id="freeBlockName" type="text" placeholder="'+escHtml(placeholders[type]||'Nom')+'" style="width:100%;font-size:16px;font-weight:500" autocomplete="off"/></div>'
+    +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date</div>'
+    +'<input class="ef-input" id="freeBlockDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +timeFieldsHTML;
+  _guideModalSaveFn = saveFreeBlockFromModal;
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function saveFreeBlockFromModal(){
+  var ck = _freeBlockModalCk;
+  var type = _freeBlockModalType;
+  if(!ck || !type) return;
+  var name = (document.getElementById('freeBlockName')?.value || '').trim();
+  var date = document.getElementById('freeBlockDate')?.value || '';
+  var timeStart = document.getElementById('freeBlockTimeStart')?.value || '';
+  var timeEnd = document.getElementById('freeBlockTimeEnd')?.value || '';
+  if(!date){ alert('Merci de choisir une date.'); return; }
+  closeGuideItemModal();
+  saveFreeBlock(ck, {type:type, name:name, date:date, timeStart:timeStart, timeEnd:timeEnd});
+}
 function openAddActivityModal(ck){
   _addActivityModalCk = ck;
   _addActivityModalCats = [];
@@ -8371,7 +8408,7 @@ function renderCityPanelContentBody(c, city){
 
     const activityTrashBtn = activityTrashButtonHTML(ck);
 
-    const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+activityTrashBtn+'<div style="height:24px"></div>';
+    const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+'<div style="display:flex;justify-content:center;gap:14px;margin-top:10px;flex-wrap:wrap">'+'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'free\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Temps libre</span>'+'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'meal\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Repas à définir</span>'+'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'dayoff\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Journée libre</span>'+'</div>'+activityTrashBtn+'<div style="height:24px"></div>';
 
     // Filtre unique : dates. Le filtre catégorie a été retiré volontairement.
     var dayTabsHTML = renderDayTabs(ck);
@@ -8391,7 +8428,13 @@ function renderCityPanelContentBody(c, city){
         // Aucune activité réellement affectée à cette date
         _emptyDayHTML = '<div style="text-align:center;padding:48px 24px 32px;color:var(--ink-muted)">'
           +'<div style="font-size:15px;font-weight:500;margin-bottom:16px">Aucune activité prévue ce jour</div>'
-          +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'+activityTrashButtonHTML(ck)+''
+          +'<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="padding:10px 22px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">+ Ajouter une activité</button>'
+          +'<div style="display:flex;justify-content:center;gap:14px;margin-top:10px;flex-wrap:wrap">'
+          +'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'free\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Temps libre</span>'
+          +'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'meal\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Repas à définir</span>'
+          +'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'dayoff\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Journée libre</span>'
+          +'</div>'
+          +activityTrashButtonHTML(ck)+''
           +'</div>';
       } else {
         // Activités existent ce jour mais masquées par filtre catégorie
