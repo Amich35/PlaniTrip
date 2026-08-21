@@ -1407,7 +1407,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:freeblocks-no-tous-v1';
+var APP_BUILD = '2026-08-20·sha:country-dates-resync-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6434,6 +6434,21 @@ async function editCityDateRange(ck, startVal, endVal){
 
   // Supabase confirmé : commit local seulement maintenant.
   S.cityDates = nextCityDates;
+  // Resynchronise l'instantané du pays parent (c.dateStart/dateEnd/dates/days) avec les
+  // vraies dates de ses villes, pour que le budget quotidien (c.days) et l'en-tête pays
+  // ne se désynchronisent jamais silencieusement.
+  var countryId = ck.split('_')[0];
+  var parentCountry = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(parentCountry){
+    var freshRange = getCountryDateRange(parentCountry);
+    if(freshRange){
+      parentCountry.dateStart = freshRange.start;
+      parentCountry.dateEnd = freshRange.end;
+      parentCountry.dates = fmtDateRangeFr(freshRange.start, freshRange.end);
+      parentCountry.days = Math.round((new Date(freshRange.end+'T00:00:00')-new Date(freshRange.start+'T00:00:00'))/86400000)+1;
+      if(typeof saveCountryEdit==='function') saveCountryEdit(countryId);
+    }
+  }
   save();
   renderContent();
   return true;
@@ -6443,7 +6458,8 @@ async function editCityDateRange(ck, startVal, endVal){
 // manuellement (c.dateStart/dateEnd) uniquement si aucune ville n'a encore de dates.
 function getCountryDateRange(c){
   if(!c) return null;
-  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
+  // Source canonique : dates réelles des villes (S.cityDates), qui peuvent évoluer après
+  // la création du pays. c.dateStart/dateEnd n'est qu'un instantané de secours.
   var start=null, end=null;
   (c.cities||[]).forEach(function(city){
     var range = cityStayRange(c.id+'_'+city.city);
@@ -6453,6 +6469,7 @@ function getCountryDateRange(c){
     }
   });
   if(start && end) return {start:start, end:end};
+  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
   return null;
 }
 function cityStayRange(ck){
@@ -9082,9 +9099,12 @@ function renderItinerary(c, embedded){
 
   var cdHTML = embedded ? '' : renderCountdown();
   if(!embedded) setTimeout(startCountdownTick, 50);
+  var _liveRange = getCountryDateRange(c);
+  var _liveDatesLabel = _liveRange ? intercountryCountryDateLabel(c) : c.dates;
+  var _liveDays = _liveRange ? (Math.round((new Date(_liveRange.end+'T00:00:00')-new Date(_liveRange.start+'T00:00:00'))/86400000)+1) : c.days;
   var coverHTML = embedded ? '' : '<div class="country-cover" style="background:'+coverColors[c.id]+'">'
-    +'<div class="cover-content"><div class="cover-eyebrow">'+c.dates+'</div><div class="cover-name">'+c.name+' <span style="font-size:26px;vertical-align:middle">'+c.flag+'</span></div><div class="cover-tagline">'+c.tagline+'</div>'
-    +'<div class="cover-pills"><span class="cover-pill">'+c.days+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
+    +'<div class="cover-content"><div class="cover-eyebrow">'+_liveDatesLabel+'</div><div class="cover-name">'+c.name+' <span style="font-size:26px;vertical-align:middle">'+c.flag+'</span></div><div class="cover-tagline">'+c.tagline+'</div>'
+    +'<div class="cover-pills"><span class="cover-pill">'+_liveDays+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
     +weatherSection
     +renderMovementsSection(c.id)
@@ -9724,20 +9744,18 @@ function setActivityDate(actKey, dateVal, opts){
 
 // ── COUNTRY STATUS (done / current / upcoming) ──────────────────
 function getCountryStatus(countryId){
-  var DEPART=getTripDepartDate();
-  var elapsedDays=Math.floor((new Date()-DEPART)/86400000);
-  var cumulative=0;
-  for(var i=0;i<COUNTRIES.length;i++){
-    var c=COUNTRIES[i];
-    var start=cumulative, end=cumulative+c.days;
-    if(c.id===countryId){
-      if(elapsedDays<start) return 'upcoming';
-      if(elapsedDays>=end) return 'done';
-      return 'current';
-    }
-    cumulative=end;
-  }
-  return 'upcoming';
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return 'upcoming';
+  // Comparaison directe sur les vraies dates du pays (villes en priorité, cf. getCountryDateRange)
+  // plutôt qu'un cumul de c.days pays par pays — un pays désynchronisé ne décale plus les suivants.
+  var range = getCountryDateRange(c);
+  if(!range) return 'upcoming';
+  var today = new Date(); today.setHours(0,0,0,0);
+  var start = new Date(range.start+'T00:00:00');
+  var end = new Date(range.end+'T00:00:00');
+  if(today < start) return 'upcoming';
+  if(today > end) return 'done';
+  return 'current';
 }
 function _countryStatusLabel(s){ return s==='current'?'En cours':s==='done'?'Terminé':'À venir'; }
 const COUNTRY_HERO_QUERY={
