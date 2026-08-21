@@ -867,6 +867,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .auth-hero h1{font-size:26px;font-weight:700;color:#1D1D1F;margin:0 0 4px 0;}
 .auth-subtitle{font-size:15px;color:#6E6E73;margin:0;}
 .auth-card{width:100%;max-width:340px;background:#FFFFFF;border-radius:22px;padding:26px 22px;box-shadow:0 2px 14px rgba(0,0,0,0.06);box-sizing:border-box;}
+.auth-loading{width:100%;max-width:340px;background:#FFFFFF;border-radius:22px;padding:26px 22px;box-shadow:0 2px 14px rgba(0,0,0,0.06);box-sizing:border-box;text-align:center;}
+.auth-loading-spinner{width:28px;height:28px;margin:0 auto 14px;border:3px solid #E5E3DE;border-top-color:#2D6A4F;border-radius:50%;animation:spin .8s linear infinite;}
 .auth-label{display:block;font-size:13px;font-weight:500;color:#6E6E73;margin-bottom:8px;}
 .auth-input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #E5E3DE;background:#F8F6F2;font-size:16px;color:#1D1D1F;box-sizing:border-box;margin-bottom:14px;}
 .auth-input:focus{outline:none;border-color:#2D6A4F;}
@@ -1071,6 +1073,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <p class="auth-subtitle">Planifiez. Voyagez. Partagez.</p>
   </div>
   <div id="auth-fatal-error" class="auth-error" style="display:none;"></div>
+  <div id="auth-loading" class="auth-loading" style="display:none;">
+    <div class="auth-loading-spinner" aria-hidden="true"></div>
+    <div style="font-size:16px;font-weight:600;color:#1D1D1F;">Chargement du voyage…</div>
+    <p class="auth-hint">Synchronisation de tes informations</p>
+  </div>
   <div class="auth-card">
 
     <!-- Connexion (par défaut) -->
@@ -14864,6 +14871,19 @@ async function initAuth() {
 function showAuthScreen() {
   document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('main-app').style.display = 'none';
+  var loading = document.getElementById('auth-loading');
+  var card = document.querySelector('#auth-screen > .auth-card');
+  if (loading) loading.style.display = 'none';
+  if (card) card.style.display = 'block';
+}
+
+function showAuthLoading() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  var loading = document.getElementById('auth-loading');
+  var card = document.querySelector('#auth-screen > .auth-card');
+  if (card) card.style.display = 'none';
+  if (loading) loading.style.display = 'block';
 }
 
 async function maybeShowPseudoOnboarding(user) {
@@ -14911,8 +14931,7 @@ async function savePseudoOnboarding() {
   renderContent();
 }
 async function onAuthenticated(user, freshLogin) {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('main-app').style.display = 'none';
+  showAuthLoading();
   if (sb) {
     try {
       var { data: profile } = await sb.from('profiles').select('status').eq('id', user.id).maybeSingle();
@@ -14927,7 +14946,7 @@ async function onAuthenticated(user, freshLogin) {
       sb.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     } catch(e) { console.warn('[PlaniTrip] profile check failed:', e); }
   }
-  checkUserTrips(user, freshLogin);
+  await checkUserTrips(user, freshLogin);
   maybeShowPseudoOnboarding(user);
 }
 
@@ -14964,7 +14983,7 @@ async function checkUserTrips(user, freshLogin) {
       console.log('[PlaniTrip diag] checkUserTrips: 1 seul voyage, freshLogin=', freshLogin, '-> enterTrip resetTab=', !!freshLogin);
       await loadCountryFlags();
       try {
-        enterTrip(uniqueTrips[0], !!freshLogin);
+        await enterTrip(uniqueTrips[0], !!freshLogin);
       } catch (renderErr) {
         console.error('[PlaniTrip trips] erreur d\'affichage (trip conservé):', renderErr);
         alert("Une erreur d'affichage est survenue, mais ton voyage est bien là. Recharge la page — si le problème persiste, préviens André.");
@@ -14976,7 +14995,7 @@ async function checkUserTrips(user, freshLogin) {
       console.log('[PlaniTrip diag] checkUserTrips: plusieurs voyages, lastTripId=', lastTripId, '- trouvé=', !!lastTrip, '- freshLogin=', freshLogin);
       if (lastTrip) {
         await loadCountryFlags();
-        try { enterTrip(lastTrip, !!freshLogin); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
+        try { await enterTrip(lastTrip, !!freshLogin); } catch (renderErr) { console.error('[PlaniTrip trips] erreur d\'affichage:', renderErr); }
         return;
       }
       showTripSelectorScreen(uniqueTrips);
