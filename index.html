@@ -10098,6 +10098,12 @@ function budgetExpenseDisplayAmount(expense, scope){
   var myEmail = (CURRENT_USER&&CURRENT_USER.email)||'';
   return scope==='mine' ? budgetExpenseShareForPerson(expense,myEmail) : (parseFloat(expense.amount)||0);
 }
+function renderBudgetScopeToggleLight(scope){
+  return '<div style="display:inline-flex;padding:3px;border-radius:14px;background:var(--sand-deep)">'
+    +'<button onclick="S.budgetScope=\'mine\';save();renderContent();" style="border:none;border-radius:11px;padding:6px 13px;font-size:12px;font-weight:650;cursor:pointer;background:'+(scope==='mine'?'#fff':'transparent')+';color:'+(scope==='mine'?'var(--accent)':'var(--ink-muted)')+';box-shadow:'+(scope==='mine'?'var(--shadow-sm)':'none')+'">Moi</button>'
+    +'<button onclick="S.budgetScope=\'group\';save();renderContent();" style="border:none;border-radius:11px;padding:6px 13px;font-size:12px;font-weight:650;cursor:pointer;background:'+(scope==='group'?'#fff':'transparent')+';color:'+(scope==='group'?'var(--accent)':'var(--ink-muted)')+';box-shadow:'+(scope==='group'?'var(--shadow-sm)':'none')+'">Groupe</button>'
+    +'</div>';
+}
 function renderBudgetDashboardNew(){
   var scope = S.budgetScope||'mine';
   var fixed = S.expenses.filter(function(e){return e.category==='flight'||e.category==='lodging';});
@@ -10145,7 +10151,7 @@ function renderBudgetDashboardNew(){
     var cpct = planned>0 ? Math.min(100,Math.round((spent/planned)*100)) : 0;
     return '<div onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid var(--divider);cursor:pointer"><span style="font-size:21px">'+c.flag+'</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:650;color:var(--ink)">'+c.name+'</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:1px">'+fmtEUR(spent)+' sur '+fmtEUR(planned)+'</div><div style="height:3px;border-radius:2px;background:var(--sand-deep);overflow:hidden;margin-top:5px"><div style="height:100%;width:'+cpct+'%;background:var(--accent);border-radius:2px"></div></div></div><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>';
   }).join('');
-  var countriesCard = '<div class="info-card" style="margin-bottom:12px"><div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:3px">Par pays</div>'+countryRows
+  var countriesCard = '<div class="info-card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:3px"><div style="font-size:17px;font-weight:700;color:var(--ink)">Par pays</div>'+renderBudgetScopeToggleLight(scope)+'</div>'+countryRows
     +(countryList.length>3?'<div onclick="S.budgetShowAllCountries=!S.budgetShowAllCountries;save();renderContent();" style="padding-top:10px;font-size:12.5px;font-weight:650;color:var(--accent);cursor:pointer">'+(S.budgetShowAllCountries?'Réduire':'Voir les '+countryList.length+' pays')+' '+svgIcon('chevron-right',13)+'</div>':'')+'</div>';
 
   var recent = S.expenses.filter(function(e){return e.category!=='reimbursement'&&(scope==='group'||budgetExpenseDisplayAmount(e,'mine')>0);}).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;}).slice(0,3);
@@ -10254,7 +10260,7 @@ function renderBudgetOverview(){
       var cPctReal = cBudget>0 ? Math.round((cSpentQuotidien/cBudget)*100) : 0;
       var cOver = cPctReal>100;
       // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
-      body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
+      body = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:10px"><div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'+renderBudgetScopeToggleLight(countryScope)+'</div>'
         +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
         +'<div style="flex:1">'+'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+' · '+(countryScope==='mine'?'Moi':'Groupe')+'</div>'+'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpentQuotidien)+'</div>'+'<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' quotidien prévu</div>'+(cSpentPonctuel>0 ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);display:flex;justify-content:space-between;align-items:center">'+'<span style="font-size:12px;color:rgba(255,255,255,0.6)">Vols et logements</span>'+'<span style="font-size:14px;font-weight:700;color:#fff">'+fmtEUR(cSpentPonctuel)+'</span></div>' : '')+'</div>'
         +(cBudget>0 ? renderProgressRing(cPctReal, 72, 7, cOver?'#E76F51':'#95D5B2') : '')
