@@ -1414,7 +1414,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:date-time-inputs-appearance-fix-v1';
+var APP_BUILD = '2026-08-21·sha:budget-dashboard-mine-group-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10081,6 +10081,82 @@ function renderProgressRing(pct, size, stroke, color, trackColor, textColor, lab
     +'<text x="'+(size/2)+'" y="'+(size/2)+'" text-anchor="middle" dominant-baseline="central" fill="'+textColor+'" font-size="'+fontSize+'" font-weight="700" font-family="-apple-system,sans-serif">'+txt+'</text>'
     +'</svg>';
 }
+function budgetExpenseShareForPerson(expense, personEmail){
+  if(!expense || expense.category==='reimbursement' || !personEmail) return 0;
+  var target = canonicalPerson(personEmail);
+  if(expense.splits && typeof expense.splits==='object' && Object.keys(expense.splits).length){
+    return Object.keys(expense.splits).reduce(function(sum,key){
+      return sum + (canonicalPerson(key)===target ? (parseFloat(expense.splits[key])||0) : 0);
+    },0);
+  }
+  var participants = (expense.participants&&expense.participants.length ? expense.participants : getPeopleList())
+    .map(canonicalPerson).filter(function(p,i,a){return p&&a.indexOf(p)===i;});
+  if(participants.indexOf(target)===-1 || !participants.length) return 0;
+  return (parseFloat(expense.amount)||0)/participants.length;
+}
+function budgetExpenseDisplayAmount(expense, scope){
+  var myEmail = (CURRENT_USER&&CURRENT_USER.email)||'';
+  return scope==='mine' ? budgetExpenseShareForPerson(expense,myEmail) : (parseFloat(expense.amount)||0);
+}
+function renderBudgetDashboardNew(){
+  var scope = S.budgetScope||'mine';
+  var fixed = S.expenses.filter(function(e){return e.category==='flight'||e.category==='lodging';});
+  var daily = S.expenses.filter(function(e){return e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging';});
+  var fixedReal = fixed.reduce(function(s,e){return s+budgetExpenseDisplayAmount(e,scope);},0);
+  var dailyReal = daily.reduce(function(s,e){return s+budgetExpenseDisplayAmount(e,scope);},0);
+  var dailyPlanned = scope==='mine'
+    ? getMyTotalPlannedBudget()
+    : COUNTRIES.filter(function(c){return c.days>=2;}).reduce(function(s,c){return s+getCountryPlannedBudget(c);},0);
+  var projection = fixedReal+dailyPlanned;
+  var engaged = fixedReal+dailyReal;
+  var available = dailyPlanned-dailyReal;
+  var availableLabel = available>=0 ? 'BUDGET QUOTIDIEN DISPONIBLE' : 'BUDGET QUOTIDIEN DÉPASSÉ';
+  var projectionPct = projection>0 ? Math.round((engaged/projection)*100) : 0;
+  var scopeToggle = '<div style="display:inline-flex;padding:3px;border-radius:14px;background:rgba(255,255,255,0.12);margin-bottom:14px">'
+    +'<button onclick="S.budgetScope=\'mine\';S.budgetCountryView=null;save();renderContent();" style="border:none;border-radius:11px;padding:7px 17px;font-size:12.5px;font-weight:650;cursor:pointer;background:'+(scope==='mine'?'#fff':'transparent')+';color:'+(scope==='mine'?'var(--accent)':'rgba(255,255,255,0.72)')+'">Moi</button>'
+    +'<button onclick="S.budgetScope=\'group\';S.budgetCountryView=null;save();renderContent();" style="border:none;border-radius:11px;padding:7px 17px;font-size:12.5px;font-weight:650;cursor:pointer;background:'+(scope==='group'?'#fff':'transparent')+';color:'+(scope==='group'?'var(--accent)':'rgba(255,255,255,0.72)')+'">Groupe</button>'
+    +'</div>';
+  var dashboard = '<div style="border-radius:var(--r24);padding:18px;margin-bottom:12px;background:#245C43;box-shadow:var(--shadow-md);color:#fff">'
+    +scopeToggle
+    +'<div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,0.62)">Projection du voyage</div>'
+    +'<div style="font-size:31px;font-weight:750;letter-spacing:-1px;margin-top:3px">'+fmtEUR(projection)+'</div>'
+    +'<div style="font-size:11.5px;color:rgba(255,255,255,0.58);margin-top:1px">Fixes réelles + quotidien prévisionnel</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:13px"><div><div style="font-size:11px;color:rgba(255,255,255,0.62)">Déjà engagés</div><div style="font-size:18px;font-weight:700">'+fmtEUR(engaged)+'</div></div><div style="font-size:11px;color:rgba(255,255,255,0.55)">'+projectionPct+' % de la projection</div></div>'
+    +'<div style="margin-top:8px;height:5px;border-radius:3px;background:rgba(255,255,255,0.18);overflow:hidden"><div style="height:100%;width:'+Math.min(100,projectionPct)+'%;background:#95D5B2;border-radius:3px"></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:13px">'
+    +'<div style="background:rgba(255,255,255,0.1);border-radius:14px;padding:11px"><div style="font-size:9.5px;letter-spacing:.5px;color:rgba(255,255,255,0.58)">FIXES RÉELLES</div><div style="font-size:18px;font-weight:700;margin-top:3px">'+fmtEUR(fixedReal)+'</div><div style="font-size:10.5px;color:rgba(255,255,255,0.48)">Vols + logements</div></div>'
+    +'<div style="background:rgba(255,255,255,0.1);border-radius:14px;padding:11px"><div style="font-size:9.5px;letter-spacing:.5px;color:rgba(255,255,255,0.58)">QUOTIDIEN RÉEL</div><div style="font-size:18px;font-weight:700;margin-top:3px">'+fmtEUR(dailyReal)+'</div><div style="font-size:10.5px;color:rgba(255,255,255,0.48)">Dépensé sur place</div></div>'
+    +'</div>'
+    +'<div style="margin-top:13px;padding-top:11px;border-top:1px solid rgba(255,255,255,0.16);display:flex;justify-content:space-between;align-items:flex-end;gap:12px"><div><div style="font-size:9.5px;letter-spacing:.7px;color:rgba(255,255,255,0.58)">'+availableLabel+'</div><div style="font-size:20px;font-weight:700;margin-top:2px">'+fmtEUR(Math.abs(available))+'</div></div><div style="font-size:10.5px;color:rgba(255,255,255,0.52);text-align:right">'+fmtEUR(dailyReal)+' dépensés<br>sur '+fmtEUR(dailyPlanned)+' prévus</div></div>'
+    +'</div>';
+
+  var balances = computeBalances();
+  var myEmail = (CURRENT_USER&&CURRENT_USER.email)||'Moi';
+  var mine = balances.find(function(b){return canonicalPerson(b.person)===canonicalPerson(myEmail);});
+  var myBalance = mine ? mine.balance : 0;
+  var balanceText = myBalance>0.01 ? 'Tu dois recevoir '+fmtEURExact(myBalance) : (myBalance<-0.01 ? 'Tu dois rembourser '+fmtEURExact(Math.abs(myBalance)) : 'Tout est à jour');
+  var balanceCard = '<div onclick="setBudgetSubTab(\'remb\')" style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:var(--r16);background:var(--accent-pale);margin-bottom:12px;cursor:pointer"><span style="width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+svgIcon('wallet',17)+'</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--accent)">Mon solde</div><div style="font-size:12px;color:var(--ink-muted)">'+balanceText+'</div></div><span style="font-size:12px;color:var(--accent);white-space:nowrap">Voir '+svgIcon('chevron-right',14)+'</span></div>';
+
+  var countryList = COUNTRIES.filter(function(c){return c.days>=2;});
+  var countryVisible = S.budgetShowAllCountries ? countryList : countryList.slice(0,3);
+  var countryRows = countryVisible.map(function(c){
+    var planned = scope==='mine' ? getMyCountryDailyBudget(c)*c.days : getCountryPlannedBudget(c);
+    var spent = daily.filter(function(e){return e.country===c.id;}).reduce(function(s,e){return s+budgetExpenseDisplayAmount(e,scope);},0);
+    var cpct = planned>0 ? Math.min(100,Math.round((spent/planned)*100)) : 0;
+    return '<div onclick="S.budgetCountryView=\''+c.id+'\';save();renderContent();" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid var(--divider);cursor:pointer"><span style="font-size:21px">'+c.flag+'</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:650;color:var(--ink)">'+c.name+'</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:1px">'+fmtEUR(spent)+' sur '+fmtEUR(planned)+'</div><div style="height:3px;border-radius:2px;background:var(--sand-deep);overflow:hidden;margin-top:5px"><div style="height:100%;width:'+cpct+'%;background:var(--accent);border-radius:2px"></div></div></div><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',16)+'</span></div>';
+  }).join('');
+  var countriesCard = '<div class="info-card" style="margin-bottom:12px"><div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:3px">Par pays</div>'+countryRows
+    +(countryList.length>3?'<div onclick="S.budgetShowAllCountries=!S.budgetShowAllCountries;save();renderContent();" style="padding-top:10px;font-size:12.5px;font-weight:650;color:var(--accent);cursor:pointer">'+(S.budgetShowAllCountries?'Réduire':'Voir les '+countryList.length+' pays')+' '+svgIcon('chevron-right',13)+'</div>':'')+'</div>';
+
+  var recent = S.expenses.filter(function(e){return e.category!=='reimbursement'&&(scope==='group'||budgetExpenseDisplayAmount(e,'mine')>0);}).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;}).slice(0,3);
+  var recentRows = recent.map(function(e){
+    var c = COUNTRIES.find(function(co){return co.id===e.country;});
+    return '<div onclick="openEditExpenseModal('+e.id+')" style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:.5px solid var(--divider);cursor:pointer"><span style="font-size:18px">'+(c?c.flag:'')+'</span><span style="flex:1;min-width:0;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'</span><span style="font-size:13px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetExpenseDisplayAmount(e,scope))+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div>';
+  }).join('');
+  var recentCard = '<div class="info-card" style="margin-bottom:12px"><div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:3px">Dépenses récentes</div>'+(recentRows||'<div class="fav-empty">Aucune dépense enregistrée.</div>')+'<div onclick="S.budgetAllExpenses=true;save();renderContent();" style="padding-top:10px;font-size:12.5px;font-weight:650;color:var(--accent);cursor:pointer">Voir toutes les dépenses '+svgIcon('chevron-right',13)+'</div></div>';
+  var addButton = '<button onclick="openAddExpenseModal()" style="width:100%;padding:13px 16px;border:none;border-radius:var(--r16);background:var(--accent);color:#fff;font-size:14px;font-weight:650;cursor:pointer">＋ Ajouter une dépense</button>';
+  return dashboard+balanceCard+countriesCard+recentCard+addButton;
+}
 function renderBudgetOverview(){
   var sub = S.budgetSubTab||'resume';
   var totalSpent = _totalNetSpent();
@@ -10091,7 +10167,7 @@ function renderBudgetOverview(){
   var nbVoyageurs = getPeopleList().length || 1;
   var pct = budgetTotal>0 ? Math.min(100, Math.round((totalSpent/budgetTotal)*100)) : 0;
   var tabsHTML = ['resume','remb'].map(function(t){
-    var lbl = t==='resume'?'Dépenses':'Remboursements';
+    var lbl = t==='resume'?'Aperçu':'Remboursements';
     return '<button class="cf-tab'+(sub===t?' active':'')+'" onclick="setBudgetSubTab(\''+t+'\')">'+lbl+'</button>';
   }).join('');
 
@@ -10099,11 +10175,27 @@ function renderBudgetOverview(){
   var fabHTML = '<button class="budget-fab" onclick="openAddExpenseModal()" title="Ajouter une dépense">'+svgIcon('plus',24)+'</button>';
 
   if(sub==='resume'){
+    // L'ancienne navigation par payeur n'est plus utilisée : la vue personnelle
+    // repose désormais sur les parts réelles via le sélecteur Moi / Groupe.
+    S.budgetPersonView = null;
     if(S.budgetCountryView){
       var cv = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
       if(!cv){ S.budgetCountryView=null; }
     }
-    if(S.budgetPersonView){
+    if(S.budgetAllExpenses){
+      var allScope = S.budgetScope||'mine';
+      var allItems = S.expenses.filter(function(e){
+        return e.category!=='reimbursement' && (allScope==='group' || budgetExpenseDisplayAmount(e,'mine')>0);
+      }).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;});
+      var allRows = allItems.map(function(e){
+        var co = COUNTRIES.find(function(c){return c.id===e.country;});
+        return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer;padding:12px 0"><span style="font-size:18px;margin-right:4px">'+(co?co.flag:'')+'</span><span class="ee-cat">'+svgIcon(getExpenseCategoryIcon(e.category),14)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">'+escHtml(e.date||'')+(allScope==='mine'?' · Ma part':'')+'</div></span><span class="ee-amount">'+fmtEUR(budgetExpenseDisplayAmount(e,allScope))+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div>';
+      }).join('');
+      body = '<div class="more-row" onclick="S.budgetAllExpenses=false;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour à l’aperçu</div>'
+        +'<div class="info-card"><div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">Toutes les dépenses · '+(allScope==='mine'?'Moi':'Groupe')+'</div>'
+        +(allRows||'<div class="fav-empty">Aucune dépense enregistrée.</div>')+'</div>'
+        +'<button onclick="openAddExpenseModal()" style="width:100%;margin-top:14px;padding:13px 16px;border:none;border-radius:var(--r16);background:var(--accent);color:#fff;font-size:14px;font-weight:650;cursor:pointer">＋ Ajouter une dépense</button>';
+    } else if(S.budgetPersonView){
       var myLabelP = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
       var pExps = S.expenses.filter(function(e){return canonicalPerson(e.personLabel||e.person)===S.budgetPersonView && e.category!=='reimbursement';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
       var pTotal = _netSpent(S.budgetPersonView);
@@ -10138,11 +10230,12 @@ function renderBudgetOverview(){
         +fabHTML;
     } else if(S.budgetCountryView){
       var c2 = COUNTRIES.find(function(co){return co.id===S.budgetCountryView;});
-      var cBudget = getCountryPlannedBudget(c2);
-      var cExpsQuotidien = S.expenses.filter(function(e){return e.country===c2.id&&e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging';}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
-      var cExpsPonctuel = S.expenses.filter(function(e){return e.country===c2.id&&(e.category==='flight'||e.category==='lodging');}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
-      var cSpentQuotidien = cExpsQuotidien.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
-      var cSpentPonctuel = cExpsPonctuel.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+      var countryScope = S.budgetScope||'mine';
+      var cBudget = countryScope==='mine' ? getMyCountryDailyBudget(c2)*c2.days : getCountryPlannedBudget(c2);
+      var cExpsQuotidien = S.expenses.filter(function(e){return e.country===c2.id&&e.category!=='reimbursement'&&e.category!=='flight'&&e.category!=='lodging'&&(countryScope==='group'||budgetExpenseDisplayAmount(e,'mine')>0);}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var cExpsPonctuel = S.expenses.filter(function(e){return e.country===c2.id&&(e.category==='flight'||e.category==='lodging')&&(countryScope==='group'||budgetExpenseDisplayAmount(e,'mine')>0);}).slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;});
+      var cSpentQuotidien = cExpsQuotidien.reduce(function(s,e){return s+budgetExpenseDisplayAmount(e,countryScope);},0);
+      var cSpentPonctuel = cExpsPonctuel.reduce(function(s,e){return s+budgetExpenseDisplayAmount(e,countryScope);},0);
       var byDate = {};
       var dateOrder = [];
       cExpsQuotidien.forEach(function(e){
@@ -10154,7 +10247,7 @@ function renderBudgetOverview(){
         var rows = byDate[d].map(function(e){
           var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
           var catIcon = getExpenseCategoryIcon(e.category);
-          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';
+          return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+(countryScope==='mine'?' · Ma part':'')+'</div></span><span class="ee-amount">'+fmtEUR(budgetExpenseDisplayAmount(e,countryScope))+'</span></div>';
         }).join('');
         return '<div style="font-size:13px;font-weight:700;color:var(--ink-muted);margin:14px 0 6px">'+dLabel+'</div>'+rows;
       }).join('');
@@ -10163,10 +10256,10 @@ function renderBudgetOverview(){
       // "Payé par" retiré ici : doublon avec le détail "Payé par X" déjà affiché sur chaque ligne ci-dessous.
       body = '<div class="more-row" onclick="S.budgetCountryView=null;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour</div>'
         +'<div style="border-radius:var(--r24);padding:20px;margin-bottom:14px;background:linear-gradient(135deg,#2D6A4F,#1F4D39);box-shadow:var(--shadow-md);color:#fff"><div style="display:flex;align-items:center;gap:20px">'
-        +'<div style="flex:1">'+'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+'</div>'+'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpentQuotidien)+'</div>'+'<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' quotidien prévu</div>'+(cSpentPonctuel>0 ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);display:flex;justify-content:space-between;align-items:center">'+'<span style="font-size:12px;color:rgba(255,255,255,0.6)">Ponctuel (vols + logements)</span>'+'<span style="font-size:14px;font-weight:700;color:#fff">'+fmtEUR(cSpentPonctuel)+'</span></div>' : '')+'</div>'
+        +'<div style="flex:1">'+'<div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6)">'+c2.flag+' '+c2.name+' · '+(countryScope==='mine'?'Moi':'Groupe')+'</div>'+'<div style="font-size:34px;font-weight:700;letter-spacing:-1px;margin-top:4px">'+fmtEUR(cSpentQuotidien)+'</div>'+'<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px">sur '+fmtEUR(cBudget)+' quotidien prévu</div>'+(cSpentPonctuel>0 ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);display:flex;justify-content:space-between;align-items:center">'+'<span style="font-size:12px;color:rgba(255,255,255,0.6)">Fixes réelles (vols + logements)</span>'+'<span style="font-size:14px;font-weight:700;color:#fff">'+fmtEUR(cSpentPonctuel)+'</span></div>' : '')+'</div>'
         +(cBudget>0 ? renderProgressRing(cPctReal, 72, 7, cOver?'#E76F51':'#95D5B2') : '')
         +'</div></div>'
-        +(cExpsPonctuel.length ? '<div class="info-card" style="margin-bottom:14px">'  +'<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px">Dépenses ponctuelles'+(_cFilter?(' · '+(COUNTRIES.find(function(c){return c.id===_cFilter;})||{}).name):'')+'</div>'  +cExpsPonctuel.map(function(e){  var whoLabel=canonicalPerson(e.personLabel||e.person||'?');  var catIcon=getExpenseCategoryIcon(e.category);  return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(e.amount)+'</span><span class="ee-del" onclick="event.stopPropagation();delExp('+e.id+')">×</span></div>';}).join('')  +'</div>' : '')  
+        +(cExpsPonctuel.length ? '<div class="info-card" style="margin-bottom:14px">'  +'<div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px">Dépenses fixes</div>'  +cExpsPonctuel.map(function(e){  var whoLabel=canonicalPerson(e.personLabel||e.person||'?');  var catIcon=getExpenseCategoryIcon(e.category);  return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer"><span class="ee-cat">'+svgIcon(catIcon,14)+'</span><span class="ee-who">'+getInitials(personDisplayName(whoLabel))+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+(countryScope==='mine'?' · Ma part':'')+'</div></span><span class="ee-amount">'+fmtEUR(budgetExpenseDisplayAmount(e,countryScope))+'</span></div>';}).join('')  +'</div>' : '')
         +'<div style="font-size:15px;font-weight:700;color:var(--ink);margin:16px 0 8px">Dépenses quotidiennes</div>'
         +(cExpsQuotidien.length ? groupsHTML : '<div class="fav-empty">Aucune dépense quotidienne enregistrée.</div>')
         +fabHTML;
@@ -10265,6 +10358,9 @@ function renderBudgetOverview(){
       +quotidienCard
       +ponctuelHTML
       +fabHTML;
+    // Nouveau tableau de bord compact validé : l'ancien calcul ci-dessus reste
+    // temporairement disponible pour les vues détaillées, mais n'est plus rendu ici.
+    body = renderBudgetDashboardNew();
     }
   } else if(sub==='remb'){
     var balances = computeBalances();
@@ -10459,7 +10555,10 @@ function personHasCountryScope(email, countryName){
 }
 function getCountryPlannedBudget(c){
   if(!c) return 0;
-  var people = getPeopleList().filter(function(email){ return personHasCountryScope(email, c.name); });
+  // Le prévisionnel ne concerne que les voyageurs actifs. Les identités historiques
+  // restent dans getPeopleList() pour préserver les soldes et remboursements passés,
+  // mais ne doivent jamais gonfler le budget futur du groupe.
+  var people = getActiveTravelerList().filter(function(email){ return personHasCountryScope(email, c.name); });
   var perCountry = (S.travelerBudgets && S.travelerBudgets[c.id]) || {};
   var dailySum = people.reduce(function(sum, email){
     var v = perCountry[email];
@@ -10479,7 +10578,7 @@ function getMyCountryDailyBudget(c){
 // à ne jamais confondre avec getCountryPlannedBudget() qui additionne le budget de TOUS les voyageurs.
 function getMyTotalPlannedBudget(){
   var myEmail = (CURRENT_USER && CURRENT_USER.email) || '';
-  return COUNTRIES.reduce(function(s,c){
+  return COUNTRIES.filter(function(c){return c.days>=2;}).reduce(function(s,c){
     return personHasCountryScope(myEmail, c.name) ? s + getMyCountryDailyBudget(c)*c.days : s;
   }, 0);
 }
@@ -10748,7 +10847,7 @@ function simplifyDebts(balances){
   }
   return txns;
 }
-function setBudgetSubTab(t){ S.budgetSubTab=t; S.budgetCountryView=null; save(); renderContent(); }
+function setBudgetSubTab(t){ S.budgetSubTab=t; S.budgetCountryView=null; S.budgetAllExpenses=false; save(); renderContent(); }
 function renderExpenseFormModal(){
   var countryOptions = COUNTRIES.map(function(c){return '<option value="'+c.id+'"'+(S.expCountry===c.id?' selected':'')+'>'+c.flag+' '+c.name+'</option>';}).join('');
   var selCountry = COUNTRIES.find(function(co){return co.id===(S.expCountry||getC().id);}) || COUNTRIES[0];
