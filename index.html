@@ -1407,7 +1407,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-20·sha:country-dates-resync-v1';
+var APP_BUILD = '2026-08-20·sha:date-time-inputs-appearance-fix-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3331,7 +3331,7 @@ function openDateChangeModal(actKey, cityKey){
   var bounds = range && range.start && range.end ? (' min="'+range.start+'" max="'+range.end+'"') : '';
   var curDate = (S.actDate && S.actDate[actKey]) || '';
   document.getElementById('dateChangeModalBody').innerHTML =
-    '<input class="ef-input" id="dateChangeInput" type="date" value="'+curDate+'"'+bounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px"/>';
+    '<input class="ef-input" id="dateChangeInput" type="date" value="'+curDate+'"'+bounds+' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/>';
   document.getElementById('dateChangeModal').classList.add('open');
 }
 async function saveDateChange(){
@@ -3561,8 +3561,8 @@ function openDetail(actKey, actName, cityKey) {
     var _hClosedDaysVal = escHtml(_dSaved.hoursClosedDays||'');
     var _hoursBody = '<div style="grid-column:1/-1"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-subtle);font-weight:600;display:flex;align-items:center;gap:3px;margin-bottom:4px">'+svgIcon('sun',11)+' Horaires d\'ouverture (du lieu)</div>'
       +'<div style="display:flex;gap:8px;margin-bottom:8px">'
-      +'<input type="time" value="'+_hOpenVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'open\',this.value)"/>'
-      +'<input type="time" value="'+_hCloseVal+'" style="'+_inStyle2+';flex:1" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'close\',this.value)"/>'
+      +'<input type="time" value="'+_hOpenVal+'" style="'+_inStyle2+';flex:1;-webkit-appearance:none;appearance:none" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'open\',this.value)"/>'
+      +'<input type="time" value="'+_hCloseVal+'" style="'+_inStyle2+';flex:1;-webkit-appearance:none;appearance:none" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'close\',this.value)"/>'
       +'</div>'
       +'<input type="text" placeholder="Jours de fermeture (optionnel), ex\u00a0: Fermé lundi" value="'+_hClosedDaysVal+'" style="'+_inStyle2+'" onblur="saveActDetailHours(\''+_esc(actKey)+'\',\''+_esc(cityKey)+'\','+_custIdx+',\'closedDays\',this.value)"/>'
       +'</div>';
@@ -7835,13 +7835,13 @@ function openPlanningModal(actKey, name, meta){
     '<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Date</div>'
     +'<input class="ef-input" id="planningModalDate" type="date" value="'+escHtml(renderedDate)+'"'
     +(stayRangeForDate?(' min="'+stayRangeForDate.start+'" max="'+stayRangeForDate.end+'"'):'')
-    +' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:16px"/>'
+    +' style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;margin-bottom:16px;-webkit-appearance:none;appearance:none"/>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Moment de la journée</div>'
     +'<div class="moment-segctrl" style="margin-bottom:16px">'+segments+'</div>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:6px">Plage horaire</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:8px">'
-    +'<input class="ef-input" id="planningModalTimeStart" type="time" value="'+escHtml(startVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
-    +'<input class="ef-input" id="planningModalTimeEnd" type="time" value="'+escHtml(endVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px"/>'
+    +'<input class="ef-input" id="planningModalTimeStart" type="time" value="'+escHtml(startVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/>'
+    +'<input class="ef-input" id="planningModalTimeEnd" type="time" value="'+escHtml(endVal)+'" style="flex:1;box-sizing:border-box;height:44px;padding:0 12px;-webkit-appearance:none;appearance:none"/>'
     +'</div>'
     +'<div style="font-size:11px;color:var(--ink-subtle);margin-bottom:10px">Avec une heure de début, le moment ci-dessus est recalculé automatiquement à la sauvegarde.</div>'
     +((startVal||endVal)?'<div style="text-align:center"><span onclick="clearPlanningTime()" style="font-size:13px;color:var(--ink-subtle);cursor:pointer">Effacer l\'horaire</span></div>':'');
@@ -8309,7 +8309,7 @@ function renderCityPanelContentBody(c, city){
         var actPlaceType = (window._customDetails && window._customDetails[k] && window._customDetails[k].tag) || (ACT_DETAILS[k] && ACT_DETAILS[k].tag) || '';
         var actCityStay = cityStayRange(ck);
         var actDateBounds = actCityStay && actCityStay.start && actCityStay.end ? (' min="'+actCityStay.start+'" max="'+actCityStay.end+'"') : '';
-        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();saveInlineActivityDate(this,\''+jsStrEsc(k)+'\')" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
+        var dateSelector = '<input type="date" value="'+(actDateVal||'')+'"'+actDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();saveInlineActivityDate(this,\''+jsStrEsc(k)+'\')" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);-webkit-appearance:none;appearance:none"/>';
         var actPhotoQuery = _PLACE_QUERY_OVERRIDES[a.n] || (a.n+' '+city.city+' '+getEnglishCountryName(c.name));
         var html = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(k)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Corbeille</span></div></div>'
           +'<div class="act-card swipe-fg'+(done?' done':'')+'" data-act-key="'+jsStrEsc(k)+'" data-act-name="'+escHtml(_actDisplayName(k,a.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="false" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
@@ -8344,7 +8344,7 @@ function renderCityPanelContentBody(c, city){
         var cdone=!!S.done[ck2];
         var cCityStay = cityStayRange(ck);
         var cDateBounds = cCityStay && cCityStay.start && cCityStay.end ? (' min="'+cCityStay.start+'" max="'+cCityStay.end+'"') : '';
-        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();saveInlineActivityDate(this,\''+jsStrEsc(ck2)+'\')" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);"/>';
+        var cDateSelector = '<input type="date" value="'+(cDateVal||'')+'"'+cDateBounds+' onclick="event.stopPropagation()" onchange="event.stopPropagation();saveInlineActivityDate(this,\''+jsStrEsc(ck2)+'\')" style="font-size:10px;border:1px solid rgba(29,29,31,0.140);border-radius:20px;padding:2px 8px;background:var(--sand);color:var(--ink-muted);-webkit-appearance:none;appearance:none"/>';
         var cPhotoQuery = _PLACE_QUERY_OVERRIDES[ca.n] || (ca.n+' '+city.city+' '+getEnglishCountryName(c.name));
         var chtml = '<div class="swipe-wrap"><div class="swipe-done-bg">'+svgIcon('check',16)+' Fait</div><div class="swipe-delete-bg"><div class="swipe-edit-btn" data-act-key="'+jsStrEsc(ck2)+'" data-city-key="'+escHtml(ck)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="editActivityFromSwipe(this)">'+svgIcon('pencil',15)+'<span>Modifier&nbsp;la&nbsp;fiche</span></div><div class="swipe-del-btn" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" onclick="deleteActivityFromEl(this)">'+svgIcon('trash-2',15)+'<span>Corbeille</span></div></div>'
           +'<div class="act-card swipe-fg'+(cdone?' done':'')+'" data-act-key="'+jsStrEsc(ck2)+'" data-act-name="'+escHtml(_actDisplayName(ck2,ca.n))+'" data-city-key="'+escHtml(ck)+'" data-orig-idx="'+origIdx+'" data-is-custom="true" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)">'
@@ -10752,7 +10752,7 @@ function renderExpenseFormModal(){
     +(selCountry.rateNum?('<span style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:28px;font-size:13px;color:var(--ink-subtle)">⇄</span><div style="position:relative;flex:1;max-width:130px"><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant" id="eAmtLocal" style="width:100%;box-sizing:border-box;padding-right:34px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink-subtle);pointer-events:none">'+escHtml(getCurrencySymbol(selCountry))+'</span></div>'):'')
     +'</div>'
     +renderSplitRows(S.expAmt)
-    +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||toLocalISODate(new Date()))+'" oninput="S.expDate=this.value" style="width:100%"/></div>'
+    +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||toLocalISODate(new Date()))+'" oninput="S.expDate=this.value" style="width:100%;-webkit-appearance:none;appearance:none"/></div>'
     +'<div class="ef-row"><select class="ef-select" id="ePerson" onchange="S.expPerson=this.value">'+personOptions+'</select>'
     +'<button class="ef-btn" id="expenseSaveBtn" onclick="addExpGlobal()">'+(isEditing?'✓ Enregistrer':'+ Ajouter')+'</button></div>'
     +(isEditing?('<button class="modal-cancel-btn" style="color:var(--red-muted)" onclick="var idToDel=S.editingExpenseId;closeAddExpenseModal();delExp(idToDel);">Supprimer cette dépense</button>'):'')
@@ -11851,7 +11851,7 @@ function renderCarnetScreen(){
   var form='<div class="info-card">'
     +'<div class="ic-header"><span data-icon="notebook-pen" data-icon-size="16"></span> Nouvelle entrée</div>'
     +'<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">'
-    +'<input class="ef-input" type="date" id="journalDate" value="'+today+'"/>'
+    +'<input class="ef-input" type="date" id="journalDate" value="'+today+'" style="-webkit-appearance:none;appearance:none"/>'
     +'<input class="ef-input" type="text" id="journalLocation" placeholder="Lieu (ex: Kyoto, Japon)"/>'
     +'<textarea class="ef-input" id="journalText" style="min-height:70px" placeholder="Ce qui s\'est passé aujourd\'hui…"></textarea>'
     +'<div style="display:flex;align-items:center;gap:10px">'
