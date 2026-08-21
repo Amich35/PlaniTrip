@@ -4938,6 +4938,15 @@ function deepSanitize(obj){
 }
 function fmtEUR(n){
   n = parseFloat(n||0);
+  var rounded = Math.round(Math.abs(n));
+  var s = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return (n<0?'-':'') + s + '\u00a0€';
+}
+// Affichage comptable exact : réservé aux remboursements et soldes entre voyageurs.
+// Les valeurs stockées et les calculs restent toujours au centime, quel que soit
+// le formateur visuel utilisé à l'écran.
+function fmtEURExact(n){
+  n = parseFloat(n||0);
   var abs = Math.abs(n);
   var s = abs.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
   return (n<0?'-':'') + s + '\u00a0€';
@@ -10268,7 +10277,7 @@ function renderBudgetOverview(){
       var lbl = isPos?'doit recevoir':(isNeg?'doit':'est à jour');
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:'+bg+';margin-bottom:8px">'
         +'<div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+getInitials(personDisplayName(b.person))+'</span><span style="font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+escHtml(b.person===myLabel2?'Moi':personDisplayName(b.person))+'</span></div>'
-        +'<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:'+color+'">'+fmtEUR(Math.abs(b.balance))+'</div><div style="font-size:11px;color:var(--ink-subtle)">'+lbl+'</div></div>'
+        +'<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:'+color+'">'+fmtEURExact(Math.abs(b.balance))+'</div><div style="font-size:11px;color:var(--ink-subtle)">'+lbl+'</div></div>'
         +'</div>';
     }).join('');
     var txnRows = txns.length ? txns.map(function(t){
@@ -10281,7 +10290,7 @@ function renderBudgetOverview(){
         +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
         +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+avatarCircle(toLabel,32,'rgba(244,162,97,0.16)','#C9762E')+'<span style="font-size:12px;font-weight:600;color:var(--ink-muted);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toLabel)+'</span></div>'
         +'</div>'
-        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#C9762E;flex-shrink:0;text-align:right">'+fmtEUR(t.amount)+'</span>'
+        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#C9762E;flex-shrink:0;text-align:right">'+fmtEURExact(t.amount)+'</span>'
         +'</div>'
         +'<div style="display:flex;justify-content:flex-end;margin-top:6px">'
         +'<button class="settle-btn" onclick="markAsReimbursed(\''+escHtml(t.from).replace(/'/g,"\\'")+'\',\''+escHtml(t.to).replace(/'/g,"\\'")+'\','+t.amount+')">'+svgIcon('check',12)+' Marqué remboursé</button>'
@@ -10314,7 +10323,7 @@ function renderBudgetOverview(){
         +'<span style="color:var(--ink-subtle);flex-shrink:0">'+svgIcon('arrow-right',13)+'</span>'
         +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+avatarCircle(toName,32)+'<span style="font-size:12px;font-weight:600;color:var(--ink);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(toName)+'</span></div>'
         +'</div>'
-        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEUR(e.amount)+'</span>'
+        +'<span style="font-size:17px;font-weight:700;letter-spacing:-0.3px;color:var(--accent);flex-shrink:0;text-align:right">'+fmtEURExact(e.amount)+'</span>'
         +'</div>'
         // Ligne 2 : date + pastille de statut discrète
         +'<div style="display:flex;align-items:center;gap:5px;margin-top:8px">'
@@ -12292,7 +12301,7 @@ function delExp(id){
   }) : [];
   var confirmMsg = 'Supprimer cette dépense ?';
   if(linkedReimbs.length > 0){
-    confirmMsg = 'Cette dépense a '+linkedReimbs.length+' remboursement'+(linkedReimbs.length>1?'s':'')+' associé'+(linkedReimbs.length>1?'s':'')+' ('+fmtEUR(linkedReimbs.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0))+'). Veux-tu aussi les supprimer ?';
+    confirmMsg = 'Cette dépense a '+linkedReimbs.length+' remboursement'+(linkedReimbs.length>1?'s':'')+' associé'+(linkedReimbs.length>1?'s':'')+' ('+fmtEURExact(linkedReimbs.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0))+'). Veux-tu aussi les supprimer ?';
   }
   showConfirm(confirmMsg, async function(){
     var syncKey='delete_'+id;
@@ -12322,7 +12331,7 @@ function delExp(id){
   }, linkedReimbs.length > 0 ? 'Supprimer tout' : 'Supprimer');
 }
 function markAsReimbursed(fromPerson, toPerson, amount){
-  showConfirm('Confirmer que '+personDisplayName(fromPerson)+' a remboursé '+fmtEUR(amount)+' à '+personDisplayName(toPerson)+' ?', async function(){
+  showConfirm('Confirmer que '+personDisplayName(fromPerson)+' a remboursé '+fmtEURExact(amount)+' à '+personDisplayName(toPerson)+' ?', async function(){
     var newId = Date.now();
     var todayStr = toLocalISODate(new Date());
     var entry = {
