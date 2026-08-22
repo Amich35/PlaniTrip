@@ -1414,7 +1414,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-22·sha:payer-preserve-display-fix-v3';
+var APP_BUILD = '2026-08-22·sha:currency-symbols-v4';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10772,7 +10772,44 @@ function renderSplitRows(totalAmtStr){
     +'<div style="background:var(--parchment);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-sm)">'+rows+'</div></div>';
 }
 function parseAmt(v){ if(v===undefined||v===null||v==='') return NaN; return parseFloat(String(v).replace(',','.')); }
-function getCurrencySymbol(c){ var m=(c&&c.currency||'').match(/\(([^)]+)\)/); return m?m[1]:((c&&c.currency)||''); }
+var CURRENCY_SYMBOLS={
+  EUR:'€',USD:'$',JPY:'¥',GBP:'£',CNY:'¥',KRW:'₩',INR:'₹',
+  KHR:'៛',THB:'฿',LAK:'₭',VND:'₫',IDR:'Rp',PHP:'₱',MYR:'RM',SGD:'S$',
+  TWD:'NT$',HKD:'HK$',AUD:'A$',NZD:'NZ$',CAD:'C$',RUB:'₽',TRY:'₺',UAH:'₴',
+  ILS:'₪',NGN:'₦',GHS:'₵',PLN:'zł',CZK:'Kč',HUF:'Ft',BRL:'R$',MXN:'Mex$',ZAR:'R',CHF:'CHF'
+};
+function currencySymbolFromCode(code){
+  code=String(code||'').trim().toUpperCase();
+  if(!code)return '';
+  if(CURRENCY_SYMBOLS[code])return CURRENCY_SYMBOLS[code];
+  try{
+    var parts=new Intl.NumberFormat('fr-FR',{style:'currency',currency:code,currencyDisplay:'narrowSymbol',minimumFractionDigits:0,maximumFractionDigits:0}).formatToParts(0);
+    for(var i=0;i<parts.length;i++)if(parts[i].type==='currency'&&parts[i].value)return parts[i].value;
+  }catch(e){}
+  return code;
+}
+function getCurrencySymbol(c){
+  var raw=String((c&&c.currency)||'').trim();
+  if(!raw)return '';
+  var explicit=raw.match(/\(([€$¥£₩₹฿₫₭₱៛₽₺₴₪₦₵]+)\)/);
+  if(explicit)return explicit[1];
+  var code='';
+  var parenCodes=raw.match(/\(([A-Z]{3})\)/g);
+  if(parenCodes&&parenCodes.length)code=parenCodes[parenCodes.length-1].replace(/[()]/g,'');
+  if(!code&&c&&c.rate){var rateCode=String(c.rate).match(/\b([A-Z]{3})\b/);if(rateCode)code=rateCode[1];}
+  if(!code){
+    var nameCodes={riel:'KHR',kip:'LAK',baht:'THB',dong:'VND',rupiah:'IDR',peso:'PHP',yen:'JPY',euro:'EUR'};
+    var low=raw.toLowerCase();
+    Object.keys(nameCodes).some(function(name){if(low.indexOf(name)>-1){code=nameCodes[name];return true;}return false;});
+  }
+  if(!code){var rawCode=raw.match(/\b([A-Z]{3})\b/);if(rawCode)code=rawCode[1];}
+  var symbol=currencySymbolFromCode(code);
+  if(/\bUSD\b/.test(raw)&&code!=='USD'){
+    var usd=currencySymbolFromCode('USD');
+    if(symbol&&symbol!==usd)symbol+=' / '+usd;
+  }
+  return symbol||raw;
+}
 function syncExpAmt(which, rateNum){
   var eEur=document.getElementById('eAmt');
   var eLoc=document.getElementById('eAmtLocal');
@@ -12307,7 +12344,7 @@ function openRateEditModal(countryId){
     +'<div style="display:flex;align-items:center;gap:8px;background:var(--sand);border-radius:var(--r12);padding:10px 14px">'
     +'<span style="font-size:15px;font-weight:700;color:var(--ink)">1 € =</span>'
     +'<input type="number" id="rateEditInput" value="'+getRate(c)+'" style="flex:1;min-width:0;border:none;background:transparent;font-size:17px;font-weight:700;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:right"/>'
-    +'<span style="font-size:14px;color:var(--ink-muted)">'+escHtml(c.currency||'')+'</span>'
+    +'<span style="font-size:14px;color:var(--ink-muted)">'+escHtml(getCurrencySymbol(c))+'</span>'
     +'</div>';
   _guideModalSaveFn = saveRateEdit;
   document.getElementById('guideItemModal').classList.add('open');
@@ -12323,9 +12360,9 @@ function renderMiniConverter(c){
   var dir = S.convDir && S.convDir[c.id] || 'eur';
   var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
-  var currencyCode = (c.currency.match(/\(([^)]+)\)/)||[,c.currency])[1];
-  var fromLabel = dir==='eur' ? 'EUR' : currencyCode;
-  var toLabel = dir==='eur' ? currencyCode : 'EUR';
+  var localSymbol = getCurrencySymbol(c);
+  var fromLabel = dir==='eur' ? '€' : localSymbol;
+  var toLabel = dir==='eur' ? localSymbol : '€';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
   return '<div>'
     +'<div style="background:var(--sand);border-radius:var(--r12);padding:6px;display:flex;align-items:center;gap:6px">'
@@ -12347,9 +12384,9 @@ function renderConverterCard(c){
   var dir = S.convDir && S.convDir[c.id] || 'eur';
   var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
-  var currencyCode = (c.currency.match(/\(([^)]+)\)/)||[,c.currency])[1];
-  var fromLabel = dir==='eur' ? 'EUR' : currencyCode;
-  var toLabel = dir==='eur' ? currencyCode : 'EUR';
+  var localSymbol = getCurrencySymbol(c);
+  var fromLabel = dir==='eur' ? '€' : localSymbol;
+  var toLabel = dir==='eur' ? localSymbol : '€';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
   var quickAmounts = [5,10,20,50];
   var quickRow = '<div style="display:flex;gap:6px;margin-top:12px">'
