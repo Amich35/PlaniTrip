@@ -1414,7 +1414,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-22·sha:computeBalances-formatDateFR-fix-v1';
+var APP_BUILD = '2026-08-22·sha:balance-parseAmt-fix-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10538,21 +10538,7 @@ function personDisplayName(emailOrLabel, selfLabel){
 // canonique de la personne, si connu. Sinon retourne la valeur telle quelle.
 function canonicalPerson(label){
   if(!label) return label;
-  var raw=String(label).trim();
-  if(!raw) return raw;
-  if(REVERSE_ALIAS_MAP[raw]) return REVERSE_ALIAS_MAP[raw];
-  // Compatibilité historique : avant l'identité email stable, certaines dépenses du
-  // propriétaire pouvaient conserver son ancien libellé/pseudo. On le résout à la
-  // volée vers l'email actuel, sans modifier les dépenses ni les données Supabase.
-  var ownerLabel = CURRENT_TRIP && CURRENT_TRIP.owner_label ? String(CURRENT_TRIP.owner_label).trim() : '';
-  var ownerEmail = CURRENT_TRIP && CURRENT_TRIP.owner_email ? String(CURRENT_TRIP.owner_email).trim() : '';
-  if(ownerLabel && raw===ownerLabel){
-    if(ownerEmail) return ownerEmail;
-    if(CURRENT_USER && CURRENT_TRIP && CURRENT_TRIP.owner_id===CURRENT_USER.id && CURRENT_USER.email){
-      return String(CURRENT_USER.email).trim();
-    }
-  }
-  return raw;
+  return REVERSE_ALIAS_MAP[label] || label;
 }
 function getActiveTravelerList(){
   var seen={},people=[];function add(email){email=canonicalPerson(email);if(email&&!seen[email]){seen[email]=true;people.push(email);}}
@@ -10637,7 +10623,6 @@ function getPeopleList(){
   });
   // 3. Propriétaire du voyage (toujours inclus — même sans dépenses)
   var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
-  ownerE = canonicalPerson(ownerE);
   if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }
   // 4. Payeurs, participants et splits présents dans les dépenses mais absents de la liste ci-dessus.
   //    canonicalPerson() fusionne automatiquement un ancien pseudo brut avec l'email réel connu.
@@ -10825,13 +10810,14 @@ function computeBalances(){
   people.forEach(function(p){paid[p]=0;share[p]=0;});
   // Vraies dépenses uniquement — les remboursements sont traités séparément
   S.expenses.filter(function(e){return e.category!=='reimbursement';}).forEach(function(e){
-    var montantPaye = Number(e.amount) || 0;
+    var montantPaye = parseAmt(e.amount) || 0;
     var sharesMap;
     if(e.splits && typeof e.splits==='object' && Object.keys(e.splits).length){
       sharesMap = {};
       Object.keys(e.splits).forEach(function(k){
         var ck = canonicalPerson(k);
-        sharesMap[ck] = (sharesMap[ck]||0) + (Number(e.splits[k])||0);
+        var splitAmount = parseAmt(e.splits[k]);
+        sharesMap[ck] = (sharesMap[ck]||0) + (isNaN(splitAmount) ? 0 : splitAmount);
       });
     } else {
       var parts = (e.participants && e.participants.length) ? e.participants.map(canonicalPerson).filter(function(p){return people.indexOf(p)>-1;}) : people.slice();
@@ -10853,7 +10839,7 @@ function computeBalances(){
   S.expenses.filter(function(e){return e.category==='reimbursement';}).forEach(function(e){
     var from = canonicalPerson(e.personLabel || e.person);
     var to = e.participants && e.participants[0] ? canonicalPerson(e.participants[0]) : null;
-    var amt = Number(e.amount) || 0;
+    var amt = parseAmt(e.amount) || 0;
     if(from && people.indexOf(from)>-1) balanceMap[from] = (balanceMap[from]||0) + amt;
     if(to   && people.indexOf(to)>-1)   balanceMap[to]   = (balanceMap[to]||0)   - amt;
   });
