@@ -1,0 +1,36 @@
+name: Temporary currency helper audit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Audit helper usages and converter context
+        shell: bash
+        run: |
+          set -eu
+          {
+            echo '=== CURRENT HEAD ==='
+            git rev-parse HEAD
+            echo
+            echo '=== getCurrencySymbol occurrences (current) ==='
+            grep -n -C 8 'getCurrencySymbol' index.html || true
+            echo
+            echo '=== currency converter related occurrences (current) ==='
+            grep -ni -C 5 -E 'converter|convertisseur|currency.*symbol|currencySymbol|exchange.*rate|taux.*change' index.html || true
+            echo
+            echo '=== ORIGINAL helper context at base cdfd673 ==='
+            git show cdfd67347e6e043e54b4647b3431d15c68fded46:index.html | grep -n -C 12 'getCurrencySymbol' || true
+          } > currency-audit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: currency-audit
+          path: currency-audit.txt
+          retention-days: 1
