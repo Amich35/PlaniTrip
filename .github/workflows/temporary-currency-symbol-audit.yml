@@ -1,0 +1,32 @@
+name: Temporary currency symbol audit
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Audit converter currency rendering
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('index.html').read_text(encoding='utf-8')
+          lines = text.splitlines()
+          needles = ['Montant', 'convertisseur', 'converter', 'currencyCode', 'currency', 'devise', 'USD', 'EUR', '⇄', '↔', 'convAmount']
+          hits=[]
+          for i,line in enumerate(lines,1):
+              low=line.lower()
+              if any(n.lower() in low for n in needles):
+                  hits.append(i)
+          print('HITS', len(hits))
+          for i in hits:
+              start=max(1,i-1); end=min(len(lines),i+1)
+              print(f'--- HIT {i} ---')
+              for j in range(start,end+1): print(f'{j}: {lines[j-1]}')
+          PY
