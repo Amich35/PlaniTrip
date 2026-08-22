@@ -1,4 +1,4 @@
-name: Temporary currency helper audit
+name: Temporary scoped currency fix
 
 on:
   push:
@@ -9,32 +9,47 @@ permissions:
   contents: write
 
 jobs:
-  audit:
+  patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Capture focused currency helper context
+      - name: Scope currency symbol helper to converters
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          if 'function getConverterCurrencySymbol(c){' in text:
+              print('Scoped helper already present; nothing to patch.')
+              raise SystemExit(0)
+          marker = 'function getCurrencySymbol(c){'
+          if text.count(marker) != 1:
+              raise SystemExit(f'Expected exactly 1 getCurrencySymbol definition, found {text.count(marker)}')
+          original = "function getCurrencySymbol(c){ var m=(c&&c.currency||'').match(/\\(([^)]+)\\)/); return m?m[1]:((c&&c.currency)||''); }\nfunction getConverterCurrencySymbol(c){"
+          text = text.replace(marker, original, 1)
+          usage = 'var localSymbol = getCurrencySymbol(c);'
+          if text.count(usage) != 2:
+              raise SystemExit(f'Expected exactly 2 converter localSymbol usages, found {text.count(usage)}')
+          text = text.replace(usage, 'var localSymbol = getConverterCurrencySymbol(c);')
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify scoped patch
         shell: bash
         run: |
           set -eu
-          {
-            echo '=== BASE helper area ==='
-            git show cdfd67347e6e043e54b4647b3431d15c68fded46:index.html | sed -n '10755,10830p'
-            echo
-            echo '=== CURRENT helper area ==='
-            sed -n '10755,10835p' index.html
-            echo
-            echo '=== CURRENT usages ==='
-            grep -n -C 2 'getCurrencySymbol' index.html || true
-          } > currency-audit-small.txt
-      - name: Commit temporary audit result
+          test "$(grep -c 'function getConverterCurrencySymbol(c)' index.html)" -eq 1
+          test "$(grep -c 'var localSymbol = getConverterCurrencySymbol(c);' index.html)" -eq 2
+          grep -n -C 2 'getCurrencySymbol' index.html
+          grep -n -C 2 'getConverterCurrencySymbol' index.html
+      - name: Commit scoped fix
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add currency-audit-small.txt
+          git add index.html
           git diff --cached --quiet && exit 0
-          git commit -m 'chore: temporary focused currency audit'
+          git commit -m 'Fix: scope currency symbols to converter UI'
           git push
