@@ -1,0 +1,89 @@
+name: Temporary payer display fix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.ref == 'trigger-payer-display-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch payer preservation and display only
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          old_options = """function getExpensePersonOptions(){
+            var people = getPeopleList();
+            if(!S.expPerson || people.indexOf(S.expPerson)===-1){
+              S.expPerson = people[0] || '';
+            }
+            return people;
+          }"""
+          new_options = """function getExpensePersonOptions(){
+            var people = getPeopleList().slice();
+            // Une dépense existante doit toujours conserver son payeur enregistré.
+            // S'il n'est plus dans la liste courante, on le garde comme option au lieu
+            // de le remplacer silencieusement par le premier voyageur.
+            if(S.expPerson){
+              if(people.indexOf(S.expPerson)===-1) people.unshift(S.expPerson);
+            }else{
+              S.expPerson = people[0] || '';
+            }
+            return people;
+          }"""
+          count = text.count(old_options)
+          if count != 1:
+            raise SystemExit(f'getExpensePersonOptions target count={count}, expected 1')
+          text = text.replace(old_options, new_options, 1)
+          old_meta = "'<div class=\"budget-expense-meta\">'+escHtml(formatDateFR(e.date)||'')+'</div>'"
+          new_meta = "'<div class=\"budget-expense-meta\">'+escHtml(formatDateFR(e.date)||'')+' · Payé par '+escHtml(personDisplayName(e.personLabel || e.person || ''))+'</div>'"
+          count = text.count(old_meta)
+          if count != 2:
+            raise SystemExit(f'budget expense payer meta target count={count}, expected 2')
+          text = text.replace(old_meta, new_meta)
+          old_build = "var APP_BUILD = '2026-08-22·sha:balance-parseAmt-fix-v2';"
+          new_build = "var APP_BUILD = '2026-08-22·sha:payer-preserve-display-fix-v3';"
+          count = text.count(old_build)
+          if count != 1:
+            raise SystemExit(f'APP_BUILD target count={count}, expected 1')
+          text = text.replace(old_build, new_build, 1)
+          path.write_text(text, encoding='utf-8')
+      - name: Validate diff and JavaScript syntax
+        shell: bash
+        run: |
+          git diff --check
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, flags=re.S|re.I)
+          if not scripts:
+              raise SystemExit('No inline script found')
+          main = max(scripts, key=len)
+          Path('/tmp/planitrip-main.js').write_text(main, encoding='utf-8')
+          PY
+          node --check /tmp/planitrip-main.js
+          git diff -- index.html
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo 'No index.html changes to commit'
+            exit 1
+          fi
+          git config user.name "PlaniTrip maintenance"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git diff --cached --check
+          git commit -m "Budget: préserver et afficher le payeur réel"
+          git push origin HEAD:main
