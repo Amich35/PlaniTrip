@@ -1,0 +1,72 @@
+name: Temporary budget identity hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/temporary-budget-identity-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, 'Apply temporary budget identity hotfix')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch historical owner identity compatibility
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+
+          old_canonical = """function canonicalPerson(label){
+            if(!label) return label;
+            return REVERSE_ALIAS_MAP[label] || label;
+          }"""
+          new_canonical = """function canonicalPerson(label){
+            if(!label) return label;
+            var raw=String(label).trim();
+            if(!raw) return raw;
+            if(REVERSE_ALIAS_MAP[raw]) return REVERSE_ALIAS_MAP[raw];
+            // Compatibilité historique : avant l'identité email stable, certaines dépenses du
+            // propriétaire pouvaient conserver son ancien libellé/pseudo. On le résout à la
+            // volée vers l'email actuel, sans modifier les dépenses ni les données Supabase.
+            var ownerLabel = CURRENT_TRIP && CURRENT_TRIP.owner_label ? String(CURRENT_TRIP.owner_label).trim() : '';
+            var ownerEmail = CURRENT_TRIP && CURRENT_TRIP.owner_email ? String(CURRENT_TRIP.owner_email).trim() : '';
+            if(ownerLabel && raw===ownerLabel){
+              if(ownerEmail) return ownerEmail;
+              if(CURRENT_USER && CURRENT_TRIP && CURRENT_TRIP.owner_id===CURRENT_USER.id && CURRENT_USER.email){
+                return String(CURRENT_USER.email).trim();
+              }
+            }
+            return raw;
+          }"""
+
+          old_owner = """  var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
+            if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }"""
+          new_owner = """  var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
+            ownerE = canonicalPerson(ownerE);
+            if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }"""
+
+          if text.count(old_canonical) != 1:
+            raise SystemExit(f'canonicalPerson target count={text.count(old_canonical)}, expected 1')
+          if text.count(old_owner) != 1:
+            raise SystemExit(f'getPeopleList owner target count={text.count(old_owner)}, expected 1')
+
+          text = text.replace(old_canonical, new_canonical, 1)
+          text = text.replace(old_owner, new_owner, 1)
+          path.write_text(text, encoding='utf-8')
+      - name: Commit patch
+        run: |
+          git config user.name "PlaniTrip maintenance"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git diff --cached --check
+          git commit -m "Budget: fusionner l’identité historique du propriétaire pour les soldes"
+          git push origin HEAD:main
