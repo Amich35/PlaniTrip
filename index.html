@@ -1414,7 +1414,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-22·sha:balance-parseAmt-fix-v2';
+var APP_BUILD = '2026-08-22·sha:payer-preserve-display-fix-v3';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10164,7 +10164,8 @@ function renderBudgetDashboardNew(){
   var recent = S.expenses.filter(function(e){return e.category!=='reimbursement'&&(scope==='group'||budgetExpenseDisplayAmount(e,'mine')>0);}).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;}).slice(0,3);
   var recentRows = recent.map(function(e){
     var c = COUNTRIES.find(function(co){return co.id===e.country;});
-    return '<div onclick="openEditExpenseModal('+e.id+')" style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:.5px solid var(--divider);cursor:pointer"><span style="font-size:18px">'+(c?c.flag:'')+'</span><span style="flex:1;min-width:0;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'</span><span style="font-size:13px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetExpenseDisplayAmount(e,scope))+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div>';
+    var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
+  return '<div onclick="openEditExpenseModal('+e.id+')" style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:.5px solid var(--divider);cursor:pointer"><span style="font-size:18px">'+(c?c.flag:'')+'</span><span style="flex:1;min-width:0;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span style="font-size:13px;font-weight:700;color:var(--ink)">'+fmtEUR(budgetExpenseDisplayAmount(e,scope))+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div>';
   }).join('');
   var recentCard = '<div class="info-card" style="margin-bottom:12px"><div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:3px">Dépenses récentes</div>'+(recentRows||'<div class="fav-empty">Aucune dépense enregistrée.</div>')+'<div onclick="S.budgetAllExpenses=true;save();renderContent();" style="padding-top:10px;font-size:12.5px;font-weight:650;color:var(--accent);cursor:pointer">Voir toutes les dépenses '+svgIcon('chevron-right',13)+'</div></div>';
   var addButton = '<button onclick="openAddExpenseModal()" style="width:100%;padding:13px 16px;border:none;border-radius:var(--r16);background:var(--accent);color:#fff;font-size:14px;font-weight:650;cursor:pointer">＋ Ajouter une dépense</button>';
@@ -10202,7 +10203,8 @@ function renderBudgetOverview(){
       }).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;});
       var allRows = allItems.map(function(e){
         var co = COUNTRIES.find(function(c){return c.id===e.country;});
-        return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer;padding:12px 0"><span style="font-size:18px;margin-right:4px">'+(co?co.flag:'')+'</span><span class="ee-cat">'+svgIcon(getExpenseCategoryIcon(e.category),14)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">'+formatDateFR(e.date)+''+'</div></span><span class="ee-amount">'+fmtEUR(budgetExpenseDisplayAmount(e,allScope))+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div>';
+        var whoLabel = canonicalPerson(e.personLabel || e.person || '?');
+  return '<div class="expense-entry" onclick="openEditExpenseModal('+e.id+')" style="cursor:pointer;padding:12px 0"><span style="font-size:18px;margin-right:4px">'+(co?co.flag:'')+'</span><span class="ee-cat">'+svgIcon(getExpenseCategoryIcon(e.category),14)+'</span><span class="ee-desc">'+escHtml(e.desc||getExpenseCategoryLabel(e.category))+'<div style="font-size:11px;color:var(--ink-subtle);font-weight:400">'+formatDateFR(e.date)+' · Payé par '+escHtml(personDisplayName(whoLabel,'moi'))+'</div></span><span class="ee-amount">'+fmtEUR(budgetExpenseDisplayAmount(e,allScope))+'</span><span style="color:var(--ink-subtle)">'+svgIcon('chevron-right',15)+'</span></div>';
       }).join('');
       body = '<div class="more-row" onclick="S.budgetAllExpenses=false;save();renderContent();" style="padding:0 0 10px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour à l’aperçu</div>'
         +'<div class="info-card"><div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">Toutes les dépenses · '+(allScope==='mine'?'Moi':'Groupe')+'</div>'
@@ -10637,8 +10639,14 @@ function getPeopleList(){
   return people;
 }
 function getExpensePersonOptions(){
-  var people = getPeopleList();
-  if(!S.expPerson || people.indexOf(S.expPerson)===-1) S.expPerson = people[0];
+  var people = getPeopleList().slice();
+  // En édition, conserver le payeur enregistré même s'il n'est plus dans la liste courante.
+  // Cela évite de le remplacer silencieusement par le premier voyageur.
+  if(S.expPerson){
+    if(people.indexOf(S.expPerson)===-1) people.unshift(S.expPerson);
+  }else{
+    S.expPerson = people[0] || '';
+  }
   return people.map(function(p){
     return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(personDisplayName(p,'Moi'))+'</option>';
   }).join('');
