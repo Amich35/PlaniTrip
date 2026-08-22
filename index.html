@@ -10788,7 +10788,8 @@ function currencySymbolFromCode(code){
   }catch(e){}
   return code;
 }
-function getCurrencySymbol(c){
+function getCurrencySymbol(c){ var m=(c&&c.currency||'').match(/\(([^)]+)\)/); return m?m[1]:((c&&c.currency)||''); }
+function getConverterCurrencySymbol(c){
   var raw=String((c&&c.currency)||'').trim();
   if(!raw)return '';
   var explicit=raw.match(/\(([€$¥£₩₹฿₫₭₱៛₽₺₴₪₦₵]+)\)/);
@@ -12360,7 +12361,7 @@ function renderMiniConverter(c){
   var dir = S.convDir && S.convDir[c.id] || 'eur';
   var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
-  var localSymbol = getCurrencySymbol(c);
+  var localSymbol = getConverterCurrencySymbol(c);
   var fromLabel = dir==='eur' ? '€' : localSymbol;
   var toLabel = dir==='eur' ? localSymbol : '€';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
@@ -12384,7 +12385,7 @@ function renderConverterCard(c){
   var dir = S.convDir && S.convDir[c.id] || 'eur';
   var amt = (S.convAmt && S.convAmt[c.id]!==undefined) ? S.convAmt[c.id] : 1;
   var result = dir==='eur' ? (amt*rate) : (amt/rate);
-  var localSymbol = getCurrencySymbol(c);
+  var localSymbol = getConverterCurrencySymbol(c);
   var fromLabel = dir==='eur' ? '€' : localSymbol;
   var toLabel = dir==='eur' ? localSymbol : '€';
   var resultStr = dir==='eur' ? result.toLocaleString('fr-FR',{maximumFractionDigits:0}) : result.toLocaleString('fr-FR',{maximumFractionDigits:2});
