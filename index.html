@@ -10538,7 +10538,21 @@ function personDisplayName(emailOrLabel, selfLabel){
 // canonique de la personne, si connu. Sinon retourne la valeur telle quelle.
 function canonicalPerson(label){
   if(!label) return label;
-  return REVERSE_ALIAS_MAP[label] || label;
+  var raw=String(label).trim();
+  if(!raw) return raw;
+  if(REVERSE_ALIAS_MAP[raw]) return REVERSE_ALIAS_MAP[raw];
+  // Compatibilité historique : avant l'identité email stable, certaines dépenses du
+  // propriétaire pouvaient conserver son ancien libellé/pseudo. On le résout à la
+  // volée vers l'email actuel, sans modifier les dépenses ni les données Supabase.
+  var ownerLabel = CURRENT_TRIP && CURRENT_TRIP.owner_label ? String(CURRENT_TRIP.owner_label).trim() : '';
+  var ownerEmail = CURRENT_TRIP && CURRENT_TRIP.owner_email ? String(CURRENT_TRIP.owner_email).trim() : '';
+  if(ownerLabel && raw===ownerLabel){
+    if(ownerEmail) return ownerEmail;
+    if(CURRENT_USER && CURRENT_TRIP && CURRENT_TRIP.owner_id===CURRENT_USER.id && CURRENT_USER.email){
+      return String(CURRENT_USER.email).trim();
+    }
+  }
+  return raw;
 }
 function getActiveTravelerList(){
   var seen={},people=[];function add(email){email=canonicalPerson(email);if(email&&!seen[email]){seen[email]=true;people.push(email);}}
@@ -10623,6 +10637,7 @@ function getPeopleList(){
   });
   // 3. Propriétaire du voyage (toujours inclus — même sans dépenses)
   var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
+  ownerE = canonicalPerson(ownerE);
   if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }
   // 4. Payeurs, participants et splits présents dans les dépenses mais absents de la liste ci-dessus.
   //    canonicalPerson() fusionne automatiquement un ancien pseudo brut avec l'email réel connu.
