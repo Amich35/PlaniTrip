@@ -5263,6 +5263,13 @@ function applyPhotoPositionToDom(query, posY, zoom){
     }
   });
 }
+// Si Supabase (ou un intermédiaire réseau, ex: service worker) renvoie une réponse HTML
+// au lieu du JSON attendu, err.message contient toute la page — jamais montrer ça tel quel.
+function friendlySupabaseError(err){
+  var msg = (err && err.message) || '';
+  if(!msg || /<!DOCTYPE|<html/i.test(msg)) return 'Problème de connexion au serveur. Réessaie dans un instant.';
+  return msg.length > 200 ? msg.slice(0,200)+'…' : msg;
+}
 async function setCustomPhoto(query, url){
   if(!S.customPhotos) S.customPhotos={};
   S.customPhotos[query]=url;
@@ -5271,7 +5278,7 @@ async function setCustomPhoto(query, url){
     // await garantit que Supabase a bien la photo avant tout rechargement possible
     try{
       var upRes = await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()});
-      if(upRes && upRes.error){ console.error('[PlaniTrip] setCustomPhoto upsert error:', upRes.error); alert('Erreur lors de l\'enregistrement de la photo : '+upRes.error.message); }
+      if(upRes && upRes.error){ console.error('[PlaniTrip] setCustomPhoto upsert error:', upRes.error); alert('Erreur lors de l\'enregistrement de la photo : '+friendlySupabaseError(upRes.error)); }
     }catch(e){ console.error('[PlaniTrip] setCustomPhoto exception:', e); alert('Erreur réseau lors de l\'enregistrement de la photo.'); }
   }
   closePhotoPicker();
@@ -5298,7 +5305,7 @@ async function resetCustomPhoto(){
   if(sb && CURRENT_TRIP){
     try{
       var delRes = await sb.from('custom_photos').delete().eq('trip_id',CURRENT_TRIP.id).eq('query',target);
-      if(delRes && delRes.error){ console.error('[PlaniTrip] resetCustomPhoto delete error:', delRes.error); alert('Erreur lors de la suppression : '+delRes.error.message); }
+      if(delRes && delRes.error){ console.error('[PlaniTrip] resetCustomPhoto delete error:', delRes.error); alert('Erreur lors de la suppression : '+friendlySupabaseError(delRes.error)); }
     }catch(e){ console.error('[PlaniTrip] resetCustomPhoto exception:', e); alert('Erreur réseau lors de la suppression.'); }
   }
   closePhotoPicker();
