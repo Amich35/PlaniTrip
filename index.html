@@ -1444,7 +1444,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-23·sha:movement-connection-times-v1';
+var APP_BUILD = '2026-08-23·sha:activity-add-discovery-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8500,6 +8500,11 @@ function renderCityPanelContentBody(c, city){
 
     const activityTrashBtn = activityTrashButtonHTML(ck);
 
+    const addActivityToolbar='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px">'
+      +'<div style="font-size:17px;font-weight:700;color:var(--ink)">Programme</div>'
+      +'<button type="button" onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="min-height:36px;padding:8px 13px;border:none;border-radius:999px;background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">＋ Activité</button>'
+      +'</div>';
+
     const addForm='<button onclick="openAddActivityModal(\''+jsStrEsc(ck)+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une activité</button>'+'<div style="display:flex;justify-content:center;gap:14px;margin-top:10px;flex-wrap:wrap">'+'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'free\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Temps libre</span>'+'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'meal\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Repas à définir</span>'+'<span onclick="openFreeBlockModal(\''+jsStrEsc(ck)+'\',\'dayoff\')" style="font-size:12px;color:var(--ink-subtle);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Journée libre</span>'+'</div>'+activityTrashBtn+'<div style="height:24px"></div>';
 
     // Filtre unique : dates. Le filtre catégorie a été retiré volontairement.
@@ -8535,7 +8540,7 @@ function renderCityPanelContentBody(c, city){
           +'</div>';
       }
     }
-    return filterBarHTML+'<div class="cf-act-list">'+(_emptyDayHTML||baseActsHTML)+'</div>'+(_emptyDayHTML?'':addForm);
+    return addActivityToolbar+filterBarHTML+'<div class="cf-act-list">'+(_emptyDayHTML||baseActsHTML)+'</div>'+(_emptyDayHTML?'':addForm);
 }
 
 function setCityCategory(ck, cat){
@@ -9306,7 +9311,11 @@ function renderItinerary(c, embedded){
     var cityCardHTML='<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-kind="city" data-img-query="'+escHtml(imgQuery)+'"></div>'
-      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
+      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">'
+      +'<span class="cc-sub" style="margin-top:0">'+cityTotal+' activités</span>'
+      +'<button type="button" aria-label="Ajouter une activité à '+escHtml(_cityDisplayName(ck,city))+'" onclick="event.stopPropagation();openAddActivityModal(\''+jsStrEsc(ck)+'\')" ontouchstart="event.stopPropagation()" ontouchmove="event.stopPropagation()" ontouchend="event.stopPropagation()" style="min-height:30px;padding:5px 10px;border:none;border-radius:999px;background:var(--accent-pale);color:var(--accent);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">＋ Activité</button>'
+      +'</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div>';
     if(cityOrderIndex<cityOrder.length-1){
