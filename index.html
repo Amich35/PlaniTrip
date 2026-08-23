@@ -784,7 +784,28 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-route-field .mv-location-suggestions{left:-5px;right:-5px;}
 .mv-coherence{display:flex;align-items:flex-start;gap:7px;margin:8px 0 0;padding:8px 10px;border-radius:11px;background:var(--status-upcoming-pale);color:var(--status-upcoming);font-size:10.5px;line-height:1.35;}
 .mv-coherence button{margin-left:auto;border:none;background:transparent;color:var(--status-upcoming);font-weight:750;padding:0;flex-shrink:0;}
-@media(max-width:370px){.mv-summary{grid-template-columns:1fr 1fr}.mv-summary> :first-child{grid-column:1/-1}.mv-schedule{grid-template-columns:1fr 1fr}.mv-schedule> :first-child{grid-column:1/-1}.mv-leg-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mv-span-2,.mv-span-3{grid-column:span 1}.mv-span-6{grid-column:1/-1}}
+.mv-essential-mode{display:block;margin:0 0 12px;border:1px solid rgba(100,70,30,.14);border-radius:var(--r12);background:#fff;padding:9px 11px;}
+.mv-essential-mode .ef-select{display:block;width:100%;border:none!important;background:transparent!important;padding:0!important;height:auto!important;font-size:14px!important;font-weight:650;box-shadow:none!important;}
+.mv-option-group{border-top:1px solid rgba(100,70,30,.13);padding-top:12px;margin-top:2px;}
+.mv-option-group>summary{list-style:none;display:flex;align-items:center;gap:6px;color:var(--ink);font-size:12.5px;font-weight:700;cursor:pointer;padding:3px 0;}
+.mv-option-group>summary::-webkit-details-marker{display:none;}
+.mv-option-group>summary .mv-option-chevron{transition:transform .18s ease;color:var(--ink-muted);}
+.mv-option-group[open]>summary .mv-option-chevron{transform:rotate(90deg);}
+.mv-option-label{color:var(--ink-subtle);font-weight:500;}
+.mv-option-body{padding-top:10px;}
+.mv-stops-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+.mv-stop-row{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) auto;gap:7px;align-items:end;padding:9px;border-radius:var(--r12);background:var(--sand);}
+.mv-stop-remove{width:34px;height:34px;border:none;border-radius:10px;background:transparent;color:var(--red-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.mv-technical-details{margin-top:9px;padding-top:8px;border-top:1px dashed rgba(100,70,30,.14);}
+.mv-technical-details>summary{list-style:none;color:var(--ink-muted);font-size:11px;font-weight:650;cursor:pointer;display:flex;align-items:center;gap:5px;}
+.mv-technical-details>summary::-webkit-details-marker{display:none;}
+.city-movement-link{position:relative;display:flex;align-items:center;gap:10px;width:calc(100% - 36px);margin:7px 10px 7px 26px;padding:10px 12px;border:1px solid rgba(100,70,30,.10);border-radius:var(--r14);background:rgba(255,255,255,.62);cursor:pointer;font-family:inherit;text-align:left;-webkit-appearance:none;}
+.city-movement-link:before{content:'';position:absolute;left:-13px;top:-8px;bottom:-8px;width:2px;background:rgba(45,106,79,.34);}
+.city-movement-icon{position:absolute;left:-27px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;border:1.5px solid var(--accent);background:var(--parchment);color:var(--accent);display:flex;align-items:center;justify-content:center;z-index:2;}
+.city-movement-copy{flex:1;min-width:0;}
+.city-movement-route{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.city-movement-meta{font-size:10.5px;color:var(--ink-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media(max-width:370px){.mv-summary{grid-template-columns:1fr 1fr}.mv-summary> :first-child{grid-column:1/-1}.mv-schedule{grid-template-columns:1fr 1fr}.mv-schedule> :first-child{grid-column:1/-1}.mv-leg-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mv-span-2,.mv-span-3{grid-column:span 1}.mv-span-6{grid-column:1/-1}.mv-stop-row{grid-template-columns:1fr 1fr}.mv-stop-remove{grid-column:2;justify-self:end}}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1414,7 +1435,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-23·sha:payer-identity-dedupe-v1';
+var APP_BUILD = '2026-08-23·sha:movement-between-cities-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8647,6 +8668,33 @@ function movementModeIcon(mode){
   if(m.indexOf('train')>-1) return svgIcon('train-front',16);
   return svgIcon('route',16);
 }
+var MOVEMENT_MODES=['Train','Métro','Marche','Bus','Ferry','Voiture','Avion','Autre'];
+function movementModeOptions(selected){
+  return MOVEMENT_MODES.map(function(mode){return '<option value="'+mode+'"'+(mode===selected?' selected':'')+'>'+mode+'</option>';}).join('');
+}
+function movementPrimaryMode(m){
+  return (m&&m.primaryMode)||((m&&m.legs&&m.legs[0]&&m.legs[0].mode)||'Train');
+}
+function movementBlankLeg(mode,from,to){
+  return {id:movementUid('leg_'),mode:mode||'Train',line:'',direction:'',from:from||'',to:to||'',durationMin:'',durationUnit:'min',stops:'',costJPY:'',instruction:''};
+}
+function ensureMovementRouteLegs(m){
+  if(!m)return;
+  if(!Array.isArray(m.legs))m.legs=[];
+  var from=movementLocationLabel(m.originRef,m.origin),to=movementLocationLabel(m.destinationRef,m.destination),mode=movementPrimaryMode(m);
+  m.primaryMode=mode;
+  if(!m.legs.length){
+    m.legs=[movementBlankLeg(mode,from,to)];
+    return;
+  }
+  m.legs[0].mode=mode;
+  m.legs[0].from=from;
+  m.legs[m.legs.length-1].to=to;
+  for(var i=1;i<m.legs.length;i++){
+    if(!m.legs[i].from&&m.legs[i-1].to)m.legs[i].from=m.legs[i-1].to;
+    if(!m.legs[i-1].to&&m.legs[i].from)m.legs[i-1].to=m.legs[i].from;
+  }
+}
 function movementCurrencyInfo(countryId){
   var c=COUNTRIES.find(function(country){return country.id===countryId;});
   var symbol=getCurrencySymbol(c)||'EUR';
@@ -8676,32 +8724,48 @@ function movementCalculatedCost(m){
 }
 function movementDurationUnit(item){
   var minutes=parseAmt(item&&item.durationMin);
-  return item&&(item.durationUnit==='hour'||(!isNaN(minutes)&&minutes>=60))?'hour':'min';
+  if(item&&item.durationUnit==='day')return'day';
+  if(item&&item.durationUnit==='hour')return'hour';
+  return !isNaN(minutes)&&minutes>=1440?'day':(!isNaN(minutes)&&minutes>=60?'hour':'min');
 }
 function movementDurationDisplay(value,item){
   var n=parseAmt(value);if(isNaN(n))return '';
-  return movementDurationUnit(item)==='hour'?Math.round((n/60)*100)/100:n;
+  var unit=movementDurationUnit(item);
+  if(unit==='day')return Math.round((n/1440)*100)/100;
+  if(unit==='hour')return Math.round((n/60)*100)/100;
+  return n;
 }
 function movementDurationToMinutes(value,unit){
   var n=parseAmt(value);if(isNaN(n))return '';
-  return Math.round((unit==='hour'?n*60:n)*100)/100;
+  var factor=unit==='day'?1440:(unit==='hour'?60:1);
+  return Math.round(n*factor*100)/100;
 }
 function movementDurationTextToMinutes(value){
   var raw=String(value==null?'':value).trim().toLowerCase().replace(',','.');
+  var days=raw.match(/^(\d+(?:\.\d+)?)\s*j/);
+  if(days)return Math.round(Number(days[1])*1440*100)/100;
   var hours=raw.match(/^(\d+(?:\.\d+)?)\s*h(?:\s*(\d{1,2}))?/);
   if(hours)return Math.round((Number(hours[1])*60+Number(hours[2]||0))*100)/100;
   var n=parseAmt(raw);return isNaN(n)?'':n;
 }
 function movementFormatDuration(value,item){
   var minutes=parseAmt(value);if(isNaN(minutes))return '';
-  if(minutes<60)return Number(minutes).toLocaleString('fr-FR',{maximumFractionDigits:2})+' min';
-  var totalMinutes=Math.round(minutes),wholeHours=Math.floor(totalMinutes/60),remainingMinutes=totalMinutes%60;
+  var totalMinutes=Math.round(minutes);
+  if(totalMinutes>=1440){
+    var wholeDays=Math.floor(totalMinutes/1440),dayRemainder=totalMinutes%1440,dayHours=Math.floor(dayRemainder/60),dayMinutes=dayRemainder%60;
+    return wholeDays+'j'+(dayHours?' '+dayHours+'h':'')+(dayMinutes?String(dayMinutes).padStart(2,'0'):'');
+  }
+  if(totalMinutes<60)return Number(minutes).toLocaleString('fr-FR',{maximumFractionDigits:2})+' min';
+  var wholeHours=Math.floor(totalMinutes/60),remainingMinutes=totalMinutes%60;
   return wholeHours+'h'+(remainingMinutes?String(remainingMinutes).padStart(2,'0'):'');
 }
 function changeMovementDurationUnit(inputId,selectEl){
   var input=document.getElementById(inputId);if(!input)return;
-  var previous=selectEl.dataset.previous||'min';var next=selectEl.value;var n=parseAmt(input.value);
-  if(!isNaN(n)&&previous!==next)input.value=next==='hour'?Math.round((n/60)*100)/100:Math.round((n*60)*100)/100;
+  var previous=selectEl.dataset.previous||'min',next=selectEl.value,n=parseAmt(input.value);
+  if(!isNaN(n)&&previous!==next){
+    var minutes=movementDurationToMinutes(n,previous);
+    input.value=next==='day'?Math.round((minutes/1440)*100)/100:(next==='hour'?Math.round((minutes/60)*100)/100:Math.round(minutes*100)/100);
+  }
   selectEl.dataset.previous=next;
 }
 function builtinMovementsForCountry(countryId){
@@ -8786,8 +8850,12 @@ function archivedMovementsForCountry(countryId){
 function movementMissingCount(m){
   return (m.legs||[]).filter(function(l){return !l.from||!l.to;}).length;
 }
-function renderMovementsSection(countryId){
-  var allList=movementsForCountry(countryId),dates=movementDates(allList),activeDate=activeMovementDate(countryId,dates);
+function renderMovementsSection(countryId,excludedIds){
+  var excluded={};(excludedIds||[]).forEach(function(id){excluded[id]=true;});
+  var allList=movementsForCountry(countryId).filter(function(m){return m.scope!=='intercountry'&&!excluded[m.id];});
+  var addButton='<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>';
+  if(!allList.length)return '<div class="section" style="padding-top:0">'+addButton+movementTrashButtonHTML(countryId)+'</div>';
+  var dates=movementDates(allList),activeDate=activeMovementDate(countryId,dates);
   var list=activeDate==='Tous'?allList:allList.filter(function(m){return m.date===activeDate;});
   var cards=list.map(function(m){
     var accordionKey='movement_'+m.id;
@@ -8795,21 +8863,22 @@ function renderMovementsSection(countryId){
     var missing=movementMissingCount(m);
     var meta=[];
     if(m.date)meta.push('<span class="mv-overview-item">'+svgIcon('calendar',13)+escHtml(new Date(m.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+'</span>');
-    if(m.durationMin) meta.push('<span class="mv-overview-item">'+svgIcon('clock',13)+escHtml(movementFormatDuration(m.durationMin,m))+'</span>');
-    if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null) meta.push('<span class="mv-overview-item">'+svgIcon('coins',13)+escHtml(movementFormatCost(m.costPerPersonJPY,m,true))+'</span>');
+    if(m.durationMin)meta.push('<span class="mv-overview-item">'+svgIcon('clock',13)+escHtml(movementFormatDuration(m.durationMin,m))+'</span>');
+    if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null)meta.push('<span class="mv-overview-item">'+svgIcon('coins',13)+escHtml(movementFormatCost(m.costPerPersonJPY,m,true))+'</span>');
     var legs=open?'<div class="mv-timeline" style="margin-top:12px">'+(m.legs||[]).map(function(l,i){
-      var incomplete=!l.from||!l.to;
-      var legMeta=[];if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
+      var incomplete=!l.from||!l.to,legMeta=[];
+      if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));
+      if(l.costJPY!==''&&l.costJPY!=null)legMeta.push(movementFormatCost(l.costJPY,m,false));
+      if(l.stops)legMeta.push(l.stops+' arrêts');
       return '<div class="mv-leg-card'+(incomplete?' incomplete':'')+'"><span class="mv-leg-node">'+(incomplete?'':movementModeIcon(l.mode))+'</span><div class="mv-leg-head" style="cursor:default"><span class="mv-leg-number">'+(i+1)+'</span><div class="mv-leg-copy"><div class="mv-leg-title">'+escHtml(incomplete?'Étape à compléter':(l.mode||'Étape'))+'</div><div class="mv-leg-sub">'+escHtml(l.line||'Informations à compléter')+'</div>'+(l.from||l.to?'<div class="mv-leg-route">'+escHtml(l.from||'Départ')+' → '+escHtml(l.to||'Arrivée')+'</div>':'')+(legMeta.length?'<div class="mv-leg-meta">'+escHtml(legMeta.join(' · '))+'</div>':'')+'</div></div></div>';
     }).join('')+'</div>':'';
     return '<div class="mv-country-card"><div class="mv-country-head" onclick="toggleMovementAccordion(\''+jsStrEsc(m.id)+'\')"><div class="mv-country-route">'+escHtml(movementLocationLabel(m.originRef,m.origin)||'Départ')+' → '+escHtml(movementLocationLabel(m.destinationRef,m.destination)||'Arrivée')+'</div><span data-icon="chevron-right" data-icon-size="15" style="color:var(--ink-subtle);transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')"></span></div>'
-      +(open?'<div class="mv-country-detail"><div class="mv-overview-row" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')"><span class="mv-status-pill'+(m.status==='incomplete'?' incomplete':'')+'">'+(m.status==='booked'?'Réservé':m.status==='planned'?'Prévu':'À compléter')+'</span><span class="mv-overview-meta">'+(meta.join('<span>·</span>')||'Détails à compléter')+'</span></div>'+legs+(missing?'<div class="mv-incomplete-count">'+missing+' étape'+(missing>1?'s':'')+' à compléter</div>':'')+'<button class="mv-inline-edit" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')">Modifier le déplacement</button></div>':'')+'</div>';
+      +(open?'<div class="mv-country-detail"><div class="mv-overview-row" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')"><span class="mv-status-pill'+(m.status==='incomplete'?' incomplete':'')+'">'+(m.status==='booked'?'Réservé':m.status==='planned'?'Prévu':'À compléter')+'</span><span class="mv-overview-meta">'+(meta.join('<span>·</span>')||'Détails facultatifs')+'</span></div>'+legs+(missing?'<div class="mv-incomplete-count">'+missing+' étape'+(missing>1?'s':'')+' à compléter</div>':'')+'<button class="mv-inline-edit" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')">Modifier le déplacement</button></div>':'')+'</div>';
   }).join('');
-  return '<div class="section"><div class="section-header"><div class="section-title">Déplacements</div><div class="section-meta">'+allList.length+' trajet'+(allList.length>1?'s':'')+'</div></div>'
+  return '<div class="section"><div class="section-header"><div class="section-title">Autres déplacements</div><div class="section-meta">'+allList.length+' trajet'+(allList.length>1?'s':'')+'</div></div>'
     +renderMovementDateFilter(countryId,dates,activeDate)
     +'<div style="display:flex;flex-direction:column;gap:8px">'+cards+'</div>'
-    +'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>'
-    +movementTrashButtonHTML(countryId)+'</div>';
+    +addButton+movementTrashButtonHTML(countryId)+'</div>';
 }
 function movementTrashButtonHTML(countryId){
   var count=archivedMovementsForCountry(countryId).length;
@@ -8827,10 +8896,12 @@ function renderArchivedMovementsScreen(){
 function toggleMovementAccordion(id){if(!S.uiAccordion)S.uiAccordion={};var k='movement_'+id;S.uiAccordion[k]=!S.uiAccordion[k];save();renderContent();}
 function openMovementModal(id,countryId){
   var found=id?movementsForCountry(countryId).find(function(m){return m.id===id;}):null;
-  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:'',destination:'',originRef:'',destinationRef:'',date:'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',legs:[]};
+  var prefill=found?null:movementPrefill(countryId);
+  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:prefill.origin||'',destination:prefill.destination||'',originRef:prefill.originRef||'',destinationRef:prefill.destinationRef||'',date:prefill.date||'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',durationUnit:'min',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',primaryMode:'Train',legs:[]};
   if(!_movementDraft.priceCurrencyMode)_movementDraft.priceCurrencyMode='LOCAL';
   if(_movementDraft.costManualOverride==null)_movementDraft.costManualOverride=false;
   if(!_movementDraft.durationUnit)_movementDraft.durationUnit='min';
+  if(!_movementDraft.primaryMode)_movementDraft.primaryMode=movementPrimaryMode(_movementDraft);
   (_movementDraft.legs||[]).forEach(function(l){if(!l.durationUnit)l.durationUnit='min';});
   _movementPriceInputsDirty=false;
   _movementOpenLeg=null;
@@ -8842,25 +8913,43 @@ function openMovementModal(id,countryId){
 }
 function closeMovementModal(){ document.getElementById('movementModal').classList.remove('open'); _movementDraft=null; }
 function movementDraftFromInputs(skipPrices){
-  if(!_movementDraft) return;
+  if(!_movementDraft)return;
   ['origin','destination','date','departureTime','arrivalTime','status','notes'].forEach(function(k){var el=document.getElementById('mv_'+k);if(el)_movementDraft[k]=el.value;});
-  var originEl=document.getElementById('mv_origin'),destinationEl=document.getElementById('mv_destination');
-  if(originEl)_movementDraft.originRef=originEl.dataset.ref||'';if(destinationEl)_movementDraft.destinationRef=destinationEl.dataset.ref||'';
-  var durationEl=document.getElementById('mv_durationDisplay');var durationUnitEl=document.getElementById('mv_durationUnit');
-  // Durée calculée depuis les étapes — le champ est en lecture seule
-  var _legsDurSum=(_movementDraft.legs||[]).reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);
-  if(_legsDurSum>0){_movementDraft.durationMin=_legsDurSum;_movementDraft.durationUnit=_legsDurSum>=60?'hour':'min';}
-  else if(durationEl&&durationEl.tagName==='INPUT'){_movementDraft.durationMin=durationUnitEl?movementDurationToMinutes(durationEl.value,durationUnitEl.value):movementDurationTextToMinutes(durationEl.value);_movementDraft.durationUnit=_movementDraft.durationMin>=60?'hour':'min';}
+  var originEl=document.getElementById('mv_origin'),destinationEl=document.getElementById('mv_destination'),primaryModeEl=document.getElementById('mv_primaryMode');
+  if(originEl)_movementDraft.originRef=originEl.dataset.ref||'';
+  if(destinationEl)_movementDraft.destinationRef=destinationEl.dataset.ref||'';
+  if(primaryModeEl)_movementDraft.primaryMode=primaryModeEl.value||'Train';
+  var legs=_movementDraft.legs||[];
+  for(var stopIndex=0;stopIndex<Math.max(0,legs.length-1);stopIndex++){
+    var stopEl=document.getElementById('mvs_'+stopIndex+'_place'),modeAfterEl=document.getElementById('mvs_'+stopIndex+'_modeAfter');
+    if(stopEl){legs[stopIndex].to=stopEl.value;legs[stopIndex+1].from=stopEl.value;}
+    if(modeAfterEl)legs[stopIndex+1].mode=modeAfterEl.value;
+  }
+  if(legs.length){
+    legs[0].mode=_movementDraft.primaryMode||movementPrimaryMode(_movementDraft);
+    legs[0].from=movementLocationLabel(_movementDraft.originRef,_movementDraft.origin);
+    legs[legs.length-1].to=movementLocationLabel(_movementDraft.destinationRef,_movementDraft.destination);
+  }
   var totalEl=document.getElementById('mv_costPerPersonDisplay');
   if(!skipPrices&&totalEl)_movementDraft.costPerPersonJPY=movementDisplayToLocal(totalEl.value,_movementDraft);
-  (_movementDraft.legs||[]).forEach(function(l,i){
-    ['mode','line','direction','from','to','stops','instruction'].forEach(function(k){var el=document.getElementById('mvl_'+i+'_'+k);if(el)l[k]=el.value;});
+  legs.forEach(function(l,i){
+    ['line','direction','stops','instruction'].forEach(function(k){var el=document.getElementById('mvl_'+i+'_'+k);if(el)l[k]=el.value;});
     var legDurationEl=document.getElementById('mvl_'+i+'_durationDisplay');
-    if(legDurationEl){l.durationMin=movementDurationTextToMinutes(legDurationEl.value);l.durationUnit=l.durationMin>=60?'hour':'min';}
+    if(legDurationEl){l.durationMin=movementDurationTextToMinutes(legDurationEl.value);l.durationUnit=l.durationMin>=1440?'day':(l.durationMin>=60?'hour':'min');}
     var costEl=document.getElementById('mvl_'+i+'_costDisplay');
     if(!skipPrices&&costEl)l.costJPY=movementDisplayToLocal(costEl.value,_movementDraft);
   });
-  if(_movementDraft.scope==='intercountry'&&_movementDraft.legs&&_movementDraft.legs.length===1)_movementDraft.primaryMode=_movementDraft.legs[0].mode||_movementDraft.primaryMode;
+  var durationEl=document.getElementById('mv_durationDisplay'),durationUnitEl=document.getElementById('mv_durationUnit');
+  var legsDuration=legs.reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);
+  if(durationEl&&durationEl.tagName==='INPUT'&&String(durationEl.value||'').trim()!==''){
+    _movementDraft.durationUnit=durationUnitEl?durationUnitEl.value:'min';
+    _movementDraft.durationMin=movementDurationToMinutes(durationEl.value,_movementDraft.durationUnit);
+  }else if(legsDuration>0){
+    _movementDraft.durationMin=legsDuration;
+    _movementDraft.durationUnit=legsDuration>=1440?'day':(legsDuration>=60?'hour':'min');
+  }else{
+    _movementDraft.durationMin='';
+  }
   if(!skipPrices&&!_movementDraft.costManualOverride)_movementDraft.costPerPersonJPY=movementCalculatedCost(_movementDraft);
 }
 function changeMovementCurrency(mode){
@@ -8897,10 +8986,12 @@ function updateMovementDurationFromTimes(){
   if(!isFinite(departureMinutes)||!isFinite(arrivalMinutes))return;
   var duration=arrivalMinutes-departureMinutes;
   if(duration<0)duration+=24*60;
+  var unit=duration>=1440?'day':(duration>=60?'hour':'min');
   _movementDraft.durationMin=duration;
-  _movementDraft.durationUnit=duration>=60?'hour':'min';
-  var _durEl=document.getElementById('mv_durationDisplay');
-  if(_durEl){var _label=movementFormatDuration(duration,{durationMin:duration});if(_durEl.tagName==='INPUT')_durEl.value=_label;else _durEl.textContent=_label;}
+  _movementDraft.durationUnit=unit;
+  var durationEl=document.getElementById('mv_durationDisplay'),unitEl=document.getElementById('mv_durationUnit');
+  if(unitEl){unitEl.value=unit;unitEl.dataset.previous=unit;}
+  if(durationEl)durationEl.value=movementDurationDisplay(duration,{durationMin:duration,durationUnit:unit});
 }
 function resetMovementDate(button){
   if(!_movementDraft)return;
@@ -8910,37 +9001,49 @@ function resetMovementDate(button){
 }
 function renderMovementModalBody(){
   var m=_movementDraft;if(!m)return;
+  var existing=movementsForCountry(m.countryId).some(function(x){return x.id===m.id;});
   var localCurrency=movementCurrencyInfo(m.countryId).symbol;
-  var legs='<div class="mv-timeline">'+(m.legs||[]).map(function(l,i){
-    var open=_movementOpenLeg===i;var incomplete=!l.from||!l.to;var legMeta=[];if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));if(l.costJPY)legMeta.push(movementFormatCost(l.costJPY,m,false));if(l.stops)legMeta.push(l.stops+' arrêts');
+  var stops=(m.legs||[]).slice(0,-1).map(function(l,i){
+    var stop=l.to||(m.legs[i+1]&&m.legs[i+1].from)||'';
+    var nextMode=(m.legs[i+1]&&m.legs[i+1].mode)||movementPrimaryMode(m);
+    return '<div class="mv-stop-row"><label class="mv-field"><span class="mv-field-label">Lieu de correspondance</span><input class="ef-input" id="mvs_'+i+'_place" value="'+escHtml(stop)+'" placeholder="Gare, aéroport, arrêt…"></label>'
+      +'<label class="mv-field"><span class="mv-field-label">Puis en</span><select class="ef-select" id="mvs_'+i+'_modeAfter">'+movementModeOptions(nextMode)+'</select></label>'
+      +'<button type="button" class="mv-stop-remove" onclick="removeMovementCorrespondence('+i+')" aria-label="Supprimer cette correspondance">'+svgIcon('trash-2',15)+'</button></div>';
+  }).join('');
+  var technicalLegs=(m.legs||[]).length?'<details class="mv-technical-details"><summary><span aria-hidden="true">›</span> Détails de chaque segment (optionnel)</summary><div class="mv-timeline">'+(m.legs||[]).map(function(l,i){
+    var open=_movementOpenLeg===i,legMeta=[];
+    if(l.durationMin)legMeta.push(movementFormatDuration(l.durationMin,l));
+    if(l.costJPY!==''&&l.costJPY!=null)legMeta.push(movementFormatCost(l.costJPY,m,false));
+    if(l.stops)legMeta.push(l.stops+' arrêts');
     var fields=open?'<div class="mv-leg-fields">'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Mode de transport</span><select class="ef-select" id="mvl_'+i+'_mode"><option'+(l.mode==='Train'?' selected':'')+'>Train</option><option'+(l.mode==='Métro'?' selected':'')+'>Métro</option><option'+(l.mode==='Marche'?' selected':'')+'>Marche</option><option'+(l.mode==='Bus'?' selected':'')+'>Bus</option><option'+(l.mode==='Ferry'?' selected':'')+'>Ferry</option><option'+(l.mode==='Voiture'?' selected':'')+'>Voiture</option><option'+(l.mode==='Avion'?' selected':'')+'>Avion</option><option'+(l.mode==='Autre'?' selected':'')+'>Autre</option></select></label>'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Ligne</span><input class="ef-input" id="mvl_'+i+'_line" value="'+escHtml(l.line||'')+'"></label>'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Départ</span><input class="ef-input" id="mvl_'+i+'_from" value="'+escHtml(l.from||'')+'"></label>'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mvl_'+i+'_to" value="'+escHtml(l.to||'')+'"></label>'
+      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Ligne ou numéro</span><input class="ef-input" id="mvl_'+i+'_line" value="'+escHtml(l.line||'')+'" placeholder="ex. TGV 6123"></label>'
       +'<label class="mv-field mv-span-3"><span class="mv-field-label">Direction</span><input class="ef-input" id="mvl_'+i+'_direction" value="'+escHtml(l.direction||'')+'"></label>'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Durée</span><div class="mv-duration-row"><input class="ef-input" id="mvl_'+i+'_durationDisplay" type="text" inputmode="decimal" value="'+escHtml(movementFormatDuration(l.durationMin,l))+'" placeholder="0 min"></div></label>'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Prix</span><div class="mv-price-row"><input class="ef-input" id="mvl_'+i+'_costDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementLegPriceChanged()" value="'+escHtml(movementLocalToDisplay(l.costJPY,m))+'"><select class="mv-currency-select mv-step-currency" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>'
-      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Arrêts</span><input class="ef-input" id="mvl_'+i+'_stops" value="'+escHtml(l.stops||'')+'"></label>'
-      +'<label class="mv-field mv-span-6"><span class="mv-field-label">Conseil pratique (optionnel)</span><input class="ef-input" id="mvl_'+i+'_instruction" value="'+escHtml(l.instruction||'')+'"></label></div>':'';
-    return '<div class="mv-leg-card'+(open?' open':'')+(incomplete?' incomplete':'')+'"><span class="mv-leg-node">'+(incomplete?'':movementModeIcon(l.mode))+'</span><div class="mv-leg-head" onclick="toggleMovementLeg('+i+')"><span class="mv-leg-number">'+(i+1)+'</span><div class="mv-leg-copy"><div class="mv-leg-title">'+escHtml(incomplete?'Dernière étape à compléter':(l.mode||'Étape'))+'</div><div class="mv-leg-sub">'+escHtml(l.line||'Informations à compléter')+'</div><div class="mv-leg-route">'+escHtml(l.from||'Départ')+' → '+escHtml(l.to||'Arrivée')+'</div>'+(legMeta.length?'<div class="mv-leg-meta">'+escHtml(legMeta.join(' · '))+'</div>':'')+(l.instruction&&!open?'<div class="mv-leg-note">'+escHtml(l.instruction)+'</div>':'')+'</div><span style="font-size:14px;color:var(--ink-muted);transform:rotate('+(open?'180deg':'0deg')+')">⌃</span><button class="mv-leg-menu" onclick="event.stopPropagation();movementLegMenu('+i+')">•••</button></div>'+fields+'</div>';
-  }).join('')+'</div>';
-  document.getElementById('movementModalTitle').textContent=(m.source==='manual'&&!movementsForCountry(m.countryId).some(function(x){return x.id===m.id;}))?'Ajouter un déplacement':'Modifier le déplacement';
-  var schedule=_movementScheduleOpen?'<div class="mv-schedule"><div class="mv-field"><span class="mv-field-label">Date</span><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'" oninput="updateMovementScheduleField(\'date\',this.value)" onchange="updateMovementScheduleField(\'date\',this.value)">'+(m.date?'<button type="button" class="mv-date-reset" onclick="resetMovementDate(this)">Réinitialiser la date</button>':'')+'</div><label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'" oninput="updateMovementScheduleField(\'departureTime\',this.value)" onchange="updateMovementScheduleField(\'departureTime\',this.value)"></label><label class="mv-field"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mv_arrivalTime" type="time" value="'+escHtml(m.arrivalTime||'')+'" oninput="updateMovementScheduleField(\'arrivalTime\',this.value)" onchange="updateMovementScheduleField(\'arrivalTime\',this.value)"></label></div>':'<button class="mv-schedule-btn" onclick="toggleMovementSchedule()">'+svgIcon('calendar',15)+' Ajouter date et horaires</button>';
-  var priceInput='<label class="mv-summary-cell"><span class="mv-field-label">Prix par personne</span><div class="mv-price-row"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>';
-  var _mvDurSumModal=(_movementDraft&&(_movementDraft.legs||[])).reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);
-  var _mvDurLabelModal=_mvDurSumModal>0?movementFormatDuration(_mvDurSumModal,m):'—';
-  var durationInput='<div class="mv-summary-cell"><span class="mv-field-label">Durée estimée</span><div class="mv-duration-computed" id="mv_durationDisplay">'+escHtml(_mvDurLabelModal)+'</div></div>';
-  var movementList=movementsForCountry(m.countryId),coherence=movementCoherenceMessage(m,movementList);
-  var copyTripButton=(m.legs||[]).length===1?'<button type="button" class="mv-copy-trip" onclick="copyMovementToSingleLeg()">'+svgIcon('copy',14)+' Reprendre les informations du trajet</button>':'';
-  document.getElementById('movementModalBody').innerHTML='<div class="mv-route-head"><span class="mv-route-line"></span><label class="mv-route-field"><span class="mv-label">Départ</span>'+movementLocationInput('origin',movementLocationLabel(m.originRef,m.origin),m.originRef)+'</label><label class="mv-route-field"><span class="mv-label">Destination</span>'+movementLocationInput('destination',movementLocationLabel(m.destinationRef,m.destination),m.destinationRef)+'</label></div>'
+      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Durée du segment</span><input class="ef-input" id="mvl_'+i+'_durationDisplay" type="text" inputmode="decimal" value="'+escHtml(movementFormatDuration(l.durationMin,l))+'" placeholder="ex. 1h30"></label>'
+      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Prix du segment</span><div class="mv-price-row"><input class="ef-input" id="mvl_'+i+'_costDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementLegPriceChanged()" value="'+escHtml(movementLocalToDisplay(l.costJPY,m))+'" placeholder="0"><select class="mv-currency-select mv-step-currency" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>'
+      +'<label class="mv-field mv-span-3"><span class="mv-field-label">Nombre d’arrêts</span><input class="ef-input" id="mvl_'+i+'_stops" value="'+escHtml(l.stops||'')+'"></label>'
+      +'<label class="mv-field mv-span-6"><span class="mv-field-label">Conseil pratique</span><input class="ef-input" id="mvl_'+i+'_instruction" value="'+escHtml(l.instruction||'')+'"></label></div>':'';
+    return '<div class="mv-leg-card'+(open?' open':'')+'"><span class="mv-leg-node">'+movementModeIcon(l.mode||movementPrimaryMode(m))+'</span><div class="mv-leg-head" onclick="toggleMovementLeg('+i+')"><span class="mv-leg-number">'+(i+1)+'</span><div class="mv-leg-copy"><div class="mv-leg-title">'+escHtml(l.mode||movementPrimaryMode(m))+'</div><div class="mv-leg-sub">'+escHtml(l.line||'Détails facultatifs')+'</div><div class="mv-leg-route">'+escHtml(l.from||'Départ')+' → '+escHtml(l.to||'Arrivée')+'</div>'+(legMeta.length?'<div class="mv-leg-meta">'+escHtml(legMeta.join(' · '))+'</div>':'')+(l.instruction&&!open?'<div class="mv-leg-note">'+escHtml(l.instruction)+'</div>':'')+'</div><span style="font-size:14px;color:var(--ink-muted);transform:rotate('+(open?'180deg':'0deg')+')">⌃</span></div>'+fields+'</div>';
+  }).join('')+'</div></details>':'';
+  document.getElementById('movementModalTitle').textContent=!existing?'Ajouter un déplacement':'Modifier le déplacement';
+  var coherence=movementCoherenceMessage(m,movementsForCountry(m.countryId));
+  var durationUnit=movementDurationUnit(m);
+  var optionalOpen=existing&&!!(m.date||m.departureTime||m.arrivalTime||m.durationMin||m.costPerPersonJPY||m.notes||m.status==='booked'||m.status==='incomplete');
+  var optionalDetails='<details class="mv-option-group"'+(optionalOpen?' open':'')+'><summary><span class="mv-option-chevron">›</span> Date, horaires et coût <span class="mv-option-label">(optionnel)</span></summary><div class="mv-option-body">'
+    +'<div class="mv-schedule"><div class="mv-field"><span class="mv-field-label">Date</span><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'" oninput="updateMovementScheduleField(\'date\',this.value)" onchange="updateMovementScheduleField(\'date\',this.value)">'+(m.date?'<button type="button" class="mv-date-reset" onclick="resetMovementDate(this)">Réinitialiser la date</button>':'')+'</div>'
+    +'<label class="mv-field"><span class="mv-field-label">Heure de départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'" oninput="updateMovementScheduleField(\'departureTime\',this.value)" onchange="updateMovementScheduleField(\'departureTime\',this.value)"></label>'
+    +'<label class="mv-field"><span class="mv-field-label">Heure d’arrivée</span><input class="ef-input" id="mv_arrivalTime" type="time" value="'+escHtml(m.arrivalTime||'')+'" oninput="updateMovementScheduleField(\'arrivalTime\',this.value)" onchange="updateMovementScheduleField(\'arrivalTime\',this.value)"></label></div>'
+    +'<div class="mv-summary"><label class="mv-summary-cell"><span class="mv-field-label">Durée estimée</span><div class="mv-duration-row"><input class="ef-input" id="mv_durationDisplay" type="number" inputmode="decimal" min="0" step="0.25" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_durationUnit" data-previous="'+durationUnit+'" onchange="changeMovementDurationUnit(\'mv_durationDisplay\',this)"><option value="min"'+(durationUnit==='min'?' selected':'')+'>min</option><option value="hour"'+(durationUnit==='hour'?' selected':'')+'>heure(s)</option><option value="day"'+(durationUnit==='day'?' selected':'')+'>jour(s)</option></select></div></label>'
+    +'<label class="mv-summary-cell"><span class="mv-field-label">Prix par personne</span><div class="mv-price-row"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>'
+    +'<label class="mv-summary-cell"><span class="mv-field-label">Statut</span><select class="ef-select mv-status-select'+(m.status==='incomplete'?' incomplete':'')+'" id="mv_status" onchange="this.classList.toggle(\'incomplete\',this.value===\'incomplete\')"><option value="planned"'+(m.status==='planned'?' selected':'')+'>Prévu</option><option value="booked"'+(m.status==='booked'?' selected':'')+'>Réservé</option><option value="incomplete"'+(m.status==='incomplete'?' selected':'')+'>À compléter</option></select></label></div>'
+    +'<label class="mv-field" style="display:block"><span class="mv-field-label">Note générale</span><textarea class="ef-input" id="mv_notes" rows="2" style="resize:none">'+escHtml(m.notes||'')+'</textarea></label></div></details>';
+  var stopDetails='<details class="mv-option-group"'+((m.legs||[]).length>1?' open':'')+'><summary><span class="mv-option-chevron">›</span> Correspondances <span class="mv-option-label">(optionnel)</span></summary><div class="mv-option-body"><div class="mv-stops-list">'+(stops||'<div style="font-size:12px;color:var(--ink-subtle)">Aucune correspondance : trajet direct.</div>')+'</div>'
+    +'<button type="button" class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une correspondance</button>'+technicalLegs+'</div></details>';
+  document.getElementById('movementModalBody').innerHTML='<div class="mv-route-head"><span class="mv-route-line"></span><label class="mv-route-field"><span class="mv-label">Lieu de départ</span>'+movementLocationInput('origin',movementLocationLabel(m.originRef,m.origin),m.originRef)+'</label><label class="mv-route-field"><span class="mv-label">Lieu d’arrivée</span>'+movementLocationInput('destination',movementLocationLabel(m.destinationRef,m.destination),m.destinationRef)+'</label></div>'
     +(coherence?'<div class="mv-coherence">'+svgIcon('triangle-alert',14)+'<span>'+escHtml(coherence)+'</span><button type="button" onclick="linkMovementToPrevious()">Relier</button></div>':'')
-    +'<div class="mv-summary"><label class="mv-summary-cell"><span class="mv-field-label">Statut</span><select class="ef-select mv-status-select'+(m.status==='incomplete'?' incomplete':'')+'" id="mv_status" onchange="this.classList.toggle(\'incomplete\',this.value===\'incomplete\')"><option value="incomplete"'+(m.status==='incomplete'?' selected':'')+'>À compléter</option><option value="planned"'+(m.status==='planned'?' selected':'')+'>Prévu</option><option value="booked"'+(m.status==='booked'?' selected':'')+'>Réservé</option></select></label>'+durationInput+priceInput+schedule+'</div>'
-    +'<label class="mv-field" style="display:block;margin-bottom:12px"><span class="mv-field-label">Note générale (optionnel)</span><textarea class="ef-input" id="mv_notes" rows="2" style="resize:none">'+escHtml(m.notes||'')+'</textarea></label>'
-    +'<div class="mv-editor-title">ITINÉRAIRE</div>'+copyTripButton+legs
-    +'<button class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une étape</button>';
+    +'<label class="mv-field mv-essential-mode"><span class="mv-field-label">Mode principal</span><select class="ef-select" id="mv_primaryMode">'+movementModeOptions(movementPrimaryMode(m))+'</select></label>'
+    +optionalDetails+stopDetails;
   var deleteBtn=document.getElementById('movementModalDeleteBtn');
-  if(deleteBtn)deleteBtn.style.display=movementsForCountry(m.countryId).some(function(x){return x.id===m.id;})?'block':'none';
+  if(deleteBtn)deleteBtn.style.display=existing?'block':'none';
   _movementPriceInputsDirty=false;
 }
 function linkMovementToPrevious(){
@@ -8948,9 +9051,46 @@ function linkMovementToPrevious(){
 }
 function toggleMovementLeg(i){movementDraftFromInputs();_movementOpenLeg=_movementOpenLeg===i?null:i;renderMovementModalBody();}
 function toggleMovementSchedule(){movementDraftFromInputs();_movementScheduleOpen=true;renderMovementModalBody();}
-function movementLegMenu(i){if(confirm('Supprimer cette étape ?'))removeMovementLeg(i);}
-function addMovementLeg(){movementDraftFromInputs();_movementDraft.legs.push({id:movementUid('leg_'),mode:'Train',line:'',direction:'',from:'',to:'',durationMin:'',stops:'',costJPY:'',instruction:''});_movementOpenLeg=_movementDraft.legs.length-1;renderMovementModalBody();}
-function removeMovementLeg(i){movementDraftFromInputs();_movementDraft.legs.splice(i,1);renderMovementModalBody();}
+function movementLegMenu(i){if(confirm('Supprimer ce segment ?'))removeMovementLeg(i);}
+function addMovementLeg(){
+  movementDraftFromInputs();
+  ensureMovementRouteLegs(_movementDraft);
+  var legs=_movementDraft.legs||[],last=legs.pop(),finalTo=last.to||movementLocationLabel(_movementDraft.destinationRef,_movementDraft.destination);
+  last.to='';
+  var after=movementBlankLeg(last.mode||movementPrimaryMode(_movementDraft),'',finalTo);
+  legs.push(last,after);
+  _movementDraft.legs=legs;
+  _movementOpenLeg=null;
+  renderMovementModalBody();
+}
+function removeMovementCorrespondence(i){
+  movementDraftFromInputs();
+  var legs=_movementDraft.legs||[],left=legs[i],right=legs[i+1];
+  if(!left||!right)return;
+  if(!confirm('Supprimer cette correspondance ?'))return;
+  var merged=JSON.parse(JSON.stringify(left));
+  merged.to=right.to;
+  merged.line=merged.line||right.line||'';
+  merged.direction=merged.direction||right.direction||'';
+  if(right.instruction&&right.instruction!==merged.instruction)merged.instruction=merged.instruction?merged.instruction+' · '+right.instruction:right.instruction;
+  var leftDuration=parseAmt(left.durationMin),rightDuration=parseAmt(right.durationMin);
+  merged.durationMin=(!isNaN(leftDuration)||!isNaN(rightDuration))?(Math.max(0,isNaN(leftDuration)?0:leftDuration)+Math.max(0,isNaN(rightDuration)?0:rightDuration)):'';
+  merged.durationUnit=merged.durationMin>=1440?'day':(merged.durationMin>=60?'hour':'min');
+  var leftCost=parseAmt(left.costJPY),rightCost=parseAmt(right.costJPY);
+  merged.costJPY=(!isNaN(leftCost)||!isNaN(rightCost))?(Math.max(0,isNaN(leftCost)?0:leftCost)+Math.max(0,isNaN(rightCost)?0:rightCost)):'';
+  if(!merged.stops)merged.stops=right.stops||'';
+  legs.splice(i,2,merged);
+  _movementDraft.legs=legs;
+  _movementOpenLeg=null;
+  renderMovementModalBody();
+}
+function removeMovementLeg(i){
+  movementDraftFromInputs();
+  var legs=_movementDraft.legs||[];
+  if(legs.length<=1){_movementDraft.legs=[];renderMovementModalBody();return;}
+  if(i<legs.length-1)removeMovementCorrespondence(i);
+  else removeMovementCorrespondence(i-1);
+}
 function copyMovementToSingleLeg(){
   if(!_movementDraft||(_movementDraft.legs||[]).length!==1)return;
   var totalEl=document.getElementById('mv_costPerPersonDisplay');
@@ -8982,17 +9122,18 @@ async function loadPersistedMovement(id){
 }
 async function saveMovementModal(){
   movementDraftFromInputs();
-  if(!_movementDraft.origin||!_movementDraft.destination){alert('Renseigne le départ et la destination.');return;}
+  if(!_movementDraft.origin||!_movementDraft.destination){alert('Renseigne le lieu de départ et le lieu d’arrivée.');return;}
+  if(!_movementDraft.primaryMode){alert('Choisis le mode principal.');return;}
   var isNewMovement=_movementDraft.source==='manual'&&!movementsForCountry(_movementDraft.countryId).some(function(m){return m.id===_movementDraft.id;});
-  if(isNewMovement&&!(_movementDraft.legs||[]).length){alert('Ajoute au moins une étape au déplacement.');return;}
-  var invalidLegIndex=(_movementDraft.legs||[]).findIndex(function(l){var duration=parseAmt(l.durationMin);return !String(l.from||'').trim()||!String(l.to||'').trim()||isNaN(duration)||duration<=0;});
-  if(isNewMovement&&invalidLegIndex>-1){
-    var invalidLeg=_movementDraft.legs[invalidLegIndex],missingFields=[],invalidDuration=parseAmt(invalidLeg.durationMin);
-    if(!String(invalidLeg.from||'').trim())missingFields.push('le départ');
-    if(!String(invalidLeg.to||'').trim())missingFields.push('l’arrivée');
-    if(isNaN(invalidDuration)||invalidDuration<=0)missingFields.push('la durée');
-    var missingLabel=missingFields.length>1?missingFields.slice(0,-1).join(', ')+' et '+missingFields[missingFields.length-1]:missingFields[0];
-    _movementOpenLeg=invalidLegIndex;renderMovementModalBody();alert('Étape '+(invalidLegIndex+1)+' : renseigne '+missingLabel+'.');return;
+  ensureMovementRouteLegs(_movementDraft);
+  var invalidStop=-1;
+  for(var stopIndex=0;stopIndex<Math.max(0,_movementDraft.legs.length-1);stopIndex++){
+    if(!String(_movementDraft.legs[stopIndex].to||'').trim()||!String(_movementDraft.legs[stopIndex+1].from||'').trim()){invalidStop=stopIndex;break;}
+  }
+  if(invalidStop>-1){
+    renderMovementModalBody();
+    alert('Correspondance '+(invalidStop+1)+' : renseigne le lieu intermédiaire.');
+    return;
   }
   (_movementDraft.legs||[]).forEach(function(l){
     if(l.from&&l.to&&String(l.line||'').trim().toLowerCase()==='à compléter')l.line=String(l.mode||'').toLowerCase()==='marche'?'Trajet à pied':(l.mode||'Étape');
@@ -9026,6 +9167,45 @@ async function deleteMovementPermanently(id,countryId){
   catch(e){console.error('[PlaniTrip] permanent movement delete:',e);alert('Impossible de supprimer définitivement ce déplacement pour le moment.');}
   finally{delete _movementTrashBusy[id];}
 }
+function movementNormalizePlace(value){
+  return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[’']/g,' ').replace(/[^a-z0-9]+/g,' ').trim();
+}
+function movementCityKey(countryId,ref,label){
+  var country=COUNTRIES.find(function(x){return x.id===countryId;});
+  if(!country)return'';
+  var validKeys={};
+  country.cities.forEach(function(city){validKeys[countryId+'_'+city.city]=true;});
+  var refParts=String(ref||'').split(':');
+  if((refParts[0]==='city'||refParts[0]==='accom'||refParts[0]==='address')&&validKeys[refParts[1]])return refParts[1];
+  var normalized=movementNormalizePlace(movementLocationLabel(ref,label)||label);
+  if(!normalized)return'';
+  var exact='';
+  country.cities.some(function(city){
+    var ck=countryId+'_'+city.city;
+    var labels=[city.city,_cityDisplayName(ck,city)];
+    (S.accom&&S.accom[ck]||[]).forEach(function(a){labels.push(a.name||'',a.address||'');});
+    if(labels.some(function(item){return item&&movementNormalizePlace(item)===normalized;})){exact=ck;return true;}
+    return false;
+  });
+  if(exact)return exact;
+  var contained='';
+  country.cities.some(function(city){
+    var ck=countryId+'_'+city.city,cityNames=[city.city,_cityDisplayName(ck,city)];
+    if(cityNames.some(function(name){var n=movementNormalizePlace(name);return n.length>=3&&(normalized===n||normalized.indexOf(n+' ')===0||normalized.indexOf(' '+n+' ')>-1||normalized.endsWith(' '+n));})){contained=ck;return true;}
+    return false;
+  });
+  return contained;
+}
+function renderCityMovementLink(m,countryId){
+  var meta=[movementPrimaryMode(m)];
+  if(m.date){var date=new Date(m.date+'T00:00:00');if(!isNaN(date))meta.push(date.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}));}
+  if(m.departureTime||m.arrivalTime)meta.push((m.departureTime||'—')+' → '+(m.arrivalTime||'—'));
+  if(m.durationMin)meta.push(movementFormatDuration(m.durationMin,m));
+  if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null)meta.push(movementFormatCost(m.costPerPersonJPY,m,true));
+  if(m.status==='booked')meta.push('Réservé');
+  var origin=movementLocationLabel(m.originRef,m.origin)||'Départ',destination=movementLocationLabel(m.destinationRef,m.destination)||'Arrivée';
+  return '<button type="button" class="city-movement-link" onclick="openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')" aria-label="Modifier le déplacement '+escHtml(origin)+' vers '+escHtml(destination)+'"><span class="city-movement-icon">'+movementModeIcon(movementPrimaryMode(m))+'</span><span class="city-movement-copy"><span class="city-movement-route">'+escHtml(origin)+' → '+escHtml(destination)+'</span><span class="city-movement-meta">'+escHtml(meta.join(' · '))+'</span></span><span data-icon="chevron-right" data-icon-size="15" style="color:var(--ink-subtle)"></span></button>';
+}
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
   var tripStarted = _depart ? (new Date() >= _depart) : false;
@@ -9040,7 +9220,9 @@ function renderItinerary(c, embedded){
   },0);
 
   const cityOrder=getCityOrder(c.id);
-  const citiesHTML=cityOrder.map(function(cityIdx){
+  const inlineMovementList=movementsForCountry(c.id).filter(function(m){return m.scope!=='intercountry';});
+  const placedMovementIds=[];
+  const citiesHTML=cityOrder.map(function(cityIdx,cityOrderIndex){
     const city=c.cities[cityIdx];
     const ck=c.id+'_'+city.city;
 
@@ -9057,12 +9239,21 @@ function renderItinerary(c, embedded){
       : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+', '+getEnglishCountryName(c.name);
 
-    return '<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
+    var cityCardHTML='<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-kind="city" data-img-query="'+escHtml(imgQuery)+'"></div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div><div class="cc-sub" style="margin-top:2px">'+cityTotal+' activités</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div>';
+    if(cityOrderIndex<cityOrder.length-1){
+      var nextCity=c.cities[cityOrder[cityOrderIndex+1]],nextCk=c.id+'_'+nextCity.city;
+      inlineMovementList.forEach(function(m){
+        if(placedMovementIds.indexOf(m.id)>-1)return;
+        var fromCk=movementCityKey(c.id,m.originRef,m.origin),toCk=movementCityKey(c.id,m.destinationRef,m.destination);
+        if(fromCk===ck&&toCk===nextCk){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);}
+      });
+    }
+    return cityCardHTML;
   }).join('');
 
   const alertsHTML=c.alerts.map(function(a){
@@ -9130,7 +9321,6 @@ function renderItinerary(c, embedded){
     +'<div class="cover-pills"><span class="cover-pill">'+_liveDays+' jours</span><span class="cover-pill">'+doneActs+'/'+allBaseActs+' activités</span><span class="cover-pill">'+fmtEUR(c.budget_daily)+'/jour</span></div></div></div>';
   return cdHTML+coverHTML
     +weatherSection
-    +renderMovementsSection(c.id)
     +'<div class="section"><div class="section-header"><div class="section-title">Programme</div><div class="section-meta">'+doneActs+'/'+allBaseActs+' faits</div></div>'
     +'<div id="lieux-ai-gen-'+c.id+'" style="margin-bottom:14px">'
     +(aiHasActiveKey()
@@ -9157,9 +9347,10 @@ function renderItinerary(c, embedded){
     )
     +'</div>'
     +'<div class="country-card-list">'+citiesHTML+'</div>'
-    +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une étape</button>'
+    +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une ville</button>'
     +cityTrashButtonHTML(c.id)
-    +'</div>';
+    +'</div>'
+    +renderMovementsSection(c.id,placedMovementIds);
 }
 function cityTrashButtonHTML(countryId){
   var count = (S.cityTrash||[]).filter(function(t){return t.countryId===countryId;}).length;
@@ -10016,7 +10207,7 @@ function intercountryCountryDateLabel(country){
 }
 function renderIntercountryConnection(fromCountry,toCountry,index,flight,movement){
   var key=fromCountry.id+'__'+toCountry.id,open=!!(S.intercountryOpen&&S.intercountryOpen[key]);
-  if(movement){var movementMode=movement.primaryMode||((movement.legs||[])[0]&&movement.legs[0].mode)||'Autre',movementSummary=[];if(movement.date)movementSummary.push(new Date(movement.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}));var _mvDurSum=(movement.legs||[]).reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);var _mvDurDisplay=_mvDurSum>0?_mvDurSum:movement.durationMin;if(_mvDurDisplay)movementSummary.push(movementFormatDuration(_mvDurDisplay,movement));if(movement.costPerPersonJPY!==''&&movement.costPerPersonJPY!=null)movementSummary.push(movementFormatCost(movement.costPerPersonJPY,movement,true));var movementComplete=movementMissingCount(movement)===0&&movement.durationMin;
+  if(movement){var movementMode=movement.primaryMode||((movement.legs||[])[0]&&movement.legs[0].mode)||'Autre',movementSummary=[];if(movement.date)movementSummary.push(new Date(movement.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}));var _mvDurSum=(movement.legs||[]).reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);var _mvDurDisplay=_mvDurSum>0?_mvDurSum:movement.durationMin;if(_mvDurDisplay)movementSummary.push(movementFormatDuration(_mvDurDisplay,movement));if(movement.costPerPersonJPY!==''&&movement.costPerPersonJPY!=null)movementSummary.push(movementFormatCost(movement.costPerPersonJPY,movement,true));var movementComplete=movementMissingCount(movement)===0&&!!movement.origin&&!!movement.destination;
     var _mvLegs=movement.legs||[];var _mvLegsHtml=_mvLegs.map(function(l,i){var _legMeta=[];if(l.durationMin)_legMeta.push(movementFormatDuration(l.durationMin,movement));if(l.line&&l.line!=='À compléter')_legMeta.push(escHtml(l.line));var _incomplete=!l.mode||l.mode==='À compléter'||l.line==='À compléter';var _legMeta2=_legMeta.length?'<div class="cc-leg-meta">'+_legMeta.join(' · ')+'</div>':'';return '<div class="cc-leg-row'+(_incomplete?' incomplete':'')+'"><span class="cc-leg-icon">'+movementModeIcon(l.mode)+'</span><div class="cc-leg-body"><div class="cc-leg-title">'+escHtml(_incomplete?'Étape à compléter':(l.from&&l.to?l.from+' → '+l.to:l.mode||'Étape'))+'</div>'+_legMeta2+'</div></div>';}).join('');var movementDetail=open?'<div class="country-connection-detail">'+(_mvLegsHtml?_mvLegsHtml:'<div style="font-size:11px;color:var(--ink-muted)">Aucune étape renseignée</div>')+'<div class="country-connection-actions"><button class="country-connection-action" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(movement.id)+'\',\''+jsStrEsc(movement.countryId)+'\')">Modifier</button><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')">Changer le mode</button></div></div>':'';
     return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon(intercountryModeIconName(movementMode),14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(movementComplete?'':' missing')+'">'+escHtml(movementMode)+(movementComplete?'':' · À compléter')+'</span><span>'+escHtml(movementSummary.join(' · ')||'Informations à compléter')+'</span></div>'+movementDetail+'</div></div>';}
   if(!flight)return '<div class="country-connection"><div class="country-connection-card" onclick="openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')"><span class="country-connection-icon missing">'+svgIcon('route',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span>'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status missing">À renseigner</span><span>Choisir le mode de transport</span></div></div></div>';
