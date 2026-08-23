@@ -8596,10 +8596,21 @@ function closeCityDetailAndFallback(){
   if(!c) return renderCountriesScreen();
   return renderCountryDetailShell(c, renderItinerary(c, true));
 }
+// Un id de pays personnalisé (ex: "ital_1956951941") contient lui-même un underscore —
+// ck.split('_')[0] le tronque à tort ("ital" au lieu de "ital_1956951941"). On retrouve
+// donc le pays par correspondance avec les ids réels de COUNTRIES (id le plus long qui
+// préfixe ck), et seulement à défaut on retombe sur le split naïf (compat pays intégrés
+// type "jp_Osaka", dont l'id ne contient jamais d'underscore).
+function countryIdFromCityKey(ck){
+  if(!ck) return '';
+  var match = COUNTRIES.filter(function(co){ return ck.indexOf(co.id+'_')===0; })
+    .sort(function(a,b){ return b.id.length-a.id.length; })[0];
+  return match ? match.id : ck.split('_')[0];
+}
 function renderCityDetailScreen(){
   var ck = S.currentCityKey;
   if(!ck) { return closeCityDetailAndFallback(); }
-  var countryId = ck.split('_')[0];
+  var countryId = countryIdFromCityKey(ck);
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) { return closeCityDetailAndFallback(); }
   var city = c.cities.find(function(ci){return c.id+'_'+ci.city===ck;});
@@ -9927,7 +9938,7 @@ function getCityStartDayInCountry(countryId, cityName){
 function getRenderedActivityDate(actKey, cityKey){
   if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
   var ck = cityKey || actKey.replace(/_c?\d+$/,'');
-  var countryId = ck.split('_')[0];
+  var countryId = countryIdFromCityKey(ck);
   var cityName = ck.slice(countryId.length+1);
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
   if(!c) return null;
