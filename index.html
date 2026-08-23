@@ -1343,7 +1343,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <button class="nav-btn" onclick="setTab('countries')" id="tab-countries"><span class="nav-icon icon" id="ni-countries"></span><span class="nav-lbl">Pays</span></button>
     <button class="nav-btn" onclick="setTab('feed')" id="tab-feed"><span style="position:relative;display:inline-flex"><span class="nav-icon icon" id="ni-feed"></span><span id="feed-badge-dot" style="display:none;position:absolute;top:-2px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--red-muted);border:1.5px solid var(--parchment)"></span></span><span class="nav-lbl">Fil</span></button>
     <button class="nav-btn" onclick="setTab('budget')" id="tab-budget"><span class="nav-icon icon" id="ni-budget"></span><span class="nav-lbl">Budget</span></button>
-    <button class="nav-btn" onclick="setTab('more')" id="tab-more"><span class="nav-icon icon" id="ni-more"></span><span class="nav-lbl">Plus</span></button>
+    <button class="nav-btn" onclick="setTab('more')" id="tab-more"><span style="position:relative;display:inline-flex"><span class="nav-icon icon" id="ni-more"></span><span id="more-badge-dot" style="display:none;position:absolute;top:-2px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--red-muted);border:1.5px solid var(--parchment)"></span></span><span class="nav-lbl">Plus</span></button>
   </nav>
 </div>
 
@@ -1444,7 +1444,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-23·sha:activity-add-discovery-v1';
+var APP_BUILD = '2026-08-23·sha:pending-invite-badge-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -11819,6 +11819,45 @@ function hasFeedNotification(){
   if(result) console.log('[PlaniTrip diag] hasFeedNotification=true, S.feedLastSeenAt=', S.feedLastSeenAt, '- nb posts total=', (S.feedPosts||[]).length);
   return result;
 }
+// ── Voyages visités (pour détecter les invitations jamais ouvertes) ────
+function getVisitedTripIds(){
+  try{ return JSON.parse(localStorage.getItem('planitrip_visited_trips')||'[]'); }
+  catch(e){ return []; }
+}
+function markTripVisited(tripId){
+  if(!tripId) return;
+  try{
+    var ids = getVisitedTripIds();
+    if(ids.indexOf(tripId)===-1){
+      ids.push(tripId);
+      localStorage.setItem('planitrip_visited_trips', JSON.stringify(ids));
+    }
+  }catch(e){}
+}
+// Nombre de voyages où je suis collaborateur (pas propriétaire) et jamais ouverts —
+// considérés comme des invitations pas encore découvertes.
+var PENDING_INVITE_COUNT = 0;
+async function refreshPendingInviteBadge(){
+  if(!sb || !CURRENT_USER) return;
+  try{
+    var { data: collabRows } = await sb.from('collaborators')
+      .select('trip_id')
+      .eq('user_id', CURRENT_USER.id);
+    var visited = getVisitedTripIds();
+    var tripIds = (collabRows||[]).map(function(r){return r.trip_id;});
+    PENDING_INVITE_COUNT = tripIds.filter(function(id){return visited.indexOf(id)===-1;}).length;
+  }catch(e){ console.warn('[PlaniTrip] refreshPendingInviteBadge:', e); return; }
+  updatePendingInviteBadgeUI();
+}
+function updatePendingInviteBadgeUI(){
+  var dot = document.getElementById('more-badge-dot');
+  if(dot) dot.style.display = PENDING_INVITE_COUNT>0 ? 'block' : 'none';
+  var countEl = document.getElementById('changer-voyage-badge');
+  if(countEl){
+    if(PENDING_INVITE_COUNT>0){ countEl.textContent = String(PENDING_INVITE_COUNT); countEl.style.display='inline-flex'; }
+    else { countEl.style.display='none'; }
+  }
+}
 function updateFeedBadge(){
   var dot = document.getElementById('feed-badge-dot');
   if(!dot) return;
@@ -12393,7 +12432,7 @@ function renderMore(){
     +'<div class="more-row" onclick="showAccessManagementScreen()"><span class="more-row-icon" data-icon="users" data-icon-size="19"></span><span class="more-row-label">Voyageurs</span><span style="font-size:12px;color:var(--ink-muted);margin-right:4px">'+(1+CURRENT_COLLABORATORS.length)+'</span><span class="more-row-chevron">›</span></div>'
     +'<div class="more-row" onclick="showManageCountriesScreen()"><span class="more-row-icon" data-icon="globe" data-icon-size="19"></span><span class="more-row-label">Gérer les pays</span><span class="more-row-chevron">›</span></div>'
     +(isTripOwner()?'<div class="more-row" onclick="showManageTripScreen()"><span class="more-row-icon" data-icon="settings" data-icon-size="19"></span><span class="more-row-label">Gérer le voyage</span><span class="more-row-chevron">›</span></div>':'')
-    +'<div class="more-row" onclick="backToTripSelector()"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span class="more-row-chevron">›</span></div>'
+    +'<div class="more-row" onclick="backToTripSelector()"><span class="more-row-icon" data-icon="repeat" data-icon-size="19"></span><span class="more-row-label">Changer de voyage</span><span id="changer-voyage-badge" style="display:'+(PENDING_INVITE_COUNT>0?'inline-flex':'none')+';align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red-muted);color:#fff;font-size:11px;font-weight:700;margin-right:6px">'+(PENDING_INVITE_COUNT>0?PENDING_INVITE_COUNT:'')+'</span><span class="more-row-chevron">›</span></div>'
     +'</div>'
     +'<div class="info-card" style="padding:14px 16px;margin-top:4px">'
     +'<div style="font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Diagnostic</div>'
@@ -16394,6 +16433,8 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   await loadProfiles();
   loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
   _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
+  markTripVisited(trip.id);
+  refreshPendingInviteBadge(); // fire-and-forget — ne bloque pas le rendu
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
   if(!skipAutofillDates) autofillMissingCountryDates();
@@ -16474,6 +16515,7 @@ function showTripSelectorScreen(trips) {
   const list = document.getElementById('ts-trip-list');
   list.innerHTML = '';
 
+  var _visitedIds = getVisitedTripIds();
   function buildItem(t, canRename) {
     const item = document.createElement('div');
     item.className = 'ts-trip-item';
@@ -16486,6 +16528,13 @@ function showTripSelectorScreen(trips) {
     nameSpan.style.textOverflow = 'ellipsis';
     nameSpan.style.whiteSpace = 'nowrap';
     item.appendChild(nameSpan);
+
+    if(t.owner_id !== CURRENT_USER.id && _visitedIds.indexOf(t.id)===-1){
+      const badge = document.createElement('span');
+      badge.textContent = 'Nouveau';
+      badge.style.cssText = 'font-size:10px;font-weight:700;color:#fff;background:var(--red-muted);border-radius:8px;padding:2px 7px;margin-left:8px;flex-shrink:0;letter-spacing:0.02em;';
+      item.appendChild(badge);
+    }
 
     const arrow = document.createElement('span');
     arrow.className = 'ts-arrow';
