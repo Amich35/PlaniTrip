@@ -794,8 +794,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .mv-option-label{color:var(--ink-subtle);font-weight:500;}
 .mv-option-body{padding-top:10px;}
 .mv-stops-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
-.mv-stop-row{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) auto;gap:7px;align-items:end;padding:9px;border-radius:var(--r12);background:var(--sand);}
-.mv-stop-remove{width:34px;height:34px;border:none;border-radius:10px;background:transparent;color:var(--red-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.mv-stop-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:10px;border-radius:var(--r12);background:var(--sand);}
+.mv-stop-place{grid-column:1;min-width:0;}
+.mv-stop-remove{grid-column:2;width:34px;height:34px;align-self:end;border:none;border-radius:10px;background:transparent;color:var(--red-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.mv-stop-times{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}
+.mv-stop-wait{grid-column:1/-1;min-height:16px;margin-top:-2px;font-size:10.5px;line-height:1.35;color:var(--accent);}
+.mv-stop-mode{grid-column:1/-1;}
 .mv-technical-details{margin-top:9px;padding-top:8px;border-top:1px dashed rgba(100,70,30,.14);}
 .mv-technical-details>summary{list-style:none;color:var(--ink-muted);font-size:11px;font-weight:650;cursor:pointer;display:flex;align-items:center;gap:5px;}
 .mv-technical-details>summary::-webkit-details-marker{display:none;}
@@ -806,9 +810,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .city-movement-route{display:block;max-width:100%;font-size:12.5px;font-weight:700;line-height:1.25;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .city-movement-meta{display:flex;align-items:center;flex-wrap:wrap;gap:1px 5px;max-width:100%;font-size:10.5px;line-height:1.35;color:var(--ink-muted);}
 .city-movement-meta-sep{color:var(--ink-subtle);}
-.city-movement-stops{display:block;max-width:100%;font-size:10.5px;line-height:1.3;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.city-movement-stops{display:flex;flex-direction:column;gap:2px;max-width:100%;font-size:10.5px;line-height:1.35;color:var(--accent);}
+.city-movement-stop{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere;}
+.city-movement-stop-time{display:block;margin-top:1px;color:var(--ink-muted);}
 .city-movement-chevron{flex:0 0 auto;align-self:center;color:var(--ink-subtle);}
-@media(max-width:370px){.mv-summary{grid-template-columns:1fr 1fr}.mv-summary> :first-child{grid-column:1/-1}.mv-schedule{grid-template-columns:1fr 1fr}.mv-schedule> :first-child{grid-column:1/-1}.mv-leg-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mv-span-2,.mv-span-3{grid-column:span 1}.mv-span-6{grid-column:1/-1}.mv-stop-row{grid-template-columns:1fr 1fr}.mv-stop-remove{grid-column:2;justify-self:end}}
+@media(max-width:370px){.mv-summary{grid-template-columns:1fr 1fr}.mv-summary> :first-child{grid-column:1/-1}.mv-schedule{grid-template-columns:1fr 1fr}.mv-schedule> :first-child{grid-column:1/-1}.mv-leg-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mv-span-2,.mv-span-3{grid-column:span 1}.mv-span-6{grid-column:1/-1}}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1438,7 +1444,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-23·sha:movement-preview-v2';
+var APP_BUILD = '2026-08-23·sha:movement-connection-times-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8679,7 +8685,7 @@ function movementPrimaryMode(m){
   return (m&&m.primaryMode)||((m&&m.legs&&m.legs[0]&&m.legs[0].mode)||'Train');
 }
 function movementBlankLeg(mode,from,to){
-  return {id:movementUid('leg_'),mode:mode||'Train',line:'',direction:'',from:from||'',to:to||'',durationMin:'',durationUnit:'min',stops:'',costJPY:'',instruction:''};
+  return {id:movementUid('leg_'),mode:mode||'Train',line:'',direction:'',from:from||'',to:to||'',departureTime:'',arrivalTime:'',durationMin:'',durationUnit:'min',stops:'',costJPY:'',instruction:''};
 }
 function ensureMovementRouteLegs(m){
   if(!m)return;
@@ -8687,12 +8693,17 @@ function ensureMovementRouteLegs(m){
   var from=movementLocationLabel(m.originRef,m.origin),to=movementLocationLabel(m.destinationRef,m.destination),mode=movementPrimaryMode(m);
   m.primaryMode=mode;
   if(!m.legs.length){
-    m.legs=[movementBlankLeg(mode,from,to)];
+    var directLeg=movementBlankLeg(mode,from,to);
+    directLeg.departureTime=m.departureTime||'';
+    directLeg.arrivalTime=m.arrivalTime||'';
+    m.legs=[directLeg];
     return;
   }
   m.legs[0].mode=mode;
   m.legs[0].from=from;
   m.legs[m.legs.length-1].to=to;
+  if(m.departureTime&&!m.legs[0].departureTime)m.legs[0].departureTime=m.departureTime;
+  if(m.arrivalTime&&!m.legs[m.legs.length-1].arrivalTime)m.legs[m.legs.length-1].arrivalTime=m.arrivalTime;
   for(var i=1;i<m.legs.length;i++){
     if(!m.legs[i].from&&m.legs[i-1].to)m.legs[i].from=m.legs[i-1].to;
     if(!m.legs[i-1].to&&m.legs[i].from)m.legs[i-1].to=m.legs[i].from;
@@ -8925,13 +8936,18 @@ function movementDraftFromInputs(skipPrices){
   var legs=_movementDraft.legs||[];
   for(var stopIndex=0;stopIndex<Math.max(0,legs.length-1);stopIndex++){
     var stopEl=document.getElementById('mvs_'+stopIndex+'_place'),modeAfterEl=document.getElementById('mvs_'+stopIndex+'_modeAfter');
+    var stopArrivalEl=document.getElementById('mvs_'+stopIndex+'_arrivalTime'),stopDepartureEl=document.getElementById('mvs_'+stopIndex+'_departureTime');
     if(stopEl){legs[stopIndex].to=stopEl.value;legs[stopIndex+1].from=stopEl.value;}
+    if(stopArrivalEl)legs[stopIndex].arrivalTime=stopArrivalEl.value||'';
+    if(stopDepartureEl)legs[stopIndex+1].departureTime=stopDepartureEl.value||'';
     if(modeAfterEl)legs[stopIndex+1].mode=modeAfterEl.value;
   }
   if(legs.length){
     legs[0].mode=_movementDraft.primaryMode||movementPrimaryMode(_movementDraft);
     legs[0].from=movementLocationLabel(_movementDraft.originRef,_movementDraft.origin);
     legs[legs.length-1].to=movementLocationLabel(_movementDraft.destinationRef,_movementDraft.destination);
+    if(document.getElementById('mv_departureTime'))legs[0].departureTime=_movementDraft.departureTime||'';
+    if(document.getElementById('mv_arrivalTime'))legs[legs.length-1].arrivalTime=_movementDraft.arrivalTime||'';
   }
   var totalEl=document.getElementById('mv_costPerPersonDisplay');
   if(!skipPrices&&totalEl)_movementDraft.costPerPersonJPY=movementDisplayToLocal(totalEl.value,_movementDraft);
@@ -8981,6 +8997,25 @@ function updateMovementScheduleField(field,value){
   _movementDraft[field]=value||'';
   if(field==='departureTime'||field==='arrivalTime')updateMovementDurationFromTimes();
 }
+function movementWaitMinutes(arrivalTime,departureTime){
+  var arrival=String(arrivalTime||'').split(':'),departure=String(departureTime||'').split(':');
+  if(arrival.length<2||departure.length<2)return'';
+  var arrivalMinutes=Number(arrival[0])*60+Number(arrival[1]),departureMinutes=Number(departure[0])*60+Number(departure[1]);
+  if(!isFinite(arrivalMinutes)||!isFinite(departureMinutes))return'';
+  var wait=departureMinutes-arrivalMinutes;
+  if(wait<0)wait+=24*60;
+  return wait;
+}
+function movementWaitText(arrivalTime,departureTime){
+  var wait=movementWaitMinutes(arrivalTime,departureTime);
+  return wait===''?'':movementFormatDuration(wait,{durationMin:wait,durationUnit:wait>=1440?'day':(wait>=60?'hour':'min')})+' d’attente';
+}
+function updateMovementStopWait(i){
+  var arrivalEl=document.getElementById('mvs_'+i+'_arrivalTime'),departureEl=document.getElementById('mvs_'+i+'_departureTime'),waitEl=document.getElementById('mvs_'+i+'_wait');
+  if(!waitEl)return;
+  var waitText=movementWaitText(arrivalEl&&arrivalEl.value,departureEl&&departureEl.value);
+  waitEl.textContent=waitText?'Attente calculée : '+waitText:'Attente calculée automatiquement';
+}
 function updateMovementDurationFromTimes(){
   if(!_movementDraft||!_movementDraft.departureTime||!_movementDraft.arrivalTime)return;
   var departure=String(_movementDraft.departureTime).split(':'),arrival=String(_movementDraft.arrivalTime).split(':');
@@ -9007,11 +9042,14 @@ function renderMovementModalBody(){
   var existing=movementsForCountry(m.countryId).some(function(x){return x.id===m.id;});
   var localCurrency=movementCurrencyInfo(m.countryId).symbol;
   var stops=(m.legs||[]).slice(0,-1).map(function(l,i){
-    var stop=l.to||(m.legs[i+1]&&m.legs[i+1].from)||'';
-    var nextMode=(m.legs[i+1]&&m.legs[i+1].mode)||movementPrimaryMode(m);
-    return '<div class="mv-stop-row"><label class="mv-field"><span class="mv-field-label">Lieu de correspondance</span><input class="ef-input" id="mvs_'+i+'_place" value="'+escHtml(stop)+'" placeholder="Gare, aéroport, arrêt…"></label>'
-      +'<label class="mv-field"><span class="mv-field-label">Puis en</span><select class="ef-select" id="mvs_'+i+'_modeAfter">'+movementModeOptions(nextMode)+'</select></label>'
-      +'<button type="button" class="mv-stop-remove" onclick="removeMovementCorrespondence('+i+')" aria-label="Supprimer cette correspondance">'+svgIcon('trash-2',15)+'</button></div>';
+    var nextLeg=m.legs[i+1]||{},stop=l.to||nextLeg.from||'',nextMode=nextLeg.mode||movementPrimaryMode(m);
+    var stopArrival=l.arrivalTime||'',stopDeparture=nextLeg.departureTime||'',waitText=movementWaitText(stopArrival,stopDeparture);
+    return '<div class="mv-stop-row"><label class="mv-field mv-stop-place"><span class="mv-field-label">Lieu de correspondance</span><input class="ef-input" id="mvs_'+i+'_place" value="'+escHtml(stop)+'" placeholder="Gare, aéroport, arrêt…"></label>'
+      +'<button type="button" class="mv-stop-remove" onclick="removeMovementCorrespondence('+i+')" aria-label="Supprimer cette correspondance">'+svgIcon('trash-2',15)+'</button>'
+      +'<div class="mv-stop-times"><label class="mv-field"><span class="mv-field-label">Arrivée à l’étape</span><input class="ef-input" id="mvs_'+i+'_arrivalTime" type="time" value="'+escHtml(stopArrival)+'" oninput="updateMovementStopWait('+i+')" onchange="updateMovementStopWait('+i+')"></label>'
+      +'<label class="mv-field"><span class="mv-field-label">Départ de l’étape</span><input class="ef-input" id="mvs_'+i+'_departureTime" type="time" value="'+escHtml(stopDeparture)+'" oninput="updateMovementStopWait('+i+')" onchange="updateMovementStopWait('+i+')"></label></div>'
+      +'<div class="mv-stop-wait" id="mvs_'+i+'_wait" aria-live="polite">'+escHtml(waitText?'Attente calculée : '+waitText:'Attente calculée automatiquement')+'</div>'
+      +'<label class="mv-field mv-stop-mode"><span class="mv-field-label">Mode après la correspondance</span><select class="ef-select" id="mvs_'+i+'_modeAfter">'+movementModeOptions(nextMode)+'</select></label></div>';
   }).join('');
   var technicalLegs=(m.legs||[]).length?'<details class="mv-technical-details"><summary><span aria-hidden="true">›</span> Détails de chaque segment (optionnel)</summary><div class="mv-timeline">'+(m.legs||[]).map(function(l,i){
     var open=_movementOpenLeg===i,legMeta=[];
@@ -9059,8 +9097,11 @@ function addMovementLeg(){
   movementDraftFromInputs();
   ensureMovementRouteLegs(_movementDraft);
   var legs=_movementDraft.legs||[],last=legs.pop(),finalTo=last.to||movementLocationLabel(_movementDraft.destinationRef,_movementDraft.destination);
+  var finalArrival=last.arrivalTime||_movementDraft.arrivalTime||'';
   last.to='';
+  last.arrivalTime='';
   var after=movementBlankLeg(last.mode||movementPrimaryMode(_movementDraft),'',finalTo);
+  after.arrivalTime=finalArrival;
   legs.push(last,after);
   _movementDraft.legs=legs;
   _movementOpenLeg=null;
@@ -9073,6 +9114,7 @@ function removeMovementCorrespondence(i){
   if(!confirm('Supprimer cette correspondance ?'))return;
   var merged=JSON.parse(JSON.stringify(left));
   merged.to=right.to;
+  merged.arrivalTime=right.arrivalTime||merged.arrivalTime||'';
   merged.line=merged.line||right.line||'';
   merged.direction=merged.direction||right.direction||'';
   if(right.instruction&&right.instruction!==merged.instruction)merged.instruction=merged.instruction?merged.instruction+' · '+right.instruction:right.instruction;
@@ -9103,8 +9145,10 @@ function copyMovementToSingleLeg(){
   if(hasData&&!confirm('Remplacer les informations déjà saisies dans cette étape ?'))return;
   leg.from=movementLocationLabel(_movementDraft.originRef,_movementDraft.origin);
   leg.to=movementLocationLabel(_movementDraft.destinationRef,_movementDraft.destination);
+  leg.departureTime=_movementDraft.departureTime||'';
+  leg.arrivalTime=_movementDraft.arrivalTime||'';
   leg.durationMin=_movementDraft.durationMin;
-  leg.durationUnit=_movementDraft.durationMin>=60?'hour':'min';
+  leg.durationUnit=_movementDraft.durationMin>=1440?'day':(_movementDraft.durationMin>=60?'hour':'min');
   leg.costJPY=_movementDraft.costPerPersonJPY;
   _movementOpenLeg=0;
   renderMovementModalBody();
@@ -9207,19 +9251,24 @@ function renderCityMovementLink(m,countryId){
   var cost=parseAmt(m.costPerPersonJPY);
   if(!isNaN(cost)&&cost>0)meta.push(movementFormatCost(m.costPerPersonJPY,m,true));
   if(m.status==='booked')meta.push('Réservé');
-  var stops=[];
+  var stopDetails=[];
   (m.legs||[]).slice(0,-1).forEach(function(leg,i){
-    var stop=String(leg.to||((m.legs||[])[i+1]&&m.legs[i+1].from)||'').trim();
-    if(stop&&stops.indexOf(stop)<0)stops.push(stop);
+    var nextLeg=(m.legs||[])[i+1]||{},place=String(leg.to||nextLeg.from||'').trim();
+    if(!place)return;
+    var timing=[];
+    if(leg.arrivalTime)timing.push('Arr. '+leg.arrivalTime);
+    if(nextLeg.departureTime)timing.push('Dép. '+nextLeg.departureTime);
+    var waitText=movementWaitText(leg.arrivalTime,nextLeg.departureTime);
+    if(waitText)timing.push(waitText);
+    stopDetails.push({place:place,timing:timing});
   });
-  var stopsLabel='';
-  if(stops.length){
-    stopsLabel=(stops.length===1?'Correspondance':'Correspondances')+' · '+stops.slice(0,2).join(' → ');
-    if(stops.length>2)stopsLabel+=' · +'+(stops.length-2);
-  }
+  var stopsHTML=stopDetails.slice(0,2).map(function(stop){
+    return '<span class="city-movement-stop"><span>Correspondance · '+escHtml(stop.place)+'</span>'+(stop.timing.length?'<span class="city-movement-stop-time">'+escHtml(stop.timing.join(' · '))+'</span>':'')+'</span>';
+  }).join('');
+  if(stopDetails.length>2)stopsHTML+='<span class="city-movement-stop">+'+(stopDetails.length-2)+' autre'+(stopDetails.length-2>1?'s':'')+' correspondance'+(stopDetails.length-2>1?'s':'')+'</span>';
   var metaHTML=meta.map(function(item,i){return(i?'<span class="city-movement-meta-sep" aria-hidden="true">·</span>':'')+'<span>'+escHtml(item)+'</span>';}).join('');
   var origin=movementLocationLabel(m.originRef,m.origin)||'Départ',destination=movementLocationLabel(m.destinationRef,m.destination)||'Arrivée';
-  return '<button type="button" class="city-movement-link" onclick="openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')" aria-label="Modifier le déplacement '+escHtml(origin)+' vers '+escHtml(destination)+'"><span class="city-movement-icon">'+movementModeIcon(movementPrimaryMode(m))+'</span><span class="city-movement-copy"><span class="city-movement-route">'+escHtml(origin)+' → '+escHtml(destination)+'</span><span class="city-movement-meta">'+metaHTML+'</span>'+(stopsLabel?'<span class="city-movement-stops">'+escHtml(stopsLabel)+'</span>':'')+'</span><span class="city-movement-chevron" data-icon="chevron-right" data-icon-size="15"></span></button>';
+  return '<button type="button" class="city-movement-link" onclick="openMovementModal(\''+jsStrEsc(m.id)+'\',\''+jsStrEsc(countryId)+'\')" aria-label="Modifier le déplacement '+escHtml(origin)+' vers '+escHtml(destination)+'"><span class="city-movement-icon">'+movementModeIcon(movementPrimaryMode(m))+'</span><span class="city-movement-copy"><span class="city-movement-route">'+escHtml(origin)+' → '+escHtml(destination)+'</span><span class="city-movement-meta">'+metaHTML+'</span>'+(stopsHTML?'<span class="city-movement-stops">'+stopsHTML+'</span>':'')+'</span><span class="city-movement-chevron" data-icon="chevron-right" data-icon-size="15"></span></button>';
 }
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
