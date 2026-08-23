@@ -1414,7 +1414,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-23·sha:currency-symbols-v5';
+var APP_BUILD = '2026-08-23·sha:payer-identity-dedupe-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10616,36 +10616,41 @@ function setMyCountryBudget(countryId, amount){
 function getPeopleList(){
   var seen = {};
   var people = [];
-  // 1. L'utilisateur courant en premier — identité = email (stable, jamais le pseudo)
-  var myEmail = (CURRENT_USER && CURRENT_USER.email) || 'Moi';
-  seen[myEmail] = true; people.push(myEmail);
-  // 2. Les collaborateurs connus, par email
-  (CURRENT_COLLABORATORS||[]).forEach(function(c){
-    if(c.invited_email && !seen[c.invited_email]){ seen[c.invited_email]=true; people.push(c.invited_email); }
-  });
-  // 3. Propriétaire du voyage (toujours inclus — même sans dépenses)
-  var ownerE = CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label);
-  if(ownerE && !seen[ownerE]){ seen[ownerE]=true; people.push(ownerE); }
-  // 4. Payeurs, participants et splits présents dans les dépenses mais absents de la liste ci-dessus.
-  //    canonicalPerson() fusionne automatiquement un ancien pseudo brut avec l'email réel connu.
-  (S.expenses||[]).forEach(function(e){
-    var payer = canonicalPerson(e.personLabel || e.person);
-    if(payer && !seen[payer]){ seen[payer]=true; people.push(payer); }
-    (e.participants||[]).forEach(function(p){ p=canonicalPerson(p); if(p && !seen[p]){ seen[p]=true; people.push(p); } });
-    if(e.splits && typeof e.splits==='object'){
-      Object.keys(e.splits).forEach(function(p){ var cp=canonicalPerson(p); if(cp && !seen[cp]){ seen[cp]=true; people.push(cp); } });
+  function addPerson(identity){
+    var canonical = canonicalPerson(identity);
+    if(canonical && !seen[canonical]){
+      seen[canonical] = true;
+      people.push(canonical);
     }
+  }
+  // 1. L'utilisateur courant en premier — identité = email (stable, jamais le pseudo)
+  addPerson((CURRENT_USER && CURRENT_USER.email) || 'Moi');
+  // 2. Les collaborateurs connus, par email
+  (CURRENT_COLLABORATORS||[]).forEach(function(c){ addPerson(c.invited_email); });
+  // 3. Propriétaire du voyage (toujours inclus — même sans dépenses)
+  addPerson(CURRENT_TRIP && (CURRENT_TRIP.owner_email || CURRENT_TRIP.owner_label));
+  // 4. Payeurs, participants et splits historiques, dédupliqués sur leur identité canonique.
+  (S.expenses||[]).forEach(function(e){
+    addPerson(e.personLabel || e.person);
+    (e.participants||[]).forEach(addPerson);
+    if(e.splits && typeof e.splits==='object') Object.keys(e.splits).forEach(addPerson);
   });
   return people;
 }
 function getExpensePersonOptions(){
   var people = getPeopleList().slice();
-  // En édition, conserver le payeur enregistré même s'il n'est plus dans la liste courante.
-  // Cela évite de le remplacer silencieusement par le premier voyageur.
+  // Un ancien pseudo connu est ramené vers son email canonique : une seule ligne visible.
   if(S.expPerson){
-    if(people.indexOf(S.expPerson)===-1) people.unshift(S.expPerson);
-  }else{
-    S.expPerson = people[0] || '';
+    var canonicalSelected = canonicalPerson(S.expPerson);
+    if(people.indexOf(canonicalSelected)>-1){
+      S.expPerson = canonicalSelected;
+    }else if(S.editingExpenseId && people.indexOf(S.expPerson)===-1){
+      // En édition uniquement, préserver un payeur historique réellement inconnu.
+      people.unshift(S.expPerson);
+    }
+  }
+  if(!S.expPerson || (!S.editingExpenseId && people.indexOf(S.expPerson)===-1)){
+    S.expPerson = (CURRENT_USER && CURRENT_USER.email) || people[0] || '';
   }
   return people.map(function(p){
     return '<option value="'+escHtml(p)+'"'+(S.expPerson===p?' selected':'')+'>'+escHtml(personDisplayName(p,'Moi'))+'</option>';
@@ -10932,6 +10937,7 @@ function renderExpenseFormModal(){
 }
 function openAddExpenseModal(){
   S.editingExpenseId = null;
+  S.expPerson = (CURRENT_USER && CURRENT_USER.email) || '';
   S.expParticipants = null;  // reset pour repartir sur tous les voyageurs
   S.expSplitOverrides = {};
   S.expDesc = '';
