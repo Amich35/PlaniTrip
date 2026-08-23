@@ -5269,7 +5269,10 @@ async function setCustomPhoto(query, url){
   save();
   if(sb && CURRENT_TRIP){
     // await garantit que Supabase a bien la photo avant tout rechargement possible
-    try{ await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()}); }catch(e){}
+    try{
+      var upRes = await sb.from('custom_photos').upsert({trip_id:CURRENT_TRIP.id, query:query, photo_data:url, updated_at:new Date().toISOString()});
+      if(upRes && upRes.error){ console.error('[PlaniTrip] setCustomPhoto upsert error:', upRes.error); alert('Erreur lors de l\'enregistrement de la photo : '+upRes.error.message); }
+    }catch(e){ console.error('[PlaniTrip] setCustomPhoto exception:', e); alert('Erreur réseau lors de l\'enregistrement de la photo.'); }
   }
   closePhotoPicker();
   document.querySelectorAll('[data-img-query="'+query.replace(/"/g,'&quot;')+'"]').forEach(function(el){
