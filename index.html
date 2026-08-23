@@ -10805,10 +10805,6 @@ function getConverterCurrencySymbol(c){
   }
   if(!code){var rawCode=raw.match(/\b([A-Z]{3})\b/);if(rawCode)code=rawCode[1];}
   var symbol=currencySymbolFromCode(code);
-  if(/\bUSD\b/.test(raw)&&code!=='USD'){
-    var usd=currencySymbolFromCode('USD');
-    if(symbol&&symbol!==usd)symbol+=' / '+usd;
-  }
   return symbol||raw;
 }
 function syncExpAmt(which, rateNum){
@@ -10925,7 +10921,7 @@ function renderExpenseFormModal(){
     +(selCity ? '<div class="ef-row"><select class="ef-select" id="eActivity" onchange="S.expActivity=this.value"><option value="">Activité (optionnel)</option>'+activityOptions+'</select></div>' : '')
     +'<div class="ef-row">'
     +'<div style="position:relative;flex:1;max-width:130px"><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant" id="eAmt" style="width:100%;box-sizing:border-box;padding-right:26px" value="'+escHtml(S.expAmt||'')+'" oninput="syncExpAmt(\'eur\','+(selCountry.rateNum||0)+')"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink-subtle);pointer-events:none">€</span></div>'
-    +(selCountry.rateNum?('<span style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:28px;font-size:13px;color:var(--ink-subtle)">⇄</span><div style="position:relative;flex:1;max-width:130px"><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant" id="eAmtLocal" style="width:100%;box-sizing:border-box;padding-right:34px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink-subtle);pointer-events:none">'+escHtml(getCurrencySymbol(selCountry))+'</span></div>'):'')
+    +(selCountry.rateNum?('<span style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:28px;font-size:13px;color:var(--ink-subtle)">⇄</span><div style="position:relative;flex:1;max-width:130px"><input class="ef-input" type="text" inputmode="decimal" placeholder="Montant" id="eAmtLocal" style="width:100%;box-sizing:border-box;padding-right:34px" value="'+(S.expAmt&&!isNaN(parseAmt(S.expAmt))?Math.round(parseAmt(S.expAmt)*selCountry.rateNum*100)/100:'')+'" oninput="syncExpAmt(\'local\','+selCountry.rateNum+')"/><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink-subtle);pointer-events:none">'+escHtml(getConverterCurrencySymbol(selCountry))+'</span></div>'):'')
     +'</div>'
     +renderSplitRows(S.expAmt)
     +'<div class="ef-row"><input class="ef-input" type="date" id="eDate" value="'+escHtml(S.expDate||toLocalISODate(new Date()))+'" oninput="S.expDate=this.value" style="width:100%;-webkit-appearance:none;appearance:none"/></div>'
@@ -12345,7 +12341,7 @@ function openRateEditModal(countryId){
     +'<div style="display:flex;align-items:center;gap:8px;background:var(--sand);border-radius:var(--r12);padding:10px 14px">'
     +'<span style="font-size:15px;font-weight:700;color:var(--ink)">1 € =</span>'
     +'<input type="number" id="rateEditInput" value="'+getRate(c)+'" style="flex:1;min-width:0;border:none;background:transparent;font-size:17px;font-weight:700;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:0;text-align:right"/>'
-    +'<span style="font-size:14px;color:var(--ink-muted)">'+escHtml(getCurrencySymbol(c))+'</span>'
+    +'<span style="font-size:14px;color:var(--ink-muted)">'+escHtml(getConverterCurrencySymbol(c))+'</span>'
     +'</div>';
   _guideModalSaveFn = saveRateEdit;
   document.getElementById('guideItemModal').classList.add('open');
