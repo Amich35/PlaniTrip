@@ -1,4 +1,4 @@
-const CACHE_NAME = 'planitrip-v7';
+const CACHE_NAME = 'planitrip-v8';
 const ASSETS = [
   'index.html',
   'manifest.json',
@@ -29,11 +29,12 @@ self.addEventListener('activate', event => {
 // Fetch : réseau en priorité (pour toujours avoir la dernière version quand il y a internet),
 // cache uniquement en secours si hors-ligne ou requête impossible.
 self.addEventListener('fetch', event => {
-  // Laisser passer les requêtes API météo, Wikipedia/Commons et Anthropic (réseau uniquement, jamais mises en cache)
+  // Laisser passer les requêtes API météo, Wikipedia/Commons, Anthropic et Supabase (réseau uniquement, jamais mises en cache)
   if (event.request.url.includes('open-meteo.com')) return;
   if (event.request.url.includes('wikipedia.org')) return;
   if (event.request.url.includes('wikimedia.org')) return;
   if (event.request.url.includes('api.anthropic.com')) return;
+  if (event.request.url.includes('supabase.co')) return;
 
   event.respondWith(
     fetch(event.request).then(response => {
