@@ -3014,6 +3014,10 @@ function backToCountries(){
 }
 var NAV_TABS=['home','countries','favorites','budget','more'];
 function setTab(tab){
+  if(tab==='countries' && COUNTRIES.length===1){
+    openCountryDetail(COUNTRIES[0].id,'lieux');
+    return;
+  }
   S.tab=tab;
   if(tab==='feed') markFeedSeen();
   save();
