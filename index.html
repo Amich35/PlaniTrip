@@ -3412,8 +3412,9 @@ function openDetail(actKey, actName, cityKey) {
   var imgEl = document.getElementById('detailImg');
   imgEl.style.backgroundImage = '';
   imgEl.textContent = d.emoji || '📍';
-  var cityLabel = cityKey ? cityKey.split('_').slice(1).join(' ') : '';
-  var detailCountryObj = cityKey ? COUNTRIES.find(function(co){return co.id===cityKey.split('_')[0];}) : null;
+  var detailCountryId = cityKey ? countryIdFromCityKey(cityKey) : '';
+  var cityLabel = cityKey ? cityKey.slice(detailCountryId.length+1) : '';
+  var detailCountryObj = cityKey ? COUNTRIES.find(function(co){return co.id===detailCountryId;}) : null;
   var photoQuery = _PLACE_QUERY_OVERRIDES[actName] || (actName+' '+cityLabel+(detailCountryObj?(' '+getEnglishCountryName(detailCountryObj.name)):''));
   _currentDetailQuery = photoQuery;
   fetchPlaceImage(photoQuery).then(function(url){
