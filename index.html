@@ -1038,6 +1038,51 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .ct-primary-btn{width:100%;height:58px;border-radius:18px;border:none;background:var(--accent);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(45,106,79,0.28);font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:transform .15s ease,box-shadow .15s ease;margin-top:8px;}
 .ct-primary-btn:active{transform:scale(0.98);box-shadow:0 4px 12px rgba(45,106,79,0.22);}
 .ct-primary-btn:disabled{opacity:0.6;}
+.ct-wizard-top{margin-bottom:22px;}
+.ct-wizard-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:11.5px;font-weight:600;color:var(--ink-muted);}
+.ct-wizard-badge{padding:4px 9px;border-radius:999px;background:var(--accent-pale);color:var(--accent);white-space:nowrap;}
+.ct-progress{height:6px;border-radius:999px;background:var(--sand-deep);overflow:hidden;}
+.ct-progress-value{height:100%;width:33.333%;border-radius:inherit;background:var(--accent);transition:width .2s ease;}
+.ct-step{display:none;}
+.ct-step.active{display:block;}
+.ct-step-title{font-size:21px;font-weight:700;color:var(--ink);margin:0 0 6px;line-height:1.2;}
+.ct-step-copy{font-size:13.5px;color:var(--ink-muted);line-height:1.5;margin:0 0 20px;}
+.ct-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px;}
+.ct-choice-btn{min-width:0;min-height:74px;border:1.5px solid #E5E3DE;border-radius:16px;background:#fff;color:var(--ink);padding:12px 10px;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;line-height:1.3;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;gap:8px;}
+.ct-choice-btn[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-pale);color:var(--accent);box-shadow:0 0 0 1px rgba(45,106,79,.08);}
+.ct-choice-icon{font-size:19px;line-height:1;}
+.ct-known-dates{display:none;margin-top:4px;}
+.ct-known-dates.open{display:block;}
+.ct-country-row{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid rgba(29,29,31,.07);min-width:0;}
+.ct-country-row:last-child{border-bottom:none;}
+.ct-country-index{width:25px;height:25px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11.5px;font-weight:700;}
+.ct-country-main{display:flex;align-items:center;gap:7px;min-width:0;flex:1;font-size:14px;font-weight:600;color:var(--ink);}
+.ct-country-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ct-country-actions{display:flex;align-items:center;gap:3px;flex-shrink:0;}
+.ct-country-action{width:30px;height:30px;border:none;border-radius:50%;background:transparent;color:var(--ink-muted);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+.ct-country-action:disabled{opacity:.25;cursor:default;}
+.ct-empty-state{padding:12px 0 4px;color:var(--ink-subtle);font-size:13px;}
+.ct-nav-row{display:flex;gap:9px;margin-top:16px;}
+.ct-nav-row .ct-primary-btn{flex:1;margin-top:0;}
+.ct-nav-back{min-width:92px;height:58px;border-radius:18px;border:1px solid #E5E3DE;background:transparent;color:var(--ink-muted);font:600 14px -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;padding:0 14px;}
+.ct-summary{border-top:1px solid rgba(29,29,31,.08);border-bottom:1px solid rgba(29,29,31,.08);margin:4px 0 20px;}
+.ct-summary-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:12px 0;font-size:13px;color:var(--ink-muted);}
+.ct-summary-row+.ct-summary-row{border-top:1px solid rgba(29,29,31,.06);}
+.ct-summary-value{max-width:68%;color:var(--ink);font-weight:600;text-align:right;overflow-wrap:anywhere;}
+.ct-reassurance{font-size:12.5px;color:var(--ink-muted);line-height:1.45;text-align:center;margin:14px 0 4px;}
+.ct-resume-panel{text-align:center;}
+.ct-resume-icon{width:46px;height:46px;border-radius:50%;background:var(--accent-pale);color:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;}
+.ct-resume-title{font-size:20px;font-weight:700;color:var(--ink);margin:0 0 7px;}
+.ct-resume-summary{font-size:13.5px;color:var(--ink-muted);line-height:1.5;margin-bottom:18px;}
+.ct-resume-secondary{width:100%;height:48px;margin-top:9px;border:none;background:transparent;color:var(--ink-muted);font:600 13.5px -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;}
+@media(max-width:360px){
+  .ct-choice-grid{grid-template-columns:1fr;}
+  .ct-nav-row{flex-direction:column-reverse;}
+  .ct-nav-back{width:100%;}
+  .ct-summary-row{display:block;}
+  .ct-summary-value{max-width:none;text-align:left;display:block;margin-top:4px;}
+}
+@media(prefers-reduced-motion:reduce){.ct-progress-value{transition:none;}}
 /* A2.1 — Import voyage */
 #ct-import-btn:hover{color:var(--accent);}
 #ct-import-btn:active{color:var(--accent);opacity:0.7;}
@@ -1224,43 +1269,91 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 <div id="create-trip-screen" class="auth-screen" style="display:none;">
   <div id="ct-back-btn" onclick="backToTripSelector()" style="display:none;position:absolute;top:max(20px,env(safe-area-inset-top));left:20px;align-items:center;gap:4px;color:var(--ink-muted);font-size:14px;font-weight:600;cursor:pointer;z-index:10;padding:6px 4px"><span data-icon="chevron-left" data-icon-size="16"></span> Retour</div>
   <div class="auth-hero">
-    <h1 style="font-size:22px;">Créer mon voyage</h1>
-    <p class="auth-subtitle">Quelques infos pour démarrer</p>
+    <h1 style="font-size:22px;">Mon prochain voyage</h1>
+    <p class="auth-subtitle">Trois petites étapes, et c’est parti</p>
   </div>
   <div class="auth-card ct-card">
 
-    <div class="ct-section">
-      <div class="ct-section-label"><span data-icon="globe" data-icon-size="15"></span> Pays visités</div>
-      <div id="ct-countries-list" class="ct-chips-wrap"></div>
-      <button id="ct-add-country-btn" class="ct-pill-btn" type="button">+ Ajouter un pays</button>
+    <div id="ct-resume-panel" class="ct-resume-panel" style="display:none">
+      <div class="ct-resume-icon">✈️</div>
+      <h2 class="ct-resume-title">On reprend où tu en étais ?</h2>
+      <div id="ct-resume-summary" class="ct-resume-summary"></div>
+      <button id="ct-resume-btn" class="ct-primary-btn" type="button">Reprendre mon voyage</button>
+      <button id="ct-start-over-btn" class="ct-resume-secondary" type="button">Recommencer</button>
     </div>
 
-    <div class="ct-section">
-      <div class="ct-section-label"><span data-icon="calendar" data-icon-size="15"></span> Dates</div>
-      <div class="ct-date-card">
-        <div class="ct-date-card-label">Départ</div>
-        <div class="ct-date-field-row">
-          <div class="ct-date-field"><select id="ct-start-day" class="ct-date-select"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
-          <div class="ct-date-field ct-date-field-month"><select id="ct-start-month" class="ct-date-select"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
-          <div class="ct-date-field ct-date-field-year"><select id="ct-start-year" class="ct-date-select"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+    <div id="ct-wizard">
+      <div class="ct-wizard-top">
+        <div class="ct-wizard-meta">
+          <span id="ct-step-label">Étape 1 sur 3</span>
+          <span id="ct-step-badge" class="ct-wizard-badge">Destination</span>
         </div>
+        <div class="ct-progress" aria-hidden="true"><div id="ct-progress-value" class="ct-progress-value"></div></div>
       </div>
-      <div class="ct-date-card" style="margin-top:8px">
-        <div class="ct-date-card-label">Retour</div>
-        <div class="ct-date-field-row">
-          <div class="ct-date-field"><select id="ct-end-day" class="ct-date-select"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
-          <div class="ct-date-field ct-date-field-month"><select id="ct-end-month" class="ct-date-select"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
-          <div class="ct-date-field ct-date-field-year"><select id="ct-end-year" class="ct-date-select"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
-        </div>
-      </div>
-      <input type="hidden" id="ct-start-input">
-      <input type="hidden" id="ct-end-input">
-      <div id="ct-days-count" class="ct-days-badge" style="display:none"></div>
-    </div>
 
-    <div class="ct-section">
-      <div class="ct-section-label"><span data-icon="pencil" data-icon-size="15"></span> Nom du voyage <span class="opt">(optionnel)</span></div>
-      <input type="text" id="ct-name-input" class="ct-input" maxlength="30" placeholder="Auto-généré à partir des pays">
+      <section id="ct-step-1" class="ct-step active" data-step="1">
+        <h2 class="ct-step-title">Où as-tu envie d’aller ?</h2>
+        <p class="ct-step-copy">Choisis au moins un pays. Tu pourras tout changer plus tard.</p>
+        <div id="ct-countries-list" class="ct-countries-list"></div>
+        <button id="ct-add-country-btn" class="ct-pill-btn" type="button">+ Ajouter un pays</button>
+        <button id="ct-step1-next" class="ct-primary-btn" type="button">Continuer</button>
+        <button type="button" id="ct-import-btn" style="width:100%;margin-top:10px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--ink-muted);font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:color .15s;" onclick="openImportTripFlow()"><span data-icon="upload" data-icon-size="15"></span> J’ai déjà un programme</button>
+      </section>
+
+      <section id="ct-step-2" class="ct-step" data-step="2">
+        <h2 class="ct-step-title">Quand pars-tu ?</h2>
+        <p class="ct-step-copy">Pas besoin d’avoir déjà tout réservé.</p>
+        <div class="ct-choice-grid">
+          <button id="ct-dates-known" class="ct-choice-btn" type="button" aria-pressed="false"><span class="ct-choice-icon">📅</span><span>Je connais mes dates</span></button>
+          <button id="ct-dates-unknown" class="ct-choice-btn" type="button" aria-pressed="false"><span class="ct-choice-icon">✨</span><span>Je ne sais pas encore</span></button>
+        </div>
+        <div id="ct-known-dates" class="ct-known-dates">
+          <div class="ct-date-card">
+            <div class="ct-date-card-label">Je pars le</div>
+            <div class="ct-date-field-row">
+              <div class="ct-date-field"><select id="ct-start-day" class="ct-date-select" aria-label="Jour de départ"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+              <div class="ct-date-field ct-date-field-month"><select id="ct-start-month" class="ct-date-select" aria-label="Mois de départ"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+              <div class="ct-date-field ct-date-field-year"><select id="ct-start-year" class="ct-date-select" aria-label="Année de départ"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+            </div>
+          </div>
+          <div class="ct-date-card" style="margin-top:8px">
+            <div class="ct-date-card-label">Je rentre le</div>
+            <div class="ct-date-field-row">
+              <div class="ct-date-field"><select id="ct-end-day" class="ct-date-select" aria-label="Jour de retour"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+              <div class="ct-date-field ct-date-field-month"><select id="ct-end-month" class="ct-date-select" aria-label="Mois de retour"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+              <div class="ct-date-field ct-date-field-year"><select id="ct-end-year" class="ct-date-select" aria-label="Année de retour"></select><span class="ct-date-chevron" data-icon="chevron-right" data-icon-size="11" style="transform:translateY(-50%) rotate(90deg)"></span></div>
+            </div>
+          </div>
+          <div id="ct-days-count" class="ct-days-badge" style="display:none"></div>
+        </div>
+        <input type="hidden" id="ct-start-input">
+        <input type="hidden" id="ct-end-input">
+        <div class="ct-nav-row">
+          <button id="ct-step2-back" class="ct-nav-back" type="button">Retour</button>
+          <button id="ct-step2-next" class="ct-primary-btn" type="button">Continuer</button>
+        </div>
+      </section>
+
+      <section id="ct-step-3" class="ct-step" data-step="3">
+        <h2 class="ct-step-title">Est-ce que tout est bon ?</h2>
+        <p class="ct-step-copy">Regarde, ton voyage prend déjà forme.</p>
+        <div class="ct-summary">
+          <div class="ct-summary-row"><span>Destination</span><span id="ct-summary-countries" class="ct-summary-value"></span></div>
+          <div class="ct-summary-row"><span>Dates</span><span id="ct-summary-dates" class="ct-summary-value"></span></div>
+        </div>
+        <div class="ct-section">
+          <div class="ct-section-label"><span data-icon="pencil" data-icon-size="15"></span> Comment veux-tu l’appeler ?</div>
+          <input type="text" id="ct-name-input" class="ct-input" maxlength="30" placeholder="Mon voyage">
+          <div class="ct-reassurance">PlaniTrip te propose un nom. Tu peux le changer.</div>
+        </div>
+        <div class="ct-reassurance">Rien n’est figé. Tu pourras tout modifier dans ton voyage.</div>
+        <div class="ct-nav-row">
+          <button id="ct-step3-back" class="ct-nav-back" type="button">Retour</button>
+          <button id="ct-submit-btn" class="ct-primary-btn" type="button">Créer mon voyage</button>
+        </div>
+      </section>
+
+      <div id="ct-error" class="auth-error" style="display:none;margin-top:12px"></div>
     </div>
 
     <!-- Voyageurs masqués du formulaire principal — les éléments DOM restent présents pour
@@ -1271,14 +1364,6 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
       <input type="email" id="ct-traveler-email-input">
       <button id="ct-add-traveler-btn" type="button"></button>
     </div>
-
-    <div style="font-size:12px;color:var(--ink-subtle);text-align:center;margin-bottom:6px;">
-      <span data-icon="users" data-icon-size="12" style="vertical-align:middle;opacity:0.6;margin-right:4px;"></span>Tu pourras inviter tes compagnons après la création.
-    </div>
-
-    <div id="ct-error" class="auth-error" style="display:none;"></div>
-    <button id="ct-submit-btn" class="ct-primary-btn">Créer mon voyage</button>
-    <button type="button" id="ct-import-btn" style="width:100%;margin-top:10px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--ink-muted);font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;transition:color .15s;" onclick="openImportTripFlow()"><span data-icon="upload" data-icon-size="15"></span> Importer un voyage existant</button>
     <!-- input file masqué pour l'import — accepte les formats documentaires (pas les images) -->
     <input type="file" id="ct-import-file-input" accept=".csv,.txt,.md,.markdown,.xlsx,.xls,.docx,.pdf" style="display:none" onchange="handleImportFileSelected(event)">
   </div>
@@ -1444,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-23·sha:pending-invite-badge-v1';
+var APP_BUILD = '2026-08-24·sha:create-trip-wizard-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -16654,6 +16739,11 @@ document.getElementById('ts-new-trip-btn').addEventListener('click', () => {
 let CT_COUNTRIES = [];
 let CT_TRAVELERS = [];
 let CT_ALL_COUNTRY_NAMES = [];
+let CT_CREATE_STEP = 1;
+let CT_DATE_MODE = '';
+let CT_NAME_TOUCHED = false;
+var CT_PENDING_DRAFT = null;
+var _ctDraftHydrating = false;
 window.COUNTRY_FLAGS = {};
 window.COUNTRY_CURRENCIES = {};
 window.COUNTRY_RATES = {};
@@ -16745,23 +16835,232 @@ function showCreateTripScreen(errorMsg, showBack) {
   document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('create-trip-screen').style.display = 'flex';
   document.getElementById('ct-back-btn').style.display = showBack ? 'flex' : 'none';
-  document.getElementById('ct-name-input').value = '';
-  document.getElementById('ct-start-input').value = '';
-  document.getElementById('ct-end-input').value = '';
+  const errEl = document.getElementById('ct-error');
+  errEl.style.display = 'none';
+
+  var draft = loadCreateTripDraft();
+  if(draft){
+    CT_PENDING_DRAFT = draft;
+    document.getElementById('ct-wizard').style.display = 'none';
+    document.getElementById('ct-resume-panel').style.display = 'block';
+    document.getElementById('ct-resume-summary').textContent = describeCreateTripDraft(draft);
+  } else {
+    resetCreateTripState(false);
+  }
+  Promise.all([loadCountryList(), loadCountryFlags()]).then(function(){
+    if(document.getElementById('create-trip-screen').style.display !== 'none') renderCtCountries(true);
+  }).catch(function(){});
+  if(errorMsg){
+    errEl.textContent = errorMsg;
+    errEl.style.display = 'block';
+  }
+}
+
+function getCreateTripDraftKey(){
+  if(!CURRENT_USER || !CURRENT_USER.id) return null;
+  return 'planitrip_create_trip_draft_' + CURRENT_USER.id;
+}
+function loadCreateTripDraft(){
+  var key = getCreateTripDraftKey();
+  if(!key) return null;
+  try{
+    var parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    if(!parsed || parsed.version !== 1 || !Array.isArray(parsed.countries)) return null;
+    parsed.countries = parsed.countries.filter(function(name, index, list){ return typeof name === 'string' && name && list.indexOf(name) === index; });
+    parsed.step = Math.max(1, Math.min(3, parseInt(parsed.step, 10) || 1));
+    parsed.dateMode = parsed.dateMode === 'known' || parsed.dateMode === 'unknown' ? parsed.dateMode : '';
+    if(!parsed.countries.length && !parsed.dateMode && !parsed.name) return null;
+    return parsed;
+  }catch(e){ return null; }
+}
+function saveCreateTripDraft(){
+  if(_ctDraftHydrating) return;
+  var key = getCreateTripDraftKey();
+  if(!key) return;
+  var nameEl = document.getElementById('ct-name-input');
+  var startEl = document.getElementById('ct-start-input');
+  var endEl = document.getElementById('ct-end-input');
+  var draft = {
+    version: 1,
+    step: CT_CREATE_STEP,
+    countries: CT_COUNTRIES.slice(),
+    dateMode: CT_DATE_MODE,
+    start: startEl ? startEl.value : '',
+    end: endEl ? endEl.value : '',
+    name: nameEl ? nameEl.value : '',
+    nameTouched: CT_NAME_TOUCHED,
+    updatedAt: new Date().toISOString()
+  };
+  try{
+    if(!draft.countries.length && !draft.dateMode && !draft.name) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(draft));
+  }catch(e){}
+}
+function clearCreateTripDraft(){
+  var key = getCreateTripDraftKey();
+  if(!key) return;
+  try{ localStorage.removeItem(key); }catch(e){}
+}
+function clearCtDateValues(){
   ['ct-start-day','ct-start-month','ct-start-year','ct-end-day','ct-end-month','ct-end-year'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.value = '';
   });
-  document.getElementById('ct-traveler-email-input').value = '';
-  document.getElementById('ct-days-count').style.display = 'none';
+  var startEl = document.getElementById('ct-start-input');
+  var endEl = document.getElementById('ct-end-input');
+  if(startEl) startEl.value = '';
+  if(endEl) endEl.value = '';
+  var daysEl = document.getElementById('ct-days-count');
+  if(daysEl) daysEl.style.display = 'none';
+}
+function setCtDateTriple(prefix, value){
+  if(!value) return;
+  var parts = value.split('-');
+  if(parts.length !== 3) return;
+  var yearEl = document.getElementById('ct-'+prefix+'-year');
+  var monthEl = document.getElementById('ct-'+prefix+'-month');
+  var dayEl = document.getElementById('ct-'+prefix+'-day');
+  if(!yearEl || !monthEl || !dayEl) return;
+  var savedYear = String(parseInt(parts[0], 10));
+  if(!Array.from(yearEl.options).some(function(option){ return option.value === savedYear; })){
+    yearEl.add(new Option(savedYear, savedYear));
+  }
+  yearEl.value = savedYear;
+  monthEl.value = String(parseInt(parts[1], 10));
+  dayEl.value = String(parseInt(parts[2], 10));
+  syncDateTriple('ct-'+prefix+'-day','ct-'+prefix+'-month','ct-'+prefix+'-year','ct-'+prefix+'-input');
+}
+function resetCreateTripState(clearStoredDraft){
+  _ctDraftHydrating = true;
+  CT_CREATE_STEP = 1;
+  CT_DATE_MODE = '';
+  CT_NAME_TOUCHED = false;
+  CT_PENDING_DRAFT = null;
   CT_COUNTRIES = [];
   CT_TRAVELERS = [];
-  renderCtCountries();
+  clearCtDateValues();
+  document.getElementById('ct-name-input').value = '';
+  document.getElementById('ct-traveler-email-input').value = '';
+  renderCtCountries(true);
   renderCtTravelers();
-  const errEl = document.getElementById('ct-error');
-  if (errorMsg) { errEl.textContent = errorMsg; errEl.style.display = 'block'; }
-  else { errEl.style.display = 'none'; }
-  loadCountryList();
+  _ctDraftHydrating = false;
+  document.getElementById('ct-resume-panel').style.display = 'none';
+  document.getElementById('ct-wizard').style.display = 'block';
+  renderCreateTripStep();
+  if(clearStoredDraft) clearCreateTripDraft();
+}
+function hydrateCreateTripDraft(draft){
+  _ctDraftHydrating = true;
+  CT_CREATE_STEP = draft.step;
+  CT_DATE_MODE = draft.dateMode;
+  CT_NAME_TOUCHED = !!draft.nameTouched;
+  CT_COUNTRIES = draft.countries.slice();
+  CT_TRAVELERS = [];
+  clearCtDateValues();
+  setCtDateTriple('start', draft.start || '');
+  setCtDateTriple('end', draft.end || '');
+  document.getElementById('ct-name-input').value = draft.name || '';
+  renderCtCountries(true);
+  renderCtTravelers();
+  _ctDraftHydrating = false;
+  CT_PENDING_DRAFT = null;
+  document.getElementById('ct-resume-panel').style.display = 'none';
+  document.getElementById('ct-wizard').style.display = 'block';
+  renderCreateTripStep();
+  updateCtDaysCount();
+}
+function describeCreateTripDraft(draft){
+  var destination = draft.countries.length ? draft.countries.join(' → ') : 'Destination à choisir';
+  return destination + ' · étape ' + draft.step + ' sur 3';
+}
+function formatCreateTripDate(value){
+  if(!value) return '';
+  try{ return new Date(value+'T00:00:00').toLocaleDateString('fr-FR', {day:'numeric', month:'short', year:'numeric'}); }
+  catch(e){ return value; }
+}
+function createTripDurationDays(){
+  var start = document.getElementById('ct-start-input').value;
+  var end = document.getElementById('ct-end-input').value;
+  if(!start || !end || end < start) return 0;
+  return Math.round((new Date(end+'T00:00:00') - new Date(start+'T00:00:00')) / 86400000) + 1;
+}
+function suggestCreateTripName(){
+  var start = document.getElementById('ct-start-input').value;
+  var yearSuffix = start ? ' ' + new Date(start+'T00:00:00').getFullYear() : '';
+  var name = 'Mon voyage' + yearSuffix;
+  if(CT_COUNTRIES.length === 1) name = CT_COUNTRIES[0] + yearSuffix;
+  else if(CT_COUNTRIES.length === 2) name = CT_COUNTRIES.join(' & ') + yearSuffix;
+  else if(CT_COUNTRIES.length > 2) name = 'Mon grand voyage' + yearSuffix;
+  return name.slice(0, 30);
+}
+function renderCreateTripStep(preserveError){
+  var step = Math.max(1, Math.min(3, CT_CREATE_STEP));
+  CT_CREATE_STEP = step;
+  document.querySelectorAll('#ct-wizard .ct-step').forEach(function(el){
+    el.classList.toggle('active', parseInt(el.dataset.step, 10) === step);
+  });
+  var badges = ['Destination','Dates','Résumé'];
+  document.getElementById('ct-step-label').textContent = 'Étape ' + step + ' sur 3';
+  document.getElementById('ct-step-badge').textContent = badges[step-1];
+  document.getElementById('ct-progress-value').style.width = (step * 33.333) + '%';
+
+  var knownBtn = document.getElementById('ct-dates-known');
+  var unknownBtn = document.getElementById('ct-dates-unknown');
+  knownBtn.setAttribute('aria-pressed', CT_DATE_MODE === 'known' ? 'true' : 'false');
+  unknownBtn.setAttribute('aria-pressed', CT_DATE_MODE === 'unknown' ? 'true' : 'false');
+  document.getElementById('ct-known-dates').classList.toggle('open', CT_DATE_MODE === 'known');
+  document.getElementById('ct-step1-next').disabled = CT_COUNTRIES.length === 0;
+  document.getElementById('ct-step2-next').disabled = !CT_DATE_MODE;
+
+  if(step === 3){
+    var nameEl = document.getElementById('ct-name-input');
+    if(!CT_NAME_TOUCHED) nameEl.value = suggestCreateTripName();
+    var countryText = CT_COUNTRIES.map(function(name){ return ((window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[name]) || '🌍') + ' ' + name; }).join(' → ');
+    document.getElementById('ct-summary-countries').textContent = countryText;
+    var start = document.getElementById('ct-start-input').value;
+    var end = document.getElementById('ct-end-input').value;
+    var days = createTripDurationDays();
+    document.getElementById('ct-summary-dates').textContent = CT_DATE_MODE === 'known' && start && end
+      ? formatCreateTripDate(start) + ' → ' + formatCreateTripDate(end) + (days ? ' · ' + days + ' jours' : '')
+      : 'À choisir plus tard';
+  }
+  var errEl = document.getElementById('ct-error');
+  if(!preserveError) errEl.style.display = 'none';
+}
+function showCreateTripError(message){
+  var errEl = document.getElementById('ct-error');
+  errEl.textContent = message;
+  errEl.style.display = 'block';
+}
+function validateCreateTripStep(step){
+  if(step === 1 && CT_COUNTRIES.length === 0){
+    showCreateTripError('Choisis au moins un pays.');
+    return false;
+  }
+  if(step === 2){
+    if(!CT_DATE_MODE){ showCreateTripError('Choisis une réponse.'); return false; }
+    if(CT_DATE_MODE === 'known'){
+      var start = document.getElementById('ct-start-input').value;
+      var end = document.getElementById('ct-end-input').value;
+      if(!start || !end){ showCreateTripError('Choisis les deux dates, ou sélectionne « Je ne sais pas encore ».'); return false; }
+      if(end < start){ showCreateTripError('La date de retour doit être postérieure à la date de départ.'); return false; }
+    }
+  }
+  return true;
+}
+function goToCreateTripStep(nextStep){
+  if(nextStep > CT_CREATE_STEP && !validateCreateTripStep(CT_CREATE_STEP)) return;
+  CT_CREATE_STEP = Math.max(1, Math.min(3, nextStep));
+  renderCreateTripStep();
+  saveCreateTripDraft();
+  var screen = document.getElementById('create-trip-screen');
+  if(screen) screen.scrollTo({top:0, behavior:'smooth'});
+}
+function setCreateTripDateMode(mode){
+  CT_DATE_MODE = mode;
+  if(mode === 'unknown') clearCtDateValues();
+  renderCreateTripStep();
+  saveCreateTripDraft();
 }
 function wireDateRangeSync(startId, endId){
   var startEl = document.getElementById(startId);
@@ -16815,21 +17114,53 @@ function addCtTraveler(){
   renderCtTravelers();
 }
 
-function renderCtCountries() {
+function renderCtCountries(skipDraftSave) {
   const list = document.getElementById('ct-countries-list');
   list.innerHTML = '';
+  if(!CT_COUNTRIES.length){
+    var empty = document.createElement('div');
+    empty.className = 'ct-empty-state';
+    empty.textContent = 'Commence par ajouter un pays.';
+    list.appendChild(empty);
+  }
   CT_COUNTRIES.forEach((c, idx) => {
     const flag = (window.COUNTRY_FLAGS && window.COUNTRY_FLAGS[c]) || '🌍';
-    const chip = document.createElement('div');
-    chip.className = 'ct-country-chip';
-    chip.innerHTML = '<span>'+flag+'</span><span></span><button type="button" aria-label="Retirer">✕</button>';
-    chip.querySelectorAll('span')[1].textContent = c;
-    chip.querySelector('button').addEventListener('click', () => {
+    const row = document.createElement('div');
+    row.className = 'ct-country-row';
+    row.innerHTML = '<span class="ct-country-index"></span>'
+      +'<span class="ct-country-main"><span class="ct-country-flag"></span><span class="ct-country-name"></span></span>'
+      +'<span class="ct-country-actions">'
+      +'<button class="ct-country-action ct-country-up" type="button" aria-label="Monter">↑</button>'
+      +'<button class="ct-country-action ct-country-down" type="button" aria-label="Descendre">↓</button>'
+      +'<button class="ct-country-action ct-country-remove" type="button" aria-label="Retirer">×</button>'
+      +'</span>';
+    row.querySelector('.ct-country-index').textContent = String(idx + 1);
+    row.querySelector('.ct-country-flag').textContent = flag;
+    row.querySelector('.ct-country-name').textContent = c;
+    var upBtn = row.querySelector('.ct-country-up');
+    var downBtn = row.querySelector('.ct-country-down');
+    upBtn.disabled = idx === 0;
+    downBtn.disabled = idx === CT_COUNTRIES.length - 1;
+    upBtn.setAttribute('aria-label', 'Monter ' + c);
+    downBtn.setAttribute('aria-label', 'Descendre ' + c);
+    row.querySelector('.ct-country-remove').setAttribute('aria-label', 'Retirer ' + c);
+    upBtn.addEventListener('click', function(){ moveCtCountry(idx, -1); });
+    downBtn.addEventListener('click', function(){ moveCtCountry(idx, 1); });
+    row.querySelector('.ct-country-remove').addEventListener('click', () => {
       CT_COUNTRIES.splice(idx, 1);
       renderCtCountries();
     });
-    list.appendChild(chip);
+    list.appendChild(row);
   });
+  if(document.getElementById('ct-step-label')) renderCreateTripStep(!!skipDraftSave);
+  if(!skipDraftSave) saveCreateTripDraft();
+}
+function moveCtCountry(index, direction){
+  var target = index + direction;
+  if(index < 0 || target < 0 || target >= CT_COUNTRIES.length) return;
+  var moved = CT_COUNTRIES.splice(index, 1)[0];
+  CT_COUNTRIES.splice(target, 0, moved);
+  renderCtCountries();
 }
 
 function normCountryStr(s) {
@@ -16905,6 +17236,7 @@ async function addCountryToCurrentTrip(countryName) {
 
 async function openCountryModal() {
   await loadCountryList();
+  await loadCountryFlags();
   const modal = document.getElementById('ct-country-modal');
   const optionsEl = document.getElementById('ct-country-options');
   const searchInput = document.getElementById('ct-country-search');
@@ -16950,8 +17282,13 @@ document.getElementById('ct-country-modal').addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('ct-start-input').addEventListener('input', updateCtDaysCount);
-document.getElementById('ct-end-input').addEventListener('input', updateCtDaysCount);
+function onCreateTripDateChanged(){
+  updateCtDaysCount();
+  if(CT_CREATE_STEP === 3) renderCreateTripStep();
+  saveCreateTripDraft();
+}
+document.getElementById('ct-start-input').addEventListener('input', onCreateTripDateChanged);
+document.getElementById('ct-end-input').addEventListener('input', onCreateTripDateChanged);
 // Sélecteurs Jour/Mois/Année (au lieu d'un <input type="date"> natif) : sur iOS, la roue native
 // pré-affiche toujours la date du jour, ce qui la fait valider par erreur si l'utilisateur ne
 // scrolle pas. Avec des <select> à valeur vide par défaut, aucune date n'est retenue tant que
@@ -16995,6 +17332,21 @@ function wireDateTriple(dayId, monthId, yearId, hiddenId){
 }
 wireDateTriple('ct-start-day','ct-start-month','ct-start-year','ct-start-input');
 wireDateTriple('ct-end-day','ct-end-month','ct-end-year','ct-end-input');
+document.getElementById('ct-step1-next').addEventListener('click', function(){ goToCreateTripStep(2); });
+document.getElementById('ct-step2-back').addEventListener('click', function(){ goToCreateTripStep(1); });
+document.getElementById('ct-step2-next').addEventListener('click', function(){ goToCreateTripStep(3); });
+document.getElementById('ct-step3-back').addEventListener('click', function(){ goToCreateTripStep(2); });
+document.getElementById('ct-dates-known').addEventListener('click', function(){ setCreateTripDateMode('known'); });
+document.getElementById('ct-dates-unknown').addEventListener('click', function(){ setCreateTripDateMode('unknown'); });
+document.getElementById('ct-name-input').addEventListener('input', function(){
+  CT_NAME_TOUCHED = true;
+  saveCreateTripDraft();
+});
+document.getElementById('ct-resume-btn').addEventListener('click', function(){
+  if(CT_PENDING_DRAFT) hydrateCreateTripDraft(CT_PENDING_DRAFT);
+  else resetCreateTripState(false);
+});
+document.getElementById('ct-start-over-btn').addEventListener('click', function(){ resetCreateTripState(true); });
 document.getElementById('ct-add-traveler-btn').addEventListener('click', addCtTraveler);
 document.getElementById('ct-traveler-email-input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addCtTraveler(); } });
 
@@ -17005,6 +17357,12 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   var name = document.getElementById('ct-name-input').value.trim();
   const start = document.getElementById('ct-start-input').value;
   const end = document.getElementById('ct-end-input').value;
+
+  if (CT_DATE_MODE === 'known' && (!start || !end)) {
+    errEl.textContent = 'Choisis les deux dates, ou sélectionne « Je ne sais pas encore ».';
+    errEl.style.display = 'block';
+    return;
+  }
 
   if (start && end && end < start) {
     errEl.textContent = "La date de retour doit être postérieure à la date de départ.";
@@ -17024,15 +17382,14 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   }
 
   if(!name){
-    var yearSuffix = start ? (' '+new Date(start+'T00:00:00').getFullYear()) : '';
-    if(CT_COUNTRIES.length===1) name = CT_COUNTRIES[0] + yearSuffix;
-    else if(CT_COUNTRIES.length===2) name = CT_COUNTRIES.join(' & ') + yearSuffix;
-    else name = CT_COUNTRIES.slice(0,-1).join(', ') + ' & ' + CT_COUNTRIES[CT_COUNTRIES.length-1] + yearSuffix;
+    name = suggestCreateTripName();
+    document.getElementById('ct-name-input').value = name;
   }
 
   const btn = document.getElementById('ct-submit-btn');
   btn.disabled = true;
   btn.textContent = 'Création...';
+  saveCreateTripDraft();
 
   const { data, error } = await sb
     .from('trips')
@@ -17101,6 +17458,7 @@ document.getElementById('ct-submit-btn').addEventListener('click', async () => {
   autofillMissingCountryDates();
 
   showPostCreateModal(data);
+  clearCreateTripDraft();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
