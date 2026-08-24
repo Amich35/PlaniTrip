@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-24·sha:create-trip-resume-v1';
+var APP_BUILD = '2026-08-24·sha:clean-program-dates-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3005,7 +3005,14 @@ function showSuccessToast(msg){
 
 function rebuildCountriesFromState(){
   COUNTRIES.length = 0;
-  BUILT_IN_COUNTRIES.forEach(function(c){ COUNTRIES.push(JSON.parse(JSON.stringify(c))); });
+  BUILT_IN_COUNTRIES.forEach(function(c){
+    var builtInCopy = JSON.parse(JSON.stringify(c));
+    // Le programme intégré est un héritage du voyage historique Asie 2026.
+    // Pour tout autre voyage, le programme vient uniquement de son état namespacé
+    // et de Supabase (cities/activities filtrés par trip_id).
+    if(CURRENT_TRIP && CURRENT_TRIP.name !== 'Asie 2026') builtInCopy.cities = [];
+    COUNTRIES.push(builtInCopy);
+  });
   // Restore countries the user added (persisted separately from the built-in catalog)
   (S.customCountries||[]).forEach(function(cc){
     if(!COUNTRIES.find(function(c){return c.id===cc.id;})) COUNTRIES.push(cc);
@@ -16415,9 +16422,10 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   localStorage.setItem('planitrip_last_trip_id', trip.id);
   const namespacedKey = 'planitrip_trip_' + trip.id;
 
-  // Migration one-shot : le tout premier trip ouvert dans ce navigateur (tous comptes confondus)
-  // réclame les anciennes données Asie. Aucun autre trip n'y touche ensuite.
-  if (!localStorage.getItem(namespacedKey) && !localStorage.getItem('planitrip_legacy_claimed')) {
+  // Migration legacy strictement réservée au voyage historique Asie 2026.
+  // Un voyage neuf ne doit jamais réclamer le blob local `asie2026` simplement parce
+  // qu'il est le premier voyage ouvert sur ce navigateur.
+  if (trip.name === 'Asie 2026' && !localStorage.getItem(namespacedKey) && !localStorage.getItem('planitrip_legacy_claimed')) {
     const legacy = localStorage.getItem('asie2026');
     if (legacy) {
       localStorage.setItem(namespacedKey, legacy);
@@ -16554,7 +16562,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   refreshPendingInviteBadge(); // fire-and-forget — ne bloque pas le rendu
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
-  if(!skipAutofillDates) autofillMissingCountryDates();
+  // Les dates par pays sont explicites : ouvrir un voyage ne doit jamais les inventer.
 
   if (COUNTRIES.length === 0) {
     console.warn('[PlaniTrip] Aucun pays visible, réinitialisation de sécurité.');
@@ -17253,7 +17261,7 @@ async function addCountryToCurrentTrip(countryName) {
   COUNTRIES.forEach(function(c){
     if(!c.practical.emergency || !c.practical.emergency.length) applyEmergencyFromTable(c);
   });
-  autofillMissingCountryDates();
+  // Un pays ajouté reste sans dates tant que l'utilisateur ne les a pas définies.
   save();
   renderContent();
 }
@@ -17389,32 +17397,8 @@ async function completeCreatedTripOpen(trip, draft){
     throw new Error('Le voyage existe, mais son ouverture ne s’est pas terminée.');
   }
 
-  var draftCountries = draft && Array.isArray(draft.countries) ? draft.countries : [];
-  var start = draft && draft.start ? draft.start : '';
-  var end = draft && draft.end ? draft.end : '';
-  // Distribuer les dates du voyage équitablement entre les pays. Fait APRÈS enterTrip() car
-  // c'est à ce moment que les pays reçoivent leur identifiant réel (ex: "albanie_175...") —
-  // le faire avant, avec le nom du pays en guise d'id, désynchronisait les dates du bon pays.
-  // enterTrip() est appelé avec skipAutofillDates=true pour éviter une course entre l'autofill
-  // (qui écrirait un repli "1 jour" au serveur) et cette répartition réelle des dates.
-  if(start && end && draftCountries.length > 0){
-    var startD = new Date(start+'T00:00:00');
-    var endD   = new Date(end+'T00:00:00');
-    var totalDays = Math.round((endD - startD)/86400000)+1;
-    var perC = Math.floor(totalDays / draftCountries.length);
-    var extras = totalDays - perC * draftCountries.length;
-    draftCountries.forEach(function(countryName, i){
-      var realCountry = COUNTRIES.find(function(co){ return co.name === countryName; });
-      if(!realCountry) return;
-      var offset = i * perC + Math.min(i, extras);
-      var cDays  = perC + (i < extras ? 1 : 0);
-      var cS = new Date(startD); cS.setDate(cS.getDate() + offset);
-      var cE = new Date(cS);    cE.setDate(cE.getDate() + cDays - 1);
-      editCountryDateRange(realCountry.id, toLocalISODate(cS), toLocalISODate(cE));
-    });
-  }
-  // Filet de sécurité : pays non couverts ci-dessus (ex: dates de voyage laissées vides à la création)
-  autofillMissingCountryDates();
+  // Les dates globales du voyage restent sur trips.start_date/end_date.
+  // Les dates de chaque pays restent volontairement indéfinies jusqu'à une saisie explicite.
 
   showPostCreateModal(trip);
   clearCreateTripDraft();
