@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-24·sha:clean-program-dates-v2';
+var APP_BUILD = '2026-08-24·sha:clean-program-dates-v3';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3016,7 +3016,11 @@ function rebuildCountriesFromState(){
       builtInCopy.days = 0;
       builtInCopy.dateStart = '';
       builtInCopy.dateEnd = '';
-      if(builtInCopy.practical) builtInCopy.practical.checklist = [];
+      builtInCopy.alerts = [];
+      if(builtInCopy.practical){
+        builtInCopy.practical.tips = [];
+        builtInCopy.practical.checklist = [];
+      }
     }
     COUNTRIES.push(builtInCopy);
   });
@@ -6519,7 +6523,7 @@ function autofillMissingCountryDates(){
   // Durée totale du voyage si connue (dates saisies à la création ou depuis), pour répartir
   // les jours RESTANTS entre les pays sans date — plutôt qu'un filet de sécurité fixe à 1 jour,
   // qui écrasait silencieusement la durée réelle (ex: pays ré-ajouté après suppression).
-  var tripStart = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) ? CURRENT_TRIP.start_date : toLocalISODate(getTripDepartDate());
+  var tripStart = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) ? CURRENT_TRIP.start_date : toLocalISODate(getTripDepartDate(true));
   var tripEnd = (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.end_date) ? CURRENT_TRIP.end_date : null;
 
   var usedDays = withDates.reduce(function(s,c){
@@ -9615,7 +9619,7 @@ function renderArchivedCitiesScreen(){
 
 // ── TRIP STATUS: current day / next transport / tonight's accommodation ──
 var TRANSPORTS=[['jp','kh','Avion'],['kh','th','Bus'],['th','la','Train'],['la','vn','Avion'],['vn','id','Avion'],['id','ph','Avion']];
-function getTripDepartDate(){
+function getTripDepartDate(allowLegacyFallback){
   var earliestStart = null;
   if(typeof COUNTRIES !== 'undefined'){
     COUNTRIES.forEach(function(cc){
@@ -9629,7 +9633,12 @@ function getTripDepartDate(){
   if (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date) {
     return new Date(CURRENT_TRIP.start_date + 'T00:00:00');
   }
-  return new Date('2026-09-10T00:00:00');
+  // Le 10 septembre 2026 appartient uniquement au voyage historique. L'import
+  // conserve temporairement son ancien comportement via allowLegacyFallback (lot 5).
+  if ((typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.name === 'Asie 2026') || allowLegacyFallback) {
+    return new Date('2026-09-10T00:00:00');
+  }
+  return null;
 }
 function getCityForCountryDay(country, dayInCountry){
   if(!country || !country.cities || !country.cities.length) return null;
@@ -9649,6 +9658,9 @@ function getTripStatus(){
   var DEPART=getTripDepartDate();
   var now=new Date();
   now.setHours(0,0,0,0); // on ne compare que les dates calendaires, pas l'heure du jour (évite un décalage d'1 jour selon l'heure de consultation)
+  if(!DEPART){
+    return {elapsedDays:null, currentCountry:COUNTRIES[0]||null, dayInCountry:0, nextTransport:null, currentCity:null};
+  }
   var elapsedDays=Math.round((now-DEPART)/86400000);
   var todayStr = toLocalISODate(now);
 
@@ -9738,9 +9750,9 @@ function getCityActivitiesForToday(c, city, todayStr){
 function renderToday(){
   var ts = getTripStatus();
   var hasDepartDate = !!(COUNTRIES.find(function(cc){return getCountryDateRange(cc);}) || (typeof CURRENT_TRIP !== 'undefined' && CURRENT_TRIP && CURRENT_TRIP.start_date));
-  var refOffset = Math.max(0, ts.elapsedDays); // avant le départ : on prévisualise le Jour 1
+  var refOffset = ts.elapsedDays===null ? 0 : Math.max(0, ts.elapsedDays); // avant le départ : on prévisualise le Jour 1
   var DEPART = getTripDepartDate();
-  var refDate = new Date(DEPART); refDate.setDate(refDate.getDate()+refOffset);
+  var refDate = DEPART ? new Date(DEPART) : new Date(); refDate.setDate(refDate.getDate()+refOffset);
   var todayStr = toLocalISODate(refDate);
   var tomorrowDate = new Date(refDate); tomorrowDate.setDate(tomorrowDate.getDate()+1);
   var tomorrowStrRef = toLocalISODate(tomorrowDate);
@@ -9830,7 +9842,7 @@ function renderToday(){
     +summaryBadge('map-pin', todayActs.length, 'Activité'+(todayActs.length>1?'s':''))
     +'</div>';
 
-  var isPreTrip = ts.elapsedDays < 0;
+  var isPreTrip = hasDepartDate && ts.elapsedDays < 0;
   var todayCardTitle = isPreTrip ? 'Prochainement' : "Aujourd'hui";
   var tomorrowCardTitle = isPreTrip ? 'Ensuite' : 'Demain';
 
@@ -10105,6 +10117,7 @@ function getActivityDate(actKey, countryId, cityName, actIdx, totalActs){
   if(dayOffsetInCity<0) dayOffsetInCity = 0;
   var totalOffset = countryStart + cityStart + dayOffsetInCity;
   var DEPART = getTripDepartDate();
+  if(!DEPART) return null;
   var d = new Date(DEPART);
   d.setDate(d.getDate()+totalOffset);
   return toLocalISODate(d);
@@ -10425,18 +10438,19 @@ function renderIntercountryConnection(fromCountry,toCountry,index,flight,movemen
 
 function renderCountriesScreen(){
   var ts = getTripStatus();
+  var hasJourneyDate=ts.elapsedDays!==null;
   var globalStart=(typeof CURRENT_TRIP!=='undefined'&&CURRENT_TRIP&&CURRENT_TRIP.start_date)||'';
   var globalEnd=(typeof CURRENT_TRIP!=='undefined'&&CURRENT_TRIP&&CURRENT_TRIP.end_date)||'';
   var globalDuration=globalStart&&globalEnd?Math.round((new Date(globalEnd+'T00:00:00')-new Date(globalStart+'T00:00:00'))/86400000):0;
   const totalDays=globalDuration>0?globalDuration:COUNTRIES.reduce(function(s,c){return s+c.days;},0);
-  var journeyElapsed=ts.elapsedDays;
+  var journeyElapsed=hasJourneyDate?ts.elapsedDays:0;
   if(globalDuration>0){var journeyToday=new Date();journeyToday.setHours(0,0,0,0);journeyElapsed=Math.round((journeyToday-new Date(globalStart+'T00:00:00'))/86400000);}
   const tripDay=Math.max(1,Math.min(totalDays,journeyElapsed+1));
   const tripPct=totalDays>0?Math.round((Math.max(0,Math.min(totalDays,journeyElapsed))/totalDays)*100):0;
   var tripRecap=COUNTRIES.length+' pays au total';
-  var journeyStatus=journeyElapsed<0?'Départ dans '+Math.abs(journeyElapsed)+' jours':(journeyElapsed>=totalDays?'Voyage terminé':'Jour '+tripDay+' sur '+totalDays);
+  var journeyStatus=!hasJourneyDate?'Dates à renseigner':(journeyElapsed<0?'Départ dans '+Math.abs(journeyElapsed)+' jours':(journeyElapsed>=totalDays?'Voyage terminé':'Jour '+tripDay+' sur '+totalDays));
   var journeyProgress=journeyElapsed<0?0:tripPct;
-  var journeyHead='<div class="countries-journey-head"><div class="countries-journey-head-main"><div><div class="countries-journey-title">Votre itinéraire</div><div class="countries-journey-meta">'+tripRecap+'</div></div><div class="countries-journey-countdown">'+svgIcon(journeyElapsed<0?'plane':'map-pin',14)+' '+journeyStatus+'</div></div><div class="countries-journey-progress"><span style="width:'+journeyProgress+'%"></span></div></div>';
+  var journeyHead='<div class="countries-journey-head"><div class="countries-journey-head-main"><div><div class="countries-journey-title">Votre itinéraire</div><div class="countries-journey-meta">'+tripRecap+'</div></div><div class="countries-journey-countdown">'+svgIcon(!hasJourneyDate?'calendar':(journeyElapsed<0?'plane':'map-pin'),14)+' '+journeyStatus+'</div></div><div class="countries-journey-progress"><span style="width:'+journeyProgress+'%"></span></div></div>';
 
   var list = COUNTRIES;
 
@@ -13766,6 +13780,7 @@ function getTripDurationLabel(){
 }
 function renderCountdown() {
   var DEPART = getTripDepartDate();
+  if(!DEPART) return '<div class="countdown-bar"><span class="cd-emoji" data-icon="calendar" data-icon-size="22"></span><div class="cd-info"><div class="cd-label">Départ</div><div class="cd-date">Date à renseigner</div></div></div>';
   var now = new Date();
   var diff = DEPART - now;
   var countryCount = COUNTRIES.length;
@@ -13791,6 +13806,7 @@ function startCountdownTick() {
   clearInterval(window._cdInterval);
   window._cdInterval = setInterval(function(){
     var DEPART = getTripDepartDate();
+    if(!DEPART) return;
     var diff = DEPART - new Date();
     if(diff < 0) return;
     var totalSecs = Math.floor(diff/1000);
