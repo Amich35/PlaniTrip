@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-24·sha:create-trip-wizard-v1';
+var APP_BUILD = '2026-08-24·sha:today-custom-photo-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9933,7 +9933,11 @@ function renderToday(){
       var pickIdx = Math.abs(hashSeed) % todayCandidates.length;
       var pick0 = todayCandidates[pickIdx];
       var pick = {name:pick0.name, meta:pick0.meta, cityName:pick0.city, actKey:pick0.key, ck:pick0.ck};
-      var spotQuery = _PLACE_QUERY_OVERRIDES[pick.name] || (pick.name+' '+pick.cityName);
+      // Utiliser exactement la même clé que les cartes et la fiche activité :
+      // activité + nom interne de la ville + pays. Sinon la photo personnalisée
+      // synchronisée est ignorée ici et le cache Wikimedia reprend la priorité.
+      var spotCityName = pick.ck ? pick.ck.slice(c.id.length+1) : pick.cityName;
+      var spotQuery = _PLACE_QUERY_OVERRIDES[pick.name] || (pick.name+' '+spotCityName+' '+getEnglishCountryName(c.name));
       photoSpotCard = '<div class="info-card" style="padding:0;overflow:hidden;cursor:pointer" onclick="openDetail(\''+jsStrEsc(pick.actKey)+'\',\''+jsStrEsc(pick.name)+'\',\''+jsStrEsc(pick.ck)+'\')">'
         +'<div class="home-hero" data-img-query="'+escHtml(spotQuery)+'" style="height:150px;border-radius:0;justify-content:center;align-items:center"><span class="home-hero-fallback-icon" style="color:rgba(255,255,255,0.35)">'+svgIcon('camera',30)+'</span></div>'
         +'<div style="padding:14px 16px">'
