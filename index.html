@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-24·sha:today-custom-photo-v1';
+var APP_BUILD = '2026-08-24·sha:country-count-clarity-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10419,10 +10419,10 @@ function renderCountriesScreen(){
   if(globalDuration>0){var journeyToday=new Date();journeyToday.setHours(0,0,0,0);journeyElapsed=Math.round((journeyToday-new Date(globalStart+'T00:00:00'))/86400000);}
   const tripDay=Math.max(1,Math.min(totalDays,journeyElapsed+1));
   const tripPct=totalDays>0?Math.round((Math.max(0,Math.min(totalDays,journeyElapsed))/totalDays)*100):0;
-  var tripRecap=COUNTRIES.length+' pays';
+  var tripRecap=COUNTRIES.length+' pays au total';
   var journeyStatus=journeyElapsed<0?'Départ dans '+Math.abs(journeyElapsed)+' jours':(journeyElapsed>=totalDays?'Voyage terminé':'Jour '+tripDay+' sur '+totalDays);
   var journeyProgress=journeyElapsed<0?0:tripPct;
-  var journeyHead='<div class="countries-journey-head"><div class="countries-journey-head-main"><div><div class="countries-journey-title">Votre itinéraire</div><div class="countries-journey-meta">'+tripRecap+' · '+totalDays+' jours</div></div><div class="countries-journey-countdown">'+svgIcon(journeyElapsed<0?'plane':'map-pin',14)+' '+journeyStatus+'</div></div><div class="countries-journey-progress"><span style="width:'+journeyProgress+'%"></span></div></div>';
+  var journeyHead='<div class="countries-journey-head"><div class="countries-journey-head-main"><div><div class="countries-journey-title">Votre itinéraire</div><div class="countries-journey-meta">'+tripRecap+'</div></div><div class="countries-journey-countdown">'+svgIcon(journeyElapsed<0?'plane':'map-pin',14)+' '+journeyStatus+'</div></div><div class="countries-journey-progress"><span style="width:'+journeyProgress+'%"></span></div></div>';
 
   var list = COUNTRIES;
 
