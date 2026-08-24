@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-24·sha:clean-program-dates-v1';
+var APP_BUILD = '2026-08-24·sha:clean-program-dates-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3010,7 +3010,14 @@ function rebuildCountriesFromState(){
     // Le programme intégré est un héritage du voyage historique Asie 2026.
     // Pour tout autre voyage, le programme vient uniquement de son état namespacé
     // et de Supabase (cities/activities filtrés par trip_id).
-    if(CURRENT_TRIP && CURRENT_TRIP.name !== 'Asie 2026') builtInCopy.cities = [];
+    if(CURRENT_TRIP && CURRENT_TRIP.name !== 'Asie 2026'){
+      builtInCopy.cities = [];
+      builtInCopy.dates = 'À définir';
+      builtInCopy.days = 0;
+      builtInCopy.dateStart = '';
+      builtInCopy.dateEnd = '';
+      if(builtInCopy.practical) builtInCopy.practical.checklist = [];
+    }
     COUNTRIES.push(builtInCopy);
   });
   // Restore countries the user added (persisted separately from the built-in catalog)
@@ -8908,7 +8915,7 @@ function changeMovementDurationUnit(inputId,selectEl){
   selectEl.dataset.previous=next;
 }
 function builtinMovementsForCountry(countryId){
-  if(countryId!=='jp') return [];
+  if(countryId!=='jp' || !CURRENT_TRIP || CURRENT_TRIP.name !== 'Asie 2026') return [];
   var osakaAccom=(Array.isArray(S.accom&&S.accom.jp_Osaka)?S.accom.jp_Osaka:[])[0];
   var osakaDestination=osakaAccom&&osakaAccom.name ? osakaAccom.name : 'Logement Osaka';
   return [
