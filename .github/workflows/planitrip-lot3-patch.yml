@@ -16,9 +16,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Verify expected parent
+      - name: Verify audited index is unchanged
         run: |
-          test "$(git rev-parse HEAD^)" = "854155a12a6d2ba0ba3b13dac1bad687287a97dd"
+          test "$(git rev-parse 854155a12a6d2ba0ba3b13dac1bad687287a97dd:index.html)" = "$(git rev-parse HEAD:index.html)"
       - name: Apply minimal lot 3 patch
         run: |
           python3 - <<'PY'
@@ -33,7 +33,7 @@ jobs:
           assert s.count(old_build) == 1, 'APP_BUILD inattendu'
           s = s.replace(old_build, new_build, 1)
 
-          old_rebuild = """  BUILT_IN_COUNTRIES.forEach(function(c){ COUNTRIES.push(JSON.parse(JSON.stringify(c))); });"""
+          old_rebuild = "  BUILT_IN_COUNTRIES.forEach(function(c){ COUNTRIES.push(JSON.parse(JSON.stringify(c))); });"
           new_rebuild = """  BUILT_IN_COUNTRIES.forEach(function(c){
     var builtInCopy = JSON.parse(JSON.stringify(c));
     // Le programme intégré est un héritage du voyage historique Asie 2026.
@@ -67,8 +67,8 @@ jobs:
           assert s.count(old_migration) == 1, 'migration legacy inattendue'
           s = s.replace(old_migration, new_migration, 1)
 
-          old_enter_dates = """  if(!skipAutofillDates) autofillMissingCountryDates();"""
-          new_enter_dates = """  // Les dates par pays sont explicites : ouvrir un voyage ne doit jamais les inventer."""
+          old_enter_dates = "  if(!skipAutofillDates) autofillMissingCountryDates();"
+          new_enter_dates = "  // Les dates par pays sont explicites : ouvrir un voyage ne doit jamais les inventer."
           assert s.count(old_enter_dates) == 1, 'appel autofill enterTrip inattendu'
           s = s.replace(old_enter_dates, new_enter_dates, 1)
 
@@ -102,7 +102,7 @@ async function openCountryModal()"""
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re, subprocess, tempfile
+          import re, subprocess
           html = Path('index.html').read_text(encoding='utf-8')
           scripts = re.findall(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>', html, flags=re.I)
           if not scripts:
