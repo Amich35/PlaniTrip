@@ -1529,10 +1529,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-25·sha:offline-trips-timeout-v1';
+var APP_BUILD = '2026-08-25·sha:city-sync-diag-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
+var CITY_SYNC_DIAG = null;
 let LAST_HANDLED_USER_ID = null;
 let _userInitiatedLogin = false; // true uniquement quand l'utilisateur clique explicitement Se connecter/Créer un compte — jamais lors d'une restauration automatique de session (reload, pull-to-refresh)
 let IN_PASSWORD_RECOVERY = false;
@@ -14958,6 +14959,50 @@ function syncActiveNavTab(){
   if(el) el.classList.add('active');
 }
 var _lastScreenKey = null;
+function _citySyncDiagActive(){
+  return !!(CURRENT_USER && CURRENT_TRIP
+    && CURRENT_USER.id === 'b630f59d-97bb-4e1c-b016-90993753277c'
+    && CURRENT_TRIP.id === 'da115c78-a9a0-48df-b328-c15c89c90f9a');
+}
+function _citySyncDiagTrueKeys(map){
+  return Object.keys(map||{}).filter(function(key){ return !!map[key]; });
+}
+function _citySyncDiagError(error){
+  if(!error) return '';
+  return [error.code,error.message,error.details,error.hint].filter(Boolean).join(' · ');
+}
+function _citySyncDiagList(value){
+  if(Array.isArray(value)) return value.length ? value.join(' · ') : '∅';
+  if(value===undefined || value===null || value==='') return '∅';
+  return String(value);
+}
+function _citySyncDiagLine(label,value){
+  return '<div style="margin-top:5px;line-height:1.35"><strong>'+escHtml(label)+' :</strong> '+escHtml(_citySyncDiagList(value))+'</div>';
+}
+function renderCitySyncDiagCard(){
+  if(!_citySyncDiagActive()) return '';
+  var d=CITY_SYNC_DIAG||{};
+  var citiesStatus=d.citiesFetchDone
+    ? (d.citiesFetchError ? 'ERREUR — '+d.citiesFetchError : 'OK — '+(d.citiesFetchCount||0)+' ligne(s)')
+    : 'en attente';
+  var detailsStatus=d.detailsFetchDone
+    ? (d.detailsFetchError ? 'ERREUR — '+d.detailsFetchError : 'OK — '+(d.detailsFetchCount||0)+' ligne(s)')
+    : 'en attente';
+  return '<div style="margin:12px 14px;padding:12px;border:2px solid #d97706;border-radius:12px;background:#fff7ed;color:#431407;font-size:11px;word-break:break-word">'
+    +'<div style="font-size:13px;font-weight:800">Diagnostic sync villes — temporaire</div>'
+    +_citySyncDiagLine('Build',APP_BUILD)
+    +_citySyncDiagLine('Lecture cities',citiesStatus)
+    +_citySyncDiagLine('Serveur cities',d.serverCities)
+    +_citySyncDiagLine('Fusion S.addedCities.kh',d.addedKhAfterMerge)
+    +_citySyncDiagLine('Lecture activity_details',detailsStatus)
+    +_citySyncDiagLine('Marqueurs serveur deletedCity',d.serverDeletedCityMarkers)
+    +_citySyncDiagLine('Suppressions avant détails',d.deletedBeforeDetails)
+    +_citySyncDiagLine('Suppressions après détails',d.deletedAfterDetails)
+    +_citySyncDiagLine('Tombstones locaux cities',d.localCityTombstones)
+    +_citySyncDiagLine('Rendu final Cambodge',d.finalKhCities)
+    +_citySyncDiagLine('Objets pays kh',d.finalKhCountryCount)
+    +'</div>';
+}
 function renderContent(){
   const c=getC();let html='';
   var screenKey = S.tab+'|'+(S.countryDetailTab||'')+'|'+(S.country||'')+'|'+(S.currentCityKey||'');
@@ -14987,6 +15032,7 @@ function renderContent(){
   else if(S.tab==='access-management')html=renderAccessManagementScreen();
   else if(S.tab==='my-account')html=renderMyAccountScreen();
   else html=renderMore();
+  if(_citySyncDiagActive()) html=renderCitySyncDiagCard()+html;
   document.getElementById('mainContent').innerHTML=html;
   document.querySelectorAll('.day-badge[data-actkey]').forEach(function(btn){
     btn.addEventListener('click',function(e){e.stopPropagation();cycleDay(btn.getAttribute('data-actkey'),btn.getAttribute('data-ck'));});
@@ -15881,11 +15927,39 @@ function _migrateActivityKeyIfNeeded(stableKey, legacyKey){
 }
 
 async function loadCitiesActivities(){
+  if(_citySyncDiagActive()){
+    CITY_SYNC_DIAG={
+      citiesFetchDone:false,
+      citiesFetchError:'',
+      citiesFetchCount:0,
+      serverCities:[],
+      addedKhAfterMerge:[],
+      detailsFetchDone:false,
+      detailsFetchError:'',
+      detailsFetchCount:0,
+      serverDeletedCityMarkers:[],
+      deletedBeforeDetails:[],
+      deletedAfterDetails:[],
+      localCityTombstones:[],
+      finalKhCities:[],
+      finalKhCountryCount:0
+    };
+  } else {
+    CITY_SYNC_DIAG=null;
+  }
   if(!sb || !CURRENT_TRIP) return;
   // Accumule les migrations legacy → stable effectuées pendant ce chargement, pour les
   // persister côté serveur une seule fois à la fin (voir bloc après la boucle villes).
   var _pendingKeyMigrations = [];
-  var {data:citiesData} = await sb.from('cities').select('*').eq('trip_id',CURRENT_TRIP.id);
+  var citiesResult = await sb.from('cities').select('*').eq('trip_id',CURRENT_TRIP.id);
+  var citiesData = citiesResult ? citiesResult.data : null;
+  var citiesError = citiesResult ? citiesResult.error : {message:'Réponse Supabase absente'};
+  if(_citySyncDiagActive() && CITY_SYNC_DIAG){
+    CITY_SYNC_DIAG.citiesFetchDone=true;
+    CITY_SYNC_DIAG.citiesFetchError=_citySyncDiagError(citiesError);
+    CITY_SYNC_DIAG.citiesFetchCount=(citiesData||[]).length;
+    CITY_SYNC_DIAG.serverCities=(citiesData||[]).map(function(row){ return row.country_id+' / '+row.city; });
+  }
   // Tri déterministe (garde-fou complémentaire — l'identité stable _sid reste la
   // vraie correction, ce tri limite seulement l'instabilité résiduelle pour les
   // activités jamais encore migrées, ex: avant leur premier chargement).
@@ -15908,6 +15982,9 @@ async function loadCitiesActivities(){
     });
     S.addedCities[cid] = sList.concat(local);
   });
+  if(_citySyncDiagActive() && CITY_SYNC_DIAG){
+    CITY_SYNC_DIAG.addedKhAfterMerge=((S.addedCities&&S.addedCities.kh)||[]).map(function(city){ return city.city; });
+  }
   // Activités : serveur autoritaire par clé ville, garder les activités locales non encore synchro,
   // en excluant celles marquées comme supprimées via tombstone.
   var deletedActTombstones = getDeletedTombstones('activities');
@@ -16111,7 +16188,17 @@ async function loadCountrySettings(){
 }
 async function loadActivityDetails(){
   if(!sb || !CURRENT_TRIP) return;
-  var {data} = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
+  var activityDetailsResult = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
+  var data = activityDetailsResult ? activityDetailsResult.data : null;
+  var activityDetailsError = activityDetailsResult ? activityDetailsResult.error : {message:'Réponse Supabase absente'};
+  if(_citySyncDiagActive() && CITY_SYNC_DIAG){
+    CITY_SYNC_DIAG.detailsFetchDone=true;
+    CITY_SYNC_DIAG.detailsFetchError=_citySyncDiagError(activityDetailsError);
+    CITY_SYNC_DIAG.detailsFetchCount=(data||[]).length;
+    CITY_SYNC_DIAG.serverDeletedCityMarkers=(data||[]).filter(function(row){
+      return row.detail_key==='__planitrip__deletedCities' || row.detail_key.indexOf('__planitrip__deletedCity__')===0;
+    }).map(function(row){ return row.detail_key; });
+  }
   if(!window._customDetails) window._customDetails={};
   // Dédoublonnage défensif par detail_key (garde la ligne la plus récente),
   // au cas où d'anciens doublons subsisteraient malgré la contrainte UNIQUE.
@@ -16604,7 +16691,13 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   await loadChecklist();
   await loadJournalEntries();
   await loadCountrySettings();
+  if(_citySyncDiagActive() && CITY_SYNC_DIAG){
+    CITY_SYNC_DIAG.deletedBeforeDetails=_citySyncDiagTrueKeys(S.deletedCities);
+  }
   await loadActivityDetails();
+  if(_citySyncDiagActive() && CITY_SYNC_DIAG){
+    CITY_SYNC_DIAG.deletedAfterDetails=_citySyncDiagTrueKeys(S.deletedCities);
+  }
   await loadAccommodations();
   await loadFreeBlocks();
   await loadCustomPhotos();
@@ -16638,6 +16731,15 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   migrateCountryCategoryAccents();
   migrateCountryTipsCategories();
   migrateBudgetDailyDefault();
+  if(_citySyncDiagActive() && CITY_SYNC_DIAG){
+    CITY_SYNC_DIAG.localCityTombstones=getDeletedTombstones('cities').slice();
+    var _diagKhCountries=COUNTRIES.filter(function(country){ return country.id==='kh'; });
+    CITY_SYNC_DIAG.finalKhCountryCount=_diagKhCountries.length;
+    CITY_SYNC_DIAG.finalKhCities=[];
+    _diagKhCountries.forEach(function(country){
+      (country.cities||[]).forEach(function(city){ CITY_SYNC_DIAG.finalKhCities.push(city.city); });
+    });
+  }
   // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
   // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
   if(CURRENT_USER && trip.owner_id === CURRENT_USER.id){
