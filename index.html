@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-25·sha:city-sync-diag-v2';
+var APP_BUILD = '2026-08-25·sha:country-restore-fix-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3028,6 +3028,25 @@ function rebuildCountriesFromState(){
   // Restore countries the user added (persisted separately from the built-in catalog)
   (S.customCountries||[]).forEach(function(cc){
     if(!COUNTRIES.find(function(c){return c.id===cc.id;})) COUNTRIES.push(cc);
+  });
+  // Correctif résidu de bug : un pays "custom" ne doit jamais porter le même nom qu'un pays
+  // intégré (ça ne pouvait arriver qu'à cause d'un ancien bug d'ordre d'exécution, désormais
+  // corrigé dans applyTripCountryFilter — voir commentaire associé). S'il en reste un, on
+  // fusionne ses villes éventuelles vers le vrai pays intégré puis on le supprime définitivement.
+  (S.customCountries||[]).slice().forEach(function(cc){
+    var builtInDup = BUILT_IN_COUNTRIES.find(function(b){ return b.name===cc.name; });
+    if(!builtInDup) return;
+    if(!S.addedCities) S.addedCities={};
+    if(!S.addedCities[builtInDup.id]) S.addedCities[builtInDup.id]=[];
+    (cc.cities||[]).forEach(function(city){
+      if(!S.addedCities[builtInDup.id].find(function(ci){return ci.city===city.city;})){
+        S.addedCities[builtInDup.id].push(city);
+      }
+    });
+    var idxInCustom = S.customCountries.indexOf(cc);
+    if(idxInCustom>-1) S.customCountries.splice(idxInCustom,1);
+    var idxInCountries = COUNTRIES.findIndex(function(c){return c.id===cc.id;});
+    if(idxInCountries>-1) COUNTRIES.splice(idxInCountries,1);
   });
   // Remove countries the user deleted/archived (built-in or custom)
   for(var _i=COUNTRIES.length-1;_i>=0;_i--){
@@ -15738,6 +15757,29 @@ function applyTripCountryFilter(trip) {
   tripCountries.forEach(countryName => {
     const exists = COUNTRIES.find(c => c.name === countryName);
     if (!exists) {
+      // Avant de créer un pays custom, vérifier si ce nom correspond en réalité à un pays
+      // INTÉGRÉ (catalogue historique Asie 2026) qui aurait été purgé de COUNTRIES juste avant
+      // cet appel par rebuildCountriesFromState() (car encore présent dans S.deletedCountryIds,
+      // ex: pays retiré à la création du voyage puis rajouté plus tard). Sans ce garde-fou, on créait
+      // un doublon avec un id différent (hash) et des villes/activités vides, tout en laissant le
+      // vrai pays coincé indéfiniment dans deletedCountryIds — perte silencieuse des données déjà
+      // synchronisées sous son vrai id (ex: villes ajoutées par un collaborateur).
+      const builtInMatch = BUILT_IN_COUNTRIES.find(c => c.name === countryName);
+      if (builtInMatch) {
+        const delIdx = S.deletedCountryIds.indexOf(builtInMatch.id);
+        if (delIdx !== -1) S.deletedCountryIds.splice(delIdx, 1);
+        if (!COUNTRIES.find(c => c.id === builtInMatch.id)) {
+          const restored = JSON.parse(JSON.stringify(builtInMatch));
+          restored.cities = [];
+          (S.addedCities && S.addedCities[builtInMatch.id] || []).forEach(function(savedCity){
+            if (!restored.cities.find(function(ci){ return ci.city === savedCity.city; })) {
+              restored.cities.push(savedCity);
+            }
+          });
+          COUNTRIES.push(restored);
+        }
+        return; // pays restauré sous son vrai id, pas de création custom
+      }
       // ID déterministe (dérivé du voyage + nom du pays, jamais aléatoire) : si ce pays doit être
       // recréé un jour (perte des données locales de l'appareil, reconnexion, autre appareil...),
       // il retombe TOUJOURS sur le même identifiant — ce qui reconnecte automatiquement tout ce qui
@@ -16715,6 +16757,11 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   refreshPendingInviteBadge(); // fire-and-forget — ne bloque pas le rendu
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
+  // Persiste immédiatement toute correction faite ci-dessus (restauration d'un pays intégré
+  // depuis deletedCountryIds, suppression d'un doublon custom résiduel) — sinon elle ne serait
+  // sauvegardée qu'au prochain save() déclenché ailleurs, potentiellement jamais si l'utilisateur
+  // ne fait aucune autre action modifiante pendant cette session.
+  save();
   // Les dates par pays sont explicites : ouvrir un voyage ne doit jamais les inventer.
 
   if (COUNTRIES.length === 0) {
