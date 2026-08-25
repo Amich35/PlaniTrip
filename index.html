@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-25·sha:city-sync-diag-v1';
+var APP_BUILD = '2026-08-25·sha:city-sync-diag-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15001,6 +15001,9 @@ function renderCitySyncDiagCard(){
     +_citySyncDiagLine('Tombstones locaux cities',d.localCityTombstones)
     +_citySyncDiagLine('Rendu final Cambodge',d.finalKhCities)
     +_citySyncDiagLine('Objets pays kh',d.finalKhCountryCount)
+    +_citySyncDiagLine('IDs "Cambodge" par nom',d.cambodgeIdsByName)
+    +_citySyncDiagLine('S.addedCities.kh (juste avant rendu)',d.addedCitiesKhNow)
+    +_citySyncDiagLine('deletedCountryIds',d.deletedCountryIdsNow)
     +'</div>';
 }
 function renderContent(){
@@ -16739,6 +16742,12 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     _diagKhCountries.forEach(function(country){
       (country.cities||[]).forEach(function(city){ CITY_SYNC_DIAG.finalKhCities.push(city.city); });
     });
+    // Diagnostic complémentaire : sous quel(s) id(s) "Cambodge" existe-t-il réellement dans
+    // COUNTRIES à ce stade, et S.addedCities['kh'] contient-il toujours Phnom Penh maintenant ?
+    var _diagCambodgeByName = COUNTRIES.filter(function(country){ return country.name==='Cambodge'; });
+    CITY_SYNC_DIAG.cambodgeIdsByName = _diagCambodgeByName.map(function(country){ return country.id; });
+    CITY_SYNC_DIAG.addedCitiesKhNow = (S.addedCities && S.addedCities['kh']) ? S.addedCities['kh'].map(function(c){return c.city;}) : null;
+    CITY_SYNC_DIAG.deletedCountryIdsNow = (S.deletedCountryIds||[]).slice();
   }
   // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
   // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
