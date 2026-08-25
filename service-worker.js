@@ -1,11 +1,14 @@
-const CACHE_NAME = 'planitrip-v8';
+const CACHE_NAME = 'planitrip-v9';
 const ASSETS = [
   'index.html',
   'manifest.json',
   'vendor/xlsx.full.min.js',
   'vendor/mammoth.browser.min.js',
   'vendor/pdf.min.js',
-  'vendor/pdf.worker.min.js'
+  'vendor/pdf.worker.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
+  'https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
 ];
 
 // Installation : mise en cache des ressources essentielles (pour le mode hors-ligne)
