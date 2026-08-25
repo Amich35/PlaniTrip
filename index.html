@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-25·sha:offline-session-fix-v1';
+var APP_BUILD = '2026-08-25·sha:offline-session-fix-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15446,9 +15446,12 @@ async function initAuth() {
     const { data: { session }, error } = await sb.auth.getSession();
     if (error) {
       // getSession() tente de rafraîchir le jeton via le réseau ; hors ligne, cette requête
-      // échoue même si une session valide est déjà en cache localement. Dans ce cas précis
-      // (hors ligne + session en cache), on reprend avec l'utilisateur en cache plutôt que
-      // de bloquer sur l'écran de connexion (qui donne l'impression d'une déconnexion).
+      // échoue même si une session valide est déjà en cache localement. Dans ce cas, on reprend
+      // avec l'utilisateur en cache plutôt que de bloquer sur l'écran de connexion (qui donne
+      // l'impression d'une déconnexion). On ne se fie PAS à navigator.onLine : cette API est
+      // connue pour être peu fiable sur Safari iOS/PWA en mode avion (peut renvoyer true à tort).
+      // La validité réelle de la session sera de toute façon revérifiée par onAuthenticated()
+      // dès qu'une requête réseau (ex. lecture du profil) aboutira.
       var cachedUser = null;
       try {
         var raw = customAuthStorage.getItem('sb-gfgjwtubvslrkatmshls-auth-token');
@@ -15458,8 +15461,8 @@ async function initAuth() {
         }
       } catch(e) { cachedUser = null; }
 
-      if (!navigator.onLine && cachedUser) {
-        console.warn('[PlaniTrip diag] getSession() a échoué hors ligne, reprise avec la session en cache pour', cachedUser.id);
+      if (cachedUser) {
+        console.warn('[PlaniTrip diag] getSession() a échoué, reprise avec la session en cache pour', cachedUser.id);
         LAST_HANDLED_USER_ID = cachedUser.id;
         onAuthenticated(cachedUser, false);
         return;
