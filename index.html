@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:trip-return-generic-resolver-v1';
+var APP_BUILD = '2026-08-26·sha:trip-return-diag-panel-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -12693,6 +12693,20 @@ function confirmDeleteCurrentTrip(){
 }
 function renderMore(){
   var myPseudo = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email] && PROFILES_MAP[CURRENT_USER.email]!==CURRENT_USER.email) ? PROFILES_MAP[CURRENT_USER.email] : '';
+  // Panneau de diagnostic temporaire pour _getMarkedTripReturn() — visible UNIQUEMENT sur
+  // les voyages de test (jamais sur "Asie 2026", le voyage réel). À retirer une fois les
+  // tests réels validés, dans un commit séparé (même principe que city-sync-diag).
+  var _TEST_TRIP_IDS = ['da115c78-a9a0-48df-b328-c15c89c90f9a','1b0a0c9d-856f-4e3e-a112-79be5d00a9d4'];
+  var tripReturnDiagCard = '';
+  if(typeof CURRENT_TRIP!=='undefined' && CURRENT_TRIP && _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)>-1){
+    var _diag = _getMarkedTripReturn();
+    var _diagText = JSON.stringify(_diag, null, 2);
+    tripReturnDiagCard = '<div class="info-card" style="padding:14px 16px;margin-top:4px">'
+      +'<div style="font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Diagnostic retour (test)</div>'
+      +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_diagText)+'</pre>'
+      +'<button onclick="renderContent()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Rafraîchir</button>'
+      +'</div>';
+  }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Plus</div>'
     +'<div class="info-card" style="padding:6px">'
@@ -12714,6 +12728,7 @@ function renderMore(){
     +'<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">Exporte tes données locales (activités, dates, catégories…) pour la récupération de données. Aucune donnée sensible incluse.</div>'
     +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
     +'</div>'
+    +tripReturnDiagCard
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">'+APP_BUILD+'</div>'
     +'</div>';
