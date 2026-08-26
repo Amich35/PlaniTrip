@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-25·sha:remove-city-sync-diag-v1';
+var APP_BUILD = '2026-08-26·sha:night-context-contract-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6678,29 +6678,37 @@ function cityStayRange(ck){
   return (start && end) ? {start:start, end:end} : null;
 }
 function getNightContextForDate(dateStr){
+  function ckToRef(ck){
+    var countryId = countryIdFromCityKey(ck);
+    var city = countryId && ck.indexOf(countryId+'_')===0 ? ck.slice(countryId.length+1) : ck;
+    return {country:countryId, city:city, ck:ck};
+  }
   var nightMatches=[], endMatches=[];
   if(S.cityDates){
     Object.keys(S.cityDates).forEach(function(ck){
       var r = S.cityDates[ck];
       if(!r || !r.start || !r.end) return;
-      if(r.start<=dateStr && dateStr<r.end) nightMatches.push(ck);
-      if(r.end===dateStr) endMatches.push(ck);
+      if(r.start<=dateStr && dateStr<r.end) nightMatches.push(ckToRef(ck));
+      if(r.end===dateStr) endMatches.push(ckToRef(ck));
     });
   }
   var tonightCity=null, transitionFromCity=null, confidence='none';
   if(nightMatches.length===1){
     tonightCity=nightMatches[0];
-    var fromCks=endMatches.filter(function(ck){return ck!==tonightCity;});
-    if(fromCks.length===1){
-      transitionFromCity=fromCks[0];
+    var fromRefs=endMatches.filter(function(ref){return ref.ck!==tonightCity.ck;});
+    if(fromRefs.length===1){
+      transitionFromCity=fromRefs[0];
       confidence='transition';
-    } else if(fromCks.length>1){
+    } else if(fromRefs.length>1){
       confidence='ambiguous';
+      transitionFromCity=null;
     } else {
       confidence='strict';
     }
   } else if(nightMatches.length>1){
     confidence='ambiguous';
+    tonightCity=nightMatches[0];
+    transitionFromCity=null;
   }
   return {tonightCity:tonightCity, transitionFromCity:transitionFromCity, confidence:confidence};
 }
