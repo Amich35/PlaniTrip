@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:trip-return-flight-flag-v1';
+var APP_BUILD = '2026-08-26·sha:movement-trip-return-participants-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9098,10 +9098,24 @@ function renderArchivedMovementsScreen(){
   return '<div class="section" style="padding-bottom:20px;padding-top:16px"><div class="more-row" onclick="openCountryDetail(\''+jsStrEsc(countryId)+'\',\'lieux\')" style="padding:0 0 12px;cursor:pointer;color:var(--ink-muted);font-size:14px">‹ Retour'+(c?' à '+escHtml(c.name):'')+'</div><div class="section-title" style="margin-bottom:12px">Corbeille — Déplacements</div><div class="info-card" style="padding:6px">'+rows+'</div></div>';
 }
 function toggleMovementAccordion(id){if(!S.uiAccordion)S.uiAccordion={};var k='movement_'+id;S.uiAccordion[k]=!S.uiAccordion[k];save();renderContent();}
+// isTripReturn (movement) : marqueur explicite "retour final du voyage", jamais déduit
+// (ni du mode de transport, ni de la position dans la liste, ni de la destination).
+// LIMITE CONNUE, VOLONTAIREMENT NON CORRIGÉE ICI : contrairement à un flight (qui a
+// arrivalDate distinct de date, pour gérer un vol traversant minuit), un movement n'a
+// qu'un seul champ `date` — pas d'équivalent arrivalDate. Un futur résolveur générique
+// du retour (ex: _getMarkedTripReturn(), combinant flights + movements) DOIT calculer
+// la date effective ainsi :
+//   flight   → effDate = f.arrivalDate || f.date
+//   movement → effDate = m.date   (faute de champ d'arrivée séparé)
+// Conséquence assumée : un trajet retour de nuit en train/bus/ferry (parti la veille,
+// arrivé le lendemain) sera rattaché à sa date de DÉPART, pas d'arrivée. Ce n'est PAS
+// une règle métier volontaire — c'est une limite du modèle de données actuel. Ne pas
+// "corriger" silencieusement ce comportement sans en discuter : ajouter un champ
+// arrivalDate à movements serait une extension de schéma, hors périmètre de ce commit.
 function openMovementModal(id,countryId){
   var found=id?movementsForCountry(countryId).find(function(m){return m.id===id;}):null;
   var prefill=found?null:movementPrefill(countryId);
-  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:prefill.origin||'',destination:prefill.destination||'',originRef:prefill.originRef||'',destinationRef:prefill.destinationRef||'',date:prefill.date||'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',durationUnit:'min',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',primaryMode:'Train',legs:[]};
+  _movementDraft=found?JSON.parse(JSON.stringify(found)):{id:movementUid('mv_'),countryId:countryId,origin:prefill.origin||'',destination:prefill.destination||'',originRef:prefill.originRef||'',destinationRef:prefill.destinationRef||'',date:prefill.date||'',departureTime:'',arrivalTime:'',status:'planned',durationMin:'',durationUnit:'min',costPerPersonJPY:'',peopleCount:2,notes:'',source:'manual',primaryMode:'Train',legs:[],participants:[],isTripReturn:false};
   if(!_movementDraft.priceCurrencyMode)_movementDraft.priceCurrencyMode='LOCAL';
   if(_movementDraft.costManualOverride==null)_movementDraft.costManualOverride=false;
   if(!_movementDraft.durationUnit)_movementDraft.durationUnit='min';
@@ -9123,6 +9137,8 @@ function movementDraftFromInputs(skipPrices){
   if(originEl)_movementDraft.originRef=originEl.dataset.ref||'';
   if(destinationEl)_movementDraft.destinationRef=destinationEl.dataset.ref||'';
   if(primaryModeEl)_movementDraft.primaryMode=primaryModeEl.value||'Train';
+  var isTripReturnEl=document.getElementById('mv_isTripReturn');
+  if(isTripReturnEl)_movementDraft.isTripReturn=!!isTripReturnEl.checked;
   var legs=_movementDraft.legs||[];
   for(var stopIndex=0;stopIndex<Math.max(0,legs.length-1);stopIndex++){
     var stopEl=document.getElementById('mvs_'+stopIndex+'_place'),modeAfterEl=document.getElementById('mvs_'+stopIndex+'_modeAfter');
@@ -9269,10 +9285,16 @@ function renderMovementModalBody(){
     +'<label class="mv-field" style="display:block"><span class="mv-field-label">Note générale</span><textarea class="ef-input" id="mv_notes" rows="2" style="resize:none">'+escHtml(m.notes||'')+'</textarea></label></div></details>';
   var stopDetails='<details class="mv-option-group"'+((m.legs||[]).length>1?' open':'')+'><summary><span class="mv-option-chevron">›</span> Correspondances <span class="mv-option-label">(optionnel)</span></summary><div class="mv-option-body"><div class="mv-stops-list">'+(stops||'<div style="font-size:12px;color:var(--ink-subtle)">Aucune correspondance : trajet direct.</div>')+'</div>'
     +'<button type="button" class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une correspondance</button>'+technicalLegs+'</div></details>';
+  var mvPeople=getActiveTravelerList();
+  var mvParticipantChips=mvPeople.map(function(p){var checked=Array.isArray(m.participants)&&m.participants.indexOf(p)>-1;return '<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleMovementParticipant(\''+jsStrEsc(p)+'\')">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';}).join('');
+  var mvSelectedNames=(Array.isArray(m.participants)?m.participants:[]).map(function(p){return personDisplayName(p,'Toi');});
+  var mvParticipantSummary=mvSelectedNames.length?mvSelectedNames.join(', '):'Non renseigné';
+  var travelersDetails='<details class="mv-option-group"><summary><span class="mv-option-chevron">›</span> Voyageurs concernés <span class="mv-option-label">(optionnel — '+escHtml(mvParticipantSummary)+')</span></summary><div class="mv-option-body">'+mvParticipantChips+'</div></details>';
+  var returnCheckboxHTML='<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--ink);cursor:pointer"><input type="checkbox" id="mv_isTripReturn"'+(m.isTripReturn===true?' checked':'')+' style="width:16px;height:16px;flex-shrink:0"><span>Ce déplacement correspond au retour final du voyage</span></label>';
   document.getElementById('movementModalBody').innerHTML='<div class="mv-route-head"><span class="mv-route-line"></span><label class="mv-route-field"><span class="mv-label">Lieu de départ</span>'+movementLocationInput('origin',movementLocationLabel(m.originRef,m.origin),m.originRef)+'</label><label class="mv-route-field"><span class="mv-label">Lieu d’arrivée</span>'+movementLocationInput('destination',movementLocationLabel(m.destinationRef,m.destination),m.destinationRef)+'</label></div>'
     +(coherence?'<div class="mv-coherence">'+svgIcon('triangle-alert',14)+'<span>'+escHtml(coherence)+'</span><button type="button" onclick="linkMovementToPrevious()">Relier</button></div>':'')
     +'<label class="mv-field mv-essential-mode"><span class="mv-field-label">Mode principal</span><select class="ef-select" id="mv_primaryMode">'+movementModeOptions(movementPrimaryMode(m))+'</select></label>'
-    +optionalDetails+stopDetails;
+    +optionalDetails+stopDetails+travelersDetails+returnCheckboxHTML;
   var deleteBtn=document.getElementById('movementModalDeleteBtn');
   if(deleteBtn)deleteBtn.style.display=existing?'block':'none';
   _movementPriceInputsDirty=false;
@@ -9282,6 +9304,13 @@ function linkMovementToPrevious(){
 }
 function toggleMovementLeg(i){movementDraftFromInputs();_movementOpenLeg=_movementOpenLeg===i?null:i;renderMovementModalBody();}
 function toggleMovementSchedule(){movementDraftFromInputs();_movementScheduleOpen=true;renderMovementModalBody();}
+function toggleMovementParticipant(email){
+  if(!_movementDraft) return;
+  if(!Array.isArray(_movementDraft.participants)) _movementDraft.participants=[];
+  var idx=_movementDraft.participants.indexOf(email);
+  if(idx>-1) _movementDraft.participants.splice(idx,1); else _movementDraft.participants.push(email);
+  renderMovementModalBody();
+}
 function movementLegMenu(i){if(confirm('Supprimer ce segment ?'))removeMovementLeg(i);}
 function addMovementLeg(){
   movementDraftFromInputs();
