@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:trip-return-diag-panel-v1';
+var APP_BUILD = '2026-08-26·sha:accueil-night-return-block-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6712,6 +6712,18 @@ function getNightContextForDate(dateStr){
   }
   return {tonightCity:tonightCity, transitionFromCity:transitionFromCity, confidence:confidence};
 }
+// Résolution sûre d'une référence ville {country,city,ck} (sortie de getNightContextForDate).
+// Ne fabrique JAMAIS un nom d'affichage à partir du seul ck. Cherche le vrai pays puis le
+// vrai objet ville dans COUNTRIES ; n'appelle _cityDisplayName(ck, cityObj) que si cet objet
+// est trouvé. Repli sur ref.city (nom brut) uniquement si la résolution échoue (incohérence
+// de données) — important pour les identifiants de pays personnalisés.
+function _resolveCityRef(ref){
+  if(!ref || !ref.ck) return {label:'', ck:'', clickable:false};
+  var c = COUNTRIES.find(function(co){ return co.id===ref.country; });
+  var cityObj = c ? c.cities.find(function(ci){ return c.id+'_'+ci.city===ref.ck; }) : null;
+  var label = cityObj ? _cityDisplayName(ref.ck, cityObj) : (ref.city||ref.ck);
+  return {label:label, ck:ref.ck, clickable:!!cityObj};
+}
 function fmtCityStayLine(ck){
   // Source canonique : S.cityDates (P0.8-A/2)
   // Fallback : logements si cityDates absent/incomplet
@@ -9982,6 +9994,47 @@ function renderToday(){
   var realTomorrowStr = toLocalISODate(new Date(Date.now()+86400000));
   var isFlightSoon = upcomingFlights.length>0 && (upcomingFlights[0].date===realTodayStr || upcomingFlights[0].date===realTomorrowStr);
 
+  // ── Bloc "où tu dors" — getNightContextForDate() + _getMarkedTripReturn() ──
+  // Condition identique au reste de l'écran (voir hasDepartDate/ts.elapsedDays plus haut) :
+  // ne pas ajouter de notion de "voyage encore actif" — un retour marqué le jour même de
+  // fin de voyage doit continuer à s'afficher.
+  var nightBlockHTML = '';
+  if(hasDepartDate && ts.elapsedDays>=0){
+    var nightCtx = getNightContextForDate(todayStr);
+    var returnInfo = _getMarkedTripReturn();
+    var returnToday = returnInfo.confidence==='strict' && returnInfo.effDate===realTodayStr;
+    var returnTomorrow = returnInfo.confidence==='strict' && returnInfo.effDate===realTomorrowStr;
+    if(returnToday){
+      // Priorité visuelle assumée : pas d'arbitrage de cohérence avec la nuit, on affiche
+      // uniquement le retour. isTripReturn est une déclaration utilisateur, pas une vérité
+      // supérieure aux dates de séjour — on ne prétend pas résoudre l'éventuel conflit.
+      nightBlockHTML = '<div class="info-card"><div class="ic-header">'+icHeaderChevron('plane','Aujourd\'hui')+'</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--ink)">Retour aujourd\'hui</div></div>';
+    } else {
+      var nbTitle='', nbSub='', nbOnclick='', nbClickable=false;
+      if(nightCtx.confidence==='strict'){
+        var refS=_resolveCityRef(nightCtx.tonightCity);
+        nbTitle='Ce soir, tu dors à '+escHtml(refS.label);
+        nbClickable=refS.clickable; nbOnclick=nbClickable?(' onclick="openCityDetail(\''+jsStrEsc(refS.ck)+'\')"'):'';
+      } else if(nightCtx.confidence==='transition'){
+        var refArr=_resolveCityRef(nightCtx.tonightCity), refFrom=_resolveCityRef(nightCtx.transitionFromCity);
+        nbTitle='Ce soir, tu dors à '+escHtml(refArr.label);
+        nbSub='Départ de '+escHtml(refFrom.label)+' ce matin';
+        nbClickable=refArr.clickable; nbOnclick=nbClickable?(' onclick="openCityDetail(\''+jsStrEsc(refArr.ck)+'\')"'):'';
+      } else {
+        // 'ambiguous' et 'none' partagent le même texte neutre — jamais de ville affichée
+        // comme fiable dans ces deux cas, jamais de fallback "dernière nuit".
+        nbTitle='Où tu dors ce soir : à préciser';
+      }
+      var nbReturnLine = returnTomorrow ? '<div class="status-sub" style="margin-top:4px">Retour demain</div>' : '';
+      nightBlockHTML = '<div class="info-card" style="cursor:'+(nbClickable?'pointer':'default')+'"'+nbOnclick+'><div class="ic-header">'+(nbClickable?icHeaderChevron('moon','Ce soir'):('<span data-icon="moon" data-icon-size="16"></span> Ce soir'))+'</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--ink)">'+nbTitle+'</div>'
+        +(nbSub?'<div class="status-sub" style="margin-top:2px">'+escHtml(nbSub)+'</div>':'')
+        +nbReturnLine
+        +'</div>';
+    }
+  }
+
   // ── Carte Demain / Ensuite ──
   var tomorrowCard = '';
   if(c){
@@ -10098,6 +10151,7 @@ function renderToday(){
     +'<div class="section-title" style="margin-bottom:12px">Aujourd\'hui</div>'
     +heroHTML
     +summaryHTML
+    +nightBlockHTML
     +importantCard
     +(isFlightSoon?flightCard:'')
     +actsCard
