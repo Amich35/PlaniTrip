@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:night-context-contract-v2';
+var APP_BUILD = '2026-08-26·sha:trip-return-flight-flag-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -11793,7 +11793,9 @@ function renderFlightModalBody(editingFlight){
     +'<label class="flight-route-field"><span class="flight-route-label">À</span><input id="newFlightTo" class="ef-input" placeholder="Destination" value="'+(editingFlight?escHtml(editingFlight.to||''):'')+'"></label></div>'
     +'<div class="flight-schedule-grid"><div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('calendar',13)+' Départ</div><div class="flight-stop-fields"><input id="newFlightDate" class="flight-date-input" type="date" value="'+(editingFlight?escHtml(editingFlight.date||''):'')+'"><input id="newFlightDepartureTime" class="flight-time-input" type="time" style="-webkit-appearance:none;appearance:none" value="'+(editingFlight?escHtml(editingFlight.departureTime||''):'')+'"></div></div>'
     +'<div class="flight-stop-card"><div class="flight-stop-title">'+svgIcon('calendar',13)+' Arrivée</div><div class="flight-stop-fields"><input id="newFlightArrivalDate" class="flight-date-input" type="date" value="'+(editingFlight?escHtml(editingFlight.arrivalDate||''):'')+'"><input id="newFlightArrivalTime" class="flight-time-input" type="time" style="-webkit-appearance:none;appearance:none" value="'+(editingFlight?escHtml(editingFlight.arrivalTime||''):'')+'"></div></div></div>'
-    +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details></div>';
+    +'<details class="flight-travelers"><summary>'+svgIcon('users',14)+'<span>Voyageurs <span style="font-weight:500;color:var(--ink-subtle)">(optionnel)</span></span><span class="flight-travelers-summary" id="flightTravelersSummary">'+escHtml(participantSummary)+'</span><span class="flight-travelers-chevron">'+svgIcon('chevron-right',13)+'</span></summary><div class="flight-travelers-body" id="flightTravelerChips">'+participantChips+'</div></details>'
+    +'<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--ink);cursor:pointer"><input type="checkbox" id="newFlightIsTripReturn"'+(editingFlight&&editingFlight.isTripReturn===true?' checked':'')+' style="width:16px;height:16px;flex-shrink:0"><span>Ce vol correspond au retour final du voyage</span></label>'
+    +'</div>';
   var btn=document.getElementById('saveFlightBtn');if(btn)btn.textContent=editingFlight?'Enregistrer les modifications':'Ajouter le vol';
   var delBtn=document.getElementById('flightDeleteBtn');if(delBtn)delBtn.style.display=editingFlight?'block':'none';
   // Inject clear buttons after each date/time input
@@ -11880,10 +11882,11 @@ async function saveFlight(){
   var existingFlight=S.editingFlightId?S.documents.tickets.flightsList.find(function(f){return f.id===S.editingFlightId;}):null;
   // Les champs ont été retirés de l'interface, mais leurs anciennes valeurs sont
   // conservées silencieusement pour qu'une modification ne détruise aucune donnée.
+  var isTripReturn = !!(document.getElementById('newFlightIsTripReturn') && document.getElementById('newFlightIsTripReturn').checked);
   var link=existingFlight?(existingFlight.link||''):'';
   var notes=existingFlight?(existingFlight.notes||''):'';
-  var flightPayload={id:flightId,from:from,to:to,date:date,arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants,participantsSpecified:true};
-  var metaPayload={arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,notes:notes,participantsSpecified:true};
+  var flightPayload={id:flightId,from:from,to:to,date:date,arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,link:link,notes:notes,participants:participants,participantsSpecified:true,isTripReturn:isTripReturn};
+  var metaPayload={arrivalDate:arrivalDate,departureTime:departureTime,arrivalTime:arrivalTime,notes:notes,participantsSpecified:true,isTripReturn:isTripReturn};
   try{
     if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='…'; }
     var flightWrite;
@@ -11948,7 +11951,7 @@ async function loadFlights(){
   // Serveur autoritaire : reconstruction complète de la liste des vols.
   S.documents.tickets.flightsList = (data||[]).map(function(row){
     var meta=(S.flightMeta&&S.flightMeta[String(row.id)])||{};
-    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,arrivalDate:meta.arrivalDate||'',departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[],participantsSpecified:meta.participantsSpecified===true||(row.participants||[]).length>0};
+    return {id:row.id,from:row.from_place,to:row.to_place,date:row.flight_date,arrivalDate:meta.arrivalDate||'',departureTime:meta.departureTime||'',arrivalTime:meta.arrivalTime||'',link:row.link,notes:meta.notes||'',participants:row.participants||[],participantsSpecified:meta.participantsSpecified===true||(row.participants||[]).length>0,isTripReturn:meta.isTripReturn===true};
   }).sort(function(a,b){
     var ak=(a.date||'')+' '+(a.departureTime||'');
     var bk=(b.date||'')+' '+(b.departureTime||'');
@@ -11956,6 +11959,32 @@ async function loadFlights(){
   });
   save();
 }
+// Fonction pure : résout le vol retour explicitement marqué (isTripReturn===true),
+// filtré strictement aux participants incluant l'utilisateur courant — jamais
+// d'extrapolation "tout le groupe" sur cette information sensible. Aucun appelant
+// pour l'instant (préparation avant intégration Accueil, commit séparé).
+function _getMarkedReturnFlight(){
+  var flightsList = (S.documents && S.documents.tickets && S.documents.tickets.flightsList) || [];
+  var myEmail = canonicalPerson((CURRENT_USER && CURRENT_USER.email) || '');
+  var marked = flightsList.filter(function(f){
+    if(!f || f.isTripReturn!==true) return false;
+    if(!f.participants || !f.participants.length) return false;
+    return f.participants.map(canonicalPerson).indexOf(myEmail)>-1;
+  });
+  if(marked.length===0){
+    return {flight:null, effDate:null, confidence:'none'};
+  }
+  if(marked.length>1){
+    return {flight:null, effDate:null, confidence:'ambiguous'};
+  }
+  var f = marked[0];
+  var effDate = f.arrivalDate || f.date || null;
+  if(!effDate){
+    return {flight:null, effDate:null, confidence:'none'};
+  }
+  return {flight:f, effDate:effDate, confidence:'strict'};
+}
+
 
 // ── FIL DU VOYAGE (FEED) ────────────────────────────────────
 function markFeedSeen(){
