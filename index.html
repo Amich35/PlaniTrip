@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:movement-trip-return-participants-v1';
+var APP_BUILD = '2026-08-26·sha:trip-return-generic-resolver-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -11988,30 +11988,48 @@ async function loadFlights(){
   });
   save();
 }
-// Fonction pure : résout le vol retour explicitement marqué (isTripReturn===true),
-// filtré strictement aux participants incluant l'utilisateur courant — jamais
-// d'extrapolation "tout le groupe" sur cette information sensible. Aucun appelant
-// pour l'instant (préparation avant intégration Accueil, commit séparé).
-function _getMarkedReturnFlight(){
-  var flightsList = (S.documents && S.documents.tickets && S.documents.tickets.flightsList) || [];
+// Fonction pure : résout le déplacement retour explicitement marqué (isTripReturn===true),
+// tous types confondus (flight OU movement — train/bus/ferry/voiture/avion), filtré
+// strictement aux participants incluant l'utilisateur courant — jamais d'extrapolation
+// "tout le groupe". Aucun appelant pour l'instant (préparation avant intégration Accueil,
+// commit séparé).
+//
+// Asymétrie de date entre les deux sources (voir commentaire détaillé au-dessus
+// d'openMovementModal) :
+//   flight   → effDate = f.arrivalDate || f.date
+//   movement → effDate = m.date   (pas de champ d'arrivée séparé côté movement)
+//
+// Important : seuls les marqueurs isTripReturn AVEC une date effective exploitable
+// comptent pour résoudre le retour ou détecter une ambiguïté. Un transport marqué
+// mais sans date exploitable est écarté avant le comptage — il ne doit jamais, à lui
+// seul, transformer un retour par ailleurs univoque en 'ambiguous'.
+function _getMarkedTripReturn(){
   var myEmail = canonicalPerson((CURRENT_USER && CURRENT_USER.email) || '');
-  var marked = flightsList.filter(function(f){
-    if(!f || f.isTripReturn!==true) return false;
-    if(!f.participants || !f.participants.length) return false;
-    return f.participants.map(canonicalPerson).indexOf(myEmail)>-1;
+  function isApplicable(item){
+    if(!item || item.isTripReturn!==true) return false;
+    if(!item.participants || !item.participants.length) return false;
+    return item.participants.map(canonicalPerson).indexOf(myEmail)>-1;
+  }
+  var flightsList = (S.documents && S.documents.tickets && S.documents.tickets.flightsList) || [];
+  var flightCandidates = flightsList.filter(isApplicable).map(function(f){
+    return {type:'flight', item:f, effDate: f.arrivalDate || f.date || null};
   });
-  if(marked.length===0){
-    return {flight:null, effDate:null, confidence:'none'};
+  var movementsList = Object.keys(S.movements||{}).map(function(id){ return S.movements[id]; })
+    .filter(function(m){ return m && !m.archived && !m.permanentlyDeleted; });
+  var movementCandidates = movementsList.filter(isApplicable).map(function(m){
+    return {type:'movement', item:m, effDate: m.date || null};
+  });
+  // Seuls les candidats avec une date effective exploitable comptent — un flag sans
+  // date ne doit jamais provoquer une ambiguïté ni masquer un retour par ailleurs clair.
+  var exploitable = flightCandidates.concat(movementCandidates).filter(function(c){ return !!c.effDate; });
+  if(exploitable.length===0){
+    return {transport:null, type:null, effDate:null, confidence:'none'};
   }
-  if(marked.length>1){
-    return {flight:null, effDate:null, confidence:'ambiguous'};
+  if(exploitable.length>1){
+    return {transport:null, type:null, effDate:null, confidence:'ambiguous'};
   }
-  var f = marked[0];
-  var effDate = f.arrivalDate || f.date || null;
-  if(!effDate){
-    return {flight:null, effDate:null, confidence:'none'};
-  }
-  return {flight:f, effDate:effDate, confidence:'strict'};
+  var only = exploitable[0];
+  return {transport:only.item, type:only.type, effDate:only.effDate, confidence:'strict'};
 }
 
 
