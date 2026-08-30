@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:fix-modal-cta-disabled-style-v1';
+var APP_BUILD = '2026-08-26·sha:outing-flow-step2-cities-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9192,7 +9192,7 @@ function closeMovementModal(){ document.getElementById('movementModal').classLis
 // uniquement via openOutingModal() en console pour test, tant que les étapes 2 à 5 et
 // persistOuting() ne sont pas branchées.
 var _outingDraft=null;
-var _outingStep=1; // seule la valeur 1 est gérée dans ce commit
+var _outingStep=1; // 1=jour, 2=ville(s) — étapes 3 à 5 pas encore implémentées
 function openOutingModal(prefillDate){
   _outingDraft={id:outingUid('out_'),date:prefillDate||'',baseCk:null,baseLabel:null,needsManualBase:false,visitCks:[],visitLabels:[],participants:null,returnToBase:true,status:'planned',primaryTransportMode:'',movementIds:[]};
   _outingStep=1;
@@ -9203,12 +9203,24 @@ function closeOutingModal(){ document.getElementById('outingModal').classList.re
 function outingStep1Valid(){
   return !!(_outingDraft && _outingDraft.date && _outingDraft.baseCk);
 }
-// Pas de message produit temporaire ("suite à venir") : ce bouton ne fait qu'une
-// validation locale de l'étape 1 et reflète son état via disabled — les étapes 2 à 5
-// n'existent pas encore dans ce commit, donc il n'y a rien de plus à déclencher ici.
+function outingStep2Valid(){
+  return !!(_outingDraft && _outingDraft.visitCks && _outingDraft.visitCks.length>0);
+}
+// Pas de message produit temporaire ("suite à venir") : à l'étape 2 (la dernière codée
+// dans ce commit), ce bouton ne fait qu'une validation locale et reflète son état via
+// disabled — les étapes 3 à 5 n'existent pas encore.
 function outingModalNext(){
-  var btn=document.getElementById('outingModalNextBtn');
-  if(btn) btn.disabled=!outingStep1Valid();
+  if(_outingStep===1){
+    if(!outingStep1Valid()){ var b=document.getElementById('outingModalNextBtn'); if(b) b.disabled=true; return; }
+    _outingStep=2;
+    renderOutingModalBody();
+  } else {
+    var btn=document.getElementById('outingModalNextBtn');
+    if(btn) btn.disabled=!outingStep2Valid();
+  }
+}
+function outingModalBack(){
+  if(_outingStep===2){ _outingStep=1; renderOutingModalBody(); }
 }
 function outingDraftSetDate(dateStr){
   if(!_outingDraft) return;
@@ -9231,6 +9243,10 @@ function outingDraftSetDate(dateStr){
     _outingDraft.baseCk=null;
     _outingDraft.baseLabel=null;
   }
+  // Changer de jour peut changer la base : une sélection de villes déjà cochée peut
+  // devenir incohérente (pays différent) — on repart proprement plutôt que de la garder.
+  _outingDraft.visitCks=[];
+  _outingDraft.visitLabels=[];
   renderOutingModalBody();
 }
 function outingDraftSetManualBase(ck){
@@ -9244,30 +9260,70 @@ function outingDraftSetManualBase(ck){
   });
   var ref=_resolveCityRef(parts);
   _outingDraft.baseCk=ref.ck||ck;
-  _outingDraft.baseLabel=ref.label||ck;
+  _outingDraft.baseLabel=ref.label||(parts?parts.city:ck);
+  renderOutingModalBody();
+}
+// Toggle d'une ville visitée. countryId et cityName sont transmis directement depuis la
+// boucle d'affichage des chips (où l'objet ville réel est déjà connu) — jamais reconstruits
+// depuis ck par découpage, pour éviter toute désynchronisation visitCks/visitLabels.
+function toggleOutingVisitCity(ck, countryId, cityName){
+  if(!_outingDraft) return;
+  var idx=_outingDraft.visitCks.indexOf(ck);
+  if(idx>-1){
+    _outingDraft.visitCks.splice(idx,1);
+    _outingDraft.visitLabels.splice(idx,1);
+  } else {
+    var ref=_resolveCityRef({country:countryId, city:cityName, ck:ck});
+    var label = ref.label || cityName || ck; // jamais undefined poussé dans visitLabels
+    _outingDraft.visitCks.push(ck);
+    _outingDraft.visitLabels.push(label);
+  }
   renderOutingModalBody();
 }
 function renderOutingModalBody(){
   var body=document.getElementById('outingModalBody');
   if(!body || !_outingDraft) return;
-  var html='<label class="ef-field"><span class="ef-label">Jour de l\'excursion</span><input type="date" class="ef-input" value="'+escHtml(_outingDraft.date||'')+'" onchange="outingDraftSetDate(this.value)"></label>';
-  if(_outingDraft.date){
-    if(_outingDraft.needsManualBase){
-      html+='<label class="ef-field" style="margin-top:12px"><span class="ef-label">Ville de base ce jour-là (à préciser)</span><select class="ef-select" onchange="outingDraftSetManualBase(this.value)"><option value="">— Choisir —</option>';
-      COUNTRIES.forEach(function(c){
-        c.cities.forEach(function(city){
-          var ck=c.id+'_'+city.city;
-          var ref=_resolveCityRef({country:c.id, city:city.city, ck:ck});
-          html+='<option value="'+jsStrEsc(ck)+'"'+(_outingDraft.baseCk===ck?' selected':'')+'>'+escHtml(ref.label)+'</option>';
+  var html='';
+  if(_outingStep===1){
+    html='<label class="ef-field"><span class="ef-label">Jour de l\'excursion</span><input type="date" class="ef-input" value="'+escHtml(_outingDraft.date||'')+'" onchange="outingDraftSetDate(this.value)"></label>';
+    if(_outingDraft.date){
+      if(_outingDraft.needsManualBase){
+        html+='<label class="ef-field" style="margin-top:12px"><span class="ef-label">Ville de base ce jour-là (à préciser)</span><select class="ef-select" onchange="outingDraftSetManualBase(this.value)"><option value="">— Choisir —</option>';
+        COUNTRIES.forEach(function(c){
+          c.cities.forEach(function(city){
+            var ck=c.id+'_'+city.city;
+            var ref=_resolveCityRef({country:c.id, city:city.city, ck:ck});
+            html+='<option value="'+jsStrEsc(ck)+'"'+(_outingDraft.baseCk===ck?' selected':'')+'>'+escHtml(ref.label)+'</option>';
+          });
         });
-      });
-      html+='</select></label>';
-    } else if(_outingDraft.baseLabel){
-      html+='<div class="status-sub" style="margin-top:12px">Base ce soir-là : <strong>'+escHtml(_outingDraft.baseLabel)+'</strong></div>';
+        html+='</select></label>';
+      } else if(_outingDraft.baseLabel){
+        html+='<div class="status-sub" style="margin-top:12px">Base ce soir-là : <strong>'+escHtml(_outingDraft.baseLabel)+'</strong></div>';
+      }
     }
+    body.innerHTML=html;
+    var manualSelect=body.querySelector('select.ef-select');
+    if(manualSelect) manualSelect.value=_outingDraft.baseCk||'';
+    var nextBtn=document.getElementById('outingModalNextBtn');
+    if(nextBtn) nextBtn.disabled=!outingStep1Valid();
+  } else if(_outingStep===2){
+    var baseCountryId = countryIdFromCityKey(_outingDraft.baseCk);
+    html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
+    html+='<div class="ef-label" style="margin-bottom:8px">Ville(s) visitée(s) ce jour-là</div>';
+    COUNTRIES.forEach(function(c){
+      if(c.id!==baseCountryId) return;
+      c.cities.forEach(function(city){
+        var ck=c.id+'_'+city.city;
+        if(ck===_outingDraft.baseCk) return; // jamais sa propre base comme "visite"
+        var checked=_outingDraft.visitCks.indexOf(ck)>-1;
+        var ref=_resolveCityRef({country:c.id, city:city.city, ck:ck});
+        html+='<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleOutingVisitCity(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(c.id)+'\',\''+jsStrEsc(city.city)+'\')">'+(checked?svgIcon('check',11):'')+escHtml(ref.label)+'</button>';
+      });
+    });
+    body.innerHTML=html;
+    var nextBtn2=document.getElementById('outingModalNextBtn');
+    if(nextBtn2) nextBtn2.disabled=!outingStep2Valid();
   }
-  body.innerHTML=html;
-  outingModalNext();
 }
 function movementDraftFromInputs(skipPrices){
   if(!_movementDraft)return;
