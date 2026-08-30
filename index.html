@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:accueil-night-return-block-v1';
+var APP_BUILD = '2026-08-26·sha:fix-return-today-chevron-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10008,7 +10008,7 @@ function renderToday(){
       // Priorité visuelle assumée : pas d'arbitrage de cohérence avec la nuit, on affiche
       // uniquement le retour. isTripReturn est une déclaration utilisateur, pas une vérité
       // supérieure aux dates de séjour — on ne prétend pas résoudre l'éventuel conflit.
-      nightBlockHTML = '<div class="info-card"><div class="ic-header">'+icHeaderChevron('plane','Aujourd\'hui')+'</div>'
+      nightBlockHTML = '<div class="info-card"><div class="ic-header"><span data-icon="plane" data-icon-size="16"></span> Aujourd\'hui</div>'
         +'<div style="font-size:14px;font-weight:600;color:var(--ink)">Retour aujourd\'hui</div></div>';
     } else {
       var nbTitle='', nbSub='', nbOnclick='', nbClickable=false;
