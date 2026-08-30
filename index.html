@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-flow-step4-transport-v1';
+var APP_BUILD = '2026-08-26·sha:outing-flow-step5-confirm-save-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9230,9 +9230,12 @@ function outingModalNext(){
     if(!outingStep3Valid()){ var b3=document.getElementById('outingModalNextBtn'); if(b3) b3.disabled=true; return; }
     _outingStep=4;
     renderOutingModalBody();
-  } else {
-    var btn=document.getElementById('outingModalNextBtn');
-    if(btn) btn.disabled=!outingStep4Valid();
+  } else if(_outingStep===4){
+    if(!outingStep4Valid()){ var b4=document.getElementById('outingModalNextBtn'); if(b4) b4.disabled=true; return; }
+    _outingStep=5;
+    renderOutingModalBody();
+  } else if(_outingStep===5){
+    outingModalConfirmSave();
   }
 }
 // mode: 'all' → tout le groupe (participants=null, vraie signification métier, pas une
@@ -9260,10 +9263,39 @@ function outingDraftSetTransportMode(mode){
   var btn=document.getElementById('outingModalNextBtn');
   if(btn) btn.disabled=!outingStep4Valid();
 }
+// Sauvegarde réelle — premier appelant de persistOuting(). Aucun postChangeEvent() dans ce
+// commit : la contrainte CHECK de change_events (entity_type) ne connaît pas encore
+// 'outing' — l'ajouter maintenant créerait une intégration morte (rien ne l'affiche dans
+// le Fil). Migration + événement traités ensemble dans un commit d'intégration dédié.
+async function outingModalConfirmSave(){
+  if(!_outingDraft) return;
+  var validationError = outingValidateComplete(_outingDraft);
+  if(validationError){ alert(validationError); return; }
+  var btn=document.getElementById('outingModalNextBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Création…'; }
+  try{
+    var next=JSON.parse(JSON.stringify(_outingDraft));
+    var myEmail=canonicalPerson((CURRENT_USER&&CURRENT_USER.email)||'');
+    if(!next.createdBy) next.createdBy=myEmail; // première création uniquement
+    next.updatedBy=myEmail;
+    var saved=await persistOuting(next);
+    S.outings[saved.id]=saved;
+    save();
+    closeOutingModal();
+    renderContent();
+    showSuccessToast('Excursion créée');
+  } catch(e){
+    console.error('[PlaniTrip] outingModalConfirmSave:', e);
+    var b2=document.getElementById('outingModalNextBtn');
+    if(b2){ b2.disabled=false; b2.textContent='Créer l\'excursion'; }
+    alert('Impossible de créer cette excursion pour le moment.');
+  }
+}
 function outingModalBack(){
   if(_outingStep===2){ _outingStep=1; renderOutingModalBody(); }
   else if(_outingStep===3){ _outingStep=2; renderOutingModalBody(); }
   else if(_outingStep===4){ _outingStep=3; renderOutingModalBody(); }
+  else if(_outingStep===5){ _outingStep=4; renderOutingModalBody(); }
 }
 function outingDraftSetDate(dateStr){
   if(!_outingDraft) return;
@@ -9348,7 +9380,7 @@ function renderOutingModalBody(){
     var manualSelect=body.querySelector('select.ef-select');
     if(manualSelect) manualSelect.value=_outingDraft.baseCk||'';
     var nextBtn=document.getElementById('outingModalNextBtn');
-    if(nextBtn) nextBtn.disabled=!outingStep1Valid();
+    if(nextBtn){ nextBtn.disabled=!outingStep1Valid(); nextBtn.textContent='Continuer'; }
   } else if(_outingStep===2){
     var baseCountryId = countryIdFromCityKey(_outingDraft.baseCk);
     html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
@@ -9365,7 +9397,7 @@ function renderOutingModalBody(){
     });
     body.innerHTML=html;
     var nextBtn2=document.getElementById('outingModalNextBtn');
-    if(nextBtn2) nextBtn2.disabled=!outingStep2Valid();
+    if(nextBtn2){ nextBtn2.disabled=!outingStep2Valid(); nextBtn2.textContent='Continuer'; }
   } else if(_outingStep===3){
     var isAll = _outingDraft.participants===null;
     html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
@@ -9382,7 +9414,7 @@ function renderOutingModalBody(){
     }
     body.innerHTML=html;
     var nextBtn3=document.getElementById('outingModalNextBtn');
-    if(nextBtn3) nextBtn3.disabled=!outingStep3Valid();
+    if(nextBtn3){ nextBtn3.disabled=!outingStep3Valid(); nextBtn3.textContent='Continuer'; }
   } else if(_outingStep===4){
     html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
     html+='<label class="ef-field"><span class="ef-label">Mode de transport principal</span><select class="ef-select" onchange="outingDraftSetTransportMode(this.value)"><option value="">— Choisir —</option>'+movementModeOptions(_outingDraft.primaryTransportMode)+'</select></label>';
@@ -9393,7 +9425,21 @@ function renderOutingModalBody(){
     var transportSelect=body.querySelector('select.ef-select');
     if(transportSelect) transportSelect.value=_outingDraft.primaryTransportMode||'';
     var nextBtn4=document.getElementById('outingModalNextBtn');
-    if(nextBtn4) nextBtn4.disabled=!outingStep4Valid();
+    if(nextBtn4){ nextBtn4.disabled=!outingStep4Valid(); nextBtn4.textContent='Continuer'; }
+  } else if(_outingStep===5){
+    html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
+    html+='<div class="ef-label" style="margin-bottom:8px">Récapitulatif</div>';
+    var d=new Date(_outingDraft.date+'T00:00:00');
+    var dateFmt=d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    var participantsLine = _outingDraft.participants===null ? 'Tout le groupe' : _outingDraft.participants.map(function(p){return personDisplayName(p,'Toi');}).join(', ');
+    html+='<div class="status-sub" style="margin-bottom:6px">Jour : <strong>'+escHtml(dateFmt)+'</strong></div>';
+    html+='<div class="status-sub" style="margin-bottom:6px">Base : <strong>'+escHtml(_outingDraft.baseLabel)+'</strong></div>';
+    html+='<div class="status-sub" style="margin-bottom:6px">Ville(s) visitée(s) : <strong>'+escHtml(_outingDraft.visitLabels.join(', '))+'</strong></div>';
+    html+='<div class="status-sub" style="margin-bottom:6px">Participants : <strong>'+escHtml(participantsLine)+'</strong></div>';
+    html+='<div class="status-sub" style="margin-bottom:6px">Transport : <strong>'+escHtml(_outingDraft.primaryTransportMode)+'</strong></div>';
+    body.innerHTML=html;
+    var nextBtn5=document.getElementById('outingModalNextBtn');
+    if(nextBtn5){ nextBtn5.disabled=false; nextBtn5.textContent='Créer l\'excursion'; }
   }
 }
 function movementDraftFromInputs(skipPrices){
@@ -9683,6 +9729,22 @@ function resolveOutingBase(dateStr){
     return {baseCk:ref.ck, baseLabel:ref.label, needsManualBase:false};
   }
   return {baseCk:null, baseLabel:null, needsManualBase:true};
+}
+// Validation finale du draft complet avant persistOuting() — filet de sécurité
+// indépendant des validations par écran (outingStepXValid()), qui protège contre un état
+// incohérent introduit par une navigation arrière, la console, ou une future évolution du
+// modal. Retourne '' si valide, sinon un message d'erreur explicite (jamais un simple bool).
+function outingValidateComplete(draft){
+  if(!draft || !draft.id) return 'Identifiant manquant.';
+  if(!draft.date) return 'Jour manquant.';
+  if(!draft.baseCk || !draft.baseLabel) return 'Ville de base manquante.';
+  if(!Array.isArray(draft.visitCks) || draft.visitCks.length===0) return 'Aucune ville visitée.';
+  if(!Array.isArray(draft.visitLabels) || draft.visitLabels.length!==draft.visitCks.length) return 'Villes visitées incohérentes.';
+  if(draft.participants!==null && (!Array.isArray(draft.participants) || draft.participants.length===0)) return 'Participants incohérents.';
+  if(draft.returnToBase!==true) return 'Excursion non conforme (retour à la base attendu).';
+  if(draft.status!=='planned') return 'Statut non conforme.';
+  if(!draft.primaryTransportMode || MOVEMENT_MODES.indexOf(draft.primaryTransportMode)===-1) return 'Mode de transport invalide.';
+  return '';
 }
 async function saveMovementModal(){
   movementDraftFromInputs();
