@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-flow-step3-participants-v1';
+var APP_BUILD = '2026-08-26·sha:outing-flow-step4-transport-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9211,9 +9211,12 @@ function outingStep3Valid(){
   if(_outingDraft.participants===null) return true; // tout le groupe, toujours valide
   return Array.isArray(_outingDraft.participants) && _outingDraft.participants.length>0;
 }
-// Pas de message produit temporaire ("suite à venir") : à l'étape 3 (la dernière codée
+function outingStep4Valid(){
+  return !!(_outingDraft && _outingDraft.primaryTransportMode);
+}
+// Pas de message produit temporaire ("suite à venir") : à l'étape 4 (la dernière codée
 // dans ce commit), ce bouton ne fait qu'une validation locale et reflète son état via
-// disabled — l'étape 4 (transport) et la confirmation n'existent pas encore.
+// disabled — la confirmation et persistOuting() n'existent pas encore.
 function outingModalNext(){
   if(_outingStep===1){
     if(!outingStep1Valid()){ var b=document.getElementById('outingModalNextBtn'); if(b) b.disabled=true; return; }
@@ -9223,9 +9226,13 @@ function outingModalNext(){
     if(!outingStep2Valid()){ var b2=document.getElementById('outingModalNextBtn'); if(b2) b2.disabled=true; return; }
     _outingStep=3;
     renderOutingModalBody();
+  } else if(_outingStep===3){
+    if(!outingStep3Valid()){ var b3=document.getElementById('outingModalNextBtn'); if(b3) b3.disabled=true; return; }
+    _outingStep=4;
+    renderOutingModalBody();
   } else {
     var btn=document.getElementById('outingModalNextBtn');
-    if(btn) btn.disabled=!outingStep3Valid();
+    if(btn) btn.disabled=!outingStep4Valid();
   }
 }
 // mode: 'all' → tout le groupe (participants=null, vraie signification métier, pas une
@@ -9244,9 +9251,19 @@ function toggleOutingParticipant(email){
   if(idx>-1) _outingDraft.participants.splice(idx,1); else _outingDraft.participants.push(email);
   renderOutingModalBody();
 }
+// Conserve exactement la valeur issue de MOVEMENT_MODES (via movementModeOptions()) —
+// jamais reformatée ni traduite. Pas de rattachement à un movementId existant dans ce
+// commit : movementIds reste [] tel qu'initialisé, chantier séparé.
+function outingDraftSetTransportMode(mode){
+  if(!_outingDraft) return;
+  _outingDraft.primaryTransportMode=mode||'';
+  var btn=document.getElementById('outingModalNextBtn');
+  if(btn) btn.disabled=!outingStep4Valid();
+}
 function outingModalBack(){
   if(_outingStep===2){ _outingStep=1; renderOutingModalBody(); }
   else if(_outingStep===3){ _outingStep=2; renderOutingModalBody(); }
+  else if(_outingStep===4){ _outingStep=3; renderOutingModalBody(); }
 }
 function outingDraftSetDate(dateStr){
   if(!_outingDraft) return;
@@ -9366,6 +9383,17 @@ function renderOutingModalBody(){
     body.innerHTML=html;
     var nextBtn3=document.getElementById('outingModalNextBtn');
     if(nextBtn3) nextBtn3.disabled=!outingStep3Valid();
+  } else if(_outingStep===4){
+    html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
+    html+='<label class="ef-field"><span class="ef-label">Mode de transport principal</span><select class="ef-select" onchange="outingDraftSetTransportMode(this.value)"><option value="">— Choisir —</option>'+movementModeOptions(_outingDraft.primaryTransportMode)+'</select></label>';
+    body.innerHTML=html;
+    // Forçage explicite de .value (même précaution que pour la base manuelle à l'étape 1) :
+    // garantit que le mode déjà choisi reste visuellement sélectionné après un aller-retour
+    // étape 3 ↔ étape 4, indépendamment de l'attribut selected dans le markup.
+    var transportSelect=body.querySelector('select.ef-select');
+    if(transportSelect) transportSelect.value=_outingDraft.primaryTransportMode||'';
+    var nextBtn4=document.getElementById('outingModalNextBtn');
+    if(nextBtn4) nextBtn4.disabled=!outingStep4Valid();
   }
 }
 function movementDraftFromInputs(skipPrices){
