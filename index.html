@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-flow-step5-confirm-save-v1';
+var APP_BUILD = '2026-08-26·sha:outing-postsave-granular-fix-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9267,28 +9267,56 @@ function outingDraftSetTransportMode(mode){
 // commit : la contrainte CHECK de change_events (entity_type) ne connaît pas encore
 // 'outing' — l'ajouter maintenant créerait une intégration morte (rien ne l'affiche dans
 // le Fil). Migration + événement traités ensemble dans un commit d'intégration dédié.
+// Capture de la dernière erreur de post-traitement (créer/modifier une excursion), pour
+// diagnostic sans accès console — affichée dans le panneau "Diagnostic retour (test)"
+// tant que le point d'entrée réel reste absent de l'app.
+var _lastOutingPostSaveError=null;
 async function outingModalConfirmSave(){
   if(!_outingDraft) return;
   var validationError = outingValidateComplete(_outingDraft);
   if(validationError){ alert(validationError); return; }
   var btn=document.getElementById('outingModalNextBtn');
   if(btn){ btn.disabled=true; btn.textContent='Création…'; }
+  var saved=null;
   try{
     var next=JSON.parse(JSON.stringify(_outingDraft));
     var myEmail=canonicalPerson((CURRENT_USER&&CURRENT_USER.email)||'');
     if(!next.createdBy) next.createdBy=myEmail; // première création uniquement
     next.updatedBy=myEmail;
-    var saved=await persistOuting(next);
-    S.outings[saved.id]=saved;
-    save();
-    closeOutingModal();
-    renderContent();
-    showSuccessToast('Excursion créée');
+    saved=await persistOuting(next);
   } catch(e){
-    console.error('[PlaniTrip] outingModalConfirmSave:', e);
+    console.error('[PlaniTrip] outingModalConfirmSave (persistOuting):', e);
     var b2=document.getElementById('outingModalNextBtn');
     if(b2){ b2.disabled=false; b2.textContent='Créer l\'excursion'; }
     alert('Impossible de créer cette excursion pour le moment.');
+    return;
+  }
+  // À partir d'ici, l'excursion existe réellement en base — plus aucune erreur ne doit
+  // produire le message "impossible de créer". Chaque étape est isolée pour identifier
+  // précisément laquelle échoue si un problème survient, sans jamais mentir sur l'état réel.
+  _lastOutingPostSaveError=null;
+  var failedStep=null, failedErr=null;
+  try{ S.outings[saved.id]=saved; }
+  catch(e1){ failedStep='S.outings'; failedErr=e1; console.error('[PlaniTrip] outingModalConfirmSave post-save (S.outings):', e1); }
+  if(!failedStep){
+    try{ save(); }
+    catch(e2){ failedStep='save'; failedErr=e2; console.error('[PlaniTrip] outingModalConfirmSave post-save (save):', e2); }
+  }
+  // Fermer le modal est prioritaire : on essaie même si une étape précédente a échoué,
+  // pour ne pas laisser l'utilisateur bloqué dans un formulaire déjà sauvegardé.
+  try{ closeOutingModal(); }
+  catch(e3){ if(!failedStep){ failedStep='closeOutingModal'; failedErr=e3; } console.error('[PlaniTrip] outingModalConfirmSave post-save (closeOutingModal):', e3); }
+  if(!failedStep){
+    try{ renderContent(); }
+    catch(e4){ failedStep='renderContent'; failedErr=e4; console.error('[PlaniTrip] outingModalConfirmSave post-save (renderContent):', e4); }
+  }
+  if(!failedStep){
+    try{ showSuccessToast('Excursion créée'); }
+    catch(e5){ failedStep='showSuccessToast'; failedErr=e5; console.error('[PlaniTrip] outingModalConfirmSave post-save (showSuccessToast):', e5); }
+  }
+  if(failedStep){
+    _lastOutingPostSaveError={step:failedStep, message:(failedErr&&failedErr.message)||String(failedErr), stack:(failedErr&&failedErr.stack)||'', at:new Date().toISOString(), outingId:saved.id};
+    alert('Excursion créée, mais l\'affichage n\'a pas pu être actualisé.');
   }
 }
 function outingModalBack(){
@@ -13108,6 +13136,7 @@ function renderMore(){
       +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_diagText)+'</pre>'
       +'<button onclick="renderContent()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Rafraîchir</button>'
       +'<button onclick="openOutingModal()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Tester : Je visite et je reviens</button>'
+      +(_lastOutingPostSaveError ? ('<div style="font-size:11px;font-weight:600;color:var(--red-muted);letter-spacing:0.06em;text-transform:uppercase;margin:10px 0">Erreur post-save outing</div><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--red-muted);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0">'+escHtml(JSON.stringify(_lastOutingPostSaveError,null,2))+'</pre>') : '')
       +'</div>';
   }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
