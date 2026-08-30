@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:fix-return-today-chevron-v1';
+var APP_BUILD = '2026-08-26·sha:detected-visits-step3-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6723,6 +6723,44 @@ function _resolveCityRef(ref){
   var cityObj = c ? c.cities.find(function(ci){ return c.id+'_'+ci.city===ref.ck; }) : null;
   var label = cityObj ? _cityDisplayName(ref.ck, cityObj) : (ref.city||ref.ck);
   return {label:label, ck:ref.ck, clickable:!!cityObj};
+}
+// Étape 3 (Base fixe + excursions) : détecte les "visites" implicites d'un jour donné,
+// c'est-à-dire les villes différentes de la/les ville(s) de base du jour (nuit + éventuelle
+// ville quittée en transition) qui ont au moins une activité EXPLICITEMENT datée sur ce jour
+// (S.actDate écrit par l'utilisateur — jamais une date auto-répartie). Fonction pure, aucun
+// appelant pour l'instant.
+function getDetectedVisitsForDate(dateStr){
+  var nightCtx = getNightContextForDate(dateStr);
+  var baseCks = [];
+  if(nightCtx.tonightCity) baseCks.push(nightCtx.tonightCity.ck);
+  if(nightCtx.transitionFromCity) baseCks.push(nightCtx.transitionFromCity.ck);
+
+  // Helper local à cette fonction uniquement — le même pattern existe déjà en double
+  // (_computeShiftedActDates, shiftActivityDatesForCity) mais sans utilitaire partagé ;
+  // ne pas ajouter une troisième copie dispersée, et ne pas toucher ces deux fonctions
+  // existantes (hors périmètre de ce commit).
+  function cityActKeys(ck, city){
+    var keys = [];
+    for(var i=0;i<(city.acts||[]).length;i++) keys.push(ck+'_'+i);
+    (S.customActs[ck]||[]).forEach(function(ca,i){ keys.push(getCustomActivityKey(ck,ca,i)); });
+    return keys;
+  }
+
+  var visits = {};
+  COUNTRIES.forEach(function(c){
+    c.cities.forEach(function(city){
+      var ck = c.id+'_'+city.city;
+      if(baseCks.indexOf(ck)>-1) return;
+      cityActKeys(ck, city).forEach(function(actKey){
+        if(isActivityArchived(actKey)) return;
+        if(Object.prototype.hasOwnProperty.call(S.actDate||{}, actKey) && S.actDate[actKey]===dateStr){
+          visits[ck] = (visits[ck]||0)+1;
+        }
+      });
+    });
+  });
+
+  return Object.keys(visits).map(function(ck){ return {ck:ck, count:visits[ck]}; });
 }
 function fmtCityStayLine(ck){
   // Source canonique : S.cityDates (P0.8-A/2)
