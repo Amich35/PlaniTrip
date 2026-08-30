@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outings-model-only-v1';
+var APP_BUILD = '2026-08-26·sha:outing-flow-step1-day-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8907,6 +8907,10 @@ function movementUid(prefix){
   if(window.crypto&&crypto.randomUUID) return (prefix||'mv_')+crypto.randomUUID();
   return (prefix||'mv_')+Date.now()+'_'+Math.floor(Math.random()*1000000);
 }
+function outingUid(prefix){
+  if(window.crypto&&crypto.randomUUID) return (prefix||'out_')+crypto.randomUUID();
+  return (prefix||'out_')+Date.now()+'_'+Math.floor(Math.random()*1000000);
+}
 function movementModeIcon(mode){
   var m=String(mode||'').toLowerCase();
   if(m.indexOf('marche')>-1) return svgIcon('person-walking',16);
@@ -9181,6 +9185,90 @@ function openMovementModal(id,countryId){
   document.getElementById('movementModal').classList.add('open');
 }
 function closeMovementModal(){ document.getElementById('movementModal').classList.remove('open'); _movementDraft=null; }
+
+// ── ÉTAPE 4 (Base fixe + excursions) — Commit 2a ────────────────────────────
+// Squelette du flux "Je visite et je reviens". Seule l'étape 1 (jour + résolution de la
+// base) est implémentée. Aucun point d'entrée visible (Accueil/Programme) : ouverture
+// uniquement via openOutingModal() en console pour test, tant que les étapes 2 à 5 et
+// persistOuting() ne sont pas branchées.
+var _outingDraft=null;
+var _outingStep=1; // seule la valeur 1 est gérée dans ce commit
+function openOutingModal(prefillDate){
+  _outingDraft={id:outingUid('out_'),date:prefillDate||'',baseCk:null,baseLabel:null,needsManualBase:false,visitCks:[],visitLabels:[],participants:null,returnToBase:true,status:'planned',primaryTransportMode:'',movementIds:[]};
+  _outingStep=1;
+  renderOutingModalBody();
+  document.getElementById('outingModal').classList.add('open');
+}
+function closeOutingModal(){ document.getElementById('outingModal').classList.remove('open'); _outingDraft=null; _outingStep=1; }
+function outingStep1Valid(){
+  return !!(_outingDraft && _outingDraft.date && _outingDraft.baseCk);
+}
+// Pas de message produit temporaire ("suite à venir") : ce bouton ne fait qu'une
+// validation locale de l'étape 1 et reflète son état via disabled — les étapes 2 à 5
+// n'existent pas encore dans ce commit, donc il n'y a rien de plus à déclencher ici.
+function outingModalNext(){
+  var btn=document.getElementById('outingModalNextBtn');
+  if(btn) btn.disabled=!outingStep1Valid();
+}
+function outingDraftSetDate(dateStr){
+  if(!_outingDraft) return;
+  _outingDraft.date=dateStr||'';
+  if(_outingDraft.date){
+    var resolved=resolveOutingBase(_outingDraft.date);
+    _outingDraft.needsManualBase=resolved.needsManualBase;
+    if(!resolved.needsManualBase){
+      _outingDraft.baseCk=resolved.baseCk;
+      _outingDraft.baseLabel=resolved.baseLabel;
+    } else {
+      // Base non déterminable automatiquement (ambiguous/none) : jamais de choix
+      // arbitraire côté resolveOutingBase(), le repli manuel est géré ici, dans le modal
+      // uniquement — resolveOutingBase() reste pure et n'est pas modifiée pour ce cas.
+      _outingDraft.baseCk=null;
+      _outingDraft.baseLabel=null;
+    }
+  } else {
+    _outingDraft.needsManualBase=false;
+    _outingDraft.baseCk=null;
+    _outingDraft.baseLabel=null;
+  }
+  renderOutingModalBody();
+}
+function outingDraftSetManualBase(ck){
+  if(!_outingDraft) return;
+  if(!ck){ _outingDraft.baseCk=null; _outingDraft.baseLabel=null; renderOutingModalBody(); return; }
+  var parts=null;
+  COUNTRIES.forEach(function(c){
+    c.cities.forEach(function(city){
+      if(c.id+'_'+city.city===ck) parts={country:c.id, city:city.city, ck:ck};
+    });
+  });
+  var ref=_resolveCityRef(parts);
+  _outingDraft.baseCk=ref.ck||ck;
+  _outingDraft.baseLabel=ref.label||ck;
+  renderOutingModalBody();
+}
+function renderOutingModalBody(){
+  var body=document.getElementById('outingModalBody');
+  if(!body || !_outingDraft) return;
+  var html='<label class="ef-field"><span class="ef-label">Jour de l\'excursion</span><input type="date" class="ef-input" value="'+escHtml(_outingDraft.date||'')+'" onchange="outingDraftSetDate(this.value)"></label>';
+  if(_outingDraft.date){
+    if(_outingDraft.needsManualBase){
+      html+='<label class="ef-field" style="margin-top:12px"><span class="ef-label">Ville de base ce jour-là (à préciser)</span><select class="ef-select" onchange="outingDraftSetManualBase(this.value)"><option value="">— Choisir —</option>';
+      COUNTRIES.forEach(function(c){
+        c.cities.forEach(function(city){
+          var ck=c.id+'_'+city.city;
+          var ref=_resolveCityRef({country:c.id, city:city.city, ck:ck});
+          html+='<option value="'+jsStrEsc(ck)+'"'+(_outingDraft.baseCk===ck?' selected':'')+'>'+escHtml(ref.label)+'</option>';
+        });
+      });
+      html+='</select></label>';
+    } else if(_outingDraft.baseLabel){
+      html+='<div class="status-sub" style="margin-top:12px">Base ce soir-là : <strong>'+escHtml(_outingDraft.baseLabel)+'</strong></div>';
+    }
+  }
+  body.innerHTML=html;
+  outingModalNext();
+}
 function movementDraftFromInputs(skipPrices){
   if(!_movementDraft)return;
   ['origin','destination','date','departureTime','arrivalTime','status','notes'].forEach(function(k){var el=document.getElementById('mv_'+k);if(el)_movementDraft[k]=el.value;});
@@ -20359,6 +20447,16 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
     <button class="modal-cta" id="movementModalSaveBtn" onclick="saveMovementModal()">Enregistrer</button>
     <button id="movementModalDeleteBtn" onclick="archiveMovement()" style="display:none;width:100%;margin-top:8px;padding:10px;border:none;background:transparent;color:var(--red-muted);font-weight:600">Mettre à la corbeille</button>
     <button class="modal-cancel-btn" onclick="closeMovementModal()">Annuler</button>
+  </div>
+</div>
+
+<div class="share-modal" id="outingModal" onclick="if(event.target.id==='outingModal') closeOutingModal();">
+  <div class="share-sheet" style="max-height:88vh;max-height:88dvh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Je visite et je reviens</div>
+    <div id="outingModalBody"></div>
+    <button class="modal-cta" id="outingModalNextBtn" onclick="outingModalNext()" disabled>Continuer</button>
+    <button class="modal-cancel-btn" onclick="closeOutingModal()">Annuler</button>
   </div>
 </div>
 
