@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-postsave-granular-fix-v1';
+var APP_BUILD = '2026-08-26·sha:outing-draft-local-resilience-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9192,14 +9192,51 @@ function closeMovementModal(){ document.getElementById('movementModal').classLis
 // uniquement via openOutingModal() en console pour test, tant que les étapes 2 à 5 et
 // persistOuting() ne sont pas branchées.
 var _outingDraft=null;
+// Résilience au rechargement de page (ex: bascule réseau/PWA iOS) : le brouillon outing
+// est répliqué dans localStorage sous une clé dédiée, distincte du namespace Supabase
+// ('__planitrip__...'). Objectif : qu'un id d'excursion, une fois généré, reste stable
+// même si tout l'état JS en mémoire est perdu — l'upsert Supabase (onConflict trip_id,
+// detail_key) rend alors un second essai idempotent au lieu de créer un doublon.
+function _outingDraftStorageKey(){ return 'planitrip_outingDraft_'+(CURRENT_TRIP?CURRENT_TRIP.id:'unknown'); }
+function _isValidOutingDraftShape(d){
+  return !!(d && typeof d.id==='string' && d.id.indexOf('out_')===0
+    && typeof d.date==='string'
+    && Array.isArray(d.visitCks) && Array.isArray(d.visitLabels)
+    && (d.participants===null || Array.isArray(d.participants))
+    && typeof d.primaryTransportMode==='string'
+    && d.status==='planned');
+}
+function persistOutingDraftLocal(){
+  try{
+    if(_outingDraft) localStorage.setItem(_outingDraftStorageKey(), JSON.stringify(_outingDraft));
+    else localStorage.removeItem(_outingDraftStorageKey());
+  }catch(e){}
+}
 var _outingStep=1; // 1=jour, 2=ville(s) — étapes 3 à 5 pas encore implémentées
 function openOutingModal(prefillDate){
-  _outingDraft={id:outingUid('out_'),date:prefillDate||'',baseCk:null,baseLabel:null,needsManualBase:false,visitCks:[],visitLabels:[],participants:null,returnToBase:true,status:'planned',primaryTransportMode:'',movementIds:[]};
-  _outingStep=1;
+  var resumed=null;
+  try{
+    var raw=localStorage.getItem(_outingDraftStorageKey());
+    if(raw){
+      var parsed=JSON.parse(raw);
+      if(_isValidOutingDraftShape(parsed)) resumed=parsed;
+      else localStorage.removeItem(_outingDraftStorageKey()); // JSON présent mais forme invalide/obsolète : on l'ignore, jamais de crash
+    }
+  }catch(e){ try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(e2){} }
+  _outingDraft = resumed || {id:outingUid('out_'),date:prefillDate||'',baseCk:null,baseLabel:null,needsManualBase:false,visitCks:[],visitLabels:[],participants:null,returnToBase:true,status:'planned',primaryTransportMode:'',movementIds:[]};
+  _outingStep=1; // toujours reprendre à l'écran 1 — champs déjà pré-remplis si brouillon repris, jamais de saut direct vers la confirmation
+  persistOutingDraftLocal();
   renderOutingModalBody();
   document.getElementById('outingModal').classList.add('open');
 }
 function closeOutingModal(){ document.getElementById('outingModal').classList.remove('open'); _outingDraft=null; _outingStep=1; }
+// Fermeture explicite par l'utilisateur (bouton "Annuler") — distincte d'une fermeture liée
+// à un rechargement/navigation système : ici l'abandon est volontaire, le brouillon local
+// est donc effacé, contrairement à closeOutingModal() seule qui ne touche jamais au stockage.
+function outingModalCancel(){
+  try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(e){}
+  closeOutingModal();
+}
 function outingStep1Valid(){
   return !!(_outingDraft && _outingDraft.date && _outingDraft.baseCk);
 }
@@ -9244,6 +9281,7 @@ function outingModalNext(){
 function outingDraftSetParticipantsMode(mode){
   if(!_outingDraft) return;
   _outingDraft.participants = (mode==='all') ? null : [];
+  persistOutingDraftLocal();
   renderOutingModalBody();
 }
 // Stocke l'email canonique exact — jamais le libellé d'affichage du chip — même
@@ -9252,6 +9290,7 @@ function toggleOutingParticipant(email){
   if(!_outingDraft || !Array.isArray(_outingDraft.participants)) return;
   var idx=_outingDraft.participants.indexOf(email);
   if(idx>-1) _outingDraft.participants.splice(idx,1); else _outingDraft.participants.push(email);
+  persistOutingDraftLocal();
   renderOutingModalBody();
 }
 // Conserve exactement la valeur issue de MOVEMENT_MODES (via movementModeOptions()) —
@@ -9260,6 +9299,7 @@ function toggleOutingParticipant(email){
 function outingDraftSetTransportMode(mode){
   if(!_outingDraft) return;
   _outingDraft.primaryTransportMode=mode||'';
+  persistOutingDraftLocal();
   var btn=document.getElementById('outingModalNextBtn');
   if(btn) btn.disabled=!outingStep4Valid();
 }
@@ -9291,6 +9331,10 @@ async function outingModalConfirmSave(){
     alert('Impossible de créer cette excursion pour le moment.');
     return;
   }
+  // Suppression immédiate du brouillon local : cet id existe maintenant réellement en
+  // base, il ne doit plus jamais être proposé en reprise par openOutingModal(). Fait avant
+  // tout post-traitement (S.outings, save(), rendu…), quoi qu'il arrive ensuite.
+  try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(eClearLocal){}
   // À partir d'ici, l'excursion existe réellement en base — plus aucune erreur ne doit
   // produire le message "impossible de créer". Chaque étape est isolée pour identifier
   // précisément laquelle échoue si un problème survient, sans jamais mentir sur l'état réel.
@@ -9350,11 +9394,12 @@ function outingDraftSetDate(dateStr){
   // devenir incohérente (pays différent) — on repart proprement plutôt que de la garder.
   _outingDraft.visitCks=[];
   _outingDraft.visitLabels=[];
+  persistOutingDraftLocal();
   renderOutingModalBody();
 }
 function outingDraftSetManualBase(ck){
   if(!_outingDraft) return;
-  if(!ck){ _outingDraft.baseCk=null; _outingDraft.baseLabel=null; renderOutingModalBody(); return; }
+  if(!ck){ _outingDraft.baseCk=null; _outingDraft.baseLabel=null; persistOutingDraftLocal(); renderOutingModalBody(); return; }
   var parts=null;
   COUNTRIES.forEach(function(c){
     c.cities.forEach(function(city){
@@ -9364,6 +9409,7 @@ function outingDraftSetManualBase(ck){
   var ref=_resolveCityRef(parts);
   _outingDraft.baseCk=ref.ck||ck;
   _outingDraft.baseLabel=ref.label||(parts?parts.city:ck);
+  persistOutingDraftLocal();
   renderOutingModalBody();
 }
 // Toggle d'une ville visitée. countryId et cityName sont transmis directement depuis la
@@ -9381,6 +9427,7 @@ function toggleOutingVisitCity(ck, countryId, cityName){
     _outingDraft.visitCks.push(ck);
     _outingDraft.visitLabels.push(label);
   }
+  persistOutingDraftLocal();
   renderOutingModalBody();
 }
 function renderOutingModalBody(){
@@ -20669,13 +20716,13 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
   </div>
 </div>
 
-<div class="share-modal" id="outingModal" onclick="if(event.target.id==='outingModal') closeOutingModal();">
+<div class="share-modal" id="outingModal" onclick="if(event.target.id==='outingModal') outingModalCancel();">
   <div class="share-sheet" style="max-height:88vh;max-height:88dvh;overflow-y:auto">
     <div class="modal-handle"></div>
     <div class="modal-title">Je visite et je reviens</div>
     <div id="outingModalBody"></div>
     <button class="modal-cta" id="outingModalNextBtn" onclick="outingModalNext()" disabled>Continuer</button>
-    <button class="modal-cancel-btn" onclick="closeOutingModal()">Annuler</button>
+    <button class="modal-cancel-btn" onclick="outingModalCancel()">Annuler</button>
   </div>
 </div>
 
