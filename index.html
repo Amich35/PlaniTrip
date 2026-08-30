@@ -328,7 +328,7 @@ html.modal-scroll-locked,body.modal-scroll-locked{overflow:hidden;overscroll-beh
 .modal-title{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:22px;font-weight:700;margin-bottom:6px;}
 .modal-sub{font-size:13px;color:var(--ink-muted);margin-bottom:20px;}
 .modal-field{width:100%;padding:12px 14px;border-radius:var(--r8);font-size:14px;border:1px solid rgba(29,29,31,0.140);background:var(--sand);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin-bottom:10px;}
-.modal-cta{width:100%;padding:var(--sp16);min-height:52px;border-radius:var(--r16);font-size:15px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin-bottom:var(--sp8);box-shadow:0 2px 8px rgba(28,24,20,0.2);transition:transform 0.15s,box-shadow 0.15s;} .modal-cta:active{transform:scale(0.99);box-shadow:none;}
+.modal-cta{width:100%;padding:var(--sp16);min-height:52px;border-radius:var(--r16);font-size:15px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin-bottom:var(--sp8);box-shadow:0 2px 8px rgba(28,24,20,0.2);transition:transform 0.15s,box-shadow 0.15s;} .modal-cta:active{transform:scale(0.99);box-shadow:none;} .modal-cta:disabled{opacity:0.4;cursor:not-allowed;}
 
 /* Global search */
 .search-modal{display:none;position:fixed;inset:0;z-index:220;background:rgba(28,24,20,0.55);align-items:flex-start;justify-content:center;}
@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-test-button-v1';
+var APP_BUILD = '2026-08-26·sha:fix-modal-cta-disabled-style-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
