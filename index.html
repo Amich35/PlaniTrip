@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:detected-visits-step3-v1';
+var APP_BUILD = '2026-08-26·sha:outings-model-only-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8897,6 +8897,7 @@ function toggleLieuxAiGen(countryId){
 // Un déplacement est un objet collectif autonome. Les modèles intégrés servent de
 // point de départ ; dès la première édition, la copie Supabase devient autoritaire.
 if(!S.movements) S.movements={};
+if(!S.outings) S.outings={}; // Étape 4 (Base fixe + excursions) — modèle seul, aucune UI/appelant
 var _movementDraft=null;
 var _movementOpenLeg=null;
 var _movementScheduleOpen=false;
@@ -9435,6 +9436,38 @@ async function loadPersistedMovement(id){
   var r=await sb.from('activity_details').select('data').eq('trip_id',CURRENT_TRIP.id).eq('detail_key','__planitrip__movement__'+id).maybeSingle();
   if(r&&r.error) throw r.error;
   return r&&r.data&&r.data.data&&typeof r.data.data==='object'?r.data.data:null;
+}
+// Étape 4 (Base fixe + excursions) — modèle seul, aucun appelant pour l'instant.
+// persistOuting() préserve createdBy s'il existe déjà sur le serveur : la création
+// définit createdBy une seule fois, les modifications ultérieures ne doivent jamais
+// l'écraser silencieusement. updatedBy/updatedAt évoluent à chaque appel.
+async function persistOuting(next){
+  if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
+  var existing = await loadPersistedOuting(next.id);
+  if(existing && existing.createdBy) next.createdBy = existing.createdBy;
+  next.updatedAt=new Date().toISOString();
+  var r=await sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__outing__'+next.id,data:next,updated_at:next.updatedAt},{onConflict:'trip_id,detail_key'}).select('data').single();
+  if(r&&r.error) throw r.error;
+  if(!r||!r.data||!r.data.data||typeof r.data.data!=='object') throw new Error('Enregistrement non confirmé par le serveur');
+  return r.data.data;
+}
+async function loadPersistedOuting(id){
+  if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
+  var r=await sb.from('activity_details').select('data').eq('trip_id',CURRENT_TRIP.id).eq('detail_key','__planitrip__outing__'+id).maybeSingle();
+  if(r&&r.error) throw r.error;
+  return r&&r.data&&r.data.data&&typeof r.data.data==='object'?r.data.data:null;
+}
+// Préremplissage sûr de la base d'une excursion : automatique quand la nuit est connue
+// (strict/transition, toujours via tonightCity — jamais transitionFromCity, car l'excursion
+// doit revenir à la base de FIN de journée), explicite (needsManualBase) sinon. Aucun choix
+// arbitraire pour ambiguous/none.
+function resolveOutingBase(dateStr){
+  var nightCtx = getNightContextForDate(dateStr);
+  if(nightCtx.confidence==='strict' || nightCtx.confidence==='transition'){
+    var ref = _resolveCityRef(nightCtx.tonightCity);
+    return {baseCk:ref.ck, baseLabel:ref.label, needsManualBase:false};
+  }
+  return {baseCk:null, baseLabel:null, needsManualBase:true};
 }
 async function saveMovementModal(){
   movementDraftFromInputs();
@@ -16464,6 +16497,12 @@ async function loadActivityDetails(){
       if(movementId && row.data && typeof row.data === 'object'){
         if(!S.movements) S.movements={};
         S.movements[movementId]=row.data;
+      }
+    } else if(row.detail_key.indexOf('__planitrip__outing__')===0){
+      var outingId = row.detail_key.slice('__planitrip__outing__'.length);
+      if(outingId && row.data && typeof row.data === 'object'){
+        if(!S.outings) S.outings={};
+        S.outings[outingId]=row.data;
       }
     } else if(row.detail_key.indexOf('__planitrip__checklist__')===0){
       var checklistKey=(row.data&&row.data.key)||row.detail_key.slice('__planitrip__checklist__'.length);
