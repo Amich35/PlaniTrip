@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-flow-step2-cities-v1';
+var APP_BUILD = '2026-08-26·sha:outing-flow-step3-participants-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9206,21 +9206,47 @@ function outingStep1Valid(){
 function outingStep2Valid(){
   return !!(_outingDraft && _outingDraft.visitCks && _outingDraft.visitCks.length>0);
 }
-// Pas de message produit temporaire ("suite à venir") : à l'étape 2 (la dernière codée
+function outingStep3Valid(){
+  if(!_outingDraft) return false;
+  if(_outingDraft.participants===null) return true; // tout le groupe, toujours valide
+  return Array.isArray(_outingDraft.participants) && _outingDraft.participants.length>0;
+}
+// Pas de message produit temporaire ("suite à venir") : à l'étape 3 (la dernière codée
 // dans ce commit), ce bouton ne fait qu'une validation locale et reflète son état via
-// disabled — les étapes 3 à 5 n'existent pas encore.
+// disabled — l'étape 4 (transport) et la confirmation n'existent pas encore.
 function outingModalNext(){
   if(_outingStep===1){
     if(!outingStep1Valid()){ var b=document.getElementById('outingModalNextBtn'); if(b) b.disabled=true; return; }
     _outingStep=2;
     renderOutingModalBody();
+  } else if(_outingStep===2){
+    if(!outingStep2Valid()){ var b2=document.getElementById('outingModalNextBtn'); if(b2) b2.disabled=true; return; }
+    _outingStep=3;
+    renderOutingModalBody();
   } else {
     var btn=document.getElementById('outingModalNextBtn');
-    if(btn) btn.disabled=!outingStep2Valid();
+    if(btn) btn.disabled=!outingStep3Valid();
   }
+}
+// mode: 'all' → tout le groupe (participants=null, vraie signification métier, pas une
+// absence de donnée) ; 'specific' → sous-groupe explicite (participants=[], jamais vide
+// une fois validé). Changer de mode ne réinitialise rien d'autre dans le draft.
+function outingDraftSetParticipantsMode(mode){
+  if(!_outingDraft) return;
+  _outingDraft.participants = (mode==='all') ? null : [];
+  renderOutingModalBody();
+}
+// Stocke l'email canonique exact — jamais le libellé d'affichage du chip — même
+// convention que pour les vols/movements (getActiveTravelerList()/canonicalPerson()).
+function toggleOutingParticipant(email){
+  if(!_outingDraft || !Array.isArray(_outingDraft.participants)) return;
+  var idx=_outingDraft.participants.indexOf(email);
+  if(idx>-1) _outingDraft.participants.splice(idx,1); else _outingDraft.participants.push(email);
+  renderOutingModalBody();
 }
 function outingModalBack(){
   if(_outingStep===2){ _outingStep=1; renderOutingModalBody(); }
+  else if(_outingStep===3){ _outingStep=2; renderOutingModalBody(); }
 }
 function outingDraftSetDate(dateStr){
   if(!_outingDraft) return;
@@ -9323,6 +9349,23 @@ function renderOutingModalBody(){
     body.innerHTML=html;
     var nextBtn2=document.getElementById('outingModalNextBtn');
     if(nextBtn2) nextBtn2.disabled=!outingStep2Valid();
+  } else if(_outingStep===3){
+    var isAll = _outingDraft.participants===null;
+    html='<button type="button" onclick="outingModalBack()" style="background:none;border:none;color:var(--ink-muted);font-size:13px;padding:0;margin-bottom:12px;cursor:pointer">‹ Retour</button>';
+    html+='<div class="ef-label" style="margin-bottom:8px">Participants</div>';
+    html+='<div style="display:flex;gap:8px;margin-bottom:12px">'
+      +'<button type="button" class="flight-traveler-chip'+(isAll?' active':'')+'" onclick="outingDraftSetParticipantsMode(\'all\')">'+(isAll?svgIcon('check',11):'')+'Tout le groupe</button>'
+      +'<button type="button" class="flight-traveler-chip'+(!isAll?' active':'')+'" onclick="outingDraftSetParticipantsMode(\'specific\')">'+(!isAll?svgIcon('check',11):'')+'Personnes spécifiques</button>'
+      +'</div>';
+    if(!isAll){
+      getActiveTravelerList().forEach(function(p){
+        var checked=_outingDraft.participants.indexOf(p)>-1;
+        html+='<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleOutingParticipant(\''+jsStrEsc(p)+'\')">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';
+      });
+    }
+    body.innerHTML=html;
+    var nextBtn3=document.getElementById('outingModalNextBtn');
+    if(nextBtn3) nextBtn3.disabled=!outingStep3Valid();
   }
 }
 function movementDraftFromInputs(skipPrices){
