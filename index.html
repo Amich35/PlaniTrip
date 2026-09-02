@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-02·sha:program-buildday-v1';
+var APP_BUILD = '2026-09-02·sha:program-clear-local-outings-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6779,6 +6779,21 @@ function getDetectedVisitsForDate(dateStr){
 // diverger de cette fusion existante.
 // activityIds/movementIds sont TOUJOURS lus avec repli [] : des outings existantes ou
 // creees par le flux actuel n'ont pas encore necessairement ce champ.
+// Outil de diagnostic temporaire (Etape 5, Programme) : vide S.outings en local
+// UNIQUEMENT pour repartir d'un etat propre pendant les tests. Ne touche jamais
+// Supabase (ces outings de test locaux n'y existent deja pas). Garde-fou double :
+// verifie lui-meme _TEST_TRIP_IDS, independamment de la visibilite du bouton dans
+// l'UI, pour ne jamais pouvoir etre invoque sur le voyage reel "Asie 2026".
+function clearLocalTestOutings(){
+  var _TEST_TRIP_IDS = ['da115c78-a9a0-48df-b328-c15c89c90f9a','1b0a0c9d-856f-4e3e-a112-79be5d00a9d4'];
+  if(typeof CURRENT_TRIP==='undefined' || !CURRENT_TRIP || _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)===-1){
+    alert('Action disponible uniquement sur un voyage de test.');
+    return;
+  }
+  S.outings = {};
+  save();
+  renderContent();
+}
 function buildProgramDay(dateStr){
   var night = getNightContextForDate(dateStr);
   var dayOutings = Object.values(S.outings||{}).filter(function(o){ return o.date===dateStr; });
@@ -13294,6 +13309,7 @@ function renderMore(){
       +'<input type="date" id="programDayDiagDateInput" value="'+escHtml(window._programDayDiagDate)+'" style="width:100%;padding:8px;margin-bottom:8px;border-radius:var(--r12);border:1px solid var(--border);font-size:13px">'
       +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_pdDiagText)+'</pre>'
       +'<button onclick="window._programDayDiagDate=document.getElementById(\'programDayDiagDateInput\').value;renderContent();" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Calculer</button>'
+      +'<button onclick="clearLocalTestOutings()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Vider les outings locaux (test)</button>'
       +'</div>';
   }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
