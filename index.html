@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-chronology-v1';
+var APP_BUILD = '2026-09-03·sha:program-chronology-polish-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15790,10 +15790,11 @@ function _programDayLabel(dateStr){
   var month=d.toLocaleDateString('fr-FR',{month:'short'}).replace('.','');
   return {weekday:wd, day:day, month:month};
 }
-function _programActivityRow(item){
+function _programActivityRow(item,compact){
   if(!item) return '';
   var t=(S.actTimeStart&&S.actTimeStart[item.actKey]) || (S.actTime&&S.actTime[item.actKey]) || '';
-  return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid rgba(29,29,31,.06)">'
+  var spacing=compact ? 'padding:0' : 'padding:10px 0;border-top:1px solid rgba(29,29,31,.06)';
+  return '<div style="display:flex;align-items:flex-start;gap:10px;'+spacing+'">'
     +(t?'<div style="flex:0 0 42px;font-size:11px;font-weight:600;color:var(--ink-muted);padding-top:1px">'+escHtml(t)+'</div>':'<div style="flex:0 0 8px"></div>')
     +'<div style="min-width:0;flex:1;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.35">'+escHtml(item.title||'Activité')+'</div>'
   +'</div>';
@@ -15860,7 +15861,7 @@ function _programRenderOutingCard(slot){
     +'<div aria-hidden="true" style="position:absolute;left:4px;top:22px;width:10px;height:1px;background:rgba(45,106,79,.22)"></div>'
     +'<div class="info-card" style="padding:14px 15px;background:var(--accent-pale);border:1px solid rgba(45,106,79,.12)">'
       +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
-        +'<span style="display:flex;align-items:center;justify-content:center;flex:0 0 27px;width:27px;height:27px;border-radius:50%;background:rgba(45,106,79,.10);color:var(--accent-deep)">'+svgIcon('arrow-left-right',14)+'</span>'
+        +'<span style="display:flex;align-items:center;justify-content:center;flex:0 0 27px;width:27px;height:27px;border-radius:50%;background:rgba(45,106,79,.10);color:var(--accent-deep)">'+svgIcon('repeat',14)+'</span>'
         +'<div style="min-width:0;flex:1;font-size:15px;font-weight:700;color:var(--ink);line-height:1.25">Excursion · '+escHtml(destination)+'</div>'
       +'</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:7px 0 0 35px">'+escHtml(mode)+' · Aller-retour</div>'
@@ -15908,13 +15909,13 @@ function _programRenderTimeline(day){
   timed.sort(function(a,b){ return a.anchor-b.anchor || a.order-b.order; });
   var html=timed.map(function(e){
     if(e.kind==='outing') return _programRenderOutingCard(e.slot);
-    return '<div class="info-card" style="padding:12px 14px;margin-top:10px">'+_programActivityRow(e.item)+'</div>';
+    return '<div class="info-card" style="padding:12px 14px;margin-top:10px">'+_programActivityRow(e.item,true)+'</div>';
   }).join('');
   if(untimed.length){
     html+='<div style="margin-top:18px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">Horaire à préciser</div>'
       +untimed.map(function(e){
         if(e.kind==='outing') return _programRenderOutingCard(e.slot);
-        return '<div class="info-card" style="padding:12px 14px;margin-top:8px">'+_programActivityRow(e.item)+'</div>';
+        return '<div class="info-card" style="padding:12px 14px;margin-top:8px">'+_programActivityRow(e.item,true)+'</div>';
       }).join('')
     +'</div>';
   }
