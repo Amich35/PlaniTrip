@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-02·sha:program-shell-v1';
+var APP_BUILD = '2026-09-02·sha:program-base-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15790,6 +15790,52 @@ function _programDayLabel(dateStr){
   var month=d.toLocaleDateString('fr-FR',{month:'short'}).replace('.','');
   return {weekday:wd, day:day, month:month};
 }
+function _programActivityRow(item){
+  if(!item) return '';
+  var t=(S.actTimeStart&&S.actTimeStart[item.actKey]) || (S.actTime&&S.actTime[item.actKey]) || '';
+  return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid rgba(29,29,31,.06)">'
+    +(t?'<div style="flex:0 0 42px;font-size:11px;font-weight:600;color:var(--ink-muted);padding-top:1px">'+escHtml(t)+'</div>':'<div style="flex:0 0 8px"></div>')
+    +'<div style="min-width:0;flex:1;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.35">'+escHtml(item.title||'Activité')+'</div>'
+  +'</div>';
+}
+function _programActivitiesBlock(title,items){
+  if(!items || !items.length) return '';
+  return '<div class="info-card" style="padding:12px 16px;margin-top:10px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;padding-bottom:4px">'+escHtml(title)+'</div>'
+    +items.map(_programActivityRow).join('')
+  +'</div>';
+}
+function _programRenderBase(day){
+  if(!day || !day.base) return '';
+  var b=day.base;
+  var tonight=b.tonightCity;
+  var from=b.transitionFromCity;
+
+  if(b.confidence==='transition' && tonight && from){
+    var fromActs=(day.otherActivities||[]).filter(function(a){ return a.ck===from.ck; });
+    var toActs=(day.baseActivities||[]).filter(function(a){ return a.ck===tonight.ck; });
+    return '<div class="info-card" style="padding:16px;margin-top:2px">'
+      +'<div style="display:flex;align-items:center;gap:8px;color:var(--ink)"><span style="font-size:20px;font-weight:750;letter-spacing:-.35px">'+escHtml(from.label)+'</span><span style="color:var(--ink-subtle)">'+svgIcon('arrow-right',16)+'</span><span style="font-size:20px;font-weight:750;letter-spacing:-.35px">'+escHtml(tonight.label)+'</span></div>'
+      +'<div style="font-size:12px;color:var(--ink-muted);margin-top:4px">Journée de transition · Nuit à '+escHtml(tonight.label)+'</div>'
+      +(fromActs.length?'<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase">'+escHtml(from.label)+'</div>'+fromActs.map(_programActivityRow).join('')+'</div>':'')
+      +(toActs.length?'<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase">'+escHtml(tonight.label)+'</div>'+toActs.map(_programActivityRow).join('')+'</div>':'')
+    +'</div>';
+  }
+
+  if(tonight && (b.confidence==='strict' || b.confidence==='ambiguous')){
+    var baseCard='<div class="info-card" style="padding:16px;margin-top:2px">'
+      +'<div style="font-size:22px;font-weight:750;letter-spacing:-.4px;color:var(--ink)">'+escHtml(tonight.label)+'</div>'
+      +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-muted);margin-top:4px">'+svgIcon('bed',13)+' Base · nuit'+(b.confidence==='ambiguous'?' · à confirmer':'')+'</div>'
+    +'</div>';
+    return baseCard+_programActivitiesBlock('Activités à '+tonight.label,day.baseActivities||[]);
+  }
+
+  return '<div class="info-card" style="padding:16px;margin-top:2px">'
+    +'<div style="font-size:18px;font-weight:700;color:var(--ink)">Base à préciser</div>'
+    +'<div style="font-size:12px;color:var(--ink-muted);margin-top:4px">Aucune ville de nuit fiable pour cette date.</div>'
+  +'</div>';
+}
+
 function renderProgramScreen(){
   var dates=_programTripDates();
   if(!dates.length){
@@ -15805,6 +15851,7 @@ function renderProgramScreen(){
   var selected=new Date(programDate+'T12:00:00');
   var selectedLabel=selected.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   selectedLabel=selectedLabel.charAt(0).toUpperCase()+selectedLabel.slice(1);
+  var programDay=buildProgramDay(programDate);
   return '<div style="min-height:100%">'
     +'<div style="padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px">'
       +'<div><button type="button" onclick="closeProgramScreen()" style="display:block;border:0;background:none;color:var(--accent);font-size:15px;padding:0 0 5px;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">‹ Retour</button><div style="font-size:26px;font-weight:700;letter-spacing:-.6px;color:var(--ink)">Programme</div></div>'
@@ -15813,7 +15860,8 @@ function renderProgramScreen(){
     +'<div id="programDayStrip" style="position:sticky;top:0;z-index:20;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:8px 16px 10px;background:rgba(248,246,242,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(29,29,31,.06)">'+dayButtons+'</div>'
     +'<div id="programSwipeBody" style="padding:22px 16px 34px;min-height:360px;touch-action:pan-y">'
       +'<div style="font-size:12px;color:var(--ink-muted);text-transform:capitalize;margin-bottom:10px">'+selectedLabel+'</div>'
-      +'<div class="info-card" style="padding:22px;text-align:center;color:var(--ink-muted)">Contenu à venir — commits suivants</div>'
+      +_programRenderBase(programDay)
+      +'<div style="font-size:11.5px;color:var(--ink-subtle);text-align:center;margin-top:18px">Excursions, autres activités et déplacements — commits suivants</div>'
     +'</div>'
   +'</div>';
 }
