@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-08-26·sha:outing-draft-local-resilience-v1';
+var APP_BUILD = '2026-09-02·sha:program-buildday-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6761,6 +6761,101 @@ function getDetectedVisitsForDate(dateStr){
   });
 
   return Object.keys(visits).map(function(ck){ return {ck:ck, count:visits[ck]}; });
+}
+// Etape 5 (Base fixe + excursions) - Programme : vue calculee pour une date donnee.
+// Fonction PURE (aucune ecriture, aucun reseau). Ne cree aucune nouvelle source de
+// verite : derive entierement de S.actDate, S.outings, S.movements et
+// getNightContextForDate(). Priorite de classement d'une activite datee ce jour-la
+// (ordre significatif, jamais interverti) :
+//   1. reclamee par outing.activityIds d'une outing du jour -> dans cette outing
+//   2. ville = base normale du jour (tonightCity) -> baseActivities
+//   3. sinon -> otherActivities (filet de securite explicite : rien de date ne doit
+//      disparaitre silencieusement du Programme)
+// Parcours des villes : COUNTRIES / c.cities est deja exhaustif, y compris les villes
+// custom (ex: Kyoto) -- celles-ci sont fusionnees dans c.cities depuis S.addedCities
+// des le demarrage / rebuildCountriesFromState() (cf. bloc "Restore user-added
+// cities"), avant que buildProgramDay() ne soit jamais appelee. Ne pas reconstruire
+// une boucle parallele sur S.addedCities ici : ce serait redondant et risquerait de
+// diverger de cette fusion existante.
+// activityIds/movementIds sont TOUJOURS lus avec repli [] : des outings existantes ou
+// creees par le flux actuel n'ont pas encore necessairement ce champ.
+function buildProgramDay(dateStr){
+  var night = getNightContextForDate(dateStr);
+  var dayOutings = Object.values(S.outings||{}).filter(function(o){ return o.date===dateStr; });
+
+  // Un meme actKey ne doit jamais etre reclame par deux outings du meme jour (regle
+  // metier verrouillee). Cette fonction ne repare JAMAIS silencieusement une telle
+  // incoherence : premier claim rencontre conserve, tout claim suivant sur le meme
+  // actKey est signale explicitement dans "conflicts" plutot que d'ecraser le premier.
+  var claimedByOuting = {}; // actKey -> outing.id (premier claim retenu)
+  var conflicts = []; // {actKey, claimedBy, alsoClaimedBy}
+  dayOutings.forEach(function(o){
+    (o.activityIds||[]).forEach(function(actKey){
+      if(claimedByOuting[actKey] && claimedByOuting[actKey]!==o.id){
+        conflicts.push({actKey:actKey, claimedBy:claimedByOuting[actKey], alsoClaimedBy:o.id});
+        return;
+      }
+      if(!claimedByOuting[actKey]) claimedByOuting[actKey]=o.id;
+    });
+  });
+
+  // Toutes les activites explicitement datees dateStr (S.actDate), toutes villes
+  // confondues, natives + custom, non archivees.
+  var dated = []; // {actKey, ck, title}
+  COUNTRIES.forEach(function(c){
+    c.cities.forEach(function(city){
+      var ck = c.id+'_'+city.city;
+      (city.acts||[]).forEach(function(a,i){
+        var actKey = ck+'_'+i;
+        if(isActivityArchived(actKey)) return;
+        if(S.actDate && S.actDate[actKey]===dateStr){
+          dated.push({actKey:actKey, ck:ck, title:a.n||''});
+        }
+      });
+      (S.customActs[ck]||[]).forEach(function(ca,i){
+        var actKey = getCustomActivityKey(ck,ca,i);
+        if(isActivityArchived(actKey)) return;
+        if(S.actDate && S.actDate[actKey]===dateStr){
+          dated.push({actKey:actKey, ck:ck, title:ca.n||''});
+        }
+      });
+    });
+  });
+
+  var baseActivities = [], otherActivities = [];
+  var outingsOut = dayOutings.map(function(o){ return {outing:o, activities:[]}; });
+
+  dated.forEach(function(item){
+    var claimOutingId = claimedByOuting[item.actKey];
+    if(claimOutingId){
+      var slot = outingsOut.find(function(x){ return x.outing.id===claimOutingId; });
+      if(slot){ slot.activities.push(item); return; }
+    }
+    if(night.tonightCity && item.ck===night.tonightCity.ck){
+      baseActivities.push(item); return;
+    }
+    otherActivities.push(item);
+  });
+
+  var dayMovements = Object.values(S.movements||{}).filter(function(m){
+    if(m.date!==dateStr) return false;
+    var claimedByAnyOuting = dayOutings.some(function(o){ return (o.movementIds||[]).indexOf(m.id)>-1; });
+    return !claimedByAnyOuting;
+  });
+
+  return {
+    date: dateStr,
+    base: {
+      confidence: night.confidence,
+      tonightCity: night.tonightCity ? _resolveCityRef(night.tonightCity) : null,
+      transitionFromCity: night.transitionFromCity ? _resolveCityRef(night.transitionFromCity) : null
+    },
+    baseActivities: baseActivities,
+    outings: outingsOut,
+    otherActivities: otherActivities,
+    movements: dayMovements,
+    conflicts: conflicts
+  };
 }
 function fmtCityStayLine(ck){
   // Source canonique : S.cityDates (P0.8-A/2)
@@ -13186,6 +13281,21 @@ function renderMore(){
       +(_lastOutingPostSaveError ? ('<div style="font-size:11px;font-weight:600;color:var(--red-muted);letter-spacing:0.06em;text-transform:uppercase;margin:10px 0">Erreur post-save outing</div><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--red-muted);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0">'+escHtml(JSON.stringify(_lastOutingPostSaveError,null,2))+'</pre>') : '')
       +'</div>';
   }
+  // Panneau de diagnostic temporaire pour buildProgramDay() (Etape 5, Programme) --
+  // visible UNIQUEMENT sur les voyages de test. A retirer une fois l'ecran Programme
+  // reel valide (meme principe que city-sync-diag et le diagnostic outing ci-dessus).
+  var programDayDiagCard = '';
+  if(typeof CURRENT_TRIP!=='undefined' && CURRENT_TRIP && _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)>-1){
+    if(typeof window._programDayDiagDate==='undefined' || !window._programDayDiagDate) window._programDayDiagDate='2026-08-31';
+    var _pdDiag = buildProgramDay(window._programDayDiagDate);
+    var _pdDiagText = JSON.stringify(_pdDiag, null, 2);
+    programDayDiagCard = '<div class="info-card" style="padding:14px 16px;margin-top:4px">'
+      +'<div style="font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Diagnostic Programme (test)</div>'
+      +'<input type="date" id="programDayDiagDateInput" value="'+escHtml(window._programDayDiagDate)+'" style="width:100%;padding:8px;margin-bottom:8px;border-radius:var(--r12);border:1px solid var(--border);font-size:13px">'
+      +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_pdDiagText)+'</pre>'
+      +'<button onclick="window._programDayDiagDate=document.getElementById(\'programDayDiagDateInput\').value;renderContent();" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Calculer</button>'
+      +'</div>';
+  }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Plus</div>'
     +'<div class="info-card" style="padding:6px">'
@@ -13208,6 +13318,7 @@ function renderMore(){
     +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
     +'</div>'
     +tripReturnDiagCard
+    +programDayDiagCard
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">'+APP_BUILD+'</div>'
     +'</div>';
