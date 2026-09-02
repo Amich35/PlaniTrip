@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-02·sha:program-outings-readonly-v1';
+var APP_BUILD = '2026-09-03·sha:program-chronology-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15827,7 +15827,7 @@ function _programRenderBase(day){
       +'<div style="font-size:22px;font-weight:750;letter-spacing:-.4px;color:var(--ink)">'+escHtml(tonight.label)+'</div>'
       +'<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-muted);margin-top:4px">'+svgIcon('bed',13)+' Base · nuit'+(b.confidence==='ambiguous'?' · à confirmer':'')+'</div>'
     +'</div>';
-    return baseCard+_programActivitiesBlock('Activités à '+tonight.label,day.baseActivities||[]);
+    return baseCard;
   }
 
   return '<div class="info-card" style="padding:16px;margin-top:2px">'
@@ -15875,6 +15875,52 @@ function _programRenderOutings(day){
   return '<div style="margin-top:12px">'+outings.map(_programRenderOutingCard).join('')+'</div>';
 }
 
+function _programTimeValue(t){
+  if(!t || !/^\d{1,2}:\d{2}$/.test(String(t))) return null;
+  var parts=String(t).split(':');
+  var h=parseInt(parts[0],10), m=parseInt(parts[1],10);
+  if(isNaN(h)||isNaN(m)||h<0||h>23||m<0||m>59) return null;
+  return h*60+m;
+}
+function _programActivityAnchor(item){
+  if(!item) return null;
+  var t=(S.actTimeStart&&S.actTimeStart[item.actKey]) || (S.actTime&&S.actTime[item.actKey]) || '';
+  return _programTimeValue(t);
+}
+function _programOutingAnchor(slot){
+  if(!slot || !slot.outing) return null;
+  var ids=Array.isArray(slot.outing.movementIds) ? slot.outing.movementIds : [];
+  var movementTimes=ids.map(function(id){
+    var m=S.movements&&S.movements[id];
+    return m ? _programTimeValue(m.departureTime||'') : null;
+  }).filter(function(v){ return v!==null; });
+  if(movementTimes.length) return Math.min.apply(null,movementTimes);
+  var activityTimes=(Array.isArray(slot.activities)?slot.activities:[]).map(_programActivityAnchor).filter(function(v){ return v!==null; });
+  return activityTimes.length ? Math.min.apply(null,activityTimes) : null;
+}
+function _programRenderTimeline(day){
+  if(!day) return '';
+  var entries=[];
+  (day.baseActivities||[]).forEach(function(item,i){ entries.push({kind:'activity',anchor:_programActivityAnchor(item),order:i,item:item}); });
+  (day.outings||[]).forEach(function(slot,i){ entries.push({kind:'outing',anchor:_programOutingAnchor(slot),order:1000+i,slot:slot}); });
+  var timed=entries.filter(function(e){ return e.anchor!==null; });
+  var untimed=entries.filter(function(e){ return e.anchor===null; });
+  timed.sort(function(a,b){ return a.anchor-b.anchor || a.order-b.order; });
+  var html=timed.map(function(e){
+    if(e.kind==='outing') return _programRenderOutingCard(e.slot);
+    return '<div class="info-card" style="padding:12px 14px;margin-top:10px">'+_programActivityRow(e.item)+'</div>';
+  }).join('');
+  if(untimed.length){
+    html+='<div style="margin-top:18px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">Horaire à préciser</div>'
+      +untimed.map(function(e){
+        if(e.kind==='outing') return _programRenderOutingCard(e.slot);
+        return '<div class="info-card" style="padding:12px 14px;margin-top:8px">'+_programActivityRow(e.item)+'</div>';
+      }).join('')
+    +'</div>';
+  }
+  return html ? '<div style="margin-top:10px">'+html+'</div>' : '';
+}
+
 function renderProgramScreen(){
   var dates=_programTripDates();
   if(!dates.length){
@@ -15900,7 +15946,7 @@ function renderProgramScreen(){
     +'<div id="programSwipeBody" style="padding:22px 16px 34px;min-height:360px;touch-action:pan-y">'
       +'<div style="font-size:12px;color:var(--ink-muted);text-transform:capitalize;margin-bottom:10px">'+selectedLabel+'</div>'
       +_programRenderBase(programDay)
-      +_programRenderOutings(programDay)
+      +((programDay.base&&programDay.base.confidence==='transition')?_programRenderOutings(programDay):_programRenderTimeline(programDay))
       +'<div style="font-size:11.5px;color:var(--ink-subtle);text-align:center;margin-top:18px">Autres activités et déplacements — commits suivants</div>'
     +'</div>'
   +'</div>';
