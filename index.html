@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-02·sha:program-clear-local-outings-v1';
+var APP_BUILD = '2026-09-02·sha:program-hard-reset-cache-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6793,6 +6793,29 @@ function clearLocalTestOutings(){
   S.outings = {};
   save();
   renderContent();
+}
+// Outil de diagnostic temporaire (Etape 5, Programme) : reinitialisation RADICALE du
+// cache local du voyage de test. Contrairement a clearLocalTestOutings() (qui vide
+// S.outings en memoire puis appelle save()), cette fonction supprime directement le
+// gros blob localStorage du voyage (CURRENT_STORAGE_KEY). Justification : save() peut
+// echouer silencieusement a reecrire ce blob (deja documente dans save() lui-meme),
+// laissant une ancienne version perimee sur le telephone qui ressuscite alors des
+// entrees supprimees cote Supabase lors du prochain chargement (merge additif dans
+// loadActivityDetails()). Supprimer la cle force loadState() a repartir de zero au
+// prochain enterTrip(), qui recharge alors la verite serveur sans aucune contamination
+// locale possible. Ne touche jamais Supabase. Garde-fou double comme les autres outils
+// de ce panneau : verifie lui-meme _TEST_TRIP_IDS, independamment du bouton dans l'UI.
+async function hardResetLocalTripCache(){
+  var _TEST_TRIP_IDS = ['da115c78-a9a0-48df-b328-c15c89c90f9a','1b0a0c9d-856f-4e3e-a112-79be5d00a9d4'];
+  if(typeof CURRENT_TRIP==='undefined' || !CURRENT_TRIP || _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)===-1){
+    alert('Action disponible uniquement sur un voyage de test.');
+    return;
+  }
+  var tripToReload = CURRENT_TRIP;
+  try{ localStorage.removeItem(CURRENT_STORAGE_KEY); }catch(e){}
+  await enterTrip(tripToReload, false);
+  renderContent();
+  alert('Cache local reinitialise, donnees rechargees depuis Supabase.');
 }
 function buildProgramDay(dateStr){
   var night = getNightContextForDate(dateStr);
@@ -13310,6 +13333,7 @@ function renderMore(){
       +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_pdDiagText)+'</pre>'
       +'<button onclick="window._programDayDiagDate=document.getElementById(\'programDayDiagDateInput\').value;renderContent();" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Calculer</button>'
       +'<button onclick="clearLocalTestOutings()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Vider les outings locaux (test)</button>'
+      +'<button onclick="hardResetLocalTripCache()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1.5px solid var(--red-muted);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Reinitialiser tout le cache local (test)</button>'
       +'</div>';
   }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
