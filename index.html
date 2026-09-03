@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-other-activities-v1';
+var APP_BUILD = '2026-09-03·sha:program-day-movements-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15899,22 +15899,73 @@ function _programOutingAnchor(slot){
   var activityTimes=(Array.isArray(slot.activities)?slot.activities:[]).map(_programActivityAnchor).filter(function(v){ return v!==null; });
   return activityTimes.length ? Math.min.apply(null,activityTimes) : null;
 }
+function _programMovementTimes(m){
+  m=m||{};
+  var legs=Array.isArray(m.legs) ? m.legs : [];
+  var first=legs.length ? legs[0] : null;
+  var last=legs.length ? legs[legs.length-1] : null;
+  return {
+    departure:m.departureTime || (first&&first.departureTime) || '',
+    arrival:m.arrivalTime || (last&&last.arrivalTime) || ''
+  };
+}
+function _programMovementAnchor(m){
+  return _programTimeValue(_programMovementTimes(m).departure);
+}
+function _programRenderMovementCard(m){
+  if(!m) return '';
+  var times=_programMovementTimes(m);
+  var origin=movementLocationLabel(m.originRef,m.origin) || 'Départ à préciser';
+  var destination=movementLocationLabel(m.destinationRef,m.destination) || 'Arrivée à préciser';
+  var mode=movementPrimaryMode(m) || 'Transport';
+  var meta=[mode];
+  if(times.departure) meta.push(times.departure+(times.arrival?' → '+times.arrival:''));
+  else if(times.arrival) meta.push('Arrivée '+times.arrival);
+  if(m.durationMin) meta.push(movementFormatDuration(m.durationMin,m));
+  return '<div class="info-card" style="padding:13px 14px;margin-top:10px;background:rgba(37,99,235,.055);border:1px solid rgba(37,99,235,.11)">'
+    +'<div style="display:flex;align-items:center;gap:9px;min-width:0">'
+      +'<span style="display:flex;align-items:center;justify-content:center;flex:0 0 27px;width:27px;height:27px;border-radius:50%;background:rgba(37,99,235,.09);color:#2563EB">'+movementModeIcon(mode)+'</span>'
+      +'<div style="min-width:0;flex:1;font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.25">'+escHtml(origin)+' → '+escHtml(destination)+'</div>'
+    +'</div>'
+    +'<div style="font-size:11.5px;color:var(--ink-muted);margin:7px 0 0 36px">'+escHtml(meta.join(' · '))+'</div>'
+    +(m.status==='incomplete'?'<div style="font-size:11px;color:var(--status-upcoming);font-weight:600;margin:4px 0 0 36px">À compléter</div>':'')
+  +'</div>';
+}
+function _programRenderTransitionMovements(day){
+  var items=(day&&Array.isArray(day.movements)) ? day.movements.slice() : [];
+  if(!items.length) return '';
+  items.sort(function(a,b){
+    var ta=_programMovementAnchor(a), tb=_programMovementAnchor(b);
+    if(ta===null && tb!==null) return 1;
+    if(ta!==null && tb===null) return -1;
+    if(ta!==null && tb!==null && ta!==tb) return ta-tb;
+    return 0;
+  });
+  return '<div style="margin-top:14px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">Déplacements du jour</div>'
+    +items.map(_programRenderMovementCard).join('')
+  +'</div>';
+}
+
 function _programRenderTimeline(day){
   if(!day) return '';
   var entries=[];
   (day.baseActivities||[]).forEach(function(item,i){ entries.push({kind:'activity',anchor:_programActivityAnchor(item),order:i,item:item}); });
   (day.outings||[]).forEach(function(slot,i){ entries.push({kind:'outing',anchor:_programOutingAnchor(slot),order:1000+i,slot:slot}); });
+  (day.movements||[]).forEach(function(item,i){ entries.push({kind:'movement',anchor:_programMovementAnchor(item),order:2000+i,item:item}); });
   var timed=entries.filter(function(e){ return e.anchor!==null; });
   var untimed=entries.filter(function(e){ return e.anchor===null; });
   timed.sort(function(a,b){ return a.anchor-b.anchor || a.order-b.order; });
   var html=timed.map(function(e){
     if(e.kind==='outing') return _programRenderOutingCard(e.slot);
+    if(e.kind==='movement') return _programRenderMovementCard(e.item);
     return '<div class="info-card" style="padding:12px 14px;margin-top:10px">'+_programActivityRow(e.item,true)+'</div>';
   }).join('');
   if(untimed.length){
     html+='<div style="margin-top:18px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">Horaire à préciser</div>'
       +untimed.map(function(e){
         if(e.kind==='outing') return _programRenderOutingCard(e.slot);
+        if(e.kind==='movement') return _programRenderMovementCard(e.item);
         return '<div class="info-card" style="padding:12px 14px;margin-top:8px">'+_programActivityRow(e.item,true)+'</div>';
       }).join('')
     +'</div>';
@@ -15995,9 +16046,8 @@ function renderProgramScreen(){
     +'<div id="programSwipeBody" style="padding:22px 16px 34px;min-height:360px;touch-action:pan-y">'
       +'<div style="font-size:12px;color:var(--ink-muted);text-transform:capitalize;margin-bottom:10px">'+selectedLabel+'</div>'
       +_programRenderBase(programDay)
-      +((programDay.base&&programDay.base.confidence==='transition')?_programRenderOutings(programDay):_programRenderTimeline(programDay))
+      +((programDay.base&&programDay.base.confidence==='transition')?(_programRenderTransitionMovements(programDay)+_programRenderOutings(programDay)):_programRenderTimeline(programDay))
       +_programRenderOtherActivities(programDay)
-      +'<div style="font-size:11.5px;color:var(--ink-subtle);text-align:center;margin-top:18px">Déplacements — commit suivant</div>'
     +'</div>'
   +'</div>';
 }
