@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-daystrip-sticky-v1';
+var APP_BUILD = '2026-09-03·sha:program-daystrip-scrollroot-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -16018,7 +16018,9 @@ function renderContent(){
   else if(S.tab==='access-management')html=renderAccessManagementScreen();
   else if(S.tab==='my-account')html=renderMyAccountScreen();
   else html=renderMore();
-  document.getElementById('mainContent').innerHTML=html;
+  var mainContentRoot=document.getElementById('mainContent');
+  mainContentRoot.style.overflowY=S.tab==='program'?'visible':'';
+  mainContentRoot.innerHTML=html;
   if(S.tab==='program') requestAnimationFrame(_programAfterRender);
   document.querySelectorAll('.day-badge[data-actkey]').forEach(function(btn){
     btn.addEventListener('click',function(e){e.stopPropagation();cycleDay(btn.getAttribute('data-actkey'),btn.getAttribute('data-ck'));});
