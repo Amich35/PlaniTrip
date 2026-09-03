@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-daystrip-scrollroot-v1';
+var APP_BUILD = '2026-09-03·sha:program-other-activities-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15793,7 +15793,7 @@ function _programDayLabel(dateStr){
 function _programActivityRow(item,compact){
   if(!item) return '';
   var t=(S.actTimeStart&&S.actTimeStart[item.actKey]) || (S.actTime&&S.actTime[item.actKey]) || '';
-  var spacing=compact ? 'padding:0' : 'padding:10px 0;border-top:1px solid rgba(29,29,31,.06)';
+  var spacing=compact===true ? 'padding:0' : 'padding:10px 0;border-top:1px solid rgba(29,29,31,.06)';
   return '<div style="display:flex;align-items:flex-start;gap:10px;'+spacing+'">'
     +(t?'<div style="flex:0 0 42px;font-size:11px;font-weight:600;color:var(--ink-muted);padding-top:1px">'+escHtml(t)+'</div>':'<div style="flex:0 0 8px"></div>')
     +'<div style="min-width:0;flex:1;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.35">'+escHtml(item.title||'Activité')+'</div>'
@@ -15922,6 +15922,54 @@ function _programRenderTimeline(day){
   return html ? '<div style="margin-top:10px">'+html+'</div>' : '';
 }
 
+function _programOtherCityLabel(ck){
+  if(!ck) return 'Ville à préciser';
+  var countryId=countryIdFromCityKey(ck);
+  var cityName=countryId ? ck.slice(countryId.length+1) : ck;
+  var ref=_resolveCityRef({ck:ck,country:countryId,city:cityName});
+  return (ref&&ref.label) ? ref.label : (cityName||ck);
+}
+function _programVisibleOtherActivities(day){
+  var items=(day&&Array.isArray(day.otherActivities)) ? day.otherActivities : [];
+  var fromCk=(day&&day.base&&day.base.confidence==='transition'&&day.base.transitionFromCity)
+    ? day.base.transitionFromCity.ck : null;
+  return items.filter(function(item){ return !fromCk || item.ck!==fromCk; });
+}
+function _programRenderOtherActivities(day){
+  var items=_programVisibleOtherActivities(day);
+  if(!items.length) return '';
+  var groups=Object.create(null), groupOrder=[];
+  items.forEach(function(item,i){
+    var ck=item.ck||'';
+    if(!Object.prototype.hasOwnProperty.call(groups,ck)){
+      groups[ck]=[];
+      groupOrder.push(ck);
+    }
+    groups[ck].push({item:item,order:i});
+  });
+  var cards=groupOrder.map(function(ck){
+    var entries=groups[ck].slice().sort(function(a,b){
+      var ta=_programActivityAnchor(a.item), tb=_programActivityAnchor(b.item);
+      if(ta===null && tb!==null) return 1;
+      if(ta!==null && tb===null) return -1;
+      if(ta!==null && tb!==null && ta!==tb) return ta-tb;
+      return a.order-b.order;
+    });
+    return '<div class="info-card" style="padding:13px 14px;margin-top:9px;background:var(--status-upcoming-pale);border:1px solid rgba(244,162,97,.22)">'
+      +'<div style="display:flex;align-items:center;gap:7px;color:var(--ink)">'
+        +'<span style="display:flex;color:var(--status-upcoming)">'+svgIcon('map-pin',14)+'</span>'
+        +'<div style="font-size:14px;font-weight:700">'+escHtml(_programOtherCityLabel(ck))+'</div>'
+      +'</div>'
+      +'<div style="margin-top:5px">'+entries.map(function(entry){ return _programActivityRow(entry.item); }).join('')+'</div>'
+    +'</div>';
+  }).join('');
+  return '<div style="margin-top:22px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase">Autres activités</div>'
+    +'<div style="font-size:11.5px;color:var(--ink-muted);line-height:1.4;margin-top:3px">Datées ce jour, mais non rattachées à la base ni à une excursion.</div>'
+    +cards
+  +'</div>';
+}
+
 function renderProgramScreen(){
   var dates=_programTripDates();
   if(!dates.length){
@@ -15948,7 +15996,8 @@ function renderProgramScreen(){
       +'<div style="font-size:12px;color:var(--ink-muted);text-transform:capitalize;margin-bottom:10px">'+selectedLabel+'</div>'
       +_programRenderBase(programDay)
       +((programDay.base&&programDay.base.confidence==='transition')?_programRenderOutings(programDay):_programRenderTimeline(programDay))
-      +'<div style="font-size:11.5px;color:var(--ink-subtle);text-align:center;margin-top:18px">Autres activités et déplacements — commits suivants</div>'
+      +_programRenderOtherActivities(programDay)
+      +'<div style="font-size:11.5px;color:var(--ink-subtle);text-align:center;margin-top:18px">Déplacements — commit suivant</div>'
     +'</div>'
   +'</div>';
 }
