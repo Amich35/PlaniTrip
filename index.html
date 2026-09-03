@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-day-movements-v1';
+var APP_BUILD = '2026-09-03·sha:program-day-movements-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -15934,16 +15934,13 @@ function _programRenderMovementCard(m){
 function _programRenderTransitionMovements(day){
   var items=(day&&Array.isArray(day.movements)) ? day.movements.slice() : [];
   if(!items.length) return '';
-  items.sort(function(a,b){
-    var ta=_programMovementAnchor(a), tb=_programMovementAnchor(b);
-    if(ta===null && tb!==null) return 1;
-    if(ta!==null && tb===null) return -1;
-    if(ta!==null && tb!==null && ta!==tb) return ta-tb;
-    return 0;
-  });
+  var timed=items.filter(function(m){ return _programMovementAnchor(m)!==null; });
+  var untimed=items.filter(function(m){ return _programMovementAnchor(m)===null; });
+  timed.sort(function(a,b){ return _programMovementAnchor(a)-_programMovementAnchor(b); });
   return '<div style="margin-top:14px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px">Déplacements du jour</div>'
-    +items.map(_programRenderMovementCard).join('')
+    +timed.map(_programRenderMovementCard).join('')
+    +(untimed.length?'<div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin:16px 0 6px">Horaire à préciser</div>'+untimed.map(_programRenderMovementCard).join(''):'')
   +'</div>';
 }
 
