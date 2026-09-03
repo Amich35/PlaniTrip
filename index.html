@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-day-movements-v2';
+var APP_BUILD = '2026-09-03·sha:program-outing-new-activity-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -5846,10 +5846,27 @@ function confirmMoveToCity(targetCityKey){
   deleteActivity(ctx.cityKey, ctx.origIdx, ctx.isCustom, ctx.actName, {skipConfirm:true});
 }
 
+function _rollbackTransientActivityCreation(cityKey, actObj, actKey){
+  var list=S.customActs&&S.customActs[cityKey];
+  if(Array.isArray(list)){
+    var idx=list.indexOf(actObj);
+    if(idx>-1) list.splice(idx,1);
+  }
+  ['actDate','actTimeStart','actTimeEnd','actTime','actMoment','actCategory','actDay','done'].forEach(function(mapName){
+    if(S[mapName]) delete S[mapName][actKey];
+  });
+  if(window._customDetails) delete window._customDetails[actKey];
+  if(COORDS) delete COORDS[actKey];
+  S.customDetails=window._customDetails||{};
+  save();
+  renderContent();
+}
+
 async function _createActivityCore(cityKey, val, opts){
   val = stripHtml(val.trim());
   if(!val) return;
   opts = opts || {};
+  if(opts.requireStable && (!sb || !CURRENT_TRIP)) throw new Error('Connexion requise pour ajouter cette activité à une excursion.');
   if(!S.customActs[cityKey]) S.customActs[cityKey]=[];
   const newIdx = S.customActs[cityKey].length;
   // Lot 6 : opts.tags (suggestion), opts.detailKey, opts.skipAiEnrichment, opts.initialDetails
@@ -5902,9 +5919,12 @@ async function _createActivityCore(cityKey, val, opts){
   }
   save();
   renderContent();
-  // Lot 6 : ne pas déclencher l'IA si la fiche est déjà connue (suggestion statique).
-  if(!opts.skipAiEnrichment){ fetchActivityDetailAI(cityKey, val, actKey, newIdx); }
-  if(!aiHasActiveKey()) geocodePinForActivity(actKey, val, cityKey);
+  // Le parcours excursion attend la clé stable avant tout enrichissement asynchrone :
+  // aucun callback tardif ne doit réécrire une clé locale supprimée après un échec INSERT.
+  if(!opts.requireStable){
+    if(!opts.skipAiEnrichment){ fetchActivityDetailAI(cityKey, val, actKey, newIdx); }
+    if(!aiHasActiveKey()) geocodePinForActivity(actKey, val, cityKey);
+  }
   if(sb && CURRENT_TRIP){
     var parts = cityKey.split('_');
     var who=(CURRENT_USER&&PROFILES_MAP[CURRENT_USER.email])||(CURRENT_USER&&CURRENT_USER.email)||'';
@@ -5914,8 +5934,13 @@ async function _createActivityCore(cityKey, val, opts){
       .select('id').single();
     if(_insertResult && _insertResult.error){
       console.error('[PlaniTrip] _createActivityCore INSERT error:', _insertResult.error);
-      // Erreur INSERT : l'activité reste locale (_cN), pas de persistance Supabase.
-      // Pas de rollback local — l'utilisateur voit l'activité et peut réessayer.
+      if(opts.requireStable){
+        _rollbackTransientActivityCreation(cityKey, actObj, actKey);
+        var _insertError=new Error('Création Supabase non confirmée.');
+        _insertError.code='ACTIVITY_INSERT_FAILED';
+        throw _insertError;
+      }
+      // Parcours historique : l'activité reste locale si la connexion échoue.
     } else if(_insertResult && _insertResult.data && _insertResult.data.id){
       var _sid = _insertResult.data.id;
       var _stableKey = cityKey+'_sid_'+_sid;
@@ -5957,23 +5982,56 @@ async function _createActivityCore(cityKey, val, opts){
       save();
       // Sync Supabase sous la clé stable uniquement
       // _syncActivityState couvre : date, moment, timeStart, timeEnd, category, done
+      var _requiredPostCreateError=null;
       try{
         await _syncActivityState(_stableKey, CURRENT_TRIP.id);
       } catch(e){
         console.error('[PlaniTrip] _createActivityCore sync state:', e);
+        if(opts.requireStable){
+          try{
+            await _syncActivityState(_stableKey, CURRENT_TRIP.id);
+          } catch(eRetry){
+            var _stateError=new Error('Activité créée, mais sa planification n\'a pas été confirmée.');
+            _stateError.code='ACTIVITY_STATE_SYNC_FAILED';
+            _stateError.activityCreated=true;
+            _requiredPostCreateError=_stateError;
+          }
+        }
       }
       // Fiche détaillée statique sous la clé stable
       if(_pendingState.hasInitialDetails && window._customDetails && window._customDetails[_stableKey]){
         sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:_stableKey,data:window._customDetails[_stableKey],updated_at:new Date().toISOString()},{onConflict:'trip_id,detail_key'}).then(function(_r){ if(_r&&_r.error) console.error('[PlaniTrip] sync suggestion detail:',_r.error); });
       }
-      // Événement collaboratif
+      if(!_requiredPostCreateError && typeof opts.afterStableCreate==='function'){
+        try{
+          await opts.afterStableCreate(_stableKey);
+        } catch(eAttach){
+          var _attachError=new Error('Activité créée, mais son rattachement à l\'excursion a échoué.');
+          _attachError.code='OUTING_ATTACH_FAILED';
+          _attachError.activityCreated=true;
+          _requiredPostCreateError=_attachError;
+          console.error('[PlaniTrip] _createActivityCore afterStableCreate:', eAttach);
+        }
+      }
+      if(opts.requireStable){
+        if(!opts.skipAiEnrichment){ fetchActivityDetailAI(cityKey, val, _stableKey, newIdx); }
+        if(!aiHasActiveKey()) geocodePinForActivity(_stableKey, val, cityKey);
+      }
+      // L'événement activité reste compatible avec le CHECK existant ; jamais d'entity_type outing.
       postChangeEvent('activity', 'add', {
         entityId: _stableKey,
         entityLabel: val,
         summary: _ceActorLabel() + ' a ajouté une activité · ' + val,
-        deepLink: 'S.tab=\'countries\';S.currentCityKey=\''+cityKey+'\';save();renderContent();',
-        meta: {cityKey: cityKey, actKey: _stableKey, name: val}
+        deepLink: opts.eventDeepLink || ('S.tab=\'countries\';S.currentCityKey=\''+cityKey+'\';save();renderContent();'),
+        meta: Object.assign({cityKey: cityKey, actKey: _stableKey, name: val}, opts.eventMeta||{})
       });
+      if(_requiredPostCreateError) throw _requiredPostCreateError;
+      return _stableKey;
+    } else if(opts.requireStable){
+      _rollbackTransientActivityCreation(cityKey, actObj, actKey);
+      var _missingInsertError=new Error('Création Supabase non confirmée.');
+      _missingInsertError.code='ACTIVITY_INSERT_FAILED';
+      throw _missingInsertError;
     }
   }
 }
@@ -6029,6 +6087,10 @@ function addActivity(cityKey) {
 }
 var _addActivityModalCk = '';
 var _addActivityModalCats = [];
+var _addActivityModalOutingId = '';
+var _addActivityModalOutingDate = '';
+var _addActivityModalAllowedCks = [];
+var _addActivityModalSaving = false;
 var _freeBlockModalCk = null;
 var _freeBlockModalType = null;
 var _freeBlockModalEditId = null;
@@ -6089,26 +6151,47 @@ function saveFreeBlockFromModal(){
   closeGuideItemModal();
   saveFreeBlock(ck, {id:editId||undefined, type:type, name:name, date:date, timeStart:timeStart, timeEnd:timeEnd});
 }
-function openAddActivityModal(ck){
+function openAddActivityModal(ck, programContext){
+  programContext=programContext||null;
+  _addActivityModalOutingId=programContext&&programContext.outingId ? programContext.outingId : '';
+  _addActivityModalOutingDate=programContext&&programContext.date ? programContext.date : '';
+  _addActivityModalAllowedCks=programContext&&Array.isArray(programContext.visitCks) ? programContext.visitCks.slice() : [];
+  if(_addActivityModalAllowedCks.length && _addActivityModalAllowedCks.indexOf(ck)===-1) ck=_addActivityModalAllowedCks[0];
   _addActivityModalCk = ck;
   _addActivityModalCats = [];
-  var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
+  _addActivityModalSaving = false;
+  var isOuting=!!_addActivityModalOutingId;
+  var range = !isOuting && (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
   var dateBounds = range ? (' min="'+range.start+'" max="'+range.end+'"') : '';
+  var dateValue=isOuting ? (' value="'+escHtml(_addActivityModalOutingDate)+'" readonly aria-readonly="true"') : '';
+  var visitLabels=programContext&&Array.isArray(programContext.visitLabels) ? programContext.visitLabels : [];
+  var cityField='';
+  if(isOuting && _addActivityModalAllowedCks.length>1){
+    var cityOptions=_addActivityModalAllowedCks.map(function(cityCk,i){
+      var label=visitLabels[i]||_programOtherCityLabel(cityCk);
+      return '<option value="'+escHtml(cityCk)+'"'+(cityCk===ck?' selected':'')+'>'+escHtml(label)+'</option>';
+    }).join('');
+    cityField='<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Ville visitée</div><select class="ef-input" onchange="selectProgramOutingActivityCity(this.value)" style="width:100%;height:42px">'+cityOptions+'</select></div>';
+  }
   var catPills = Object.keys(ACTIVITY_CATEGORIES).map(function(key){
     var cat = ACTIVITY_CATEGORIES[key];
     return '<span onclick="event.stopPropagation();selectAddActivityCat(\''+key+'\')" data-cat-pill="'+key+'" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--ink-subtle);background:var(--sand-deep);padding:6px 12px;border-radius:14px;cursor:pointer;margin:0 6px 6px 0">'+svgIcon(cat.icon,13)+' '+cat.label+'</span>';
   }).join('');
-  document.getElementById('guideItemModalTitle').textContent = 'Ajouter une activité';
+  var title='Ajouter une activité';
+  if(isOuting){
+    var oneLabel=visitLabels[0]||_programOtherCityLabel(ck);
+    title=_addActivityModalAllowedCks.length===1 ? 'Nouvelle activité · '+oneLabel : 'Nouvelle activité';
+  }
+  document.getElementById('guideItemModalTitle').textContent = title;
   document.getElementById('guideItemModalBody').innerHTML =
-    // Nom — seul champ obligatoire, toujours visible en premier
-    '<div style="margin-bottom:10px"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%;font-size:16px;font-weight:500" autocomplete="off" oninput="showModalActSuggestions(\''+jsStrEsc(ck)+'\')"/></div>'
+    cityField
+    +'<div style="margin-bottom:10px"><input class="ef-input" id="guideModalActName" type="text" placeholder="Nom de l\'activité" style="width:100%;font-size:16px;font-weight:500" autocomplete="off" oninput="showModalActSuggestions(_addActivityModalCk)"/></div>'
     +'<div class="suggestions-list" id="guideModalActSuggestions" style="position:static;margin-bottom:8px"></div>'
-    // Bloc "Options rapides" : catégories + planning côte à côte (compact)
     +'<div style="font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--ink-subtle);margin-bottom:8px">Options</div>'
     +'<div style="margin-bottom:10px">'+catPills+'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:10px">'
-    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Date</div>'
-    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+' style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
+    +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">'+(isOuting?'Jour':'Date')+'</div>'
+    +'<input class="ef-input" id="guideModalActDate" type="date"'+dateBounds+dateValue+' style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none;'+(isOuting?'background:var(--sand-deep);color:var(--ink-muted);':'')+'"/></div>'
     +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Début</div>'
     +'<input class="ef-input" id="guideModalActTime" type="time" style="width:100%;box-sizing:border-box;height:40px;padding:0 10px;-webkit-appearance:none;appearance:none"/></div>'
     +'<div style="flex:1"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Fin</div>'
@@ -6116,13 +6199,29 @@ function openAddActivityModal(ck){
     +'</div>'
     +'<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--ink-subtle);margin-bottom:4px">Type de lieu (optionnel)</div>'
     +'<input class="ef-input" id="guideModalActPlaceType" type="text" placeholder="Ex. temple, marché, café…" style="width:100%"/></div>'
-    // Description — zone secondaire, visuellement moins prioritaire
     +'<details style="margin-top:2px"><summary style="font-size:12px;color:var(--ink-subtle);cursor:pointer;list-style:none;display:flex;align-items:center;gap:4px;padding:4px 0">'+svgIcon('chevron-right',11)+'<span>Description (optionnel)</span></summary>'
     +'<div style="margin-top:6px"><input class="ef-input" id="guideModalActMeta" type="text" placeholder="Quelques mots sur ce lieu…" style="width:100%;margin-top:2px"/></div>'
     +'</details>';
   _guideModalSaveFn = saveAddActivityModal;
+  var saveBtn=document.querySelector('#guideItemModal .modal-cta');
+  var cancelBtn=document.querySelector('#guideItemModal .modal-cancel-btn');
+  if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=isOuting?'Créer et ajouter':'Enregistrer'; }
+  if(cancelBtn) cancelBtn.disabled=false;
   document.getElementById('guideItemModal').classList.add('open');
 }
+function selectProgramOutingActivityCity(ck){
+  if(_addActivityModalAllowedCks.indexOf(ck)===-1) return;
+  _addActivityModalCk=ck;
+  var list=document.getElementById('guideModalActSuggestions');
+  if(list){ list.classList.remove('open'); list.innerHTML=''; }
+}
+function _resetAddActivityOutingContext(){
+  _addActivityModalOutingId='';
+  _addActivityModalOutingDate='';
+  _addActivityModalAllowedCks=[];
+  _addActivityModalSaving=false;
+}
+
 function selectAddActivityCat(key){
   var idx = _addActivityModalCats.indexOf(key);
   if(idx>-1) _addActivityModalCats.splice(idx,1); else _addActivityModalCats.push(key);
@@ -6151,13 +6250,81 @@ function showModalActSuggestions(ck){
     el.addEventListener('click', function(e){
       e.stopPropagation();
       var a = matches[i];
-      // Lot 6 : même chemin que showSuggestions — passe par _createActivityCore.
-      closeGuideItemModal();
-      _createActivityCore(ck, a.n, {meta:a.m, tags:a.tags, detailKey:a.key, skipAiEnrichment:true, initialDetails:a.detail||{}});
+      var targetCk=_addActivityModalCk||ck;
+      var suggestionOpts={meta:a.m, tags:a.tags, detailKey:a.key, skipAiEnrichment:true, initialDetails:a.detail||{}};
+      if(_addActivityModalOutingId){
+        suggestionOpts.categories=_addActivityModalCats.slice();
+        suggestionOpts.date=_addActivityModalOutingDate;
+        suggestionOpts.time=((document.getElementById('guideModalActTime')||{}).value||'').trim();
+        suggestionOpts.timeEnd=((document.getElementById('guideModalActTimeEnd')||{}).value||'').trim();
+        _submitAddActivityCreation(targetCk,a.n,suggestionOpts);
+      } else {
+        closeGuideItemModal();
+        _createActivityCore(targetCk,a.n,suggestionOpts);
+      }
     });
   });
 }
-function saveAddActivityModal(){
+async function _submitAddActivityCreation(cityKey,val,opts){
+  opts=opts||{};
+  var outingId=_addActivityModalOutingId;
+  var outingDate=_addActivityModalOutingDate;
+  if(!outingId){
+    closeGuideItemModal();
+    return _createActivityCore(cityKey,val,opts);
+  }
+  if(!sb || !CURRENT_TRIP){
+    alert('Connexion requise pour ajouter une activité à une excursion.');
+    return;
+  }
+  if(_addActivityModalAllowedCks.indexOf(cityKey)===-1){
+    alert('Merci de choisir une ville visitée par cette excursion.');
+    return;
+  }
+  if(_addActivityModalSaving) return;
+  _addActivityModalSaving=true;
+  var saveBtn=document.querySelector('#guideItemModal .modal-cta');
+  var cancelBtn=document.querySelector('#guideItemModal .modal-cancel-btn');
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Création…'; }
+  if(cancelBtn) cancelBtn.disabled=true;
+  opts.date=outingDate;
+  opts.requireStable=true;
+  opts.eventDeepLink='S.tab=\'program\';programDate=\''+outingDate+'\';save();renderContent();';
+  opts.eventMeta=Object.assign({},opts.eventMeta||{},{outingId:outingId});
+  opts.afterStableCreate=async function(stableKey){
+    var savedOuting=await _programAttachActivityToOuting(outingId,stableKey,outingDate,cityKey);
+    if(!S.outings) S.outings={};
+    S.outings[outingId]=savedOuting;
+    save();
+  };
+  try{
+    var stableKey=await _createActivityCore(cityKey,val,opts);
+    if(!stableKey) throw new Error('Création Supabase non confirmée.');
+    _addActivityModalSaving=false;
+    closeGuideItemModal();
+    _resetAddActivityOutingContext();
+    renderContent();
+    showSuccessToast('Activité ajoutée à l’excursion');
+    return stableKey;
+  } catch(e){
+    console.error('[PlaniTrip] _submitAddActivityCreation:',e);
+    _addActivityModalSaving=false;
+    if(e&&e.activityCreated){
+      closeGuideItemModal();
+      _resetAddActivityOutingContext();
+      renderContent();
+      alert(e.code==='ACTIVITY_STATE_SYNC_FAILED'
+        ? 'Activité créée, mais sa date n’a pas pu être confirmée. Elle reste conservée dans la ville.'
+        : 'Activité créée, mais son rattachement à l’excursion n’a pas pu être confirmé. Elle reste conservée dans la ville.');
+    } else {
+      if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Créer et ajouter'; }
+      if(cancelBtn) cancelBtn.disabled=false;
+      alert('Impossible de créer cette activité pour le moment.');
+    }
+    return null;
+  }
+}
+async function saveAddActivityModal(){
   var val = ((document.getElementById('guideModalActName')||{}).value||'').trim();
   if(!val) return;
   var meta = ((document.getElementById('guideModalActMeta')||{}).value||'').trim();
@@ -6165,16 +6332,11 @@ function saveAddActivityModal(){
   var timeVal = ((document.getElementById('guideModalActTime')||{}).value||'').trim();
   var timeEndVal = ((document.getElementById('guideModalActTimeEnd')||{}).value||'').trim();
   var placeType = ((document.getElementById('guideModalActPlaceType')||{}).value||'').trim();
-  closeGuideItemModal();
-  var opts = {meta:meta, categories:_addActivityModalCats, date:date, time:timeVal, timeEnd:timeEndVal};
-  // Type de lieu saisi manuellement : même champ ("tag") que celui rempli par l'IA ou
-  // les suggestions statiques, via le mécanisme initialDetails déjà utilisé pour ces cas.
-  // _userTag protège ce choix explicite d'un écrasement par fetchActivityDetailAI(), qui
-  // continue de tourner normalement pour enrichir le reste de la fiche (description,
-  // adresse, conseils...).
+  var opts = {meta:meta, categories:_addActivityModalCats.slice(), date:date, time:timeVal, timeEnd:timeEndVal};
   if(placeType) opts.initialDetails = {tag: placeType, _userTag: true};
-  _createActivityCore(_addActivityModalCk, val, opts);
+  return _submitAddActivityCreation(_addActivityModalCk,val,opts);
 }
+
 
 // ── B2 : sélecteur de fournisseur minimal dans la modale Réglages (les
 // providers non implémentés — Gemini en B2 — n'apparaissent pas comme chip
@@ -9926,6 +10088,42 @@ async function loadPersistedOuting(id){
   if(r&&r.error) throw r.error;
   return r&&r.data&&r.data.data&&typeof r.data.data==='object'?r.data.data:null;
 }
+async function _programAttachActivityToOuting(outingId,actKey,expectedDate,expectedCk){
+  if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
+  var detailKey='__planitrip__outing__'+outingId;
+  for(var attempt=0;attempt<2;attempt++){
+    var read=await sb.from('activity_details')
+      .select('data,updated_at')
+      .eq('trip_id',CURRENT_TRIP.id)
+      .eq('detail_key',detailKey)
+      .single();
+    if(read&&read.error) throw read.error;
+    var row=read&&read.data;
+    var current=row&&row.data;
+    if(!current||current.id!==outingId) throw new Error('Excursion introuvable.');
+    if(current.date!==expectedDate) throw new Error('Le jour de l’excursion a changé.');
+    if(!Array.isArray(current.visitCks)||current.visitCks.indexOf(expectedCk)===-1) throw new Error('La ville ne fait plus partie de l’excursion.');
+    var ids=Array.isArray(current.activityIds)?current.activityIds.slice():[];
+    if(ids.indexOf(actKey)>-1) return current;
+    ids.push(actKey);
+    var next=JSON.parse(JSON.stringify(current));
+    next.activityIds=ids;
+    next.updatedBy=canonicalPerson((CURRENT_USER&&CURRENT_USER.email)||'');
+    next.updatedAt=new Date().toISOString();
+    var updated=await sb.from('activity_details')
+      .update({data:next,updated_at:next.updatedAt})
+      .eq('trip_id',CURRENT_TRIP.id)
+      .eq('detail_key',detailKey)
+      .eq('updated_at',row.updated_at)
+      .select('data')
+      .maybeSingle();
+    if(updated&&updated.error) throw updated.error;
+    if(updated&&updated.data&&updated.data.data) return updated.data.data;
+    // Zéro ligne = modification concurrente : relire puis fusionner une fois.
+  }
+  throw new Error('Excursion modifiée simultanément. Réessaie.');
+}
+
 // Préremplissage sûr de la base d'une excursion : automatique quand la nuit est connue
 // (strict/transition, toujours via tonightCity — jamais transitionFromCity, car l'excursion
 // doit revenir à la base de FIN de journée), explicite (needsManualBase) sinon. Aucun choix
@@ -15850,12 +16048,36 @@ function _programOutingParticipantsLabel(o){
   if(!count) return 'Sous-groupe · à préciser';
   return 'Sous-groupe · '+count+' voyageur'+(count>1?'s':'');
 }
+function openProgramOutingActivity(outingId){
+  var outing=S.outings&&S.outings[outingId];
+  if(!outing||!Array.isArray(outing.visitCks)||!outing.visitCks.length){
+    alert('Destination de l’excursion indisponible.');
+    return;
+  }
+  if(!sb||!CURRENT_TRIP){
+    alert('Connexion requise pour ajouter une activité à une excursion.');
+    return;
+  }
+  openAddActivityModal(outing.visitCks[0],{
+    outingId:outing.id,
+    date:outing.date,
+    visitCks:outing.visitCks.slice(),
+    visitLabels:Array.isArray(outing.visitLabels)?outing.visitLabels.slice():[]
+  });
+}
+
 function _programRenderOutingCard(slot){
   if(!slot || !slot.outing) return '';
   var o=slot.outing;
   var destination=_programOutingDestinationLabel(o);
   var mode=o.primaryTransportMode || 'Transport à préciser';
-  var acts=Array.isArray(slot.activities) ? slot.activities : [];
+  var acts=(Array.isArray(slot.activities) ? slot.activities : []).map(function(item,i){ return {item:item,order:i}; }).sort(function(a,b){
+    var ta=_programActivityAnchor(a.item),tb=_programActivityAnchor(b.item);
+    if(ta===null&&tb!==null) return 1;
+    if(ta!==null&&tb===null) return -1;
+    if(ta!==null&&tb!==null&&ta!==tb) return ta-tb;
+    return a.order-b.order;
+  }).map(function(entry){ return entry.item; });
   return '<div style="position:relative;margin-top:12px;padding-left:18px">'
     +'<div aria-hidden="true" style="position:absolute;left:4px;top:-10px;bottom:18px;width:1px;background:rgba(45,106,79,.22)"></div>'
     +'<div aria-hidden="true" style="position:absolute;left:4px;top:22px;width:10px;height:1px;background:rgba(45,106,79,.22)"></div>'
@@ -15867,6 +16089,7 @@ function _programRenderOutingCard(slot){
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:7px 0 0 35px">'+escHtml(mode)+' · Aller-retour</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:3px 0 0 35px">'+escHtml(_programOutingParticipantsLabel(o))+'</div>'
       +(acts.length?'<div style="margin:11px 0 0 35px">'+acts.map(_programActivityRow).join('')+'</div>':'')
+      +'<button type="button" onclick="event.stopPropagation();openProgramOutingActivity(\''+jsStrEsc(o.id)+'\')" style="margin:12px 0 0 35px;padding:8px 11px;border-radius:999px;border:1px solid rgba(45,106,79,.18);background:rgba(255,255,255,.52);color:var(--accent-deep);font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+svgIcon('plus',12)+' Nouvelle activité</button>'
     +'</div>'
   +'</div>';
 }
