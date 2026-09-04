@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-03·sha:program-outing-new-activity-v1';
+var APP_BUILD = '2026-09-04·sha:program-outing-existing-activity-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -7435,6 +7435,11 @@ function openGuideItemModal(countryId, listField, idx){
 }
 function closeGuideItemModal(){
   document.getElementById('guideItemModal').classList.remove('open');
+  var saveBtn=document.querySelector('#guideItemModal .modal-cta');
+  var cancelBtn=document.querySelector('#guideItemModal .modal-cancel-btn');
+  if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Enregistrer'; saveBtn.style.opacity=''; }
+  if(cancelBtn) cancelBtn.disabled=false;
+  if(typeof _programResetExistingActivityModal==='function') _programResetExistingActivityModal();
 }
 function saveGuideItem(){
   var c=COUNTRIES.find(function(co){return co.id===_guideModalCountryId;});
@@ -10088,7 +10093,7 @@ async function loadPersistedOuting(id){
   if(r&&r.error) throw r.error;
   return r&&r.data&&r.data.data&&typeof r.data.data==='object'?r.data.data:null;
 }
-async function _programAttachActivityToOuting(outingId,actKey,expectedDate,expectedCk){
+async function _programAttachActivityToOuting(outingId,actKey,expectedDate,expectedCk,returnMeta){
   if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
   var detailKey='__planitrip__outing__'+outingId;
   for(var attempt=0;attempt<2;attempt++){
@@ -10104,7 +10109,7 @@ async function _programAttachActivityToOuting(outingId,actKey,expectedDate,expec
     if(current.date!==expectedDate) throw new Error('Le jour de l’excursion a changé.');
     if(!Array.isArray(current.visitCks)||current.visitCks.indexOf(expectedCk)===-1) throw new Error('La ville ne fait plus partie de l’excursion.');
     var ids=Array.isArray(current.activityIds)?current.activityIds.slice():[];
-    if(ids.indexOf(actKey)>-1) return current;
+    if(ids.indexOf(actKey)>-1) return returnMeta ? {outing:current,added:false} : current;
     ids.push(actKey);
     var next=JSON.parse(JSON.stringify(current));
     next.activityIds=ids;
@@ -10118,7 +10123,7 @@ async function _programAttachActivityToOuting(outingId,actKey,expectedDate,expec
       .select('data')
       .maybeSingle();
     if(updated&&updated.error) throw updated.error;
-    if(updated&&updated.data&&updated.data.data) return updated.data.data;
+    if(updated&&updated.data&&updated.data.data) return returnMeta ? {outing:updated.data.data,added:true} : updated.data.data;
     // Zéro ligne = modification concurrente : relire puis fusionner une fois.
   }
   throw new Error('Excursion modifiée simultanément. Réessaie.');
@@ -16066,6 +16071,353 @@ function openProgramOutingActivity(outingId){
   });
 }
 
+
+var _programExistingOutingId='';
+var _programExistingActKey='';
+var _programExistingSaving=false;
+var _programExistingError='';
+var _programExistingBlocked={};
+var _programExistingOutingStale=false;
+
+function _programResetExistingActivityModal(){
+  _programExistingOutingId='';
+  _programExistingActKey='';
+  _programExistingSaving=false;
+  _programExistingError='';
+  _programExistingBlocked={};
+  _programExistingOutingStale=false;
+}
+function _programExistingMakeError(code,message){
+  var err=new Error(message);
+  err.code=code;
+  return err;
+}
+function _programExistingErrorMessage(err){
+  if(err&&err.code==='OUTING_ACTIVITY_CONFLICT') return 'Cette activité vient d’être rattachée à une autre excursion. Aucun changement local n’a été appliqué.';
+  if(err&&err.code==='OUTING_CHANGED') return 'Cette excursion a changé sur un autre appareil. Ferme cette feuille puis actualise le Programme.';
+  if(err&&err.code==='ACTIVITY_CHANGED') return 'Cette activité a changé sur un autre appareil et n’est plus éligible.';
+  if(err&&err.code==='ACTIVITY_UNAVAILABLE') return 'Cette activité n’est plus disponible dans cette destination.';
+  if(err&&err.code==='ACTIVITY_UNSTABLE') return 'Cette activité ne possède pas encore d’identité synchronisée stable.';
+  if(err&&err.code==='OUTING_ACTIVITY_RECOVERY') return 'Un conflit a été détecté et le rattachement doit être vérifié après actualisation.';
+  return 'Impossible d’ajouter cette activité pour le moment. Vérifie la connexion puis réessaie.';
+}
+function _programExistingCandidateGroups(outing){
+  if(!outing||!outing.date) return [];
+  var day=buildProgramDay(outing.date), all=[];
+  (day.baseActivities||[]).forEach(function(item){ all.push(item); });
+  (day.otherActivities||[]).forEach(function(item){ all.push(item); });
+  (day.outings||[]).forEach(function(slot){ (slot.activities||[]).forEach(function(item){ all.push(item); }); });
+
+  var claims={};
+  Object.values(S.outings||{}).forEach(function(o){
+    if(!o||o.date!==outing.date) return;
+    (Array.isArray(o.activityIds)?o.activityIds:[]).forEach(function(actKey){
+      if(!claims[actKey]) claims[actKey]=[];
+      if(claims[actKey].indexOf(o.id)===-1) claims[actKey].push(o.id);
+    });
+  });
+
+  var visitCks=Array.isArray(outing.visitCks)?outing.visitCks:[];
+  var seen={};
+  var groups=visitCks.map(function(ck){ return {ck:ck,label:_programOtherCityLabel(ck),items:[]}; });
+  all.forEach(function(item,order){
+    if(!item||!item.actKey||seen[item.actKey]) return;
+    var groupIndex=visitCks.indexOf(item.ck);
+    if(groupIndex===-1) return;
+    seen[item.actKey]=true;
+    var claimIds=claims[item.actKey]||[];
+    var status='',statusLabel='';
+    if(_programExistingBlocked[item.actKey]){
+      status='blocked'; statusLabel=_programExistingBlocked[item.actKey];
+    }else if(claimIds.length>1){
+      status='conflict'; statusLabel='Conflit de rattachement';
+    }else if(claimIds.indexOf(outing.id)>-1){
+      status='same'; statusLabel='Déjà ajoutée';
+    }else if(claimIds.length){
+      status='other'; statusLabel='Déjà dans une autre excursion';
+    }else if(!_usesGranularActivityState(item.actKey)){
+      status='unstable'; statusLabel='Activité non synchronisée';
+    }
+    groups[groupIndex].items.push({
+      actKey:item.actKey,ck:item.ck,
+      title:_actDisplayName(item.actKey,item.title||'Activité'),
+      status:status,statusLabel:statusLabel,order:order
+    });
+  });
+  groups.forEach(function(group){
+    group.items.sort(function(a,b){
+      var ta=_programActivityAnchor(a),tb=_programActivityAnchor(b);
+      if(ta===null&&tb!==null) return 1;
+      if(ta!==null&&tb===null) return -1;
+      if(ta!==null&&tb!==null&&ta!==tb) return ta-tb;
+      return a.order-b.order;
+    });
+  });
+  return groups.filter(function(group){ return group.items.length; });
+}
+function _programFindExistingCandidate(outing,actKey){
+  var found=null;
+  _programExistingCandidateGroups(outing).some(function(group){
+    found=group.items.find(function(item){ return item.actKey===actKey; })||null;
+    return !!found;
+  });
+  return found;
+}
+function _programExistingStatusColor(status){
+  return status==='conflict'||status==='blocked'?'var(--red-muted)':'var(--ink-subtle)';
+}
+function _programRenderExistingActivityModal(){
+  var outing=S.outings&&S.outings[_programExistingOutingId];
+  var body=document.getElementById('guideItemModalBody');
+  var title=document.getElementById('guideItemModalTitle');
+  var modal=document.getElementById('guideItemModal');
+  if(!outing||!body||!title||!modal) return;
+  var sheet=modal.querySelector('.share-sheet');
+  var previousScroll=sheet?sheet.scrollTop:0;
+  var groups=_programExistingCandidateGroups(outing),total=0,eligible=0;
+  groups.forEach(function(group){
+    total+=group.items.length;
+    eligible+=group.items.filter(function(item){ return !item.status; }).length;
+  });
+  var dateLabel=new Date(outing.date+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  var destination=_programOutingDestinationLabel(outing);
+  title.textContent='Ajouter une activité existante';
+
+  var html='<div style="margin-top:2px;padding:11px 12px;border-radius:14px;background:var(--sand);display:flex;align-items:flex-start;gap:9px">'
+    +'<span style="display:flex;color:var(--accent-deep);padding-top:1px">'+svgIcon('repeat',14)+'</span>'
+    +'<div style="min-width:0"><div style="font-size:13px;font-weight:700;color:var(--ink)">Excursion · '+escHtml(destination)+'</div>'
+    +'<div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;text-transform:capitalize">'+escHtml(dateLabel)+'</div></div></div>'
+    +'<div style="font-size:11.5px;color:var(--ink-muted);line-height:1.45;margin:10px 2px 4px">Seules les activités non archivées, datées ce jour et situées dans la destination sont proposées.</div>';
+
+  if(!total){
+    html+='<div style="margin-top:12px;padding:18px 14px;border-radius:16px;background:var(--sand);text-align:center">'
+      +'<div style="display:flex;justify-content:center;color:var(--ink-subtle);margin-bottom:8px">'+svgIcon('calendar',20)+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--ink)">Aucune activité compatible</div>'
+      +'<div style="font-size:11.5px;color:var(--ink-muted);line-height:1.45;margin-top:4px">Aucune activité de cette destination n’est datée le '+escHtml(dateLabel)+'.</div></div>';
+  }else{
+    groups.forEach(function(group){
+      html+='<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin:0 2px 6px">'+escHtml(group.label)+'</div>'
+        +'<div style="border:1px solid rgba(29,29,31,.08);border-radius:16px;overflow:hidden;background:var(--card)">';
+      group.items.forEach(function(item,index){
+        var selected=!item.status&&_programExistingActKey===item.actKey;
+        var time=(S.actTimeStart&&S.actTimeStart[item.actKey])||(S.actTime&&S.actTime[item.actKey])||'';
+        var selectable=!item.status&&!_programExistingOutingStale;
+        html+='<button type="button" '+(selectable?'onclick="event.stopPropagation();selectProgramExistingActivity(\''+jsStrEsc(item.actKey)+'\')"':'disabled')
+          +' aria-pressed="'+(selected?'true':'false')+'" style="width:100%;min-height:54px;padding:10px 11px;border:none;'+(index?'border-top:1px solid rgba(29,29,31,.07);':'')
+          +'background:'+(selected?'var(--accent-pale)':'transparent')+';font-family:inherit;text-align:left;display:flex;align-items:center;gap:10px;opacity:1;cursor:'+(selectable?'pointer':'default')+'">'
+          +(time?'<span style="flex:0 0 38px;font-size:11px;font-weight:700;color:var(--ink-muted)">'+escHtml(time)+'</span>':'<span style="flex:0 0 8px"></span>')
+          +'<span style="min-width:0;flex:1"><span style="display:block;font-size:13px;font-weight:650;color:var(--ink);line-height:1.3">'+escHtml(item.title)+'</span>'
+          +(item.statusLabel?'<span style="display:block;font-size:10.5px;font-weight:600;color:'+_programExistingStatusColor(item.status)+';line-height:1.3;margin-top:3px">'+escHtml(item.statusLabel)+'</span>':'')+'</span>'
+          +(selectable?'<span style="flex:0 0 22px;width:22px;height:22px;border-radius:50%;border:1.5px solid '+(selected?'var(--accent)':'rgba(29,29,31,.22)')+';background:'+(selected?'var(--accent)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center">'+(selected?svgIcon('check',13):'')+'</span>':'')
+          +'</button>';
+      });
+      html+='</div></div>';
+    });
+    if(!eligible) html+='<div style="font-size:11.5px;color:var(--ink-muted);line-height:1.45;text-align:center;margin:12px 8px 0">Aucune activité n’est disponible pour un nouveau rattachement.</div>';
+  }
+  html+=_programExistingError
+    ?'<div id="programExistingActivityFeedback" role="alert" style="margin-top:12px;padding:10px 11px;border-radius:12px;background:var(--red-pale);color:var(--red-muted);font-size:11.5px;font-weight:600;line-height:1.4">'+escHtml(_programExistingError)+'</div>'
+    :'<div id="programExistingActivityFeedback" aria-live="polite"></div>';
+  body.innerHTML=html;
+
+  var saveBtn=modal.querySelector('.modal-cta');
+  var cancelBtn=modal.querySelector('.modal-cancel-btn');
+  var disabled=_programExistingSaving||_programExistingOutingStale||!_programExistingActKey;
+  if(saveBtn){
+    saveBtn.disabled=disabled;
+    saveBtn.textContent=_programExistingSaving?'Ajout…':'Ajouter à l’excursion';
+    saveBtn.style.opacity=disabled?'.45':'1';
+  }
+  if(cancelBtn) cancelBtn.disabled=_programExistingSaving;
+  _guideModalSaveFn=saveProgramExistingActivity;
+  if(sheet) sheet.scrollTop=previousScroll;
+}
+function openProgramExistingActivity(outingId){
+  var outing=S.outings&&S.outings[outingId];
+  if(!outing||!Array.isArray(outing.visitCks)||!outing.visitCks.length){
+    alert('Destination de l’excursion indisponible.'); return;
+  }
+  if(!sb||!CURRENT_TRIP){
+    alert('Connexion requise pour ajouter une activité à une excursion.'); return;
+  }
+  _programResetExistingActivityModal();
+  _programExistingOutingId=outing.id;
+  _programRenderExistingActivityModal();
+  document.getElementById('guideItemModal').classList.add('open');
+}
+function selectProgramExistingActivity(actKey){
+  if(_programExistingSaving||_programExistingOutingStale) return;
+  var outing=S.outings&&S.outings[_programExistingOutingId];
+  var candidate=outing&&_programFindExistingCandidate(outing,actKey);
+  if(!candidate||candidate.status) return;
+  _programExistingActKey=actKey;
+  _programExistingError='';
+  _programRenderExistingActivityModal();
+}
+async function _programReadServerOutings(){
+  var result=await sb.from('activity_details').select('detail_key,data,updated_at')
+    .eq('trip_id',CURRENT_TRIP.id).like('detail_key','__planitrip__outing__%');
+  if(result&&result.error) throw result.error;
+  return (result&&result.data?result.data:[]).filter(function(row){
+    return row&&row.data&&typeof row.data==='object'&&row.data.id;
+  });
+}
+function _programServerOutingRow(rows,outingId){
+  return (rows||[]).find(function(row){ return row.data&&row.data.id===outingId; })||null;
+}
+function _programServerClaims(rows,date,actKey){
+  return (rows||[]).filter(function(row){
+    var o=row.data;
+    return o&&o.date===date&&Array.isArray(o.activityIds)&&o.activityIds.indexOf(actKey)>-1;
+  });
+}
+async function _programValidateExistingActivity(candidate,expectedDate){
+  if(!candidate||!candidate.actKey||!candidate.ck) throw _programExistingMakeError('ACTIVITY_UNAVAILABLE','Activité introuvable.');
+  if(!_usesGranularActivityState(candidate.actKey)) throw _programExistingMakeError('ACTIVITY_UNSTABLE','Identité non synchronisée.');
+
+  var dateKey=candidate.actKey+'__state__date';
+  var globalDateKey='__planitrip__actDate';
+  var deletedKey=_deletedActDetailKey(candidate.actKey);
+  var trashKey=_activityTrashDetailKey(candidate.actKey);
+  var details=await sb.from('activity_details').select('detail_key,data')
+    .eq('trip_id',CURRENT_TRIP.id).in('detail_key',[dateKey,globalDateKey,deletedKey,trashKey]);
+  if(details&&details.error) throw details.error;
+  var byKey={};
+  (details&&details.data?details.data:[]).forEach(function(row){ byKey[row.detail_key]=row.data; });
+
+  if((byKey[deletedKey]&&byKey[deletedKey].deleted)||(byKey[trashKey]&&byKey[trashKey].archived)){
+    throw _programExistingMakeError('ACTIVITY_CHANGED','Activité archivée.');
+  }
+  var serverDate='';
+  if(Object.prototype.hasOwnProperty.call(byKey,dateKey)){
+    var granular=byKey[dateKey]||{};
+    if(!granular.deleted) serverDate=granular.value||'';
+  }else{
+    var legacyDates=byKey[globalDateKey]||{};
+    serverDate=legacyDates[candidate.actKey]||'';
+  }
+  if(serverDate!==expectedDate) throw _programExistingMakeError('ACTIVITY_CHANGED','Date modifiée.');
+
+  if(_isCustomStableKey(candidate.actKey)){
+    var marker=candidate.actKey.lastIndexOf('_sid_');
+    var sid=marker>-1?candidate.actKey.slice(marker+5):'';
+    if(!sid) throw _programExistingMakeError('ACTIVITY_UNAVAILABLE','Identité invalide.');
+    var activity=await sb.from('activities').select('id,country_id,city')
+      .eq('trip_id',CURRENT_TRIP.id).eq('id',sid).maybeSingle();
+    if(activity&&activity.error) throw activity.error;
+    var row=activity&&activity.data;
+    if(!row||(row.country_id+'_'+row.city)!==candidate.ck){
+      throw _programExistingMakeError('ACTIVITY_UNAVAILABLE','Activité déplacée ou supprimée.');
+    }
+  }
+}
+async function _programRollbackExistingAttachment(outingId,actKey){
+  var detailKey='__planitrip__outing__'+outingId;
+  for(var attempt=0;attempt<2;attempt++){
+    var read=await sb.from('activity_details').select('data,updated_at')
+      .eq('trip_id',CURRENT_TRIP.id).eq('detail_key',detailKey).maybeSingle();
+    if(read&&read.error) return false;
+    var row=read&&read.data,current=row&&row.data;
+    if(!current||current.id!==outingId) return false;
+    var ids=Array.isArray(current.activityIds)?current.activityIds.slice():[];
+    if(ids.indexOf(actKey)===-1) return true;
+    var next=JSON.parse(JSON.stringify(current));
+    next.activityIds=ids.filter(function(id){ return id!==actKey; });
+    next.updatedBy=canonicalPerson((CURRENT_USER&&CURRENT_USER.email)||'');
+    next.updatedAt=new Date().toISOString();
+    var updated=await sb.from('activity_details').update({data:next,updated_at:next.updatedAt})
+      .eq('trip_id',CURRENT_TRIP.id).eq('detail_key',detailKey).eq('updated_at',row.updated_at)
+      .select('data').maybeSingle();
+    if(updated&&updated.error) return false;
+    if(updated&&updated.data) return true;
+  }
+  return false;
+}
+async function _programAttachExistingActivity(outing,candidate){
+  await _programValidateExistingActivity(candidate,outing.date);
+  var beforeRows=await _programReadServerOutings();
+  var targetBefore=_programServerOutingRow(beforeRows,outing.id);
+  var fresh=targetBefore&&targetBefore.data;
+  if(!fresh||fresh.date!==outing.date||!Array.isArray(fresh.visitCks)||fresh.visitCks.indexOf(candidate.ck)===-1){
+    throw _programExistingMakeError('OUTING_CHANGED','Excursion modifiée.');
+  }
+  var beforeClaims=_programServerClaims(beforeRows,outing.date,candidate.actKey);
+  if(beforeClaims.some(function(row){ return row.data.id!==outing.id; })){
+    throw _programExistingMakeError('OUTING_ACTIVITY_CONFLICT','Activité déjà rattachée.');
+  }
+
+  var attachResult=await _programAttachActivityToOuting(outing.id,candidate.actKey,outing.date,candidate.ck,true);
+  var added=!!(attachResult&&attachResult.added);
+  try{
+    await _programValidateExistingActivity(candidate,outing.date);
+    var afterRows=await _programReadServerOutings();
+    var targetAfter=_programServerOutingRow(afterRows,outing.id);
+    var saved=targetAfter&&targetAfter.data;
+    if(!saved||saved.date!==outing.date||!Array.isArray(saved.visitCks)||saved.visitCks.indexOf(candidate.ck)===-1){
+      throw _programExistingMakeError('OUTING_CHANGED','Excursion modifiée après le rattachement.');
+    }
+    var afterClaims=_programServerClaims(afterRows,outing.date,candidate.actKey);
+    if(afterClaims.some(function(row){ return row.data.id!==outing.id; })){
+      throw _programExistingMakeError('OUTING_ACTIVITY_CONFLICT','Rattachement concurrent détecté.');
+    }
+    if(!Array.isArray(saved.activityIds)||saved.activityIds.indexOf(candidate.actKey)===-1){
+      throw _programExistingMakeError('OUTING_CHANGED','Rattachement non confirmé.');
+    }
+    return {outing:saved,added:added};
+  }catch(err){
+    if(added){
+      var rolledBack=await _programRollbackExistingAttachment(outing.id,candidate.actKey);
+      if(!rolledBack) throw _programExistingMakeError('OUTING_ACTIVITY_RECOVERY','Rollback non confirmé.');
+    }
+    throw err;
+  }
+}
+async function saveProgramExistingActivity(){
+  if(_programExistingSaving||_programExistingOutingStale||!_programExistingActKey) return;
+  var outing=S.outings&&S.outings[_programExistingOutingId];
+  var candidate=outing&&_programFindExistingCandidate(outing,_programExistingActKey);
+  if(!outing||!candidate||candidate.status){
+    _programExistingError='Cette activité n’est plus disponible dans la sélection.';
+    _programExistingActKey='';
+    _programRenderExistingActivityModal();
+    return;
+  }
+  _programExistingSaving=true;
+  _programExistingError='';
+  _programRenderExistingActivityModal();
+  try{
+    var result=await _programAttachExistingActivity(outing,candidate);
+    if(!S.outings||Array.isArray(S.outings)) S.outings={};
+    S.outings[outing.id]=result.outing;
+    save();
+    var eventDate=outing.date,eventOutingId=outing.id,eventActKey=candidate.actKey,eventCk=candidate.ck,eventTitle=candidate.title;
+    _programExistingSaving=false;
+    closeGuideItemModal();
+    renderContent();
+    showSuccessToast(result.added?'Activité ajoutée à l’excursion':'Activité déjà présente dans l’excursion');
+    if(result.added){
+      postChangeEvent('activity','update',{
+        entityId:eventActKey,entityLabel:eventTitle,
+        summary:_ceActorLabel()+' a ajouté une activité à une excursion · '+eventTitle,
+        deepLink:'S.tab=\'program\';programDate=\''+eventDate+'\';save();renderContent();',
+        meta:{outingId:eventOutingId,cityKey:eventCk,actKey:eventActKey}
+      });
+    }
+  }catch(err){
+    console.error('[PlaniTrip] saveProgramExistingActivity:',err);
+    _programExistingSaving=false;
+    _programExistingError=_programExistingErrorMessage(err);
+    if(err&&err.code==='OUTING_CHANGED'){
+      _programExistingOutingStale=true; _programExistingActKey='';
+    }else if(err&&err.code==='OUTING_ACTIVITY_CONFLICT'){
+      _programExistingBlocked[candidate.actKey]='Conflit détecté'; _programExistingActKey='';
+    }else if(err&&['ACTIVITY_CHANGED','ACTIVITY_UNAVAILABLE','ACTIVITY_UNSTABLE'].indexOf(err.code)>-1){
+      _programExistingBlocked[candidate.actKey]='Activité modifiée ailleurs'; _programExistingActKey='';
+    }
+    _programRenderExistingActivityModal();
+  }
+}
+
 function _programRenderOutingCard(slot){
   if(!slot || !slot.outing) return '';
   var o=slot.outing;
@@ -16089,7 +16441,10 @@ function _programRenderOutingCard(slot){
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:7px 0 0 35px">'+escHtml(mode)+' · Aller-retour</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:3px 0 0 35px">'+escHtml(_programOutingParticipantsLabel(o))+'</div>'
       +(acts.length?'<div style="margin:11px 0 0 35px">'+acts.map(_programActivityRow).join('')+'</div>':'')
-      +'<button type="button" onclick="event.stopPropagation();openProgramOutingActivity(\''+jsStrEsc(o.id)+'\')" style="margin:12px 0 0 35px;padding:8px 11px;border-radius:999px;border:1px solid rgba(45,106,79,.18);background:rgba(255,255,255,.52);color:var(--accent-deep);font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+svgIcon('plus',12)+' Nouvelle activité</button>'
+      +'<div style="margin:12px 0 0 35px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
+        +'<button type="button" onclick="event.stopPropagation();openProgramOutingActivity(\''+jsStrEsc(o.id)+'\')" style="padding:8px 11px;border-radius:999px;border:1px solid rgba(45,106,79,.18);background:rgba(255,255,255,.52);color:var(--accent-deep);font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+svgIcon('plus',12)+' Nouvelle activité</button>'
+        +'<button type="button" onclick="event.stopPropagation();openProgramExistingActivity(\''+jsStrEsc(o.id)+'\')" style="padding:8px 11px;border-radius:999px;border:1px solid rgba(45,106,79,.18);background:rgba(255,255,255,.52);color:var(--accent-deep);font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+svgIcon('link',12)+' Activité existante</button>'
+      +'</div>'
     +'</div>'
   +'</div>';
 }
