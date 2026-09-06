@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-06·sha:program-entry-today-v1';
+var APP_BUILD = '2026-09-06·sha:program-diagnostic-cleanup-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6941,44 +6941,6 @@ function getDetectedVisitsForDate(dateStr){
 // diverger de cette fusion existante.
 // activityIds/movementIds sont TOUJOURS lus avec repli [] : des outings existantes ou
 // creees par le flux actuel n'ont pas encore necessairement ce champ.
-// Outil de diagnostic temporaire (Etape 5, Programme) : vide S.outings en local
-// UNIQUEMENT pour repartir d'un etat propre pendant les tests. Ne touche jamais
-// Supabase (ces outings de test locaux n'y existent deja pas). Garde-fou double :
-// verifie lui-meme _TEST_TRIP_IDS, independamment de la visibilite du bouton dans
-// l'UI, pour ne jamais pouvoir etre invoque sur le voyage reel "Asie 2026".
-function clearLocalTestOutings(){
-  var _TEST_TRIP_IDS = ['da115c78-a9a0-48df-b328-c15c89c90f9a','1b0a0c9d-856f-4e3e-a112-79be5d00a9d4'];
-  if(typeof CURRENT_TRIP==='undefined' || !CURRENT_TRIP || _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)===-1){
-    alert('Action disponible uniquement sur un voyage de test.');
-    return;
-  }
-  S.outings = {};
-  save();
-  renderContent();
-}
-// Outil de diagnostic temporaire (Etape 5, Programme) : reinitialisation RADICALE du
-// cache local du voyage de test. Contrairement a clearLocalTestOutings() (qui vide
-// S.outings en memoire puis appelle save()), cette fonction supprime directement le
-// gros blob localStorage du voyage (CURRENT_STORAGE_KEY). Justification : save() peut
-// echouer silencieusement a reecrire ce blob (deja documente dans save() lui-meme),
-// laissant une ancienne version perimee sur le telephone qui ressuscite alors des
-// entrees supprimees cote Supabase lors du prochain chargement (merge additif dans
-// loadActivityDetails()). Supprimer la cle force loadState() a repartir de zero au
-// prochain enterTrip(), qui recharge alors la verite serveur sans aucune contamination
-// locale possible. Ne touche jamais Supabase. Garde-fou double comme les autres outils
-// de ce panneau : verifie lui-meme _TEST_TRIP_IDS, independamment du bouton dans l'UI.
-async function hardResetLocalTripCache(){
-  var _TEST_TRIP_IDS = ['da115c78-a9a0-48df-b328-c15c89c90f9a','1b0a0c9d-856f-4e3e-a112-79be5d00a9d4'];
-  if(typeof CURRENT_TRIP==='undefined' || !CURRENT_TRIP || _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)===-1){
-    alert('Action disponible uniquement sur un voyage de test.');
-    return;
-  }
-  var tripToReload = CURRENT_TRIP;
-  try{ localStorage.removeItem(CURRENT_STORAGE_KEY); }catch(e){}
-  await enterTrip(tripToReload, false);
-  renderContent();
-  alert('Cache local reinitialise, donnees rechargees depuis Supabase.');
-}
 function buildProgramDay(dateStr){
   var night = getNightContextForDate(dateStr);
   var dayOutings = Object.values(S.outings||{}).filter(function(o){ return o.date===dateStr; });
@@ -13524,24 +13486,6 @@ function renderMore(){
       +(_lastOutingPostSaveError ? ('<div style="font-size:11px;font-weight:600;color:var(--red-muted);letter-spacing:0.06em;text-transform:uppercase;margin:10px 0">Erreur post-save outing</div><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--red-muted);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0">'+escHtml(JSON.stringify(_lastOutingPostSaveError,null,2))+'</pre>') : '')
       +'</div>';
   }
-  // Panneau de diagnostic temporaire pour buildProgramDay() (Etape 5, Programme) --
-  // visible UNIQUEMENT sur les voyages de test. A retirer une fois l'ecran Programme
-  // reel valide (meme principe que city-sync-diag et le diagnostic outing ci-dessus).
-  var programDayDiagCard = '';
-  if(typeof CURRENT_TRIP!=='undefined' && CURRENT_TRIP && _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)>-1){
-    if(typeof window._programDayDiagDate==='undefined' || !window._programDayDiagDate) window._programDayDiagDate='2026-08-31';
-    var _pdDiag = buildProgramDay(window._programDayDiagDate);
-    var _pdDiagText = JSON.stringify(_pdDiag, null, 2);
-    programDayDiagCard = '<div class="info-card" style="padding:14px 16px;margin-top:4px">'
-      +'<div style="font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Diagnostic Programme (test)</div>'
-      +'<input type="date" id="programDayDiagDateInput" value="'+escHtml(window._programDayDiagDate)+'" style="width:100%;padding:8px;margin-bottom:8px;border-radius:var(--r12);border:1px solid var(--border);font-size:13px">'
-      +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_pdDiagText)+'</pre>'
-      +'<button onclick="window._programDayDiagDate=document.getElementById(\'programDayDiagDateInput\').value;renderContent();" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Calculer</button>'
-      +'<button onclick="clearLocalTestOutings()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Vider les outings locaux (test)</button>'
-      +'<button onclick="hardResetLocalTripCache()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1.5px solid var(--red-muted);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Reinitialiser tout le cache local (test)</button>'
-      +'<button onclick="openProgramScreen()" style="width:100%;padding:10px;margin-top:8px;border-radius:var(--r12);border:1px solid rgba(45,106,79,.25);background:var(--accent-pale);color:var(--accent-deep);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:600">Ouvrir Programme (test)</button>'
-      +'</div>';
-  }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Plus</div>'
     +'<div class="info-card" style="padding:6px">'
@@ -13564,7 +13508,6 @@ function renderMore(){
     +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
     +'</div>'
     +tripReturnDiagCard
-    +programDayDiagCard
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">'+APP_BUILD+'</div>'
     +'</div>';
