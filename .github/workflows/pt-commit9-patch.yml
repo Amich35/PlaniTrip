@@ -2,15 +2,13 @@ name: PlaniTrip commit 9 patch
 
 on:
   push:
-    branches:
-      - pt-commit9-temp
+    branches: [pt-commit9-temp]
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,16 +16,14 @@ jobs:
           ref: pt-commit9-temp
           fetch-depth: 0
       - name: Patch index.html safely
-        shell: python
         run: |
+          python3 - <<'PY'
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-
           old_build = "var APP_BUILD = '2026-09-04·sha:program-outing-existing-activity-v1';"
           new_build = "var APP_BUILD = '2026-09-06·sha:program-activity-edit-v1';"
           assert s.count(old_build) == 1, f'APP_BUILD anchor count={s.count(old_build)}'
-
           old = """function _programActivityRow(item,compact){
   if(!item) return '';
   var t=(S.actTimeStart&&S.actTimeStart[item.actKey]) || (S.actTime&&S.actTime[item.actKey]) || '';
@@ -60,6 +56,7 @@ function _programActivityRow(item,compact){
           assert s.count("function _programOpenActivityFromRow(el){") == 1
           assert s.count("onclick=\"_programOpenActivityFromRow(this)\"") == 1
           p.write_text(s, encoding='utf-8')
+          PY
       - name: Remove temporary workflow from resulting tree
         run: rm .github/workflows/pt-commit9-patch.yml
       - name: Commit patch on temporary branch
