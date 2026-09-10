@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-09·sha:activity-stable-date-context-v1';
+var APP_BUILD = '2026-09-10·sha:program-outing-entry-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9497,6 +9497,17 @@ function openOutingModal(prefillDate){
     }
   }catch(e){ try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(e2){} }
   _outingDraft = resumed || {id:outingUid('out_'),date:prefillDate||'',baseCk:null,baseLabel:null,needsManualBase:false,visitCks:[],visitLabels:[],participants:null,returnToBase:true,status:'planned',primaryTransportMode:'',movementIds:[]};
+  // Depuis Programme, la date est déjà connue : résoudre immédiatement la base comme
+  // le ferait un changement manuel du champ date. Un brouillon repris conserve en
+  // revanche exactement son état existant.
+  if(!resumed && _outingDraft.date){
+    var resolved=resolveOutingBase(_outingDraft.date);
+    _outingDraft.needsManualBase=resolved.needsManualBase;
+    if(!resolved.needsManualBase){
+      _outingDraft.baseCk=resolved.baseCk;
+      _outingDraft.baseLabel=resolved.baseLabel;
+    }
+  }
   _outingStep=1; // toujours reprendre à l'écran 1 — champs déjà pré-remplis si brouillon repris, jamais de saut direct vers la confirmation
   persistOutingDraftLocal();
   renderOutingModalBody();
@@ -16603,6 +16614,7 @@ function renderProgramScreen(){
       +_programRenderBase(programDay)
       +((programDay.base&&programDay.base.confidence==='transition')?(_programRenderTransitionMovements(programDay)+_programRenderOutings(programDay)):_programRenderTimeline(programDay))
       +_programRenderOtherActivities(programDay)
+      +'<button id="programCreateOutingBtn" type="button" onclick="openOutingModal(programDate)" style="width:100%;margin-top:22px;padding:12px 14px;border-radius:var(--r12);border:1px dashed rgba(45,106,79,.30);background:transparent;color:var(--accent-deep);font-size:13px;font-weight:650;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">'+svgIcon('repeat',14)+' Je visite et je reviens</button>'
     +'</div>'
   +'</div>';
 }
