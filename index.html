@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-06·sha:program-diagnostic-cleanup-v1';
+var APP_BUILD = '2026-09-09·sha:activity-stable-date-context-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -2324,6 +2324,17 @@ function exportActivityRecoverySnapshot() {
 // Les built-ins (jp_Osaka_0, etc.) et les legacy (_c0, _c1…) retournent false.
 function _isCustomStableKey(k){
   return typeof k === 'string' && k.indexOf('_sid_') !== -1;
+}
+
+// Retrouve la ville depuis n'importe quel format de clé d'activité :
+// built-in (<cityKey>_<index>), custom legacy (<cityKey>_c<index>) ou
+// custom stable (<cityKey>_sid_<uuid>). Une cityKey explicite reste prioritaire.
+function _activityCityKey(actKey, explicitCityKey){
+  if(explicitCityKey) return explicitCityKey;
+  if(typeof actKey !== 'string') return '';
+  var sidPos = actKey.lastIndexOf('_sid_');
+  if(sidPos > 0) return actKey.slice(0, sidPos);
+  return actKey.replace(/_c?\d+$/,'');
 }
 
 // Les built-in ont une clé stable dans les données de base et peuvent donc utiliser
@@ -3470,7 +3481,7 @@ function handleActionMenuTap(action){
       openDetail(ctx.actKey, ctx.actName, ctx.cityKey);
     }
   } else if(action==='plan'){
-    openPlanningModal(ctx.actKey, ctx.actName, '');
+    openPlanningModal(ctx.actKey, ctx.actName, '', ctx.cityKey);
   } else if(action==='category'){
     openCategoryPickerModal(ctx.actKey);
   } else if(action==='date'){
@@ -3645,7 +3656,7 @@ function openDetail(actKey, actName, cityKey) {
   // les dates de repli en dates explicites au simple affichage.
   document.getElementById('detailDateBtn').onclick = function(){
     closeDetail();
-    openPlanningModal(actKey, actName, actMeta);
+    openPlanningModal(actKey, actName, actMeta, cityKey);
   };
   document.getElementById('detailDoneBtn').onclick = function(){ toggleAct(actKey); refreshActionButtons(); };
   refreshActionButtons();
@@ -8346,7 +8357,7 @@ function setActTimeRange(actKey, start, end, freeText, opts){
 }
 var _planningModalActKey = '';
 var _planningModalMoment = '';
-function openPlanningModal(actKey, name, meta){
+function openPlanningModal(actKey, name, meta, cityKey){
   var _pErr = document.getElementById('planningModalErr');
   if(_pErr){ _pErr.textContent=''; _pErr.style.display='none'; }
   _planningModalActKey = actKey;
@@ -8367,7 +8378,7 @@ function openPlanningModal(actKey, name, meta){
   // fiche/la carte montraient déjà une date. Mais l'ouverture seule n'écrit jamais S.actDate :
   // seule une validation explicite (bouton Enregistrer, voir savePlanningModal) peut transformer
   // cette date affichée en date explicite.
-  var ckForDate = actKey.replace(/_c?\d+$/,'');
+  var ckForDate = _activityCityKey(actKey, cityKey);
   var stayRangeForDate = (typeof cityStayRange==='function') ? cityStayRange(ckForDate) : null;
   var renderedDate = getRenderedActivityDate(actKey, ckForDate) || '';
   document.getElementById('planningModalBody').innerHTML =
@@ -8471,7 +8482,7 @@ function getActCategory(actKey, name, meta){
   return guessed ? [guessed] : [];
 }
 function openPlanningModalFromEl(el){
-  openPlanningModal(el.getAttribute('data-act-key'), el.getAttribute('data-act-name'), el.getAttribute('data-act-meta'));
+  openPlanningModal(el.getAttribute('data-act-key'), el.getAttribute('data-act-name'), el.getAttribute('data-act-meta'), el.getAttribute('data-city-key'));
 }
 function planningPill(actKey, name, meta){
   var mk = getActMoment(actKey, name, meta);
@@ -8534,7 +8545,7 @@ function formatDayLong(iso){
 // calculée automatiquement par répartition sur le séjour — seule l'absence de date EXPLICITE
 // ET d'heure ET de moment déclenche l'état "+ Planifier" (garde-fou §1 : une activité qui a
 // déjà une date, même sans heure ni moment, n'est jamais "à planifier").
-function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
+function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone, cityKey){
   var timeVal = formatTimeRange(actKey);
   var mk = getActMoment(actKey, name, meta);
   var mo = mk ? ACTIVITY_MOMENTS[mk] : null;
@@ -8545,7 +8556,7 @@ function timeCapsuleHTML(actKey, name, meta, dateVal, activeDay, isDone){
   // carte, simplement parce qu'aucune date n'avait été choisie explicitement — contradiction
   // visuelle entre le filtre actif et la carte elle-même.
   var hasDate = !!dateVal;
-  var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'"';
+  var dataAttrs = 'data-act-key="'+escHtml(actKey)+'" data-act-name="'+escHtml(name)+'" data-act-meta="'+escHtml(meta||'')+'" data-city-key="'+escHtml(cityKey||'')+'"';
   var isViewingSingleDay = activeDay && activeDay!=='Tous';
 
   if(isDone){
@@ -8857,7 +8868,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(_actDisplayName(k,a.n))+'</div>'
           +(actPlaceType?'<div class="act-meta">'+escHtml(actPlaceType)+'</div>':'')
           +'<div class="act-footer">'
-          +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done)
+          +timeCapsuleHTML(k,a.n,a.m,actDateVal,activeDay,done,ck)
           +categoryPill(actCat,k)
           +'</div></div>'
           +'<div class="act-actions">'
@@ -8892,7 +8903,7 @@ function renderCityPanelContentBody(c, city){
           +'<div class="act-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">'+escHtml(_actDisplayName(ck2,ca.n))+'</div>'
           +(caPlaceType?'<div class="act-meta">'+escHtml(caPlaceType)+'</div>':'')
           +'<div class="act-footer">'
-          +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone)
+          +timeCapsuleHTML(ck2,ca.n,ca.m,cDateVal,activeDay,cdone,ck)
           +categoryPill(caCat,ck2)
           +'</div></div>'
           +'<div class="act-actions">'
@@ -10925,7 +10936,8 @@ function getCityStartDayInCountry(countryId, cityName){
 // N'appelle getActivityDate() qu'UNE SEULE fois, sans réimplémenter l'algorithme de répartition.
 function getRenderedActivityDate(actKey, cityKey){
   if(S.actDate && S.actDate[actKey]) return S.actDate[actKey];
-  var ck = cityKey || actKey.replace(/_c?\d+$/,'');
+  var ck = _activityCityKey(actKey, cityKey);
+  if(!ck) return null;
   var countryId = countryIdFromCityKey(ck);
   var cityName = ck.slice(countryId.length+1);
   var c = COUNTRIES.find(function(co){return co.id===countryId;});
@@ -10938,9 +10950,17 @@ function getRenderedActivityDate(actKey, cityKey){
   // Reconstruit le slot ('b0','c2',...) correspondant à cet actKey, exactement comme le fait
   // renderCityPanelContentBody lors de la construction des cartes.
   var idxPart = actKey.slice(ck.length+1);
-  var isCustom = idxPart.indexOf('c')===0;
-  var origIdx = isCustom ? parseInt(idxPart.slice(1)) : parseInt(idxPart);
-  var slot = (isCustom?'c':'b')+origIdx;
+  var slot = '';
+  if(/^\d+$/.test(idxPart)){
+    slot = 'b'+parseInt(idxPart,10);
+  } else if(/^c\d+$/.test(idxPart)){
+    slot = 'c'+parseInt(idxPart.slice(1),10);
+  } else if(idxPart.indexOf('sid_')===0){
+    var stableCustomIdx = (S.customActs[ck]||[]).findIndex(function(activity, index){
+      return getCustomActivityKey(ck, activity, index) === actKey;
+    });
+    if(stableCustomIdx >= 0) slot = 'c'+stableCustomIdx;
+  }
   var slotIdx = order.indexOf(slot);
   if(slotIdx<0) slotIdx = 0; // repli prudent si jamais le slot n'est pas trouvé (activité supprimée entre-temps, etc.)
   return getActivityDate(actKey, countryId, cityName, slotIdx, order.length);
@@ -11010,7 +11030,7 @@ async function saveInlineActivityDate(input, actKey){
 
 function setActivityDate(actKey, dateVal, opts){
   if(dateVal){
-    var ck = actKey.replace(/_c?\d+$/,'');
+    var ck = _activityCityKey(actKey, opts && opts.cityKey);
     var range = (typeof cityStayRange==='function') ? cityStayRange(ck) : null;
     if(range && (dateVal<range.start || dateVal>range.end)){
       var fmt1 = function(iso){ return new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}); };
