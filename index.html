@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-10·sha:program-outing-entry-v1';
+var APP_BUILD = '2026-09-10·sha:outing-diagnostic-cleanup-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9591,10 +9591,6 @@ function outingDraftSetTransportMode(mode){
 // commit : la contrainte CHECK de change_events (entity_type) ne connaît pas encore
 // 'outing' — l'ajouter maintenant créerait une intégration morte (rien ne l'affiche dans
 // le Fil). Migration + événement traités ensemble dans un commit d'intégration dédié.
-// Capture de la dernière erreur de post-traitement (créer/modifier une excursion), pour
-// diagnostic sans accès console — affichée dans le panneau "Diagnostic retour (test)"
-// tant que le point d'entrée réel reste absent de l'app.
-var _lastOutingPostSaveError=null;
 async function outingModalConfirmSave(){
   if(!_outingDraft) return;
   var validationError = outingValidateComplete(_outingDraft);
@@ -9622,7 +9618,6 @@ async function outingModalConfirmSave(){
   // À partir d'ici, l'excursion existe réellement en base — plus aucune erreur ne doit
   // produire le message "impossible de créer". Chaque étape est isolée pour identifier
   // précisément laquelle échoue si un problème survient, sans jamais mentir sur l'état réel.
-  _lastOutingPostSaveError=null;
   var failedStep=null, failedErr=null;
   try{ S.outings[saved.id]=saved; }
   catch(e1){ failedStep='S.outings'; failedErr=e1; console.error('[PlaniTrip] outingModalConfirmSave post-save (S.outings):', e1); }
@@ -9643,7 +9638,6 @@ async function outingModalConfirmSave(){
     catch(e5){ failedStep='showSuccessToast'; failedErr=e5; console.error('[PlaniTrip] outingModalConfirmSave post-save (showSuccessToast):', e5); }
   }
   if(failedStep){
-    _lastOutingPostSaveError={step:failedStep, message:(failedErr&&failedErr.message)||String(failedErr), stack:(failedErr&&failedErr.stack)||'', at:new Date().toISOString(), outingId:saved.id};
     alert('Excursion créée, mais l\'affichage n\'a pas pu être actualisé.');
   }
 }
@@ -13501,22 +13495,6 @@ function confirmDeleteCurrentTrip(){
 }
 function renderMore(){
   var myPseudo = (CURRENT_USER && PROFILES_MAP[CURRENT_USER.email] && PROFILES_MAP[CURRENT_USER.email]!==CURRENT_USER.email) ? PROFILES_MAP[CURRENT_USER.email] : '';
-  // Panneau de diagnostic temporaire pour _getMarkedTripReturn() — visible UNIQUEMENT sur
-  // les voyages de test (jamais sur "Asie 2026", le voyage réel). À retirer une fois les
-  // tests réels validés, dans un commit séparé (même principe que city-sync-diag).
-  var _TEST_TRIP_IDS = ['da115c78-a9a0-48df-b328-c15c89c90f9a','1b0a0c9d-856f-4e3e-a112-79be5d00a9d4'];
-  var tripReturnDiagCard = '';
-  if(typeof CURRENT_TRIP!=='undefined' && CURRENT_TRIP && _TEST_TRIP_IDS.indexOf(CURRENT_TRIP.id)>-1){
-    var _diag = _getMarkedTripReturn();
-    var _diagText = JSON.stringify(_diag, null, 2);
-    tripReturnDiagCard = '<div class="info-card" style="padding:14px 16px;margin-top:4px">'
-      +'<div style="font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Diagnostic retour (test)</div>'
-      +'<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;color:var(--ink);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0 0 10px">'+escHtml(_diagText)+'</pre>'
-      +'<button onclick="renderContent()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Rafraîchir</button>'
-      +'<button onclick="openOutingModal()" style="width:100%;padding:9px;margin-top:8px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Tester : Je visite et je reviens</button>'
-      +(_lastOutingPostSaveError ? ('<div style="font-size:11px;font-weight:600;color:var(--red-muted);letter-spacing:0.06em;text-transform:uppercase;margin:10px 0">Erreur post-save outing</div><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--red-muted);background:var(--parchment);padding:10px;border-radius:var(--r12);margin:0">'+escHtml(JSON.stringify(_lastOutingPostSaveError,null,2))+'</pre>') : '')
-      +'</div>';
-  }
   return '<div class="section" style="padding-bottom:20px;padding-top:16px">'
     +'<div class="section-title" style="margin-bottom:12px">Plus</div>'
     +'<div class="info-card" style="padding:6px">'
@@ -13538,7 +13516,6 @@ function renderMore(){
     +'<div style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px">Exporte tes données locales (activités, dates, catégories…) pour la récupération de données. Aucune donnée sensible incluse.</div>'
     +'<button onclick="exportActivityRecoverySnapshot()" style="width:100%;padding:9px;border-radius:var(--r12);border:1px solid var(--border);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Exporter mes données locales</button>'
     +'</div>'
-    +tripReturnDiagCard
     +'<div class="info-card"><button onclick="logoutUser()" style="width:100%;padding:10px;border-radius:var(--r12);border:1px solid rgba(192,57,43,0.3);background:transparent;color:var(--red-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">Déconnexion</button></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--ink-subtle);margin-top:10px">'+APP_BUILD+'</div>'
     +'</div>';
