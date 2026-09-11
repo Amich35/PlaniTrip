@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-10·sha:outing-diagnostic-cleanup-v1';
+var APP_BUILD = '2026-09-11·sha:outing-delete-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -16021,6 +16021,45 @@ function _programOutingParticipantsLabel(o){
   if(!count) return 'Sous-groupe · à préciser';
   return 'Sous-groupe · '+count+' voyageur'+(count>1?'s':'');
 }
+var _outingDeleteBusy={};
+function openOutingActionMenu(outingId){
+  var outing=S.outings&&S.outings[outingId];
+  if(!outing||outing.deleted) return;
+  document.getElementById('actionMenuTitle').textContent='Excursion · '+_programOutingDestinationLabel(outing);
+  document.getElementById('actionMenuBody').innerHTML='<div onclick="requestDeleteOuting(\''+jsStrEsc(outingId)+'\')" style="display:flex;align-items:center;gap:12px;padding:13px 4px;cursor:pointer;color:#E76F51">'
+    +'<span style="width:22px;display:flex;justify-content:center;flex-shrink:0">'+svgIcon('trash-2',18)+'</span>'
+    +'<span style="font-size:15px;font-weight:500">Supprimer l\'excursion</span>'
+    +'</div>';
+  document.getElementById('actionMenu').classList.add('open');
+}
+function requestDeleteOuting(outingId){
+  var outing=S.outings&&S.outings[outingId];
+  closeActionMenu();
+  if(!outing||outing.deleted) return;
+  showConfirm('Supprimer cette excursion vers '+_programOutingDestinationLabel(outing)+' ? Les activités et déplacements seront conservés.',function(){ deleteOuting(outingId); },'Supprimer','Annuler');
+}
+async function deleteOuting(outingId){
+  if(_outingDeleteBusy[outingId]) return;
+  var outing=S.outings&&S.outings[outingId];
+  if(!outing||outing.deleted) return;
+  if(!sb||!CURRENT_TRIP){ alert('Connexion requise pour supprimer cette excursion.'); return; }
+  _outingDeleteBusy[outingId]=true;
+  try{
+    // Conserver un marqueur serveur plutôt que supprimer la ligne : il écrase aussi les
+    // anciennes copies locales lors de la prochaine synchronisation multi-appareils.
+    var marker={id:outingId,deleted:true,updatedBy:canonicalPerson((CURRENT_USER&&CURRENT_USER.email)||'')};
+    var saved=await persistOuting(marker);
+    S.outings[outingId]=saved;
+    save();
+    renderContent();
+    showSuccessToast('Excursion supprimée');
+  }catch(e){
+    console.error('[PlaniTrip] delete outing:',e);
+    alert('Impossible de supprimer cette excursion pour le moment.');
+  }finally{
+    delete _outingDeleteBusy[outingId];
+  }
+}
 function openProgramOutingActivity(outingId){
   var outing=S.outings&&S.outings[outingId];
   if(!outing||!Array.isArray(outing.visitCks)||!outing.visitCks.length){
@@ -16405,6 +16444,7 @@ function _programRenderOutingCard(slot){
       +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
         +'<span style="display:flex;align-items:center;justify-content:center;flex:0 0 27px;width:27px;height:27px;border-radius:50%;background:rgba(45,106,79,.10);color:var(--accent-deep)">'+svgIcon('repeat',14)+'</span>'
         +'<div style="min-width:0;flex:1;font-size:15px;font-weight:700;color:var(--ink);line-height:1.25">Excursion · '+escHtml(destination)+'</div>'
+        +'<button type="button" aria-label="Actions de l\'excursion" onclick="event.stopPropagation();openOutingActionMenu(\''+jsStrEsc(o.id)+'\')" style="flex:0 0 30px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0">'+svgIcon('ellipsis',16)+'</button>'
       +'</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:7px 0 0 35px">'+escHtml(mode)+' · Aller-retour</div>'
       +'<div style="font-size:11.5px;color:var(--ink-muted);margin:3px 0 0 35px">'+escHtml(_programOutingParticipantsLabel(o))+'</div>'
