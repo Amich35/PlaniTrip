@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-14·sha:today-country-daily-average-v1';
+var APP_BUILD = '2026-09-14·sha:outing-edit-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9465,6 +9465,10 @@ function closeMovementModal(){ document.getElementById('movementModal').classLis
 // uniquement via openOutingModal() en console pour test, tant que les étapes 2 à 5 et
 // persistOuting() ne sont pas branchées.
 var _outingDraft=null;
+var _outingEditingId='';
+var _outingEditExpectedUpdatedAt='';
+var _outingEditStructureLocked=false;
+var _outingEditOpening=false;
 // Résilience au rechargement de page (ex: bascule réseau/PWA iOS) : le brouillon outing
 // est répliqué dans localStorage sous une clé dédiée, distincte du namespace Supabase
 // ('__planitrip__...'). Objectif : qu'un id d'excursion, une fois généré, reste stable
@@ -9480,6 +9484,9 @@ function _isValidOutingDraftShape(d){
     && d.status==='planned');
 }
 function persistOutingDraftLocal(){
+  // Un formulaire d'édition vient toujours du serveur et ne doit jamais remplacer
+  // un éventuel brouillon de création conservé sur cet appareil.
+  if(_outingEditingId) return;
   try{
     if(_outingDraft) localStorage.setItem(_outingDraftStorageKey(), JSON.stringify(_outingDraft));
     else localStorage.removeItem(_outingDraftStorageKey());
@@ -9487,6 +9494,9 @@ function persistOutingDraftLocal(){
 }
 var _outingStep=1; // 1=jour, 2=ville(s) — étapes 3 à 5 pas encore implémentées
 function openOutingModal(prefillDate){
+  _outingEditingId='';
+  _outingEditExpectedUpdatedAt='';
+  _outingEditStructureLocked=false;
   var resumed=null;
   try{
     var raw=localStorage.getItem(_outingDraftStorageKey());
@@ -9511,14 +9521,23 @@ function openOutingModal(prefillDate){
   _outingStep=1; // toujours reprendre à l'écran 1 — champs déjà pré-remplis si brouillon repris, jamais de saut direct vers la confirmation
   persistOutingDraftLocal();
   renderOutingModalBody();
+  var title=document.getElementById('outingModalTitle');
+  if(title) title.textContent='Je visite et je reviens';
   document.getElementById('outingModal').classList.add('open');
 }
-function closeOutingModal(){ document.getElementById('outingModal').classList.remove('open'); _outingDraft=null; _outingStep=1; }
+function closeOutingModal(){
+  document.getElementById('outingModal').classList.remove('open');
+  _outingDraft=null;
+  _outingStep=1;
+  _outingEditingId='';
+  _outingEditExpectedUpdatedAt='';
+  _outingEditStructureLocked=false;
+}
 // Fermeture explicite par l'utilisateur (bouton "Annuler") — distincte d'une fermeture liée
 // à un rechargement/navigation système : ici l'abandon est volontaire, le brouillon local
 // est donc effacé, contrairement à closeOutingModal() seule qui ne touche jamais au stockage.
 function outingModalCancel(){
-  try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(e){}
+  if(!_outingEditingId){ try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(e){} }
   closeOutingModal();
 }
 function outingStep1Valid(){
@@ -9593,28 +9612,33 @@ function outingDraftSetTransportMode(mode){
 // le Fil). Migration + événement traités ensemble dans un commit d'intégration dédié.
 async function outingModalConfirmSave(){
   if(!_outingDraft) return;
+  var wasEditing=!!_outingEditingId;
   var validationError = outingValidateComplete(_outingDraft);
   if(validationError){ alert(validationError); return; }
   var btn=document.getElementById('outingModalNextBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Création…'; }
+  if(btn){ btn.disabled=true; btn.textContent=wasEditing?'Enregistrement…':'Création…'; }
   var saved=null;
   try{
     var next=JSON.parse(JSON.stringify(_outingDraft));
     var myEmail=canonicalPerson((CURRENT_USER&&CURRENT_USER.email)||'');
     if(!next.createdBy) next.createdBy=myEmail; // première création uniquement
     next.updatedBy=myEmail;
-    saved=await persistOuting(next);
+    saved=wasEditing
+      ? await persistEditedOuting(next,_outingEditExpectedUpdatedAt,_outingEditStructureLocked)
+      : await persistOuting(next);
   } catch(e){
     console.error('[PlaniTrip] outingModalConfirmSave (persistOuting):', e);
     var b2=document.getElementById('outingModalNextBtn');
-    if(b2){ b2.disabled=false; b2.textContent='Créer l\'excursion'; }
-    alert('Impossible de créer cette excursion pour le moment.');
+    if(b2){ b2.disabled=false; b2.textContent=wasEditing?'Enregistrer':'Créer l\'excursion'; }
+    if(wasEditing && e && e.code==='OUTING_CHANGED') alert('Cette excursion a été modifiée sur un autre appareil. Ferme puis rouvre le formulaire pour reprendre la dernière version.');
+    else if(wasEditing && e && e.code==='OUTING_DELETED') alert('Cette excursion vient d’être supprimée sur un autre appareil.');
+    else alert(wasEditing?'Impossible de modifier cette excursion pour le moment.':'Impossible de créer cette excursion pour le moment.');
     return;
   }
   // Suppression immédiate du brouillon local : cet id existe maintenant réellement en
   // base, il ne doit plus jamais être proposé en reprise par openOutingModal(). Fait avant
   // tout post-traitement (S.outings, save(), rendu…), quoi qu'il arrive ensuite.
-  try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(eClearLocal){}
+  if(!wasEditing){ try{ localStorage.removeItem(_outingDraftStorageKey()); }catch(eClearLocal){} }
   // À partir d'ici, l'excursion existe réellement en base — plus aucune erreur ne doit
   // produire le message "impossible de créer". Chaque étape est isolée pour identifier
   // précisément laquelle échoue si un problème survient, sans jamais mentir sur l'état réel.
@@ -9634,11 +9658,11 @@ async function outingModalConfirmSave(){
     catch(e4){ failedStep='renderContent'; failedErr=e4; console.error('[PlaniTrip] outingModalConfirmSave post-save (renderContent):', e4); }
   }
   if(!failedStep){
-    try{ showSuccessToast('Excursion créée'); }
+    try{ showSuccessToast(wasEditing?'Excursion modifiée':'Excursion créée'); }
     catch(e5){ failedStep='showSuccessToast'; failedErr=e5; console.error('[PlaniTrip] outingModalConfirmSave post-save (showSuccessToast):', e5); }
   }
   if(failedStep){
-    alert('Excursion créée, mais l\'affichage n\'a pas pu être actualisé.');
+    alert((wasEditing?'Excursion modifiée':'Excursion créée')+', mais l\'affichage n\'a pas pu être actualisé.');
   }
 }
 function outingModalBack(){
@@ -9648,7 +9672,7 @@ function outingModalBack(){
   else if(_outingStep===5){ _outingStep=4; renderOutingModalBody(); }
 }
 function outingDraftSetDate(dateStr){
-  if(!_outingDraft) return;
+  if(!_outingDraft || _outingEditStructureLocked) return;
   _outingDraft.date=dateStr||'';
   if(_outingDraft.date){
     var resolved=resolveOutingBase(_outingDraft.date);
@@ -9676,7 +9700,7 @@ function outingDraftSetDate(dateStr){
   renderOutingModalBody();
 }
 function outingDraftSetManualBase(ck){
-  if(!_outingDraft) return;
+  if(!_outingDraft || _outingEditStructureLocked) return;
   if(!ck){ _outingDraft.baseCk=null; _outingDraft.baseLabel=null; persistOutingDraftLocal(); renderOutingModalBody(); return; }
   var parts=null;
   COUNTRIES.forEach(function(c){
@@ -9694,7 +9718,7 @@ function outingDraftSetManualBase(ck){
 // boucle d'affichage des chips (où l'objet ville réel est déjà connu) — jamais reconstruits
 // depuis ck par découpage, pour éviter toute désynchronisation visitCks/visitLabels.
 function toggleOutingVisitCity(ck, countryId, cityName){
-  if(!_outingDraft) return;
+  if(!_outingDraft || _outingEditStructureLocked) return;
   var idx=_outingDraft.visitCks.indexOf(ck);
   if(idx>-1){
     _outingDraft.visitCks.splice(idx,1);
@@ -9713,10 +9737,11 @@ function renderOutingModalBody(){
   if(!body || !_outingDraft) return;
   var html='';
   if(_outingStep===1){
-    html='<label class="ef-field"><span class="ef-label">Jour de l\'excursion</span><input type="date" class="ef-input" value="'+escHtml(_outingDraft.date||'')+'" onchange="outingDraftSetDate(this.value)"></label>';
+    html='<label class="ef-field"><span class="ef-label">Jour de l\'excursion</span><input type="date" class="ef-input" value="'+escHtml(_outingDraft.date||'')+'" onchange="outingDraftSetDate(this.value)"'+(_outingEditStructureLocked?' disabled':'')+'></label>';
+    if(_outingEditStructureLocked) html+='<div class="status-sub" style="margin-top:9px">Le jour, la base et les destinations restent verrouillés car cette excursion contient déjà une activité ou un déplacement.</div>';
     if(_outingDraft.date){
       if(_outingDraft.needsManualBase){
-        html+='<label class="ef-field" style="margin-top:12px"><span class="ef-label">Ville de base ce jour-là (à préciser)</span><select class="ef-select" onchange="outingDraftSetManualBase(this.value)"><option value="">— Choisir —</option>';
+        html+='<label class="ef-field" style="margin-top:12px"><span class="ef-label">Ville de base ce jour-là (à préciser)</span><select class="ef-select" onchange="outingDraftSetManualBase(this.value)"'+(_outingEditStructureLocked?' disabled':'')+'><option value="">— Choisir —</option>';
         COUNTRIES.forEach(function(c){
           c.cities.forEach(function(city){
             var ck=c.id+'_'+city.city;
@@ -9745,7 +9770,7 @@ function renderOutingModalBody(){
         if(ck===_outingDraft.baseCk) return; // jamais sa propre base comme "visite"
         var checked=_outingDraft.visitCks.indexOf(ck)>-1;
         var ref=_resolveCityRef({country:c.id, city:city.city, ck:ck});
-        html+='<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleOutingVisitCity(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(c.id)+'\',\''+jsStrEsc(city.city)+'\')">'+(checked?svgIcon('check',11):'')+escHtml(ref.label)+'</button>';
+        html+='<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'"'+(_outingEditStructureLocked?' disabled':' onclick="toggleOutingVisitCity(\''+jsStrEsc(ck)+'\',\''+jsStrEsc(c.id)+'\',\''+jsStrEsc(city.city)+'\')"')+'>'+(checked?svgIcon('check',11):'')+escHtml(ref.label)+'</button>';
       });
     });
     body.innerHTML=html;
@@ -9792,7 +9817,7 @@ function renderOutingModalBody(){
     html+='<div class="status-sub" style="margin-bottom:6px">Transport : <strong>'+escHtml(_outingDraft.primaryTransportMode)+'</strong></div>';
     body.innerHTML=html;
     var nextBtn5=document.getElementById('outingModalNextBtn');
-    if(nextBtn5){ nextBtn5.disabled=false; nextBtn5.textContent='Créer l\'excursion'; }
+    if(nextBtn5){ nextBtn5.disabled=false; nextBtn5.textContent=_outingEditingId?'Enregistrer':'Créer l\'excursion'; }
   }
 }
 function movementDraftFromInputs(skipPrices){
@@ -10070,6 +10095,41 @@ async function loadPersistedOuting(id){
   var r=await sb.from('activity_details').select('data').eq('trip_id',CURRENT_TRIP.id).eq('detail_key','__planitrip__outing__'+id).maybeSingle();
   if(r&&r.error) throw r.error;
   return r&&r.data&&r.data.data&&typeof r.data.data==='object'?r.data.data:null;
+}
+// Édition optimiste : l'excursion doit toujours exister dans la version ouverte par
+// l'utilisateur. Une modification concurrente produit zéro écriture et n'est jamais
+// remplacée silencieusement. Les relations restent celles du serveur, pas du brouillon.
+async function persistEditedOuting(next,expectedUpdatedAt,structureLocked){
+  if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
+  var detailKey='__planitrip__outing__'+next.id;
+  var read=await sb.from('activity_details').select('data,updated_at').eq('trip_id',CURRENT_TRIP.id).eq('detail_key',detailKey).maybeSingle();
+  if(read&&read.error) throw read.error;
+  var row=read&&read.data;
+  var current=row&&row.data;
+  if(!current || current.deleted){ var deletedErr=new Error('Excursion supprimée'); deletedErr.code='OUTING_DELETED'; throw deletedErr; }
+  if(current.id!==next.id || !expectedUpdatedAt || String(row.updated_at)!==String(expectedUpdatedAt)){
+    var changedErr=new Error('Excursion modifiée simultanément'); changedErr.code='OUTING_CHANGED'; throw changedErr;
+  }
+  var hasLinked=(Array.isArray(current.activityIds)&&current.activityIds.length)||(Array.isArray(current.movementIds)&&current.movementIds.length);
+  if(structureLocked || hasLinked){
+    ['date','baseCk','baseLabel','needsManualBase','visitCks','visitLabels'].forEach(function(k){
+      next[k]=current[k]===undefined ? undefined : JSON.parse(JSON.stringify(current[k]));
+    });
+  }
+  next.createdBy=current.createdBy||next.createdBy;
+  next.activityIds=Array.isArray(current.activityIds)?current.activityIds.slice():[];
+  next.movementIds=Array.isArray(current.movementIds)?current.movementIds.slice():[];
+  next.updatedAt=new Date().toISOString();
+  var updated=await sb.from('activity_details')
+    .update({data:next,updated_at:next.updatedAt})
+    .eq('trip_id',CURRENT_TRIP.id)
+    .eq('detail_key',detailKey)
+    .eq('updated_at',row.updated_at)
+    .select('data')
+    .maybeSingle();
+  if(updated&&updated.error) throw updated.error;
+  if(!updated||!updated.data||!updated.data.data){ var conflictErr=new Error('Excursion modifiée simultanément'); conflictErr.code='OUTING_CHANGED'; throw conflictErr; }
+  return updated.data.data;
 }
 async function _programAttachActivityToOuting(outingId,actKey,expectedDate,expectedCk,returnMeta){
   if(!sb||!CURRENT_TRIP) throw new Error('Connexion indisponible');
@@ -16047,11 +16107,47 @@ function openOutingActionMenu(outingId){
   var outing=S.outings&&S.outings[outingId];
   if(!outing||outing.deleted) return;
   document.getElementById('actionMenuTitle').textContent='Excursion · '+_programOutingDestinationLabel(outing);
-  document.getElementById('actionMenuBody').innerHTML='<div onclick="requestDeleteOuting(\''+jsStrEsc(outingId)+'\')" style="display:flex;align-items:center;gap:12px;padding:13px 4px;cursor:pointer;color:#E76F51">'
+  document.getElementById('actionMenuBody').innerHTML='<div onclick="openEditOutingModal(\''+jsStrEsc(outingId)+'\')" style="display:flex;align-items:center;gap:12px;padding:13px 4px;cursor:pointer;color:var(--ink)">'
+    +'<span style="width:22px;display:flex;justify-content:center;flex-shrink:0;color:var(--accent)">'+svgIcon('pencil',18)+'</span>'
+    +'<span style="font-size:15px;font-weight:500">Modifier l\'excursion</span>'
+    +'</div>'
+    +'<div style="height:1px;background:var(--divider)"></div>'
+    +'<div onclick="requestDeleteOuting(\''+jsStrEsc(outingId)+'\')" style="display:flex;align-items:center;gap:12px;padding:13px 4px;cursor:pointer;color:#E76F51">'
     +'<span style="width:22px;display:flex;justify-content:center;flex-shrink:0">'+svgIcon('trash-2',18)+'</span>'
     +'<span style="font-size:15px;font-weight:500">Supprimer l\'excursion</span>'
     +'</div>';
   document.getElementById('actionMenu').classList.add('open');
+}
+async function openEditOutingModal(outingId){
+  closeActionMenu();
+  if(_outingEditOpening) return;
+  if(!sb||!CURRENT_TRIP){ alert('Connexion requise pour modifier une excursion.'); return; }
+  _outingEditOpening=true;
+  try{
+    var detailKey='__planitrip__outing__'+outingId;
+    var read=await sb.from('activity_details').select('data,updated_at').eq('trip_id',CURRENT_TRIP.id).eq('detail_key',detailKey).maybeSingle();
+    if(read&&read.error) throw read.error;
+    var row=read&&read.data;
+    var fresh=row&&row.data;
+    if(!fresh || fresh.deleted){ alert('Cette excursion n’est plus disponible.'); return; }
+    if(!_isValidOutingDraftShape(fresh)){ alert('Cette excursion ne peut pas être modifiée pour le moment.'); return; }
+    _outingDraft=JSON.parse(JSON.stringify(fresh));
+    if(!Array.isArray(_outingDraft.activityIds)) _outingDraft.activityIds=[];
+    if(!Array.isArray(_outingDraft.movementIds)) _outingDraft.movementIds=[];
+    _outingEditingId=outingId;
+    _outingEditExpectedUpdatedAt=row.updated_at;
+    _outingEditStructureLocked=!!(_outingDraft.activityIds.length||_outingDraft.movementIds.length);
+    _outingStep=1;
+    var title=document.getElementById('outingModalTitle');
+    if(title) title.textContent='Modifier l’excursion';
+    renderOutingModalBody();
+    document.getElementById('outingModal').classList.add('open');
+  }catch(e){
+    console.error('[PlaniTrip] openEditOutingModal:',e);
+    alert('Impossible d’ouvrir cette excursion pour le moment.');
+  }finally{
+    _outingEditOpening=false;
+  }
 }
 function requestDeleteOuting(outingId){
   var outing=S.outings&&S.outings[outingId];
@@ -21833,7 +21929,7 @@ document.getElementById('auth-sp-submit-btn').addEventListener('click', async ()
 <div class="share-modal" id="outingModal" onclick="if(event.target.id==='outingModal') outingModalCancel();">
   <div class="share-sheet" style="max-height:88vh;max-height:88dvh;overflow-y:auto">
     <div class="modal-handle"></div>
-    <div class="modal-title">Je visite et je reviens</div>
+    <div class="modal-title" id="outingModalTitle">Je visite et je reviens</div>
     <div id="outingModalBody"></div>
     <button class="modal-cta" id="outingModalNextBtn" onclick="outingModalNext()" disabled>Continuer</button>
     <button class="modal-cancel-btn" onclick="outingModalCancel()">Annuler</button>
