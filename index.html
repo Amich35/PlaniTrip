@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-14·sha:outing-edit-v1';
+var APP_BUILD = '2026-09-20·sha:startup-parallel-loads-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -18464,22 +18464,28 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- clé IA active=', aiHasActiveKey());
   rebuildCountriesFromState();
 
+  // Démarrage : conserver l'ordre des chargements qui ont des dépendances
+  // (villes/activités -> checklist -> détails d'activités), puis charger en parallèle
+  // les domaines indépendants. Cela évite d'additionner la latence réseau de chaque
+  // table avant d'afficher l'app, sans changer l'autorité Supabase ni les migrations.
   await loadCollaborators();
   await loadCitiesActivities();
-  await loadBudgetEntries();
-  await loadFavorites();
   await loadChecklist();
-  await loadJournalEntries();
-  await loadCountrySettings();
   await loadActivityDetails();
-  await loadAccommodations();
-  await loadFreeBlocks();
-  await loadCustomPhotos();
-  await loadFlights();
-  await loadFeedPosts();
-  await loadFeedSeenState();
+  await Promise.all([
+    loadBudgetEntries(),
+    loadFavorites(),
+    loadJournalEntries(),
+    loadCountrySettings(),
+    loadAccommodations(),
+    loadFreeBlocks(),
+    loadCustomPhotos(),
+    loadFlights(),
+    loadFeedPosts(),
+    loadFeedSeenState(),
+    loadProfiles()
+  ]);
   updateFeedBadge();
-  await loadProfiles();
   loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
   _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
   markTripVisited(trip.id);
