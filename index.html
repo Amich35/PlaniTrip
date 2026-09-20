@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-20·sha:startup-photos-background-v1';
+var APP_BUILD = '2026-09-20·sha:startup-offline-first-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -18464,44 +18464,12 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- clé IA active=', aiHasActiveKey());
   rebuildCountriesFromState();
 
-  // Les domaines indépendants sont chargés en parallèle. Les photos personnalisées,
-  // potentiellement volumineuses, ne bloquent plus l'ouverture : l'état local restauré
-  // reste visible immédiatement, puis Supabase rafraîchit les photos en arrière-plan.
-  await loadCollaborators();
-  await loadCitiesActivities();
-  await loadChecklist();
-  await loadActivityDetails();
-  await Promise.all([
-    loadBudgetEntries(),
-    loadFavorites(),
-    loadJournalEntries(),
-    loadCountrySettings(),
-    loadAccommodations(),
-    loadFreeBlocks(),
-    loadFlights(),
-    loadFeedPosts(),
-    loadFeedSeenState(),
-    loadProfiles()
-  ]);
-  loadCustomPhotos().then(function(){
-    // La synchro photo peut avoir remplacé les valeurs locales : rafraîchir l'écran courant.
-    if(CURRENT_TRIP && CURRENT_TRIP.id===trip.id) renderContent();
-  }).catch(function(err){
-    console.warn('[PlaniTrip] loadCustomPhotos background:', err);
-  });
-  updateFeedBadge();
-  loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
-  _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
-  markTripVisited(trip.id);
-  refreshPendingInviteBadge(); // fire-and-forget — ne bloque pas le rendu
+  // Offline-first : l'état local restauré ci-dessus suffit pour rendre le voyage.
+  // On applique d'abord les garde-fous purement locaux, puis on ouvre l'interface
+  // sans attendre les lectures Supabase.
   rebuildCountriesFromState();
   applyTripCountryFilter(trip);
-  // Persiste immédiatement toute correction faite ci-dessus (restauration d'un pays intégré
-  // depuis deletedCountryIds, suppression d'un doublon custom résiduel) — sinon elle ne serait
-  // sauvegardée qu'au prochain save() déclenché ailleurs, potentiellement jamais si l'utilisateur
-  // ne fait aucune autre action modifiante pendant cette session.
   save();
-  // Les dates par pays sont explicites : ouvrir un voyage ne doit jamais les inventer.
 
   if (COUNTRIES.length === 0) {
     console.warn('[PlaniTrip] Aucun pays visible, réinitialisation de sécurité.');
@@ -18520,28 +18488,73 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   migrateCountryCategoryAccents();
   migrateCountryTipsCategories();
   migrateBudgetDailyDefault();
-  // Auto-save owner_email + profil (pseudo) dans Supabase pour que les collaborateurs
-  // voient toujours le pseudo actuel du propriétaire, résolu via PROFILES_MAP.
-  if(CURRENT_USER && trip.owner_id === CURRENT_USER.id){
-    if(trip.owner_email !== CURRENT_USER.email){
-      trip.owner_email = CURRENT_USER.email;
-      CURRENT_TRIP.owner_email = CURRENT_USER.email;
-      if(sb) sb.from('trips').update({owner_email: CURRENT_USER.email}).eq('id', trip.id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-    }
-    if(sb){
-      sb.from('profiles').select('id').eq('id', CURRENT_USER.id).maybeSingle().then(function(res){
-        if(!res.data){
-          sb.from('profiles').upsert({id:CURRENT_USER.id, email:CURRENT_USER.email, updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
-        }
-      });
-    }
-  }
+
   document.getElementById('create-trip-screen').style.display = 'none';
   document.getElementById('trip-selector-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   renderContent();
   if(window._retrySwReloadIfPending) window._retrySwReloadIfPending();
+
+  // La synchronisation collaborative se poursuit après le premier rendu.
+  // Préserver l'ordre des domaines dépendants ; paralléliser seulement les domaines indépendants.
+  (async function syncTripAfterFirstRender(){
+    try{
+      await loadCollaborators();
+      await loadCitiesActivities();
+      await loadChecklist();
+      await loadActivityDetails();
+      await Promise.all([
+        loadBudgetEntries(),
+        loadFavorites(),
+        loadJournalEntries(),
+        loadCountrySettings(),
+        loadAccommodations(),
+        loadFreeBlocks(),
+        loadFlights(),
+        loadFeedPosts(),
+        loadFeedSeenState(),
+        loadProfiles()
+      ]);
+
+      updateFeedBadge();
+      rebuildCountriesFromState();
+      applyTripCountryFilter(trip);
+      save();
+
+      // Auto-save owner_email + profil (pseudo) une fois les collaborateurs/profils synchronisés.
+      if(CURRENT_USER && CURRENT_TRIP && CURRENT_TRIP.id===trip.id && trip.owner_id === CURRENT_USER.id){
+        if(trip.owner_email !== CURRENT_USER.email){
+          trip.owner_email = CURRENT_USER.email;
+          CURRENT_TRIP.owner_email = CURRENT_USER.email;
+          if(sb) sb.from('trips').update({owner_email: CURRENT_USER.email}).eq('id', trip.id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+        }
+        if(sb){
+          sb.from('profiles').select('id').eq('id', CURRENT_USER.id).maybeSingle().then(function(res){
+            if(!res.data){
+              sb.from('profiles').upsert({id:CURRENT_USER.id, email:CURRENT_USER.email, updated_at:new Date().toISOString()}).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
+            }
+          });
+        }
+      }
+
+      if(CURRENT_TRIP && CURRENT_TRIP.id===trip.id) renderContent();
+    }catch(err){
+      console.warn('[PlaniTrip] synchronisation après premier rendu:', err);
+    }
+  })();
+
+  // Les photos peuvent être volumineuses : elles restent dans leur propre synchro non bloquante.
+  loadCustomPhotos().then(function(){
+    if(CURRENT_TRIP && CURRENT_TRIP.id===trip.id) renderContent();
+  }).catch(function(err){
+    console.warn('[PlaniTrip] loadCustomPhotos background:', err);
+  });
+
+  loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
+  _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
+  markTripVisited(trip.id);
+  refreshPendingInviteBadge(); // fire-and-forget — ne bloque pas le rendu
   } finally {
     _enterTripLock = null;
   }
