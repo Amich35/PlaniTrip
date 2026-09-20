@@ -1152,7 +1152,6 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <div class="auth-loading-spinner" aria-hidden="true"></div>
     <div style="font-size:16px;font-weight:600;color:#1D1D1F;">Chargement du voyage…</div>
     <p class="auth-hint">Synchronisation de tes informations</p>
-    <div id="startup-diag-visible" style="display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:#F5F5F3;color:#6E6E73;font-size:11px;line-height:1.45;text-align:left;white-space:pre-line;"></div>
   </div>
   <div class="auth-card">
 
@@ -1530,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-20·sha:startup-fullchain-diagnostic-v1';
+var APP_BUILD = '2026-09-20·sha:startup-photos-background-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -17410,18 +17409,9 @@ async function savePseudoOnboarding() {
 }
 async function onAuthenticated(user, freshLogin) {
   showAuthLoading();
-  window._startupOuterDiagStart = performance.now();
-  window._startupOuterDiagLines = [];
-  window._startupOuterDiagAdd = function(label, ms){
-    window._startupOuterDiagLines.push(label+': '+(ms/1000).toFixed(1)+' s');
-    var el=document.getElementById('startup-diag-visible');
-    if(el){ el.style.display='block'; el.textContent=window._startupOuterDiagLines.join('\n'); }
-  };
   if (sb) {
     try {
-      var _profileDiagStart=performance.now();
       var { data: profile } = await sb.from('profiles').select('status').eq('id', user.id).maybeSingle();
-      window._startupOuterDiagAdd('profile status', Math.round(performance.now()-_profileDiagStart));
       if (profile && profile.status === 'deleted') {
         await sb.auth.signOut();
         CURRENT_USER = null; CURRENT_TRIP = null; LAST_HANDLED_USER_ID = null;
@@ -17433,10 +17423,7 @@ async function onAuthenticated(user, freshLogin) {
       sb.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id).then(function(_r){ if(_r&&_r.error) console.error("[PlaniTrip] sync error:",_r.error); });
     } catch(e) { console.warn('[PlaniTrip] profile check failed:', e); }
   }
-  var _tripsDiagStart=performance.now();
   await checkUserTrips(user, freshLogin);
-  window._startupOuterDiagAdd('checkUserTrips TOTAL', Math.round(performance.now()-_tripsDiagStart));
-  window._startupOuterDiagAdd('TOTAL auth→app', Math.round(performance.now()-window._startupOuterDiagStart));
   maybeShowPseudoOnboarding(user);
 }
 
@@ -17457,24 +17444,16 @@ function withTimeout(promise, ms, label){
 async function checkUserTrips(user, freshLogin) {
   CURRENT_USER = user;
   try {
-    if (sb) {
-      var _claimDiagStart=performance.now();
-      try { await withTimeout(sb.rpc('claim_pending_invitations'), 6000, 'claim_pending_invitations'); } catch(e) { console.warn('[PlaniTrip] claim_pending_invitations:', e); }
-      if(window._startupOuterDiagAdd) window._startupOuterDiagAdd('claim invitations', Math.round(performance.now()-_claimDiagStart));
-    }
-    var _ownedDiagStart=performance.now();
+    if (sb) { try { await withTimeout(sb.rpc('claim_pending_invitations'), 6000, 'claim_pending_invitations'); } catch(e) { console.warn('[PlaniTrip] claim_pending_invitations:', e); } }
     const { data: ownedTrips, error: ownedErr } = await withTimeout(sb
       .from('trips')
       .select('id, name, owner_id, owner_label, owner_email, countries, archived_countries, start_date, end_date')
       .eq('owner_id', user.id), 8000, 'trips').catch(function(e){ return { data: null, error: e }; });
-    if(window._startupOuterDiagAdd) window._startupOuterDiagAdd('owned trips', Math.round(performance.now()-_ownedDiagStart));
 
-    var _collabTripsDiagStart=performance.now();
     const { data: collabRows, error: collabErr } = await withTimeout(sb
       .from('collaborators')
       .select('trip_id, trips(id, name, owner_id, owner_label, owner_email, countries, archived_countries, start_date, end_date)')
       .eq('user_id', user.id), 8000, 'collaborators').catch(function(e){ return { data: null, error: e }; });
-    if(window._startupOuterDiagAdd) window._startupOuterDiagAdd('collab trips', Math.round(performance.now()-_collabTripsDiagStart));
 
     if (ownedErr || collabErr) {
       console.error('[PlaniTrip trips] erreur:', ownedErr || collabErr);
@@ -17491,13 +17470,9 @@ async function checkUserTrips(user, freshLogin) {
       return;
     } else if (uniqueTrips.length === 1) {
       console.log('[PlaniTrip diag] checkUserTrips: 1 seul voyage, freshLogin=', freshLogin, '-> enterTrip resetTab=', !!freshLogin);
-      var _flagsDiagStart=performance.now();
       await loadCountryFlags();
-      if(window._startupOuterDiagAdd) window._startupOuterDiagAdd('country refs', Math.round(performance.now()-_flagsDiagStart));
       try {
-        var _enterOuterDiagStart=performance.now();
         await enterTrip(uniqueTrips[0], !!freshLogin);
-        if(window._startupOuterDiagAdd) window._startupOuterDiagAdd('enterTrip incl. access', Math.round(performance.now()-_enterOuterDiagStart));
       } catch (renderErr) {
         console.error('[PlaniTrip trips] erreur d\'affichage (trip conservé):', renderErr);
         alert("Une erreur d'affichage est survenue, mais ton voyage est bien là. Recharge la page — si le problème persiste, préviens André.");
@@ -18358,9 +18333,7 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   if (_enterTripLock === trip.id) { console.warn('[PlaniTrip] enterTrip ignoré (appel concurrent déjà en cours) pour', trip.id); return; }
   _enterTripLock = trip.id;
   try {
-  var _accessDiagStart=performance.now();
   var accessOk = await verifyTripAccess(trip.id);
-  if(window._startupOuterDiagAdd) window._startupOuterDiagAdd('verifyTripAccess', Math.round(performance.now()-_accessDiagStart));
   if(!accessOk){
     try{ localStorage.removeItem('planitrip_trip_' + trip.id); }catch(e){}
     try{ if(localStorage.getItem('planitrip_last_trip_id')===trip.id) localStorage.removeItem('planitrip_last_trip_id'); }catch(e){}
@@ -18491,51 +18464,31 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- clé IA active=', aiHasActiveKey());
   rebuildCountriesFromState();
 
-  // Diagnostic temporaire démarrage : mesure chaque phase sans changer son comportement.
-  var _startupDiagStart = performance.now();
-  var _startupDiagLines = (window._startupOuterDiagLines||[]).slice();
-  function _startupDiagVisible(label, ms){
-    var _line = label+': '+(ms/1000).toFixed(1)+' s';
-    _startupDiagLines.push(_line);
-    var _el = document.getElementById('startup-diag-visible');
-    if(_el){
-      _el.style.display = 'block';
-      _el.textContent = _startupDiagLines.join('\n');
-    }
-  }
-  async function _startupTimed(label, fn){
-    var _t = performance.now();
-    try { return await fn(); }
-    finally {
-      var _ms = Math.round(performance.now()-_t);
-      console.log('[PlaniTrip startup] '+label+': '+_ms+' ms');
-      _startupDiagVisible(label, _ms);
-    }
-  }
-  console.log('[PlaniTrip startup] enterTrip sync start');
-
-  await _startupTimed('loadCollaborators', function(){ return loadCollaborators(); });
-  await _startupTimed('loadCitiesActivities', function(){ return loadCitiesActivities(); });
-  await _startupTimed('loadChecklist', function(){ return loadChecklist(); });
-  await _startupTimed('loadActivityDetails', function(){ return loadActivityDetails(); });
-  await _startupTimed('parallel independent loads', function(){ return Promise.all([
-    _startupTimed('loadBudgetEntries', function(){ return loadBudgetEntries(); }),
-    _startupTimed('loadFavorites', function(){ return loadFavorites(); }),
-    _startupTimed('loadJournalEntries', function(){ return loadJournalEntries(); }),
-    _startupTimed('loadCountrySettings', function(){ return loadCountrySettings(); }),
-    _startupTimed('loadAccommodations', function(){ return loadAccommodations(); }),
-    _startupTimed('loadFreeBlocks', function(){ return loadFreeBlocks(); }),
-    _startupTimed('loadCustomPhotos', function(){ return loadCustomPhotos(); }),
-    _startupTimed('loadFlights', function(){ return loadFlights(); }),
-    _startupTimed('loadFeedPosts', function(){ return loadFeedPosts(); }),
-    _startupTimed('loadFeedSeenState', function(){ return loadFeedSeenState(); }),
-    _startupTimed('loadProfiles', function(){ return loadProfiles(); })
-  ]); });
-  var _startupTotalMs = Math.round(performance.now()-_startupDiagStart);
-  console.log('[PlaniTrip startup] enterTrip sync total: '+_startupTotalMs+' ms');
-  _startupDiagVisible('TOTAL enterTrip', _startupTotalMs);
-  // Laisser brièvement les mesures visibles pour qu'une capture iPhone soit possible.
-  await new Promise(function(resolve){ setTimeout(resolve, 1800); });
+  // Les domaines indépendants sont chargés en parallèle. Les photos personnalisées,
+  // potentiellement volumineuses, ne bloquent plus l'ouverture : l'état local restauré
+  // reste visible immédiatement, puis Supabase rafraîchit les photos en arrière-plan.
+  await loadCollaborators();
+  await loadCitiesActivities();
+  await loadChecklist();
+  await loadActivityDetails();
+  await Promise.all([
+    loadBudgetEntries(),
+    loadFavorites(),
+    loadJournalEntries(),
+    loadCountrySettings(),
+    loadAccommodations(),
+    loadFreeBlocks(),
+    loadFlights(),
+    loadFeedPosts(),
+    loadFeedSeenState(),
+    loadProfiles()
+  ]);
+  loadCustomPhotos().then(function(){
+    // La synchro photo peut avoir remplacé les valeurs locales : rafraîchir l'écran courant.
+    if(CURRENT_TRIP && CURRENT_TRIP.id===trip.id) renderContent();
+  }).catch(function(err){
+    console.warn('[PlaniTrip] loadCustomPhotos background:', err);
+  });
   updateFeedBadge();
   loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
   _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
