@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-20·sha:startup-parallel-loads-v1';
+var APP_BUILD = '2026-09-20·sha:startup-timing-diagnostic-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -18464,27 +18464,33 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
   console.log('[PlaniTrip diag] enterTrip -> S.tab final=', S.tab, '- clé IA active=', aiHasActiveKey());
   rebuildCountriesFromState();
 
-  // Démarrage : conserver l'ordre des chargements qui ont des dépendances
-  // (villes/activités -> checklist -> détails d'activités), puis charger en parallèle
-  // les domaines indépendants. Cela évite d'additionner la latence réseau de chaque
-  // table avant d'afficher l'app, sans changer l'autorité Supabase ni les migrations.
-  await loadCollaborators();
-  await loadCitiesActivities();
-  await loadChecklist();
-  await loadActivityDetails();
-  await Promise.all([
-    loadBudgetEntries(),
-    loadFavorites(),
-    loadJournalEntries(),
-    loadCountrySettings(),
-    loadAccommodations(),
-    loadFreeBlocks(),
-    loadCustomPhotos(),
-    loadFlights(),
-    loadFeedPosts(),
-    loadFeedSeenState(),
-    loadProfiles()
-  ]);
+  // Diagnostic temporaire démarrage : mesure chaque phase sans changer son comportement.
+  var _startupDiagStart = performance.now();
+  async function _startupTimed(label, fn){
+    var _t = performance.now();
+    try { return await fn(); }
+    finally { console.log('[PlaniTrip startup] '+label+': '+Math.round(performance.now()-_t)+' ms'); }
+  }
+  console.log('[PlaniTrip startup] enterTrip sync start');
+
+  await _startupTimed('loadCollaborators', function(){ return loadCollaborators(); });
+  await _startupTimed('loadCitiesActivities', function(){ return loadCitiesActivities(); });
+  await _startupTimed('loadChecklist', function(){ return loadChecklist(); });
+  await _startupTimed('loadActivityDetails', function(){ return loadActivityDetails(); });
+  await _startupTimed('parallel independent loads', function(){ return Promise.all([
+    _startupTimed('loadBudgetEntries', function(){ return loadBudgetEntries(); }),
+    _startupTimed('loadFavorites', function(){ return loadFavorites(); }),
+    _startupTimed('loadJournalEntries', function(){ return loadJournalEntries(); }),
+    _startupTimed('loadCountrySettings', function(){ return loadCountrySettings(); }),
+    _startupTimed('loadAccommodations', function(){ return loadAccommodations(); }),
+    _startupTimed('loadFreeBlocks', function(){ return loadFreeBlocks(); }),
+    _startupTimed('loadCustomPhotos', function(){ return loadCustomPhotos(); }),
+    _startupTimed('loadFlights', function(){ return loadFlights(); }),
+    _startupTimed('loadFeedPosts', function(){ return loadFeedPosts(); }),
+    _startupTimed('loadFeedSeenState', function(){ return loadFeedSeenState(); }),
+    _startupTimed('loadProfiles', function(){ return loadProfiles(); })
+  ]); });
+  console.log('[PlaniTrip startup] enterTrip sync total: '+Math.round(performance.now()-_startupDiagStart)+' ms');
   updateFeedBadge();
   loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
   _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
