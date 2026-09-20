@@ -1152,6 +1152,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
     <div class="auth-loading-spinner" aria-hidden="true"></div>
     <div style="font-size:16px;font-weight:600;color:#1D1D1F;">Chargement du voyage…</div>
     <p class="auth-hint">Synchronisation de tes informations</p>
+    <div id="startup-diag-visible" style="display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:#F5F5F3;color:#6E6E73;font-size:11px;line-height:1.45;text-align:left;white-space:pre-line;"></div>
   </div>
   <div class="auth-card">
 
@@ -1529,7 +1530,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-20·sha:startup-timing-diagnostic-v1';
+var APP_BUILD = '2026-09-20·sha:startup-visible-diagnostic-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -18466,10 +18467,24 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
 
   // Diagnostic temporaire démarrage : mesure chaque phase sans changer son comportement.
   var _startupDiagStart = performance.now();
+  var _startupDiagLines = [];
+  function _startupDiagVisible(label, ms){
+    var _line = label+': '+(ms/1000).toFixed(1)+' s';
+    _startupDiagLines.push(_line);
+    var _el = document.getElementById('startup-diag-visible');
+    if(_el){
+      _el.style.display = 'block';
+      _el.textContent = _startupDiagLines.join('\n');
+    }
+  }
   async function _startupTimed(label, fn){
     var _t = performance.now();
     try { return await fn(); }
-    finally { console.log('[PlaniTrip startup] '+label+': '+Math.round(performance.now()-_t)+' ms'); }
+    finally {
+      var _ms = Math.round(performance.now()-_t);
+      console.log('[PlaniTrip startup] '+label+': '+_ms+' ms');
+      _startupDiagVisible(label, _ms);
+    }
   }
   console.log('[PlaniTrip startup] enterTrip sync start');
 
@@ -18490,7 +18505,11 @@ async function enterTrip(trip, resetTab, skipAutofillDates) {
     _startupTimed('loadFeedSeenState', function(){ return loadFeedSeenState(); }),
     _startupTimed('loadProfiles', function(){ return loadProfiles(); })
   ]); });
-  console.log('[PlaniTrip startup] enterTrip sync total: '+Math.round(performance.now()-_startupDiagStart)+' ms');
+  var _startupTotalMs = Math.round(performance.now()-_startupDiagStart);
+  console.log('[PlaniTrip startup] enterTrip sync total: '+_startupTotalMs+' ms');
+  _startupDiagVisible('TOTAL enterTrip', _startupTotalMs);
+  // Laisser brièvement les mesures visibles pour qu'une capture iPhone soit possible.
+  await new Promise(function(resolve){ setTimeout(resolve, 1800); });
   updateFeedBadge();
   loadChangeEvents(); // fire-and-forget — ne bloque pas le rendu
   _ceSubscribeRealtime(); // Realtime — écoute les nouveaux événements sans reload
