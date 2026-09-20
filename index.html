@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-20·sha:startup-offline-first-v1';
+var APP_BUILD = '2026-09-20·sha:outing-existing-target-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -16198,6 +16198,7 @@ function openProgramOutingActivity(outingId){
 
 var _programExistingOutingId='';
 var _programExistingActKey='';
+var _programExistingTargetOutingId='';
 var _programExistingSaving=false;
 var _programExistingError='';
 var _programExistingBlocked={};
@@ -16206,6 +16207,7 @@ var _programExistingOutingStale=false;
 function _programResetExistingActivityModal(){
   _programExistingOutingId='';
   _programExistingActKey='';
+  _programExistingTargetOutingId='';
   _programExistingSaving=false;
   _programExistingError='';
   _programExistingBlocked={};
@@ -16290,6 +16292,15 @@ function _programFindExistingCandidate(outing,actKey){
 function _programExistingStatusColor(status){
   return status==='conflict'||status==='blocked'?'var(--red-muted)':'var(--ink-subtle)';
 }
+function _programCompatibleOutingsForExistingActivity(sourceOuting,candidate){
+  if(!sourceOuting||!candidate) return [];
+  return Object.values(S.outings||{}).filter(function(o){
+    return o&&!o.deleted&&o.date===sourceOuting.date&&Array.isArray(o.visitCks)&&o.visitCks.indexOf(candidate.ck)>-1;
+  });
+}
+function _programExistingOutingChoiceLabel(outing){
+  return 'Excursion · '+_programOutingDestinationLabel(outing);
+}
 function _programRenderExistingActivityModal(){
   var outing=S.outings&&S.outings[_programExistingOutingId];
   var body=document.getElementById('guideItemModalBody');
@@ -16339,6 +16350,25 @@ function _programRenderExistingActivityModal(){
     });
     if(!eligible) html+='<div style="font-size:11.5px;color:var(--ink-muted);line-height:1.45;text-align:center;margin:12px 8px 0">Aucune activité n’est disponible pour un nouveau rattachement.</div>';
   }
+  var selectedCandidate=_programExistingActKey?_programFindExistingCandidate(outing,_programExistingActKey):null;
+  var compatibleTargets=selectedCandidate&&!selectedCandidate.status?_programCompatibleOutingsForExistingActivity(outing,selectedCandidate):[];
+  if(compatibleTargets.length===1){
+    _programExistingTargetOutingId=compatibleTargets[0].id;
+  }else if(compatibleTargets.length>1){
+    if(!compatibleTargets.some(function(o){ return o.id===_programExistingTargetOutingId; })) _programExistingTargetOutingId='';
+    html+='<div style="margin-top:16px"><div style="font-size:11px;font-weight:700;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;margin:0 2px 6px">Choisir l’excursion</div>'
+      +'<div style="border:1px solid rgba(29,29,31,.08);border-radius:16px;overflow:hidden;background:var(--card)">';
+    compatibleTargets.forEach(function(target,index){
+      var selected=_programExistingTargetOutingId===target.id;
+      html+='<button type="button" onclick="event.stopPropagation();selectProgramExistingTargetOuting(\''+jsStrEsc(target.id)+'\')" aria-pressed="'+(selected?'true':'false')+'" style="width:100%;min-height:52px;padding:10px 11px;border:none;'+(index?'border-top:1px solid rgba(29,29,31,.07);':'')+'background:'+(selected?'var(--accent-pale)':'transparent')+';font-family:inherit;text-align:left;display:flex;align-items:center;gap:10px;cursor:pointer">'
+        +'<span style="min-width:0;flex:1;font-size:13px;font-weight:650;color:var(--ink);line-height:1.3">'+escHtml(_programExistingOutingChoiceLabel(target))+'</span>'
+        +'<span style="flex:0 0 22px;width:22px;height:22px;border-radius:50%;border:1.5px solid '+(selected?'var(--accent)':'rgba(29,29,31,.22)')+';background:'+(selected?'var(--accent)':'transparent')+';color:#fff;display:flex;align-items:center;justify-content:center">'+(selected?svgIcon('check',13):'')+'</span>'
+        +'</button>';
+    });
+    html+='</div><div style="font-size:11.5px;color:var(--ink-muted);line-height:1.45;margin:7px 2px 0">Cette activité est compatible avec plusieurs excursions de ce jour.</div></div>';
+  }else{
+    _programExistingTargetOutingId='';
+  }
   html+=_programExistingError
     ?'<div id="programExistingActivityFeedback" role="alert" style="margin-top:12px;padding:10px 11px;border-radius:12px;background:var(--red-pale);color:var(--red-muted);font-size:11.5px;font-weight:600;line-height:1.4">'+escHtml(_programExistingError)+'</div>'
     :'<div id="programExistingActivityFeedback" aria-live="polite"></div>';
@@ -16346,7 +16376,7 @@ function _programRenderExistingActivityModal(){
 
   var saveBtn=modal.querySelector('.modal-cta');
   var cancelBtn=modal.querySelector('.modal-cancel-btn');
-  var disabled=_programExistingSaving||_programExistingOutingStale||!_programExistingActKey;
+  var disabled=_programExistingSaving||_programExistingOutingStale||!_programExistingActKey||!_programExistingTargetOutingId;
   if(saveBtn){
     saveBtn.disabled=disabled;
     saveBtn.textContent=_programExistingSaving?'Ajout…':'Ajouter à l’excursion';
@@ -16375,6 +16405,17 @@ function selectProgramExistingActivity(actKey){
   var candidate=outing&&_programFindExistingCandidate(outing,actKey);
   if(!candidate||candidate.status) return;
   _programExistingActKey=actKey;
+  _programExistingTargetOutingId='';
+  _programExistingError='';
+  _programRenderExistingActivityModal();
+}
+function selectProgramExistingTargetOuting(outingId){
+  if(_programExistingSaving||_programExistingOutingStale||!_programExistingActKey) return;
+  var sourceOuting=S.outings&&S.outings[_programExistingOutingId];
+  var candidate=sourceOuting&&_programFindExistingCandidate(sourceOuting,_programExistingActKey);
+  var compatible=sourceOuting&&candidate?_programCompatibleOutingsForExistingActivity(sourceOuting,candidate):[];
+  if(!compatible.some(function(o){ return o.id===outingId; })) return;
+  _programExistingTargetOutingId=outingId;
   _programExistingError='';
   _programRenderExistingActivityModal();
 }
@@ -16497,12 +16538,15 @@ async function _programAttachExistingActivity(outing,candidate){
   }
 }
 async function saveProgramExistingActivity(){
-  if(_programExistingSaving||_programExistingOutingStale||!_programExistingActKey) return;
-  var outing=S.outings&&S.outings[_programExistingOutingId];
-  var candidate=outing&&_programFindExistingCandidate(outing,_programExistingActKey);
-  if(!outing||!candidate||candidate.status){
-    _programExistingError='Cette activité n’est plus disponible dans la sélection.';
+  if(_programExistingSaving||_programExistingOutingStale||!_programExistingActKey||!_programExistingTargetOutingId) return;
+  var sourceOuting=S.outings&&S.outings[_programExistingOutingId];
+  var candidate=sourceOuting&&_programFindExistingCandidate(sourceOuting,_programExistingActKey);
+  var outing=S.outings&&S.outings[_programExistingTargetOutingId];
+  var compatible=sourceOuting&&candidate?_programCompatibleOutingsForExistingActivity(sourceOuting,candidate):[];
+  if(!sourceOuting||!outing||!candidate||candidate.status||!compatible.some(function(o){ return o.id===outing.id; })){
+    _programExistingError='Cette activité ou cette excursion n’est plus disponible dans la sélection.';
     _programExistingActKey='';
+    _programExistingTargetOutingId='';
     _programRenderExistingActivityModal();
     return;
   }
