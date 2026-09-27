@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-20·sha:outing-existing-target-v1';
+var APP_BUILD = '2026-09-27·sha:stable-custom-edit-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -3474,7 +3474,7 @@ function handleActionMenuTap(action){
     // pour les activités custom (pas de tap supplémentaire sur "Modifier").
     // Pour les activités de base statiques, ouvre en lecture (pas de rename possible).
     var _editIdxPart = ctx.actKey.slice(ctx.cityKey.length+1);
-    var _editIsCustom = _editIdxPart.indexOf('c')===0;
+    var _editIsCustom = _editIdxPart.indexOf('c')===0 || _isCustomStableKey(ctx.actKey);
     if(_editIsCustom){
       unlockCustomActDetail(ctx.actKey, ctx.cityKey, ctx.actName);
     } else {
@@ -7746,7 +7746,7 @@ function editActivityFromSwipe(el){
   // Lot 5B : même comportement que "Modifier la fiche" dans le menu —
   // ouvre directement en mode édition pour les activités custom.
   var _sIdxPart = _sActKey ? _sActKey.slice((_sCityKey||'').length+1) : '';
-  var _sIsCustom = _sIdxPart.indexOf('c')===0;
+  var _sIsCustom = _sIdxPart.indexOf('c')===0 || _isCustomStableKey(_sActKey);
   if(_sIsCustom){
     unlockCustomActDetail(_sActKey, _sCityKey, _sActName);
   } else {
