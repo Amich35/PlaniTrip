@@ -1529,7 +1529,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-27·sha:stable-custom-edit-v1';
+var APP_BUILD = '2026-09-30·sha:country-date-authority-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -6796,33 +6796,19 @@ async function editCityDateRange(ck, startVal, endVal){
   }
 
   // Supabase confirmé : commit local seulement maintenant.
+  // Les dates de ville décrivent le séjour dans cette ville, mais ne réécrivent jamais
+  // silencieusement les bornes explicites du pays choisies par l'utilisateur.
   S.cityDates = nextCityDates;
-  // Resynchronise l'instantané du pays parent (c.dateStart/dateEnd/dates/days) avec les
-  // vraies dates de ses villes, pour que le budget quotidien (c.days) et l'en-tête pays
-  // ne se désynchronisent jamais silencieusement.
-  var countryId = ck.split('_')[0];
-  var parentCountry = COUNTRIES.find(function(co){return co.id===countryId;});
-  if(parentCountry){
-    var freshRange = getCountryDateRange(parentCountry);
-    if(freshRange){
-      parentCountry.dateStart = freshRange.start;
-      parentCountry.dateEnd = freshRange.end;
-      parentCountry.dates = fmtDateRangeFr(freshRange.start, freshRange.end);
-      parentCountry.days = Math.round((new Date(freshRange.end+'T00:00:00')-new Date(freshRange.start+'T00:00:00'))/86400000)+1;
-      if(typeof saveCountryEdit==='function') saveCountryEdit(countryId);
-    }
-  }
   save();
   renderContent();
   return true;
 }
-// Dates réelles d'un pays = étendue min/max des séjours réels de ses villes (logements),
-// pas une valeur saisie à part qui peut se désynchroniser. Fallback sur une date saisie
-// manuellement (c.dateStart/dateEnd) uniquement si aucune ville n'a encore de dates.
+// Les bornes explicites du pays sont la source de vérité lorsqu'elles existent.
+// Les dates de villes restent un fallback pour les anciens pays qui n'ont jamais eu
+// de bornes pays enregistrées.
 function getCountryDateRange(c){
   if(!c) return null;
-  // Source canonique : dates réelles des villes (S.cityDates), qui peuvent évoluer après
-  // la création du pays. c.dateStart/dateEnd n'est qu'un instantané de secours.
+  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
   var start=null, end=null;
   (c.cities||[]).forEach(function(city){
     var range = cityStayRange(c.id+'_'+city.city);
@@ -6831,9 +6817,7 @@ function getCountryDateRange(c){
       if(!end || range.end>end) end=range.end;
     }
   });
-  if(start && end) return {start:start, end:end};
-  if(c.dateStart && c.dateEnd) return {start:c.dateStart, end:c.dateEnd};
-  return null;
+  return (start && end) ? {start:start, end:end} : null;
 }
 function cityStayRange(ck){
   var start=null, end=null;
