@@ -9842,7 +9842,7 @@ function movementDraftFromInputs(skipPrices){
   var legsDuration=legs.reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);
   if(durationEl&&durationEl.tagName==='INPUT'&&String(durationEl.value||'').trim()!==''){
     _movementDraft.durationUnit=durationUnitEl?durationUnitEl.value:'min';
-    _movementDraft.durationMin=movementDurationToMinutes(durationEl.value,_movementDraft.durationUnit);
+    _movementDraft.durationMin=durationEl.readOnly?movementDurationTextToMinutes(durationEl.value):movementDurationToMinutes(durationEl.value,_movementDraft.durationUnit);
   }else if(legsDuration>0){
     _movementDraft.durationMin=legsDuration;
     _movementDraft.durationUnit=legsDuration>=1440?'day':(legsDuration>=60?'hour':'min');
