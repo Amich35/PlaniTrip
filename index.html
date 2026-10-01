@@ -902,6 +902,20 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 #movementModal .mv-option-group[open]>.mv-option-body.mv-more-body{margin-top:8px;padding:10px;border:1px solid rgba(100,70,30,.12);border-radius:16px;background:#fff;}
 #movementModal .mv-more-body .mv-inline-editor{padding:5px 2px 9px;}
 #movementModal .mv-more-body>.mv-field{border:0!important;}
+/* Transport editor — final density pass */
+#movementModal .mv-schedule-card .mv-schedule{grid-template-columns:1fr 1fr!important;}
+#movementModal .mv-schedule-card .mv-schedule .mv-field:first-child{min-height:62px!important;padding:8px 10px 6px!important;}
+#movementModal .mv-schedule-card .mv-schedule .mv-field:nth-child(2),
+#movementModal .mv-schedule-card .mv-schedule .mv-field:nth-child(3){min-height:54px!important;padding-top:7px!important;padding-bottom:7px!important;}
+#movementModal .mv-date-reset{float:right!important;margin-top:-23px!important;font-size:0!important;width:25px!important;height:25px!important;border-radius:50%!important;text-align:center!important;color:var(--ink-subtle)!important;}
+#movementModal .mv-date-reset:after{content:'×';font-size:17px;line-height:25px;}
+#movementModal .mv-duration-display-only{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-top:1px solid rgba(100,70,30,.09);}
+#movementModal .mv-duration-display-only .mv-inline-editor-label{font-size:11px;color:var(--ink-muted);font-weight:600;}
+#movementModal .mv-duration-display-only strong{font-size:14px;color:var(--accent);}
+#movementModal .mv-option-group{margin-top:4px!important;padding-top:7px!important;}
+#movementModal .mv-option-group .mv-stops-list{margin-top:3px!important;}
+#movementModal .mv-add-leg{margin-top:6px!important;}
+#movementModal .mv-option-group+.mv-option-group{margin-top:4px!important;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1616,7 +1630,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-01·sha:movement-editor-cards-v1';
+var APP_BUILD = '2026-10-01·sha:movement-editor-density-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10022,9 +10036,8 @@ function renderMovementModalBody(){
   var coherence=movementCoherenceMessage(m,movementsForCountry(m.countryId));
   var durationUnit=movementDurationUnit(m);
   var hasBothTimes=!!(m.departureTime&&m.arrivalTime);
-  var durationField=hasBothTimes
-    ? '<div class="mv-duration-compact">Durée <strong id="mv_durationDisplay">'+escHtml(movementFormatDuration(m.durationMin,m))+'</strong><input type="hidden" id="mv_durationUnit" value="'+durationUnit+'"></div>'
-    : '<div class="mv-inline-editor"><span class="mv-inline-editor-label">Durée estimée</span><span class="mv-inline-editor-control"><input class="ef-input" id="mv_durationDisplay" type="number" inputmode="decimal" min="0" step="0.01" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'" placeholder="—" aria-label="Durée estimée"><span id="mv_durationPretty" style="font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap">'+escHtml(movementCompactDurationText(movementDurationDisplay(m.durationMin,m),durationUnit))+'</span><select class="mv-currency-select" id="mv_durationUnit" data-previous="'+durationUnit+'" onchange="changeMovementDurationUnit(\'mv_durationDisplay\',this);var p=document.getElementById(\'mv_durationPretty\');if(p)p.textContent=movementCompactDurationText(document.getElementById(\'mv_durationDisplay\').value,this.value)"><option value="min"'+(durationUnit==='min'?' selected':'')+'>min</option><option value="hour"'+(durationUnit==='hour'?' selected':'')+'>h</option><option value="day"'+(durationUnit==='day'?' selected':'')+'>j</option></select></span></div>';
+  var durationPretty=movementCompactDurationText(movementDurationDisplay(m.durationMin,m),durationUnit);
+  var durationField='<div class="mv-duration-display-only"><span class="mv-inline-editor-label">Durée estimée</span><strong>'+escHtml(durationPretty||'—')+'</strong><input type="hidden" id="mv_durationDisplay" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'"><input type="hidden" id="mv_durationUnit" value="'+durationUnit+'"></div>';
   var schedule='<div class="mv-option-body mv-schedule-card">'
     +'<div class="mv-schedule"><div class="mv-field"><span class="mv-field-label">Date</span><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'" oninput="updateMovementScheduleField(\'date\',this.value)" onchange="updateMovementScheduleField(\'date\',this.value)">'+(m.date?'<button type="button" class="mv-date-reset" onclick="resetMovementDate(this)">Réinitialiser</button>':'')+'</div>'
     +'<label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'" oninput="updateMovementScheduleField(\'departureTime\',this.value)" onchange="updateMovementScheduleField(\'departureTime\',this.value)"></label>'
