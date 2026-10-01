@@ -916,6 +916,23 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 #movementModal .mv-option-group .mv-stops-list{margin-top:3px!important;}
 #movementModal .mv-add-leg{margin-top:6px!important;}
 #movementModal .mv-option-group+.mv-option-group{margin-top:4px!important;}
+/* Transport editor — iOS visual language */
+#movementModal .mv-trip-card{margin-top:14px;border:1px solid rgba(100,70,30,.11);border-radius:18px;background:#fff;overflow:hidden;}
+#movementModal .mv-trip-card .mv-essential-mode{margin:0!important;border:0!important;border-radius:0!important;padding:11px 14px 9px!important;background:transparent!important;}
+#movementModal .mv-trip-card .mv-schedule-card{margin:0!important;border:0!important;border-radius:0!important;border-top:1px solid rgba(100,70,30,.08)!important;}
+#movementModal .mv-trip-card .mv-schedule .mv-field:first-child{min-height:50px!important;}
+#movementModal .mv-trip-card .mv-schedule .mv-field:nth-child(2),
+#movementModal .mv-trip-card .mv-schedule .mv-field:nth-child(3){min-height:48px!important;}
+#movementModal .mv-trip-card .mv-duration-display-only{padding:8px 10px!important;}
+#movementModal .mv-section-spaced{margin-top:18px!important;padding-top:0!important;border-top:0!important;}
+#movementModal .mv-section-spaced>summary{padding:0 3px 7px!important;}
+#movementModal .mv-section-add{margin-left:auto;width:27px;height:27px;border:0;border-radius:50%;background:rgba(45,106,79,.09);color:var(--accent);font-size:20px;line-height:25px;font-weight:500;display:flex;align-items:center;justify-content:center;}
+#movementModal .mv-section-add:active{background:rgba(45,106,79,.16);}
+#movementModal .mv-section-spaced .mv-stops-list{margin-top:0!important;}
+#movementModal .mv-section-spaced .mv-stop-summary{padding:11px 8px!important;}
+#movementModal .mv-more-light{margin-top:18px!important;padding-top:0!important;border-top:0!important;}
+#movementModal .mv-more-light>summary{padding:0 3px!important;}
+#movementModal .mv-more-light .mv-more-summary{padding-left:21px!important;margin-top:4px!important;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1630,7 +1647,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-01·sha:movement-editor-density-v1';
+var APP_BUILD = '2026-10-01·sha:movement-editor-ios-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10043,13 +10060,13 @@ function renderMovementModalBody(){
     +'<label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'" oninput="updateMovementScheduleField(\'departureTime\',this.value)" onchange="updateMovementScheduleField(\'departureTime\',this.value)"></label>'
     +'<label class="mv-field"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mv_arrivalTime" type="time" value="'+escHtml(m.arrivalTime||'')+'" oninput="updateMovementScheduleField(\'arrivalTime\',this.value)" onchange="updateMovementScheduleField(\'arrivalTime\',this.value)"></label></div>'
     +durationField+'</div>';
-  var stopDetails='<details class="mv-option-group"'+((m.legs||[]).length>1?' open':'')+'><summary><span class="mv-option-chevron">›</span> Correspondances <span class="mv-option-label">'+((m.legs||[]).length>1?'('+(m.legs.length-1)+')':'(optionnel)')+'</span></summary><div class="mv-option-body"><div class="mv-stops-list">'+(stops||'<div style="font-size:12px;color:var(--ink-subtle)">Trajet direct.</div>')+'</div>'
-    +'<button type="button" class="mv-add-leg" onclick="addMovementLeg()">＋ Ajouter une correspondance</button></div></details>';
+  var stopDetails='<details class="mv-option-group mv-section-spaced"'+((m.legs||[]).length>1?' open':'')+'><summary><span class="mv-option-chevron">›</span> Correspondances <span class="mv-option-label">'+((m.legs||[]).length>1?'('+(m.legs.length-1)+')':'(optionnel)')+'</span><button type="button" class="mv-section-add" onclick="event.preventDefault();event.stopPropagation();addMovementLeg()" aria-label="Ajouter une correspondance">+</button></summary><div class="mv-option-body"><div class="mv-stops-list">'+(stops||'<div style="font-size:12px;color:var(--ink-subtle)">Trajet direct.</div>')+'</div>'
+    +'</div></details>';
   var mvPeople=getActiveTravelerList();
   var mvParticipantChips=mvPeople.map(function(p){var checked=Array.isArray(m.participants)&&m.participants.indexOf(p)>-1;return '<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleMovementParticipant(\''+jsStrEsc(p)+'\')">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';}).join('');
   var mvSelectedNames=(Array.isArray(m.participants)?m.participants:[]).map(function(p){return personDisplayName(p,'Toi');});
   var moreSummary=[];if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null)moreSummary.push(movementFormatCost(m.costPerPersonJPY,m,true));if(mvSelectedNames.length)moreSummary.push(mvSelectedNames.join(', '));if(m.notes)moreSummary.push('Note');
-  var moreDetails='<details class="mv-option-group"><summary><span class="mv-more-head"><span class="mv-option-chevron">›</span><span>Plus d’informations</span></span>'+(moreSummary.length?'<span class="mv-more-summary">'+escHtml(moreSummary.join(' · '))+'</span>':'<span class="mv-option-label">(optionnel)</span>')+'</summary><div class="mv-option-body mv-more-body">'
+  var moreDetails='<details class="mv-option-group mv-more-light"><summary><span class="mv-more-head"><span class="mv-option-chevron">›</span><span>Plus d’informations</span></span>'+(moreSummary.length?'<span class="mv-more-summary">'+escHtml(moreSummary.join(' · '))+'</span>':'<span class="mv-option-label">(optionnel)</span>')+'</summary><div class="mv-option-body mv-more-body">'
     +'<div class="mv-inline-editor mv-price-compact"><span class="mv-inline-editor-label">Prix par personne</span><span class="mv-inline-editor-control"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></span></div>'
     +(mvPeople.length?'<div class="mv-field" style="margin-top:12px"><span class="mv-field-label">Voyageurs concernés</span><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">'+mvParticipantChips+'</div></div>':'')
     +'<label class="mv-field" style="display:block;margin-top:12px"><span class="mv-field-label">Note</span><textarea class="ef-input" id="mv_notes" rows="2" style="resize:none">'+escHtml(m.notes||'')+'</textarea></label>'
@@ -10057,8 +10074,8 @@ function renderMovementModalBody(){
     +'</div></details>';
   document.getElementById('movementModalBody').innerHTML='<div class="mv-route-head"><span class="mv-route-line"></span><label class="mv-route-field"><span class="mv-label">Départ</span>'+movementLocationInput('origin',movementLocationLabel(m.originRef,m.origin),m.originRef)+'</label><label class="mv-route-field"><span class="mv-label">Arrivée</span>'+movementLocationInput('destination',movementLocationLabel(m.destinationRef,m.destination),m.destinationRef)+'</label></div>'
     +(coherence?'<div class="mv-coherence">'+svgIcon('triangle-alert',14)+'<span>'+escHtml(coherence)+'</span><button type="button" onclick="linkMovementToPrevious()">Relier</button></div>':'')
-    +'<label class="mv-field mv-essential-mode"><span class="mv-field-label">Transport</span><select class="ef-select" id="mv_primaryMode">'+movementModeOptions(movementPrimaryMode(m))+'</select></label>'
-    +schedule+stopDetails+moreDetails;
+    +'<div class="mv-trip-card"><label class="mv-field mv-essential-mode"><span class="mv-field-label">Transport</span><select class="ef-select" id="mv_primaryMode">'+movementModeOptions(movementPrimaryMode(m))+'</select></label>'
+    +schedule+'</div>'+stopDetails+moreDetails;
   var deleteBtn=document.getElementById('movementModalDeleteBtn');
   if(deleteBtn)deleteBtn.style.display=existing?'block':'none';
   _movementPriceInputsDirty=false;
