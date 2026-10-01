@@ -933,6 +933,14 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 #movementModal .mv-more-light{margin-top:18px!important;padding-top:0!important;border-top:0!important;}
 #movementModal .mv-more-light>summary{padding:0 3px!important;}
 #movementModal .mv-more-light .mv-more-summary{padding-left:21px!important;margin-top:4px!important;}
+/* Transport editor — iOS micro polish */
+#movementModal .mv-trip-card .mv-schedule .mv-field:nth-child(2),
+#movementModal .mv-trip-card .mv-schedule .mv-field:nth-child(3){min-height:40px!important;padding-top:6px!important;padding-bottom:6px!important;}
+#movementModal .mv-trip-card input[type="time"]:not(:focus):invalid:before,
+#movementModal .mv-trip-card input[type="time"]:not(:focus)[value=""]:before{content:'—:—';color:var(--ink-subtle);}
+#movementModal .mv-section-spaced{margin-top:22px!important;}
+#movementModal .mv-section-add{width:24px!important;height:24px!important;font-size:18px!important;line-height:22px!important;}
+#movementModal .mv-more-light .mv-more-summary{margin-top:2px!important;line-height:1.2!important;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1647,7 +1655,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-01·sha:movement-editor-ios-v1';
+var APP_BUILD = '2026-10-01·sha:movement-editor-ios-polish-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
