@@ -949,6 +949,16 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .movement-compact-route{font-size:14px;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .movement-compact-meta{font-size:11.5px;font-weight:400;color:var(--ink-muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .movement-compact-chevron{display:flex;flex:0 0 auto;color:var(--ink-subtle);}
+/* Transport cards — country itinerary visual reference */
+.movement-country-style{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;padding:13px 14px!important;}
+.movement-country-style .movement-country-head{display:flex;align-items:center;gap:8px;width:100%;}
+.movement-country-style .movement-compact-route{font-size:14px;font-weight:700;line-height:1.25;flex:1;min-width:0;}
+.movement-country-style .movement-compact-chevron{margin-left:auto;color:var(--ink);display:flex;}
+.movement-country-meta{display:flex;align-items:center;gap:8px;min-width:0;width:100%;}
+.movement-mode-pill{display:inline-flex;align-items:center;flex:0 0 auto;padding:4px 8px;border-radius:999px;background:rgba(45,106,79,.09);color:var(--accent);font-size:11px;font-weight:700;line-height:1;}
+.movement-mode-pill.incomplete{color:var(--ink-muted);background:rgba(120,120,128,.10);}
+.movement-country-details{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--ink-muted);font-weight:400;}
+.movement-country-style .movement-compact-icon,.movement-country-style>.movement-compact-copy{display:none!important;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1663,7 +1673,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-01·sha:movement-card-unified-v2';
+var APP_BUILD = '2026-10-01·sha:movement-card-country-style-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10397,17 +10407,17 @@ function renderMovementCompactCard(m,options){
   var origin=options.origin||movementLocationLabel(m.originRef,m.origin)||'Départ à préciser';
   var destination=options.destination||movementLocationLabel(m.destinationRef,m.destination)||'Arrivée à préciser';
   var mode=options.mode||movementPrimaryMode(m)||'Transport';
-  var meta=[mode];
-  if(options.dateLabel)meta.push(options.dateLabel);
-  else if(m.date){var d=new Date(m.date+'T00:00:00');if(!isNaN(d))meta.push(d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}).replace(/\.$/,''));}
-  if(times.departure||times.arrival)meta.push((times.departure||'—')+' → '+(times.arrival||'—'));
-  var dur=options.duration||'';if(!dur&&m.durationMin)dur=movementFormatDuration(m.durationMin,m);if(dur)meta.push(dur);
-  if(options.incomplete||m.status==='incomplete')meta.push('À compléter');
+  var details=[];
+  if(options.dateLabel)details.push(options.dateLabel);
+  else if(m.date){var d=new Date(m.date+'T00:00:00');if(!isNaN(d))details.push(d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}).replace(/\.$/,''));}
+  var dur=options.duration||'';if(!dur&&m.durationMin)dur=movementFormatDuration(m.durationMin,m);if(dur)details.push(dur);
+  if(times.departure||times.arrival)details.push((times.departure||'—')+' → '+(times.arrival||'—'));
+  var incomplete=options.incomplete||m.status==='incomplete';
   var click=options.onclick||("openMovementModal('"+jsStrEsc(m.id)+"','"+jsStrEsc(m.countryId||options.countryId||'')+"')");
-  return '<button type="button" class="movement-compact-card'+(options.connector?' movement-compact-connector':'')+'" onclick="'+click+'">'
-    +'<span class="movement-compact-icon">'+movementModeIcon(mode)+'</span>'
-    +'<span class="movement-compact-copy"><span class="movement-compact-route">'+escHtml(origin)+' → '+escHtml(destination)+'</span><span class="movement-compact-meta">'+escHtml(meta.join(' · '))+'</span></span>'
-    +'<span class="movement-compact-chevron">'+svgIcon('chevron-right',15)+'</span></button>';
+  return '<button type="button" class="movement-compact-card movement-country-style'+(options.connector?' movement-compact-connector':'')+'" onclick="'+click+'">'
+    +'<span class="movement-country-head"><span class="movement-compact-route">'+escHtml(origin)+' → '+escHtml(destination)+'</span><span class="movement-compact-chevron">'+svgIcon('chevron-right',15)+'</span></span>'
+    +'<span class="movement-country-meta"><span class="movement-mode-pill'+(incomplete?' incomplete':'')+'">'+escHtml(incomplete?'À compléter':mode)+'</span>'+(details.length?'<span class="movement-country-details">'+escHtml(details.join(' · '))+'</span>':'')+'</span>'
+    +'</button>';
 }
 function renderCityMovementLink(m,countryId){
   return renderMovementCompactCard(m,{countryId:countryId,connector:true});
