@@ -815,6 +815,50 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .city-movement-stop-time{display:block;margin-top:1px;color:var(--ink-muted);}
 .city-movement-chevron{flex:0 0 auto;align-self:center;color:var(--ink-subtle);}
 @media(max-width:370px){.mv-summary{grid-template-columns:1fr 1fr}.mv-summary> :first-child{grid-column:1/-1}.mv-schedule{grid-template-columns:1fr 1fr}.mv-schedule> :first-child{grid-column:1/-1}.mv-leg-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mv-span-2,.mv-span-3{grid-column:span 1}.mv-span-6{grid-column:1/-1}}
+/* Transport editor — compact iPhone layout */
+#movementModal .share-sheet{padding:18px 18px calc(12px + env(safe-area-inset-bottom));}
+#movementModal .modal-handle{margin-bottom:14px;}
+#movementModal .modal-title{font-size:23px;line-height:1.15;margin-bottom:18px;}
+#movementModalBody{padding-bottom:4px;}
+#movementModal .mv-route-head{gap:10px;padding-left:32px;margin-bottom:10px;}
+#movementModal .mv-route-line{left:11px;top:10px;bottom:10px;}
+#movementModal .mv-route-input{font-size:15px!important;}
+#movementModal .mv-label{font-size:9px;margin-bottom:2px;}
+#movementModal .mv-essential-mode{margin-bottom:8px;padding:7px 10px;border-radius:12px;}
+#movementModal .mv-option-body{padding-top:6px;}
+#movementModal .mv-schedule{display:grid;grid-template-columns:1.25fr .82fr .82fr;gap:5px;}
+#movementModal .mv-schedule .mv-field{padding:6px 7px;border-radius:11px;}
+#movementModal .mv-schedule .mv-field-label{font-size:9px;margin-bottom:1px;}
+#movementModal .mv-schedule .ef-input{font-size:12px!important;}
+#movementModal .mv-date-reset{font-size:8.5px;padding-top:2px;}
+#movementModal .mv-duration-compact{border:0;background:transparent;padding:5px 2px 1px;font-size:11px;color:var(--ink-muted);}
+#movementModal .mv-duration-compact strong{color:var(--accent);font-weight:700;}
+#movementModal .mv-duration-edit{margin-top:5px;}
+#movementModal .mv-option-group{padding-top:9px;margin-top:7px;}
+#movementModal .mv-option-group>summary{font-size:13px;padding:3px 1px;}
+#movementModal .mv-stops-list{gap:0;margin:0;}
+#movementModal .mv-stop-row{display:block;padding:0;background:transparent;border-bottom:1px solid rgba(100,70,30,.10);}
+#movementModal .mv-stop-row:last-child{border-bottom:0;}
+#movementModal .mv-stop-summary{width:100%;border:0;background:transparent;padding:10px 2px;display:flex;align-items:center;gap:9px;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer;}
+#movementModal .mv-stop-dot{width:25px;height:25px;border-radius:50%;background:rgba(45,106,79,.09);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+#movementModal .mv-stop-summary-copy{flex:1;min-width:0;}
+#movementModal .mv-stop-summary-place{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#movementModal .mv-stop-summary-meta{font-size:10.5px;color:var(--ink-muted);margin-top:2px;}
+#movementModal .mv-stop-chevron{color:var(--ink-subtle);transition:transform .18s;}
+#movementModal .mv-stop-row.open .mv-stop-chevron{transform:rotate(90deg);}
+#movementModal .mv-stop-editor{display:none;padding:2px 2px 10px 34px;grid-template-columns:1fr auto;gap:6px;}
+#movementModal .mv-stop-row.open .mv-stop-editor{display:grid;}
+#movementModal .mv-stop-place{grid-column:1;}
+#movementModal .mv-stop-remove{grid-column:2;width:30px;height:30px;align-self:center;}
+#movementModal .mv-stop-times{grid-column:1/-1;gap:5px;}
+#movementModal .mv-stop-times .mv-field,#movementModal .mv-stop-mode{padding:6px 8px;}
+#movementModal .mv-stop-wait{grid-column:1/-1;margin:0;min-height:0;font-size:10px;}
+#movementModal .mv-stop-wait:empty{display:none;}
+#movementModal .mv-stop-mode{grid-column:1/-1;}
+#movementModal .mv-add-leg{margin-top:8px!important;min-height:38px!important;padding:7px!important;}
+#movementModal .modal-cta{position:sticky;bottom:0;z-index:8;margin-top:10px!important;box-shadow:0 -8px 18px rgba(255,255,255,.92),0 5px 14px rgba(29,29,31,.08);}
+#movementModal #movementModalDeleteBtn{font-size:12px!important;margin-top:4px!important;padding:7px!important;}
+#movementModal .modal-cancel-btn{font-size:12px!important;padding:7px!important;margin-top:0!important;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1529,7 +1573,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-09-30·sha:movement-editor-simple-v1';
+var APP_BUILD = '2026-10-01·sha:movement-editor-compact-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9924,20 +9968,20 @@ function renderMovementModalBody(){
   var stops=(m.legs||[]).slice(0,-1).map(function(l,i){
     var nextLeg=m.legs[i+1]||{},stop=l.to||nextLeg.from||'',nextMode=nextLeg.mode||movementPrimaryMode(m);
     var stopArrival=l.arrivalTime||'',stopDeparture=nextLeg.departureTime||'',waitText=movementWaitText(stopArrival,stopDeparture);
-    return '<div class="mv-stop-row"><label class="mv-field mv-stop-place"><span class="mv-field-label">Correspondance</span><input class="ef-input" id="mvs_'+i+'_place" value="'+escHtml(stop)+'" placeholder="Gare, aéroport, arrêt…"></label>'
+    return '<div class="mv-stop-row" id="mvStopRow_'+i+'"><button type="button" class="mv-stop-summary" onclick="toggleMovementStopEditor('+i+')"><span class="mv-stop-dot">'+movementModeIcon(nextMode)+'</span><span class="mv-stop-summary-copy"><span class="mv-stop-summary-place">'+escHtml(stop||'Correspondance')+'</span><span class="mv-stop-summary-meta">'+escHtml(nextMode)+(waitText?' · '+escHtml(waitText):'')+'</span></span><span class="mv-stop-chevron">›</span></button><div class="mv-stop-editor"><label class="mv-field mv-stop-place"><span class="mv-field-label">Correspondance</span><input class="ef-input" id="mvs_'+i+'_place" value="'+escHtml(stop)+'" placeholder="Gare, aéroport, arrêt…"></label>'
       +'<button type="button" class="mv-stop-remove" onclick="removeMovementCorrespondence('+i+')" aria-label="Supprimer cette correspondance">'+svgIcon('trash-2',15)+'</button>'
       +'<div class="mv-stop-times"><label class="mv-field"><span class="mv-field-label">Arrivée</span><input class="ef-input" id="mvs_'+i+'_arrivalTime" type="time" value="'+escHtml(stopArrival)+'" oninput="updateMovementStopWait('+i+')" onchange="updateMovementStopWait('+i+')"></label>'
       +'<label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mvs_'+i+'_departureTime" type="time" value="'+escHtml(stopDeparture)+'" oninput="updateMovementStopWait('+i+')" onchange="updateMovementStopWait('+i+')"></label></div>'
       +'<div class="mv-stop-wait" id="mvs_'+i+'_wait" aria-live="polite">'+escHtml(waitText||'Attente calculée automatiquement')+'</div>'
-      +'<label class="mv-field mv-stop-mode"><span class="mv-field-label">Transport suivant</span><select class="ef-select" id="mvs_'+i+'_modeAfter">'+movementModeOptions(nextMode)+'</select></label></div>';
+      +'<label class="mv-field mv-stop-mode"><span class="mv-field-label">Transport suivant</span><select class="ef-select" id="mvs_'+i+'_modeAfter">'+movementModeOptions(nextMode)+'</select></label></div></div>';
   }).join('');
   document.getElementById('movementModalTitle').textContent=!existing?'Ajouter un déplacement':'Modifier le déplacement';
   var coherence=movementCoherenceMessage(m,movementsForCountry(m.countryId));
   var durationUnit=movementDurationUnit(m);
   var hasBothTimes=!!(m.departureTime&&m.arrivalTime);
   var durationField=hasBothTimes
-    ? '<label class="mv-field"><span class="mv-field-label">Durée</span><input class="ef-input" id="mv_durationDisplay" type="text" readonly value="'+escHtml(movementFormatDuration(m.durationMin,m))+'" style="background:rgba(29,29,31,.035);color:var(--ink-muted)"><input type="hidden" id="mv_durationUnit" value="'+durationUnit+'"></label>'
-    : '<label class="mv-field"><span class="mv-field-label">Durée <span class="mv-option-label">(facultatif)</span></span><div class="mv-duration-row"><input class="ef-input" id="mv_durationDisplay" type="number" inputmode="decimal" min="0" step="0.25" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_durationUnit" data-previous="'+durationUnit+'" onchange="changeMovementDurationUnit(\'mv_durationDisplay\',this)"><option value="min"'+(durationUnit==='min'?' selected':'')+'>min</option><option value="hour"'+(durationUnit==='hour'?' selected':'')+'>heure(s)</option><option value="day"'+(durationUnit==='day'?' selected':'')+'>jour(s)</option></select></div></label>';
+    ? '<div class="mv-duration-compact">Durée <strong id="mv_durationDisplay">'+escHtml(movementFormatDuration(m.durationMin,m))+'</strong><input type="hidden" id="mv_durationUnit" value="'+durationUnit+'"></div>'
+    : '<label class="mv-field mv-duration-edit"><span class="mv-field-label">Durée (facultatif)</span><div class="mv-duration-row"><input class="ef-input" id="mv_durationDisplay" type="number" inputmode="decimal" min="0" step="0.25" value="'+escHtml(movementDurationDisplay(m.durationMin,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_durationUnit" data-previous="'+durationUnit+'" onchange="changeMovementDurationUnit(\'mv_durationDisplay\',this)"><option value="min"'+(durationUnit==='min'?' selected':'')+'>min</option><option value="hour"'+(durationUnit==='hour'?' selected':'')+'>heure(s)</option><option value="day"'+(durationUnit==='day'?' selected':'')+'>jour(s)</option></select></div></label>';
   var schedule='<div class="mv-option-body" style="padding-top:4px">'
     +'<div class="mv-schedule"><div class="mv-field"><span class="mv-field-label">Date</span><input class="ef-input" id="mv_date" type="date" value="'+escHtml(m.date||'')+'" oninput="updateMovementScheduleField(\'date\',this.value)" onchange="updateMovementScheduleField(\'date\',this.value)">'+(m.date?'<button type="button" class="mv-date-reset" onclick="resetMovementDate(this)">Réinitialiser</button>':'')+'</div>'
     +'<label class="mv-field"><span class="mv-field-label">Départ</span><input class="ef-input" id="mv_departureTime" type="time" value="'+escHtml(m.departureTime||'')+'" oninput="updateMovementScheduleField(\'departureTime\',this.value)" onchange="updateMovementScheduleField(\'departureTime\',this.value)"></label>'
@@ -9963,6 +10007,10 @@ function renderMovementModalBody(){
   if(deleteBtn)deleteBtn.style.display=existing?'block':'none';
   _movementPriceInputsDirty=false;
 }
+function toggleMovementStopEditor(i){
+  var row=document.getElementById('mvStopRow_'+i);if(row)row.classList.toggle('open');
+}
+
 function linkMovementToPrevious(){
   if(!_movementDraft)return;movementDraftFromInputs(true);var list=movementsForCountry(_movementDraft.countryId),idx=list.findIndex(function(x){return x.id===_movementDraft.id;}),prev=list[idx-1];if(!prev)return;_movementDraft.origin=movementLocationLabel(prev.destinationRef,prev.destination);_movementDraft.originRef=prev.destinationRef||'';renderMovementModalBody();
 }
