@@ -859,6 +859,25 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 #movementModal .modal-cta{position:sticky;bottom:0;z-index:8;margin-top:10px!important;box-shadow:0 -8px 18px rgba(255,255,255,.92),0 5px 14px rgba(29,29,31,.08);}
 #movementModal #movementModalDeleteBtn{font-size:12px!important;margin-top:4px!important;padding:7px!important;}
 #movementModal .modal-cancel-btn{font-size:12px!important;padding:7px!important;margin-top:0!important;}
+/* Transport editor — responsive finishing pass */
+#movementModal .mv-schedule{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid rgba(100,70,30,.10);border-bottom:1px solid rgba(100,70,30,.10);}
+#movementModal .mv-schedule .mv-field{border:0!important;background:transparent!important;border-radius:0!important;padding:8px 3px!important;}
+#movementModal .mv-schedule .mv-field:first-child{grid-column:1/-1;border-bottom:1px solid rgba(100,70,30,.08)!important;}
+#movementModal .mv-schedule .mv-field:nth-child(2){border-right:1px solid rgba(100,70,30,.08)!important;padding-right:10px!important;}
+#movementModal .mv-schedule .mv-field:nth-child(3){padding-left:10px!important;}
+#movementModal .mv-schedule .mv-field-label{text-align:left!important;font-size:9.5px!important;}
+#movementModal .mv-schedule .ef-input{text-align:left!important;font-size:13px!important;min-height:22px!important;}
+#movementModal .mv-date-reset{width:auto!important;display:inline-block;padding:2px 0 0!important;text-align:left!important;}
+#movementModal .mv-duration-compact{display:flex;align-items:baseline;gap:5px;padding:7px 3px 2px!important;}
+#movementModal .mv-duration-compact strong{font-size:12px;}
+#movementModal .mv-duration-edit{border:0!important;border-bottom:1px solid rgba(100,70,30,.10)!important;border-radius:0!important;padding:7px 3px!important;}
+#movementModal .mv-stop-summary{align-items:flex-start!important;}
+#movementModal .mv-stop-summary-copy{display:flex!important;flex-direction:column!important;gap:2px!important;overflow:hidden;}
+#movementModal .mv-stop-summary-place{display:block!important;line-height:1.2!important;}
+#movementModal .mv-stop-summary-meta{display:block!important;line-height:1.25!important;margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#movementModal .mv-stop-chevron{margin-left:auto;padding-top:5px;flex:0 0 auto;}
+#movementModal .mv-option-group>summary{flex-wrap:wrap;}
+#movementModal .mv-more-summary{flex-basis:100%;display:block;padding-left:18px;margin-top:1px;font-size:10.5px;color:var(--ink-subtle);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1573,7 +1592,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-01·sha:movement-editor-compact-v1';
+var APP_BUILD = '2026-10-01·sha:movement-editor-responsive-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -9993,7 +10012,7 @@ function renderMovementModalBody(){
   var mvParticipantChips=mvPeople.map(function(p){var checked=Array.isArray(m.participants)&&m.participants.indexOf(p)>-1;return '<button type="button" class="flight-traveler-chip'+(checked?' active':'')+'" onclick="toggleMovementParticipant(\''+jsStrEsc(p)+'\')">'+(checked?svgIcon('check',11):'')+escHtml(personDisplayName(p,'Toi'))+'</button>';}).join('');
   var mvSelectedNames=(Array.isArray(m.participants)?m.participants:[]).map(function(p){return personDisplayName(p,'Toi');});
   var moreSummary=[];if(m.costPerPersonJPY!==''&&m.costPerPersonJPY!=null)moreSummary.push(movementFormatCost(m.costPerPersonJPY,m,true));if(mvSelectedNames.length)moreSummary.push(mvSelectedNames.join(', '));if(m.notes)moreSummary.push('Note');
-  var moreDetails='<details class="mv-option-group"><summary><span class="mv-option-chevron">›</span> Plus d’informations <span class="mv-option-label">'+(moreSummary.length?'('+escHtml(moreSummary.join(' · '))+')':'(optionnel)')+'</span></summary><div class="mv-option-body">'
+  var moreDetails='<details class="mv-option-group"><summary><span class="mv-option-chevron">›</span><span>Plus d’informations</span>'+(moreSummary.length?'<span class="mv-more-summary">'+escHtml(moreSummary.join(' · '))+'</span>':'<span class="mv-option-label">(optionnel)</span>')+'</summary><div class="mv-option-body">'
     +'<label class="mv-field"><span class="mv-field-label">Prix par personne</span><div class="mv-price-row"><input class="ef-input" id="mv_costPerPersonDisplay" type="number" inputmode="decimal" step="0.01" oninput="movementTotalPriceChanged()" value="'+escHtml(movementLocalToDisplay(m.costPerPersonJPY,m))+'" placeholder="0"><select class="mv-currency-select" id="mv_currencyMode" onchange="changeMovementCurrency(this.value)"><option value="LOCAL"'+(movementCurrencyMode(m)==='LOCAL'?' selected':'')+'>'+escHtml(localCurrency)+'</option><option value="EUR"'+(movementCurrencyMode(m)==='EUR'?' selected':'')+'>EUR</option></select></div></label>'
     +(mvPeople.length?'<div class="mv-field" style="margin-top:12px"><span class="mv-field-label">Voyageurs concernés</span><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">'+mvParticipantChips+'</div></div>':'')
     +'<label class="mv-field" style="display:block;margin-top:12px"><span class="mv-field-label">Note</span><textarea class="ef-input" id="mv_notes" rows="2" style="resize:none">'+escHtml(m.notes||'')+'</textarea></label>'
