@@ -959,6 +959,11 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .movement-mode-pill.incomplete{color:var(--ink-muted);background:rgba(120,120,128,.10);}
 .movement-country-details{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--ink-muted);font-weight:400;}
 .movement-country-style .movement-compact-icon,.movement-country-style>.movement-compact-copy{display:none!important;}
+/* City itinerary transport timeline — mirrors the Countries visual language */
+.city-movement-timeline{position:relative;margin:0 0 0 0;padding:5px 0 5px 46px;}
+.city-movement-timeline .city-movement-line{position:absolute;left:22px;top:-12px;bottom:-12px;width:2px;background:rgba(45,106,79,.45);border-radius:2px;}
+.city-movement-timeline .city-movement-node{position:absolute;left:3px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:2px solid var(--accent);background:var(--surface,#fff);color:var(--accent);}
+.city-movement-timeline .movement-compact-connector{width:100%;margin:0;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
 /* ── TRASH SECTION ── */
@@ -1673,7 +1678,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-01·sha:movement-card-country-style-v1';
+var APP_BUILD = '2026-10-01·sha:movement-timeline-restore-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10420,7 +10425,8 @@ function renderMovementCompactCard(m,options){
     +'</button>';
 }
 function renderCityMovementLink(m,countryId){
-  return renderMovementCompactCard(m,{countryId:countryId,connector:true});
+  var mode=movementPrimaryMode(m)||'Transport';
+  return '<div class="city-movement-timeline"><span class="city-movement-line" aria-hidden="true"></span><span class="city-movement-node">'+movementModeIcon(mode)+'</span>'+renderMovementCompactCard(m,{countryId:countryId,connector:true})+'</div>';
 }
 function renderItinerary(c, embedded){
   var _depart = getTripDepartDate();
@@ -11491,23 +11497,19 @@ function intercountryCountryDateLabel(country){
   return start&&end?start+' – '+end:(start||end);
 }
 function renderIntercountryConnection(fromCountry,toCountry,index,flight,movement){
-  var origin=fromCountry.name,destination=toCountry.name;
-  if(movement){
-    var movementMode=movement.primaryMode||((movement.legs||[])[0]&&movement.legs[0].mode)||'Autre';
-    var durSum=(movement.legs||[]).reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);
-    var duration=durSum>0?movementFormatDuration(durSum,movement):(movement.durationMin?movementFormatDuration(movement.durationMin,movement):'');
-    var complete=movementMissingCount(movement)===0&&!!movement.origin&&!!movement.destination;
-    return '<div class="country-connection">'+renderMovementCompactCard(movement,{origin:origin,destination:destination,mode:movementMode,duration:duration,incomplete:!complete,connector:true,onclick:"openMovementModal('"+jsStrEsc(movement.id)+"','"+jsStrEsc(movement.countryId)+"')"})+'</div>';
-  }
-  if(!flight){
-    var placeholder={id:'',countryId:fromCountry.id,origin:origin,destination:destination,primaryMode:'Transport',status:'incomplete'};
-    return '<div class="country-connection">'+renderMovementCompactCard(placeholder,{origin:origin,destination:destination,mode:'Transport',incomplete:true,connector:true,onclick:"openIntercountryModePicker('"+jsStrEsc(fromCountry.id)+"','"+jsStrEsc(toCountry.id)+"')"})+'</div>';
-  }
-  var dateLabel=flight.date?new Date(flight.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}).replace(/\.$/,''):'';
-  var duration=intercountryFlightDuration(flight);
-  var flightProxy={id:String(flight.id),countryId:fromCountry.id,origin:origin,destination:destination,primaryMode:'Avion',date:flight.date||'',departureTime:flight.departureTime||'',arrivalTime:flight.arrivalTime||'',durationMin:'',status:(flight.date&&flight.departureTime&&flight.arrivalTime)?'':'incomplete'};
-  return '<div class="country-connection">'+renderMovementCompactCard(flightProxy,{origin:origin,destination:destination,mode:'Avion',dateLabel:dateLabel,duration:duration,incomplete:flightProxy.status==='incomplete',connector:true,onclick:"openIntercountryFlight('"+jsStrEsc(String(flight.id))+"')"})+'</div>';
+  var key=fromCountry.id+'__'+toCountry.id,open=!!(S.intercountryOpen&&S.intercountryOpen[key]);
+  if(movement){var movementMode=movement.primaryMode||((movement.legs||[])[0]&&movement.legs[0].mode)||'Autre',movementSummary=[];if(movement.date)movementSummary.push(new Date(movement.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}));var _mvDurSum=(movement.legs||[]).reduce(function(acc,l){return acc+(parseFloat(l.durationMin)||0);},0);var _mvDurDisplay=_mvDurSum>0?_mvDurSum:movement.durationMin;if(_mvDurDisplay)movementSummary.push(movementFormatDuration(_mvDurDisplay,movement));if(movement.costPerPersonJPY!==''&&movement.costPerPersonJPY!=null)movementSummary.push(movementFormatCost(movement.costPerPersonJPY,movement,true));var movementComplete=movementMissingCount(movement)===0&&!!movement.origin&&!!movement.destination;
+    var _mvLegs=movement.legs||[];var _mvLegsHtml=_mvLegs.map(function(l,i){var _legMeta=[];if(l.durationMin)_legMeta.push(movementFormatDuration(l.durationMin,movement));if(l.line&&l.line!=='À compléter')_legMeta.push(escHtml(l.line));var _incomplete=!l.mode||l.mode==='À compléter'||l.line==='À compléter';var _legMeta2=_legMeta.length?'<div class="cc-leg-meta">'+_legMeta.join(' · ')+'</div>':'';return '<div class="cc-leg-row'+(_incomplete?' incomplete':'')+'"><span class="cc-leg-icon">'+movementModeIcon(l.mode)+'</span><div class="cc-leg-body"><div class="cc-leg-title">'+escHtml(_incomplete?'Étape à compléter':(l.from&&l.to?l.from+' → '+l.to:l.mode||'Étape'))+'</div>'+_legMeta2+'</div></div>';}).join('');var movementDetail=open?'<div class="country-connection-detail">'+(_mvLegsHtml?_mvLegsHtml:'<div style="font-size:11px;color:var(--ink-muted)">Aucune étape renseignée</div>')+'<div class="country-connection-actions"><button class="country-connection-action" onclick="event.stopPropagation();openMovementModal(\''+jsStrEsc(movement.id)+'\',\''+jsStrEsc(movement.countryId)+'\')">Modifier</button><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')">Changer le mode</button></div></div>':'';
+    return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon(intercountryModeIconName(movementMode),14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(movementComplete?'':' missing')+'">'+escHtml(movementMode)+(movementComplete?'':' · À compléter')+'</span><span>'+escHtml(movementSummary.join(' · ')||'Informations à compléter')+'</span></div>'+movementDetail+'</div></div>';}
+  if(!flight)return '<div class="country-connection"><div class="country-connection-card" onclick="openIntercountryModePicker(\''+jsStrEsc(fromCountry.id)+'\',\''+jsStrEsc(toCountry.id)+'\')"><span class="country-connection-icon missing">'+svgIcon('route',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span>'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status missing">À renseigner</span><span>Choisir le mode de transport</span></div></div></div>';
+  var complete=!!(flight.date&&flight.departureTime&&flight.arrivalTime),dateLabel=flight.date?new Date(flight.date+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'',duration=intercountryFlightDuration(flight),summary=[];
+  if(dateLabel)summary.push(dateLabel);if(duration)summary.push(duration);
+  var _flightTimeHtml=flight.departureTime?svgIcon('clock',11)+' '+escHtml(flight.departureTime+(flight.arrivalTime?' → '+flight.arrivalTime:'')):'';
+  var activeTravelers=getActiveTravelerList(),people=flightParticipantsSpecified(flight)?activeFlightParticipants(flight.participants):activeTravelers,peopleLabel=people.length?(people.length>=activeTravelers.length?'Tous les voyageurs':people.map(function(p){return personDisplayName(p,'Toi');}).join(', ')):'Voyageurs non renseignés';
+  var detail=open?'<div class="country-connection-detail"><div class="country-connection-detail-footer"><span class="country-connection-detail-people">'+svgIcon('users',11)+' '+escHtml(peopleLabel)+'</span><button class="country-connection-action" onclick="event.stopPropagation();openIntercountryFlight(\''+jsStrEsc(String(flight.id))+'\')">Voir le vol</button></div></div>':'';
+  return '<div class="country-connection"><div class="country-connection-card" onclick="toggleIntercountryConnection(\''+jsStrEsc(key)+'\')"><span class="country-connection-icon">'+svgIcon('plane',14)+'</span><div class="country-connection-head"><div class="country-connection-route">'+escHtml(fromCountry.name)+' → '+escHtml(toCountry.name)+'</div><span style="transition:transform .2s;transform:rotate('+(open?'90deg':'0deg')+')">'+svgIcon('chevron-right',14)+'</span></div><div class="country-connection-summary"><span class="country-connection-status'+(complete?'':' missing')+'">'+(complete?'Vol renseigné':'À compléter')+'</span><span>'+escHtml(summary.join(' · '))+(_flightTimeHtml?(summary.length?' · '+_flightTimeHtml:_flightTimeHtml):'')+(!summary.length&&!_flightTimeHtml?'Informations du vol à compléter':'')+'</span></div>'+detail+'</div></div>';
 }
+
 function renderCountriesScreen(){
   var ts = getTripStatus();
   var hasJourneyDate=ts.elapsedDays!==null;
