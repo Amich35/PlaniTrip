@@ -9525,7 +9525,7 @@ function renderMovementsSection(countryId,excludedIds,hideAddButton){
   var excluded={};(excludedIds||[]).forEach(function(id){excluded[id]=true;});
   var allList=movementsForCountry(countryId).filter(function(m){return m.scope!=='intercountry'&&!excluded[m.id];});
   var addButton=hideAddButton?'':'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>';
-  if(!allList.length)return '<div class="section" style="padding-top:0">'+addButton+movementTrashButtonHTML(countryId)+'</div>';
+  if(!allList.length)return addButton?'<div class="section" style="padding-top:0">'+addButton+'</div>':'';
   var dates=movementDates(allList),activeDate=activeMovementDate(countryId,dates);
   var list=activeDate==='Tous'?allList:allList.filter(function(m){return m.date===activeDate;});
   var cards=list.map(function(m){
@@ -9549,7 +9549,7 @@ function renderMovementsSection(countryId,excludedIds,hideAddButton){
   return '<div class="section"><div class="section-header"><div class="section-title">Autres déplacements</div><div class="section-meta">'+allList.length+' trajet'+(allList.length>1?'s':'')+'</div></div>'
     +renderMovementDateFilter(countryId,dates,activeDate)
     +'<div style="display:flex;flex-direction:column;gap:8px">'+cards+'</div>'
-    +addButton+movementTrashButtonHTML(countryId)+'</div>';
+    +addButton+'</div>';
 }
 function movementTrashButtonHTML(countryId){
   var count=archivedMovementsForCountry(countryId).length;
@@ -10488,14 +10488,6 @@ function renderItinerary(c, embedded){
       +'</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,38,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div></div>';
-    if(cityOrderIndex<cityOrder.length-1){
-      var nextCity=c.cities[cityOrder[cityOrderIndex+1]],nextCk=c.id+'_'+nextCity.city;
-      inlineMovementList.forEach(function(m){
-        if(placedMovementIds.indexOf(m.id)>-1)return;
-        var fromCk=movementCityKey(c.id,m.originRef,m.origin),toCk=movementCityKey(c.id,m.destinationRef,m.destination);
-        if(fromCk===ck&&toCk===nextCk){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);}
-      });
-    }
     if(cityOrderIndex===cityOrder.length-1){
       inlineMovementList.filter(function(m){var lastBoundary=cityTimelineDates[cityOrderIndex];return !!m.date&&placedMovementIds.indexOf(m.id)<0&&!!lastBoundary&&m.date>=lastBoundary;}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).forEach(function(m){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);});
     }
