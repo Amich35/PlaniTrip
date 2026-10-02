@@ -8169,9 +8169,13 @@ function deleteActivityPermanently(cityKey, trashIndex){
     }
     S.trash[cityKey].splice(trashIndex,1);
     if(_actKey && S.deletedActs) delete S.deletedActs[_actKey];
+    // Empêcher une ancienne copie du gros cache local de ressusciter l'activité après reload.
+    // Ce tombstone local est retiré uniquement lors d'une vraie restauration.
+    if(_item && _item.n) markDeletedTombstone('activities', cityKey+'||'+_item.n);
     save();
     renderContent();
-    syncDeletedActs();
+    // Ne pas recréer ici le marqueur granulaire supprimé ci-dessus : la suppression
+    // définitive est représentée par l'absence serveur + le tombstone local anti-cache.
     var _permLabel = _item && _item.n ? _item.n : 'activité';
     postChangeEvent('activity','delete',{entityId:cityKey,entityLabel:_permLabel,summary:_ceActorLabel()+' a supprimé définitivement : '+_permLabel});
   }, 'Supprimer définitivement');
