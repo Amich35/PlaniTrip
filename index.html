@@ -960,10 +960,15 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 .movement-country-details{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--ink-muted);font-weight:400;}
 .movement-country-style .movement-compact-icon,.movement-country-style>.movement-compact-copy{display:none!important;}
 /* City itinerary transport timeline — mirrors the Countries visual language */
+.city-stop{position:relative;padding-left:38px;}
+.city-stop:before{content:'';position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(45,106,79,.48);}
+.city-stop:first-child:before{top:50%;}
+.country-card-list>.city-stop:last-child:before{bottom:50%;}
+.city-stop-marker{position:absolute;left:5px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;border:5px solid rgba(45,106,79,.16);background:#fff;box-shadow:inset 0 0 0 4px var(--accent);z-index:3;}
 .city-movement-timeline{position:relative;margin:0;padding:12px 0 12px 38px;}
 .city-movement-timeline .city-movement-line{position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(45,106,79,.48);border-radius:2px;}
-.city-movement-timeline .city-movement-node{position:absolute;left:1px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);background:var(--parchment);color:var(--accent);}
-.city-movement-timeline .city-movement-node svg{width:13px!important;height:13px!important;}
+.city-movement-timeline .city-movement-node{position:absolute;left:-1px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--parchment);color:var(--accent);}
+.city-movement-timeline .city-movement-node svg{width:14px!important;height:14px!important;}
 .city-movement-timeline .movement-compact-connector{width:100%;margin:0;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
@@ -1679,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-02·sha:city-movement-node-compact-v1';
+var APP_BUILD = '2026-10-02·sha:city-timeline-continuous-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10462,7 +10467,7 @@ function renderItinerary(c, embedded){
       : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+', '+getEnglishCountryName(c.name);
 
-    var cityCardHTML='<div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
+    var cityCardHTML='<div class="city-stop"><span class="city-stop-marker" aria-hidden="true"></span><div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-kind="city" data-img-query="'+escHtml(imgQuery)+'"></div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div>'
@@ -10471,7 +10476,7 @@ function renderItinerary(c, embedded){
       +'<button type="button" aria-label="Ajouter une activité à '+escHtml(_cityDisplayName(ck,city))+'" onclick="event.stopPropagation();openAddActivityModal(\''+jsStrEsc(ck)+'\')" ontouchstart="event.stopPropagation()" ontouchmove="event.stopPropagation()" ontouchend="event.stopPropagation()" style="min-height:30px;padding:5px 10px;border:none;border-radius:999px;background:var(--accent-pale);color:var(--accent);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">＋ Activité</button>'
       +'</div>'+accomNameLine+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,34,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
-      +'</div></div>';
+      +'</div></div></div>';
     if(cityOrderIndex<cityOrder.length-1){
       var nextCity=c.cities[cityOrder[cityOrderIndex+1]],nextCk=c.id+'_'+nextCity.city;
       inlineMovementList.forEach(function(m){
