@@ -1684,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-02·sha:city-hotel-width-progress-ring-v1';
+var APP_BUILD = '2026-10-02·sha:city-hotel-full-width-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10470,11 +10470,11 @@ function renderItinerary(c, embedded){
     var cityCardHTML='<div class="city-stop"><span class="city-stop-marker" aria-hidden="true"></span><div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-kind="city" data-img-query="'+escHtml(imgQuery)+'"></div>'
-      +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div>'
+      +'<div class="cc-body" style="padding-top:2px;position:relative;padding-bottom:'+(accomNameLine?'34px':'0')+'"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div>'
       +'<div style="display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:nowrap;white-space:nowrap">'
       +'<span class="cc-sub" style="margin-top:0;overflow:visible;text-overflow:clip;flex-shrink:0">'+cityTotal+' activités</span>'
       +'<button type="button" aria-label="Ajouter une activité à '+escHtml(_cityDisplayName(ck,city))+'" onclick="event.stopPropagation();openAddActivityModal(\''+jsStrEsc(ck)+'\')" ontouchstart="event.stopPropagation()" ontouchmove="event.stopPropagation()" ontouchend="event.stopPropagation()" style="min-height:30px;padding:5px 8px;border:none;border-radius:999px;background:var(--accent-pale);color:var(--accent);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">＋ Activité</button>'
-      +'</div>'+accomNameLine+'</div>'
+      +'</div>'+(accomNameLine?'<div style="position:absolute;left:0;top:76px;width:calc(100% + 52px)">'+accomNameLine+'</div>':'')+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,38,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div></div>';
     if(cityOrderIndex<cityOrder.length-1){
