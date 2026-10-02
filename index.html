@@ -10459,7 +10459,7 @@ function renderItinerary(c, embedded){
   function datedMovementsBeforeCity(cityOrderIndex){
     var boundary=cityTimelineDates[cityOrderIndex];if(!boundary)return '';
     var previousBoundary=cityOrderIndex>0?cityTimelineDates[cityOrderIndex-1]:null;
-    return inlineMovementList.filter(function(m){return !!m.date&&placedMovementIds.indexOf(m.id)<0&&m.date<boundary&&(!previousBoundary||m.date>=previousBoundary);}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).map(function(m){placedMovementIds.push(m.id);return renderCityMovementLink(m,c.id);}).join('');
+    return inlineMovementList.filter(function(m){return !!m.date&&placedMovementIds.indexOf(m.id)<0&&m.date<=boundary&&(!previousBoundary||m.date>previousBoundary);}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).map(function(m){placedMovementIds.push(m.id);return renderCityMovementLink(m,c.id);}).join('');
   }
   const citiesHTML=cityOrder.map(function(cityIdx,cityOrderIndex){
     const city=c.cities[cityIdx];
@@ -10489,7 +10489,7 @@ function renderItinerary(c, embedded){
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,38,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div></div>';
     if(cityOrderIndex===cityOrder.length-1){
-      inlineMovementList.filter(function(m){var lastBoundary=cityTimelineDates[cityOrderIndex];return !!m.date&&placedMovementIds.indexOf(m.id)<0&&!!lastBoundary&&m.date>=lastBoundary;}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).forEach(function(m){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);});
+      inlineMovementList.filter(function(m){var lastBoundary=cityTimelineDates[cityOrderIndex];return !!m.date&&placedMovementIds.indexOf(m.id)<0&&!!lastBoundary&&m.date>lastBoundary;}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).forEach(function(m){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);});
     }
     return cityCardHTML;
   }).join('');
