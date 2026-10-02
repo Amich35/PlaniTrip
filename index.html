@@ -9521,10 +9521,10 @@ function archivedMovementsForCountry(countryId){
 function movementMissingCount(m){
   return (m.legs||[]).filter(function(l){return !l.from||!l.to;}).length;
 }
-function renderMovementsSection(countryId,excludedIds){
+function renderMovementsSection(countryId,excludedIds,hideAddButton){
   var excluded={};(excludedIds||[]).forEach(function(id){excluded[id]=true;});
   var allList=movementsForCountry(countryId).filter(function(m){return m.scope!=='intercountry'&&!excluded[m.id];});
-  var addButton='<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>';
+  var addButton=hideAddButton?'':'<button onclick="openMovementModal(null,\''+jsStrEsc(countryId)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>';
   if(!allList.length)return '<div class="section" style="padding-top:0">'+addButton+movementTrashButtonHTML(countryId)+'</div>';
   var dates=movementDates(allList),activeDate=activeMovementDate(countryId,dates);
   var list=activeDate==='Tous'?allList:allList.filter(function(m){return m.date===activeDate;});
@@ -10450,6 +10450,17 @@ function renderItinerary(c, embedded){
   const cityOrder=getCityOrder(c.id);
   const inlineMovementList=movementsForCountry(c.id).filter(function(m){return m.scope!=='intercountry';});
   const placedMovementIds=[];
+  const cityTimelineDates=cityOrder.map(function(cityIdx){
+    var timelineCity=c.cities[cityIdx],timelineCk=c.id+'_'+timelineCity.city;
+    var stay=cityStayRange(timelineCk),minDate=stay?stay.start:null;
+    if(!minDate&&S.actDate){Object.keys(S.actDate).forEach(function(k){if(k.indexOf(timelineCk+'_')===0){var d=S.actDate[k];if(d&&(!minDate||d<minDate))minDate=d;}});}
+    return minDate;
+  });
+  function datedMovementsBeforeCity(cityOrderIndex){
+    var boundary=cityTimelineDates[cityOrderIndex];if(!boundary)return '';
+    var previousBoundary=cityOrderIndex>0?cityTimelineDates[cityOrderIndex-1]:null;
+    return inlineMovementList.filter(function(m){return !!m.date&&placedMovementIds.indexOf(m.id)<0&&m.date<boundary&&(!previousBoundary||m.date>=previousBoundary);}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).map(function(m){placedMovementIds.push(m.id);return renderCityMovementLink(m,c.id);}).join('');
+  }
   const citiesHTML=cityOrder.map(function(cityIdx,cityOrderIndex){
     const city=c.cities[cityIdx];
     const ck=c.id+'_'+city.city;
@@ -10467,7 +10478,7 @@ function renderItinerary(c, embedded){
       : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+', '+getEnglishCountryName(c.name);
 
-    var cityCardHTML='<div class="city-stop"><span class="city-stop-marker" aria-hidden="true"></span><div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
+    var cityCardHTML=datedMovementsBeforeCity(cityOrderIndex)+'<div class="city-stop><span class="city-stop-marker" aria-hidden="true"></span><div class="swipe-wrap" style="border-radius:var(--r22)"><div class="swipe-delete-bg city-archive-bg" style="width:112px;border-radius:0 var(--r22) var(--r22) 0;align-items:center;justify-content:center;gap:6px;background:#6F8378;color:#fff;font-size:12px;font-weight:600" onclick="deleteCityConfirm(\''+c.id+'\',\''+jsStrEsc(city.city)+'\')">'+svgIcon('archive',16)+' <span>Archiver</span></div>'
       +'<div class="country-card swipe-fg" onclick="openCityDetail(\''+jsStrEsc(ck)+'\')" ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)" style="align-items:flex-start;padding:14px;position:relative">'
       +'<div class="city-thumb" data-img-kind="city" data-img-query="'+escHtml(imgQuery)+'"></div>'
       +'<div class="cc-body" style="padding-top:2px"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div>'
@@ -10484,6 +10495,9 @@ function renderItinerary(c, embedded){
         var fromCk=movementCityKey(c.id,m.originRef,m.origin),toCk=movementCityKey(c.id,m.destinationRef,m.destination);
         if(fromCk===ck&&toCk===nextCk){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);}
       });
+    }
+    if(cityOrderIndex===cityOrder.length-1){
+      inlineMovementList.filter(function(m){var lastBoundary=cityTimelineDates[cityOrderIndex];return !!m.date&&placedMovementIds.indexOf(m.id)<0&&!!lastBoundary&&m.date>=lastBoundary;}).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}).forEach(function(m){cityCardHTML+=renderCityMovementLink(m,c.id);placedMovementIds.push(m.id);});
     }
     return cityCardHTML;
   }).join('');
@@ -10580,9 +10594,10 @@ function renderItinerary(c, embedded){
     +'</div>'
     +'<div class="country-card-list">'+citiesHTML+'</div>'
     +'<button onclick="addCityToCountry(\''+c.id+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:var(--r12);font-size:13px;border:1px dashed rgba(30,80,55,0.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter une ville</button>'
+    +'<button onclick="openMovementModal(null,\''+jsStrEsc(c.id)+'\')" style="width:100%;margin-top:8px;padding:11px;border-radius:var(--r12);font-size:12.5px;border:1px dashed rgba(30,80,55,.3);background:transparent;color:var(--ink-muted);cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif">＋ Ajouter un déplacement</button>'
     +cityTrashButtonHTML(c.id)
     +'</div>'
-    +renderMovementsSection(c.id,placedMovementIds);
+    +renderMovementsSection(c.id,placedMovementIds,true);
 }
 function cityTrashButtonHTML(countryId){
   var count = (S.cityTrash||[]).filter(function(t){return t.countryId===countryId;}).length;
