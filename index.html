@@ -8141,14 +8141,37 @@ function restoreActivity(cityKey, trashIndex) {
 }
 function deleteActivityPermanently(cityKey, trashIndex){
   if(!S.trash||!S.trash[cityKey]||!S.trash[cityKey][trashIndex]) return;
-  showConfirm('Supprimer définitivement cette activité ? Cette action est irréversible.', function(){
+  showConfirm('Supprimer définitivement cette activité ? Cette action est irréversible.', async function(){
     var _item=S.trash[cityKey][trashIndex];
     var _actKey=_trashItemActKey(cityKey,_item);
+    // Une activité stable mise à la corbeille conserve volontairement sa ligne activities
+    // afin d'être restaurable avec le même _sid. En suppression définitive, on efface
+    // réellement cette ligne et tous ses états associés avant de retirer les tombstones.
+    if(_item && _item._softArchived && _actKey && sb && CURRENT_TRIP){
+      try{
+        if(_item._sid){
+          var _delAct=await sb.from('activities').delete().eq('trip_id',CURRENT_TRIP.id).eq('id',_item._sid);
+          if(_delAct&&_delAct.error) throw _delAct.error;
+        }
+        var _delState=await sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).like('detail_key',_actKey+'%');
+        if(_delState&&_delState.error) throw _delState.error;
+        var _delFav=await sb.from('favorites').delete().eq('trip_id',CURRENT_TRIP.id).eq('key',_actKey);
+        if(_delFav&&_delFav.error) throw _delFav.error;
+        var _trashKey='__planitrip__activityTrash__'+encodeURIComponent(_actKey);
+        var _deletedKey='__planitrip__deletedAct__'+encodeURIComponent(_actKey);
+        var _delMarkers=await sb.from('activity_details').delete().eq('trip_id',CURRENT_TRIP.id).in('detail_key',[_trashKey,_deletedKey]);
+        if(_delMarkers&&_delMarkers.error) throw _delMarkers.error;
+      }catch(e){
+        console.error('[PlaniTrip] permanent activity delete:',e);
+        alert('Impossible de supprimer définitivement cette activité pour le moment.');
+        return;
+      }
+    }
     S.trash[cityKey].splice(trashIndex,1);
-    // Le marqueur deleted reste vrai : suppression logique définitive, données physiques conservées par sécurité.
-    if(_item && _item._softArchived && _actKey) syncActivityTrashMarker(cityKey,_actKey,_item,false);
+    if(_actKey && S.deletedActs) delete S.deletedActs[_actKey];
     save();
     renderContent();
+    syncDeletedActs();
     var _permLabel = _item && _item.n ? _item.n : 'activité';
     postChangeEvent('activity','delete',{entityId:cityKey,entityLabel:_permLabel,summary:_ceActorLabel()+' a supprimé définitivement : '+_permLabel});
   }, 'Supprimer définitivement');
