@@ -962,7 +962,8 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 /* City itinerary transport timeline — mirrors the Countries visual language */
 .city-movement-timeline{position:relative;margin:0;padding:12px 0 12px 38px;}
 .city-movement-timeline .city-movement-line{position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(45,106,79,.48);border-radius:2px;}
-.city-movement-timeline .city-movement-node{position:absolute;left:-1px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--parchment);color:var(--accent);}
+.city-movement-timeline .city-movement-node{position:absolute;left:1px;top:50%;transform:translateY(-50%);z-index:2;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--accent);background:var(--parchment);color:var(--accent);}
+.city-movement-timeline .city-movement-node svg{width:13px!important;height:13px!important;}
 .city-movement-timeline .movement-compact-connector{width:100%;margin:0;}
 .modal-handle{width:40px;height:4px;background:rgba(29,29,31,0.126);border-radius:2px;margin:0 auto 24px;}
 
@@ -1678,7 +1679,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-02·sha:city-movement-timeline-align-v1';
+var APP_BUILD = '2026-10-02·sha:city-movement-node-compact-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
