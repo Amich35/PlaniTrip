@@ -1684,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-02·sha:city-hotel-full-width-v1';
+var APP_BUILD = '2026-10-02·sha:city-activity-button-spacing-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -10463,7 +10463,7 @@ function renderItinerary(c, embedded){
     const accomList = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
     const stayLine = fmtCityStayLine(ck);
     const periodLine = stayLine || '<span style="color:var(--ink-subtle)">Dates à définir</span>';
-    const accomNameLine = accomList.length===1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:flex-start;gap:4px;min-width:0;overflow:visible">'+svgIcon('bed',12)+'<span style="overflow:visible;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;line-height:1.3;min-width:0;flex:1"> '+escHtml(accomList[0].name||'')+'</span></div>')
+    const accomNameLine = accomList.length===1 ? ('<div class="cc-sub" style="margin-top:6px;display:flex;align-items:flex-start;gap:4px;min-width:0;overflow:visible">'+svgIcon('bed',12)+'<span style="overflow:visible;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;line-height:1.3;min-width:0;flex:1"> '+escHtml(accomList[0].name||'')+'</span></div>')
       : accomList.length>1 ? ('<div class="cc-sub" style="margin-top:2px;display:flex;align-items:center;gap:4px">'+svgIcon('bed',12)+' '+accomList.length+' logements</div>') : '';
     var imgQuery = city.city+', '+getEnglishCountryName(c.name);
 
@@ -10473,7 +10473,7 @@ function renderItinerary(c, embedded){
       +'<div class="cc-body" style="padding-top:2px;position:relative;padding-bottom:'+(accomNameLine?'34px':'0')+'"><div class="cc-name">'+escHtml(_cityDisplayName(c.id+'_'+city.city,city))+'</div><div class="cc-sub">'+periodLine+'</div>'
       +'<div style="display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:nowrap;white-space:nowrap">'
       +'<span class="cc-sub" style="margin-top:0;overflow:visible;text-overflow:clip;flex-shrink:0">'+cityTotal+' activités</span>'
-      +'<button type="button" aria-label="Ajouter une activité à '+escHtml(_cityDisplayName(ck,city))+'" onclick="event.stopPropagation();openAddActivityModal(\''+jsStrEsc(ck)+'\')" ontouchstart="event.stopPropagation()" ontouchmove="event.stopPropagation()" ontouchend="event.stopPropagation()" style="min-height:30px;padding:5px 8px;border:none;border-radius:999px;background:var(--accent-pale);color:var(--accent);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">＋ Activité</button>'
+      +'<button type="button" aria-label="Ajouter une activité à '+escHtml(_cityDisplayName(ck,city))+'" onclick="event.stopPropagation();openAddActivityModal(\''+jsStrEsc(ck)+'\')" ontouchstart="event.stopPropagation()" ontouchmove="event.stopPropagation()" ontouchend="event.stopPropagation()" style="min-height:26px;padding:4px 7px;border:none;border-radius:999px;background:var(--accent-pale);color:var(--accent);font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0">＋ Activité</button>'
       +'</div>'+(accomNameLine?'<div style="position:absolute;left:0;top:76px;width:calc(100% + 52px)">'+accomNameLine+'</div>':'')+'</div>'
       +'<span style="flex-shrink:0;margin-top:8px">'+renderProgressRing(pct,38,4,'var(--accent)','rgba(29,29,31,0.08)','var(--ink)',cityDone+'/'+cityTotal)+'</span>'
       +'</div></div></div>';
