@@ -5103,6 +5103,10 @@ var _accomModalId = null;
 function openAccomModal(ck, id){
   _accomModalCk = ck;
   _accomModalId = id||null;
+  // La modale est réutilisée entre deux ouvertures : une sauvegarde précédente peut avoir
+  // laissé son CTA désactivé avec « … ». Toujours repartir d'un état neutre à l'ouverture.
+  var _accomSaveBtn = document.querySelector('#accomModal .modal-cta');
+  if(_accomSaveBtn){ _accomSaveBtn.disabled=false; _accomSaveBtn.textContent='Enregistrer'; }
   var list = Array.isArray(S.accom[ck]) ? S.accom[ck] : [];
   var a = id ? (list.find(function(e){return e.id===id;})||{}) : {};
   var cityStay = S.cityDates && S.cityDates[ck];
