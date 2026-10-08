@@ -1684,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-02·sha:city-hotel-natural-flow-v1';
+var APP_BUILD = '2026-10-08·sha:act-delete-keep-done-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -8025,8 +8025,9 @@ async function deleteActivity(cityKey, index, isCustom, actName, opts) {
           sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeStart', data:S.actTimeStart, updated_at:_now},{onConflict:'trip_id,detail_key'}),
           sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTimeEnd',   data:S.actTimeEnd,   updated_at:_now},{onConflict:'trip_id,detail_key'}),
           sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actTime',      data:S.actTime,      updated_at:_now},{onConflict:'trip_id,detail_key'}),
-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'}),
-          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__done',         data:S.done,         updated_at:_now},{onConflict:'trip_id,detail_key'})
+          sb.from('activity_details').upsert({trip_id:CURRENT_TRIP.id,detail_key:'__planitrip__actCategory',  data:S.actCategory,  updated_at:_now},{onConflict:'trip_id,detail_key'})
+          // __planitrip__done volontairement NON réécrit ici : les activités avec _sid utilisent
+          // les états granulaires (__state__done) ; réécrire le gros blob S.done écrasait des « Fait ».
         ]).catch(function(e){ console.error('[PlaniTrip] blobs update after delete:', e); });
       }
     } else {
