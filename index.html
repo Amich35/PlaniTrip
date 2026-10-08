@@ -1684,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-08·sha:act-delete-keep-done-v1';
+var APP_BUILD = '2026-10-08·sha:act-details-paginate-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -18173,9 +18173,22 @@ async function loadCountrySettings(){
 }
 async function loadActivityDetails(){
   if(!sb || !CURRENT_TRIP) return;
-  var activityDetailsResult = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id);
-  var data = activityDetailsResult ? activityDetailsResult.data : null;
-  var activityDetailsError = activityDetailsResult ? activityDetailsResult.error : {message:'Réponse Supabase absente'};
+  // Lecture paginée et déterministe (tri par detail_key, unique par trip) : l'API plafonne
+  // une requête à 1000 lignes, et un trip en compte davantage. Sans pagination, les lignes
+  // au-delà du plafond (souvent les plus récemment modifiées, dont __state__done) n'étaient
+  // jamais chargées. Si une page échoue, rien n'est appliqué (aucun état partiel).
+  var data = [];
+  var _adPageSize = 1000;
+  for(var _adFrom = 0; ; _adFrom += _adPageSize){
+    var _adPage = await sb.from('activity_details').select('*').eq('trip_id',CURRENT_TRIP.id)
+      .order('detail_key',{ascending:true}).range(_adFrom, _adFrom + _adPageSize - 1);
+    if(!_adPage || _adPage.error || !Array.isArray(_adPage.data)){
+      console.error('[PlaniTrip] loadActivityDetails: lecture paginée échouée, aucun état appliqué :', _adPage && _adPage.error ? _adPage.error : 'réponse Supabase absente');
+      return;
+    }
+    data = data.concat(_adPage.data);
+    if(_adPage.data.length < _adPageSize) break;
+  }
   if(!window._customDetails) window._customDetails={};
   // Dédoublonnage défensif par detail_key (garde la ligne la plus récente),
   // au cas où d'anciens doublons subsisteraient malgré la contrainte UNIQUE.
