@@ -1684,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-08·sha:act-details-paginate-v1';
+var APP_BUILD = '2026-10-11·sha:country-dates-confirm-v1';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -7652,11 +7652,56 @@ function openDatesModal(countryId){
     if(_ctaBtn) _ctaBtn.style.cssText='flex:1;padding:13px;min-height:44px;border-radius:var(--r16);font-size:14px;font-weight:600;background:var(--ink);color:var(--sand);border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 8px rgba(28,24,20,0.2);margin-bottom:0;';
   }
 }
-function saveDatesModal(){
+// Dates de séjour d'un pays : Supabase confirme AVANT toute mutation locale (même principe que
+// saveCityDatesModal). Sinon l'écran affichait des dates jamais enregistrées, et le prochain
+// chargement les écrasait par les anciennes valeurs du serveur (loadCountrySettings).
+async function saveCountryDatesConfirmed(countryId, startVal, endVal){
+  var c = COUNTRIES.find(function(co){return co.id===countryId;});
+  if(!c) return false;
+  if(startVal && endVal && endVal < startVal){
+    alert("La date de départ doit être postérieure à la date d'arrivée.");
+    return false;
+  }
+  if(!sb || !CURRENT_TRIP){
+    alert('Connexion requise pour enregistrer les dates.');
+    return false;
+  }
+  var next = Object.assign({}, countryEditSnapshot(c), {
+    dateStart: startVal||'',
+    dateEnd: endVal||'',
+    dates: fmtDateRangeFr(startVal, endVal)
+  });
+  if(startVal && endVal){
+    var diffDays = Math.round((new Date(endVal+'T00:00:00')-new Date(startVal+'T00:00:00'))/86400000)+1;
+    if(diffDays>0) next.days = diffDays;
+  }
+  var saved;
+  try{
+    saved = await persistCountryEdit(countryId, next);
+  } catch(e){
+    console.error('[PlaniTrip] saveCountryDatesConfirmed sync error:', e);
+    alert('Erreur de sauvegarde — vérifie ta connexion et réessaie.');
+    return false;
+  }
+  // Serveur confirmé : commit local seulement maintenant.
+  c.dateStart = saved.dateStart||'';
+  c.dateEnd = saved.dateEnd||'';
+  c.dates = saved.dates;
+  c.days = saved.days;
+  S.countryEdits[countryId] = saved;
+  save();
+  renderContent();
+  return true;
+}
+async function saveDatesModal(){
   var start=((document.getElementById('guideModalDateStart')||{}).value||'');
   var end=((document.getElementById('guideModalDateEnd')||{}).value||'');
-  editCountryDateRange(_datesModalCountryId, start, end);
-  closeGuideItemModal();
+  var _btn = document.querySelector('#guideItemModal .modal-cta');
+  if(_btn){ _btn.disabled = true; _btn.textContent = '…'; }
+  var ok = await saveCountryDatesConfirmed(_datesModalCountryId, start, end);
+  if(ok){ closeGuideItemModal(); return; }
+  // Échec : la modale reste ouverte, dates locales inchangées.
+  if(_btn){ _btn.disabled = false; _btn.textContent = 'Enregistrer'; }
 }
 // ── Modale Dates du séjour (par ville) ──
 function openCityDotsMenu(ck, cityLabel, query){
