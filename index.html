@@ -1684,7 +1684,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent) !important;box-
 
 
 <script>
-var APP_BUILD = '2026-10-11·sha:country-dates-confirm-v1';
+var APP_BUILD = '2026-10-14·sha:guide-lists-cas-v2';
 console.log('[PlaniTrip] Version chargée :', APP_BUILD);
 let CURRENT_USER = null;
 let CURRENT_TRIP = null;
@@ -7557,7 +7557,366 @@ function closeGuideItemModal(){
   if(cancelBtn) cancelBtn.disabled=false;
   if(typeof _programResetExistingActivityModal==='function') _programResetExistingActivityModal();
 }
-function saveGuideItem(){
+// ── Listes d'informations pratiques : sauvegarde confirmée (compare-and-swap) ──────────────────
+// Urgences, alertes, mots & expressions, conseils, checklist. Le serveur confirme AVANT toute
+// mutation locale. Lecture (data, updated_at) → la liste serveur doit être celle que l'utilisateur
+// voit → UPDATE conditionné par la valeur EXACTE de updated_at (IS NULL si nul), avec .select()
+// pour compter les lignes. Zéro ligne, 23505 ou réponse ambiguë ne sont JAMAIS un succès :
+// relecture puis classement (appliqué / non appliqué / divergence). Rien n'est renvoyé aveuglément.
+// Limites connues (hors périmètre) : collision de updated_at à la même milliseconde ; écrivains non
+// verrouillés (saveCountryEdit, devise, taux, IA) ; formes de réponse PostgREST traitées défensivement.
+var _GL_TIMEOUT_MS = 15000;   // délai maximal d'une requête
+var _GL_GUARD_MS = 5000;      // attente avant « Vérifier » : laisse une requête retardée se poser
+var _glLocks = {};            // verrou par pays : une sauvegarde de liste à la fois
+var _glPending = null;        // enregistrement incertain en attente de vérification (modale)
+var _GL_MSG = {
+  offline:'Connexion requise : rien n’a été enregistré. Ta saisie est conservée.',
+  failed:'Enregistrement impossible : rien n’a été modifié. Réessaie.',
+  denied:'Accès refusé ou session expirée : rien n’a été modifié. Reconnecte-toi puis réessaie.',
+  retry:'Le serveur a été modifié pendant l’enregistrement. Rien n’a été enregistré : réessaie.',
+  conflict:'Ces informations ont changé sur le serveur. Rien n’a été enregistré. Ferme, actualise l’application, puis recommence.',
+  diverged:'La liste du serveur diffère de l’ancienne et de la nouvelle version. Rien n’a été renvoyé. Ferme et actualise l’application.',
+  uncertain:'Résultat incertain : l’enregistrement n’est pas confirmé. Ne renvoie pas : appuie sur « Vérifier ».',
+  busy:'Un enregistrement est déjà en cours pour ce pays.',
+  missing:'Élément introuvable : la liste a changé. Ferme et rouvre.',
+  not_applied:'Non enregistré. Tu peux réessayer.'
+};
+function _glLocalList(c,key){ return key==='alerts' ? c.alerts : (c.practical ? c.practical[key] : undefined); }
+function _glGet(data,key){ if(!data) return undefined; return key==='alerts' ? data.alerts : (data.practical ? data.practical[key] : undefined); }
+function _glSet(data,key,list){
+  if(key==='alerts'){ data.alerts=list; return; }
+  if(!data.practical || typeof data.practical!=='object') data.practical={};
+  data.practical[key]=list;
+}
+// Sérialisation stable : jsonb réordonne les clés des objets, JSON.stringify ne suffit pas.
+function _glCanon(v){
+  if(Array.isArray(v)) return '['+v.map(_glCanon).join(',')+']';
+  if(v && typeof v==='object') return '{'+Object.keys(v).filter(function(k){return v[k]!==undefined;}).sort().map(function(k){return JSON.stringify(k)+':'+_glCanon(v[k]);}).join(',')+'}';
+  return JSON.stringify(v===undefined ? null : v);
+}
+function _glSame(a,b){ return _glCanon(a)===_glCanon(b); }
+// La liste serveur est-elle celle que l'utilisateur voit ? Liste absente côté serveur : rien à perdre.
+// Urgences / mots vides côté serveur : l'application affiche alors les valeurs par défaut du pays.
+function _glMatchesBase(key,serverList,baseList){
+  if(!Array.isArray(serverList)) return true;
+  if((key==='phrases' || key==='emergency') && !serverList.length) return true;
+  return _glSame(serverList,baseList);
+}
+// Millisecondes d'une chaîne updated_at serveur (jusqu'à 6 décimales), sans dépendre du moteur Date.
+function _glMs(ts){
+  var m=/^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?(Z|[+-]\d\d:?\d\d)?$/.exec(String(ts||''));
+  if(!m) return NaN;
+  return Date.parse(m[1]+'.'+((m[2]||'')+'000').slice(0,3)+(m[3]||'Z'));
+}
+// Nouveau updated_at : toujours différent de la base, même si l'horloge recule.
+function _glNextTs(base){
+  var t=Date.now(), b=(base===null||base===undefined) ? NaN : _glMs(base);
+  if(!isNaN(b) && t<=b) t=b+1;
+  return new Date(t).toISOString();
+}
+// Une requête avec délai maximal. Hors erreur d'abandon, jamais d'exception : toujours {data,error,status}.
+function _glRun(builder){
+  return new Promise(function(resolve){
+    var done=false, ac=null, timer=null;
+    function fin(v){ if(done) return; done=true; clearTimeout(timer); resolve(v); }
+    try{
+      if(typeof AbortController!=='undefined' && builder && typeof builder.abortSignal==='function'){
+        ac=new AbortController();
+        builder=builder.abortSignal(ac.signal);
+      }
+    }catch(e){ ac=null; }
+    timer=setTimeout(function(){
+      try{ if(ac) ac.abort(); }catch(e){}
+      fin({data:null,error:{message:'timeout',code:''},status:0,_timeout:true});
+    },_GL_TIMEOUT_MS);
+    Promise.resolve(builder).then(fin,function(e){
+      fin({data:null,error:{message:String((e&&e.message)||e),code:''},status:0});
+    });
+  });
+}
+// null (pas d'erreur) | 'denied' | 'certain' (erreur serveur à code : rien d'écrit) | 'uncertain'
+// Classement selon code/status de la réponse, jamais selon try/catch.
+function _glErrKind(res){
+  if(!res || typeof res!=='object') return 'uncertain';
+  var e=res.error;
+  if(!e) return null;
+  var code=String(e.code||'');
+  if(code==='42501' || code==='PGRST301' || code==='PGRST302' || res.status===401 || res.status===403) return 'denied';
+  if(code) return 'certain';
+  return 'uncertain';
+}
+// {kind:'row',row} | {kind:'absent'} | {kind:'denied'|'certain'|'uncertain'}
+async function _glReadRow(cid){
+  var res=await _glRun(sb.from('country_settings').select('data,updated_at').eq('trip_id',CURRENT_TRIP.id).eq('country_id',cid));
+  var k=_glErrKind(res);
+  if(k) return {kind:k};
+  if(!Array.isArray(res.data) || res.data.length>1) return {kind:'uncertain'};
+  if(!res.data.length) return {kind:'absent'};
+  var row=res.data[0];
+  if(!row || typeof row.data!=='object' || row.data===null || Array.isArray(row.data) || row.updated_at===undefined) return {kind:'uncertain'};
+  return {kind:'row',row:row};
+}
+// Session authentifiée ? 'ok' (utilisateur présent) | 'none' (aucune session) | 'error' (erreur, exception,
+// timeout ou réponse inexploitable : jamais interprété comme une session valide).
+async function _glSessionState(){
+  var res;
+  try{ res=await _glRun(sb.auth.getSession()); }
+  catch(e){ return 'error'; }
+  if(!res || typeof res!=='object' || res.error) return 'error';
+  var d=res.data;
+  if(!d || typeof d!=='object') return 'error';
+  var s=d.session;
+  if(s===null) return 'none';
+  if(s && s.user && s.user.id) return 'ok';
+  return 'error';
+}
+// Relecture complète : 'applied' | 'not_applied' | 'diverged' | 'absent' | 'denied' | 'unreadable'
+async function _glVerify(cid,key,base,expected){
+  var r=await _glReadRow(cid);
+  if(r.kind==='denied') return 'denied';
+  if(r.kind==='absent') return 'absent';
+  if(r.kind!=='row') return 'unreadable';
+  var sl=_glGet(r.row.data,key);
+  if(Array.isArray(sl) && _glSame(sl,expected)) return 'applied';
+  if(_glMatchesBase(key,sl,base)) return 'not_applied';
+  return 'diverged';
+}
+// Statuts : confirmed | noop | offline | denied | failed (rien d'écrit) | retry | conflict | diverged | uncertain
+async function saveCountryListConfirmed(cid,key,base,next){
+  if(!sb || !CURRENT_TRIP) return {status:'offline'};
+  if(typeof navigator!=='undefined' && navigator.onLine===false) return {status:'offline'};
+  if(_glSame(base,next)) return {status:'noop'};
+  var rd=await _glReadRow(cid);
+  if(rd.kind==='denied') return {status:'denied'};
+  if(rd.kind==='certain' || rd.kind==='uncertain') return {status:'failed'};   // lecture seule : rien n'a été écrit
+  var res, k, v;
+  if(rd.kind==='row'){
+    var sl=_glGet(rd.row.data,key);
+    if(!_glMatchesBase(key,sl,base)){
+      if(Array.isArray(sl) && _glSame(sl,next)) return {status:'confirmed'};   // le serveur est déjà dans l'état attendu
+      return {status:'conflict'};
+    }
+    var data2=JSON.parse(JSON.stringify(rd.row.data));
+    _glSet(data2,key,JSON.parse(JSON.stringify(next)));
+    var baseTs=rd.row.updated_at;                       // chaîne exacte du serveur, ou null
+    var q=sb.from('country_settings').update({data:data2,updated_at:_glNextTs(baseTs)}).eq('trip_id',CURRENT_TRIP.id).eq('country_id',cid);
+    q=(baseTs===null) ? q.is('updated_at',null) : q.eq('updated_at',baseTs);
+    res=await _glRun(q.select('data,updated_at'));
+    k=_glErrKind(res);
+    if(k==='denied') return {status:'denied'};
+    if(k==='certain') return {status:'failed'};
+    if(k==='uncertain' || !Array.isArray(res.data) || res.data.length>1) return {status:'uncertain'};
+    if(res.data.length===1){
+      var got=res.data[0], gl=_glGet(got&&got.data,key);
+      if(Array.isArray(gl) && _glSame(gl,next)) return {status:'confirmed'};
+      return {status:'uncertain'};                      // ligne renvoyée mais inattendue
+    }
+    v=await _glVerify(cid,key,base,next);               // zéro ligne : jamais un succès
+    if(v==='applied') return {status:'confirmed'};
+    if(v==='not_applied') return {status:'retry'};
+    if(v==='diverged') return {status:'diverged'};
+    if(v==='denied') return {status:'denied'};
+    return {status:'uncertain'};
+  }
+  // Ligne absente ou invisible : INSERT simple (jamais d'upsert, aucun écrasement possible).
+  // Un SELECT vide sans erreur est aussi ce que renvoie RLS sans session valide : session authentifiée exigée avant toute tentative d'écriture.
+  var sess=await _glSessionState();
+  if(sess==='none') return {status:'denied'};
+  if(sess!=='ok') return {status:'failed'};       // session non vérifiable : rien n'est écrit
+  var c=COUNTRIES.find(function(co){return co.id===cid;});
+  if(!c) return {status:'failed'};
+  var snap=JSON.parse(JSON.stringify(countryEditSnapshot(c)));
+  _glSet(snap,key,JSON.parse(JSON.stringify(next)));
+  res=await _glRun(sb.from('country_settings').insert({trip_id:CURRENT_TRIP.id,country_id:cid,data:snap,updated_at:_glNextTs(null)}).select('data,updated_at'));
+  k=_glErrKind(res);
+  if(k==='denied') return {status:'denied'};
+  if(res && res.error && String(res.error.code)==='23505'){   // une ligne existe : relire et classer
+    v=await _glVerify(cid,key,base,next);
+    if(v==='applied') return {status:'confirmed'};
+    if(v==='not_applied') return {status:'retry'};
+    if(v==='diverged') return {status:'diverged'};
+    if(v==='denied') return {status:'denied'};
+    return {status:'uncertain'};
+  }
+  if(k==='certain') return {status:'failed'};
+  if(k==='uncertain' || !Array.isArray(res.data) || res.data.length!==1) return {status:'uncertain'};
+  var gl2=_glGet(res.data[0]&&res.data[0].data,key);
+  if(Array.isArray(gl2) && _glSame(gl2,next)) return {status:'confirmed'};
+  return {status:'uncertain'};
+}
+// Vérification explicite après un résultat incertain : relire et comparer, sans rien renvoyer.
+async function verifyCountryListSaved(cid,key,base,expected){
+  if(!sb || !CURRENT_TRIP) return {status:'offline'};
+  var v=await _glVerify(cid,key,base,expected);
+  if(v==='applied') return {status:'confirmed'};
+  if(v==='not_applied' || v==='absent') return {status:'not_applied'};
+  if(v==='diverged') return {status:'diverged'};
+  if(v==='denied') return {status:'denied'};
+  return {status:'uncertain'};
+}
+// Application locale APRÈS confirmation : seul le champ touché est remplacé dans c, puis le snapshot est recalculé.
+function _glApplyLocal(c,key,next,beforeSave){
+  var list=JSON.parse(JSON.stringify(next));
+  if(key==='alerts') c.alerts=list;
+  else { if(!c.practical) c.practical={}; c.practical[key]=list; }
+  if(typeof beforeSave==='function') beforeSave();
+  if(!S.countryEdits) S.countryEdits={};
+  S.countryEdits[c.id]=countryEditSnapshot(c);
+  save();
+}
+function _glModalBusy(on,label){
+  var cta=document.querySelector('#guideItemModal .modal-cta');
+  var cancel=document.querySelector('#guideItemModal .modal-cancel-btn');
+  if(cta){ cta.disabled=!!on; if(on) cta.textContent='…'; else if(label) cta.textContent=label; }
+  if(cancel) cancel.disabled=!!on;
+}
+function _glModalStatus(msg,tone){
+  var body=document.getElementById('guideItemModalBody');
+  if(!body) return;
+  var el=document.getElementById('guideListStatus');
+  if(!msg){ if(el&&el.parentNode) el.parentNode.removeChild(el); return; }
+  if(!el){ el=document.createElement('div'); el.id='guideListStatus'; el.setAttribute('role','status'); body.appendChild(el); }
+  el.style.cssText='margin-top:10px;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.45;'+(tone==='warn'?'background:#FFF3E6;color:#9A5A12;':'background:#FDECE7;color:#B3402A;');
+  el.textContent=msg;
+}
+// « Vérifier » est désactivé pendant la garde, pour laisser une requête retardée se poser avant la relecture.
+function _glArmGuard(p){
+  (function tick(){
+    var modal=document.getElementById('guideItemModal');
+    if(_glPending!==p || !modal || !modal.classList.contains('open')) return;
+    var cta=document.querySelector('#guideItemModal .modal-cta');
+    if(!cta) return;
+    var left=Math.ceil((_GL_GUARD_MS-(Date.now()-p.at))/1000);
+    if(left>0){ cta.disabled=true; cta.textContent='Vérifier ('+left+')'; setTimeout(tick,500); }
+    else { cta.disabled=false; cta.textContent='Vérifier'; }
+  })();
+}
+function _glModalResult(c,key,base,next,r){
+  if(r.status==='confirmed' || r.status==='noop'){
+    if(r.status==='confirmed') _glApplyLocal(c,key,next);
+    closeGuideItemModal();
+    renderContent();
+    return;
+  }
+  if(r.status==='uncertain'){
+    _glPending={cid:c.id,key:key,base:base,next:next,at:Date.now()};
+    _glModalBusy(false);
+    _glModalStatus(_GL_MSG.uncertain,'warn');
+    _guideModalSaveFn=_glVerifyFromModal;
+    _glArmGuard(_glPending);
+    return;
+  }
+  _glModalBusy(false,'Enregistrer');
+  _glModalStatus(_GL_MSG[r.status]||_GL_MSG.failed);
+}
+async function _glSubmitFromModal(c,key,base,next){
+  var cid=c.id;
+  if(_glLocks[cid]){ _glModalStatus(_GL_MSG.busy,'warn'); return; }
+  _glLocks[cid]=true; _glPending=null; _glModalStatus(''); _glModalBusy(true);
+  var r;
+  try{ r=await saveCountryListConfirmed(cid,key,base,next); }
+  catch(e){ console.error('[PlaniTrip] saveCountryListConfirmed:',e); r={status:'uncertain'}; }
+  finally{ _glLocks[cid]=false; }
+  _glModalResult(c,key,base,next,r);
+}
+async function _glVerifyFromModal(){
+  var p=_glPending;
+  if(!p) return;
+  var c=COUNTRIES.find(function(co){return co.id===p.cid;});
+  if(!c) return;
+  if(_glLocks[p.cid]){ _glModalStatus(_GL_MSG.busy,'warn'); return; }
+  if(Date.now()-p.at<_GL_GUARD_MS) return;
+  _glLocks[p.cid]=true; _glModalBusy(true);
+  var r;
+  try{ r=await verifyCountryListSaved(p.cid,p.key,p.base,p.next); }
+  catch(e){ console.error('[PlaniTrip] verifyCountryListSaved:',e); r={status:'uncertain'}; }
+  finally{ _glLocks[p.cid]=false; }
+  if(r.status==='confirmed'){
+    _glPending=null;
+    _glApplyLocal(c,p.key,p.next);
+    closeGuideItemModal();
+    renderContent();
+    return;
+  }
+  if(r.status==='not_applied'){
+    _glPending=null;
+    _guideModalSaveFn=saveGuideItem;
+    _glModalBusy(false,'Enregistrer');
+    _glModalStatus(_GL_MSG.not_applied,'warn');
+    return;
+  }
+  if(r.status==='diverged'){
+    _glModalBusy(false);
+    var cta=document.querySelector('#guideItemModal .modal-cta');
+    if(cta){ cta.disabled=true; cta.textContent='Vérifier'; }
+    _glModalStatus(_GL_MSG.diverged);
+    return;
+  }
+  p.at=Date.now();                                      // incertain / hors ligne / refusé : on peut revérifier plus tard
+  _glModalBusy(false);
+  _glModalStatus(r.status==='denied' ? _GL_MSG.denied : (r.status==='offline' ? _GL_MSG.offline : _GL_MSG.uncertain), 'warn');
+  _glArmGuard(p);
+}
+// Ajout / modification depuis la modale : la liste locale n'est PAS modifiée avant la confirmation serveur.
+function _glSaveListItem(c,key,item){
+  var cur=_glLocalList(c,key);
+  var base=JSON.parse(JSON.stringify(Array.isArray(cur) ? cur : []));
+  var next=base.slice();
+  if(_guideModalIdx!==null){
+    if(_guideModalIdx<0 || _guideModalIdx>=base.length){ _glModalStatus(_GL_MSG.missing); return Promise.resolve(); }
+    next[_guideModalIdx]=item;
+  } else {
+    next.push(item);
+  }
+  return _glSubmitFromModal(c,key,base,next);
+}
+// Suppression (sans modale) : même logique ; double soumission ignorée tant que le verrou du pays est pris.
+async function _glDelete(cid,key,idx,beforeSave){
+  var c=COUNTRIES.find(function(co){return co.id===cid;});
+  if(!c) return;
+  var cur=_glLocalList(c,key);
+  if(!Array.isArray(cur) || idx<0 || idx>=cur.length) return;
+  if(_glLocks[cid]) return;
+  var base=JSON.parse(JSON.stringify(cur));
+  var next=base.slice();
+  next.splice(idx,1);
+  _glLocks[cid]=true;
+  var r;
+  try{ r=await saveCountryListConfirmed(cid,key,base,next); }
+  catch(e){ console.error('[PlaniTrip] suppression de liste:',e); r={status:'uncertain'}; }
+  finally{ _glLocks[cid]=false; }
+  _glDeleteResult(c,key,base,next,beforeSave,r,Date.now());
+}
+function _glDeleteResult(c,key,base,next,beforeSave,r,at){
+  if(r.status==='confirmed'){
+    _glApplyLocal(c,key,next,beforeSave);
+    renderContent();
+    return;
+  }
+  if(r.status==='uncertain'){
+    showConfirm('Résultat incertain : la suppression n’est pas confirmée. Vérifier maintenant ?',function(){
+      _glDeleteVerify(c,key,base,next,beforeSave,at);
+    },'Vérifier','Plus tard');
+    return;
+  }
+  alert(_GL_MSG[r.status]||_GL_MSG.failed);
+}
+async function _glDeleteVerify(c,key,base,next,beforeSave,at){
+  var wait=_GL_GUARD_MS-(Date.now()-at);
+  if(wait>0) await new Promise(function(res){ setTimeout(res,wait); });
+  if(_glLocks[c.id]) return;
+  _glLocks[c.id]=true;
+  var r;
+  try{ r=await verifyCountryListSaved(c.id,key,base,next); }
+  catch(e){ console.error('[PlaniTrip] vérification de suppression:',e); r={status:'uncertain'}; }
+  finally{ _glLocks[c.id]=false; }
+  if(r.status==='confirmed'){ _glApplyLocal(c,key,next,beforeSave); renderContent(); return; }
+  if(r.status==='not_applied'){ alert('Non supprimé. Tu peux réessayer.'); return; }
+  if(r.status==='diverged'){ alert(_GL_MSG.diverged); return; }
+  if(r.status==='denied'){ alert(_GL_MSG.denied); return; }
+  _glDeleteResult(c,key,base,next,beforeSave,{status:'uncertain'},Date.now());
+}
+async function saveGuideItem(){
   var c=COUNTRIES.find(function(co){return co.id===_guideModalCountryId;});
   if(!c){closeGuideItemModal();return;}
 
@@ -7565,14 +7924,8 @@ function saveGuideItem(){
     var name=((document.getElementById('guideModalEmergName')||{}).value||'').trim();
     var num=((document.getElementById('guideModalEmergNum')||{}).value||'').trim();
     if(!name||!num){closeGuideItemModal();return;}
-    if(!c.practical.emergency) c.practical.emergency=[];
     var newE={k:stripHtml(name),v:stripHtml(num)};
-    if(_guideModalIdx!==null) c.practical.emergency[_guideModalIdx]=newE;
-    else c.practical.emergency.push(newE);
-    saveCountryEdit(_guideModalCountryId);
-    closeGuideItemModal();
-    renderContent();
-    return;
+    return _glSaveListItem(c,'emergency',newE);
   }
 
   if(_guideModalListField==='city'){
@@ -7588,28 +7941,16 @@ function saveGuideItem(){
     var atext=((document.getElementById('guideModalAlertText')||{}).value||'').trim();
     var aurl=((document.getElementById('guideModalAlertUrl')||{}).value||'').trim();
     if(!atext){closeGuideItemModal();return;}
-    if(!c.alerts) c.alerts=[];
     var newA = aurl ? {t:stripHtml(atext), url:stripHtml(aurl)} : {t:stripHtml(atext)};
-    if(_guideModalIdx!==null) c.alerts[_guideModalIdx]=newA;
-    else c.alerts.push(newA);
-    saveCountryEdit(_guideModalCountryId);
-    closeGuideItemModal();
-    renderContent();
-    return;
+    return _glSaveListItem(c,'alerts',newA);
   }
 
   if(_guideModalListField==='phrases'){
     var pfr=((document.getElementById('guideModalPhraseFr')||{}).value||'').trim();
     var plocal=((document.getElementById('guideModalPhraseLocal')||{}).value||'').trim();
     if(!pfr||!plocal){closeGuideItemModal();return;}
-    if(!c.practical.phrases) c.practical.phrases=[];
     var newP={fr:stripHtml(pfr),local:stripHtml(plocal)};
-    if(_guideModalIdx!==null) c.practical.phrases[_guideModalIdx]=newP;
-    else c.practical.phrases.push(newP);
-    saveCountryEdit(_guideModalCountryId);
-    closeGuideItemModal();
-    renderContent();
-    return;
+    return _glSaveListItem(c,'phrases',newP);
   }
 
   var text=((document.getElementById('guideModalText')||{}).value||'').trim();
@@ -7617,18 +7958,7 @@ function saveGuideItem(){
   if(!text){closeGuideItemModal();return;}
   var newItem={t:stripHtml(text),cat:cat};
   var isTip=_guideModalListField==='tips';
-  if(isTip){
-    if(!c.practical.tips) c.practical.tips=[];
-    if(_guideModalIdx!==null) c.practical.tips[_guideModalIdx]=newItem;
-    else c.practical.tips.push(newItem);
-  } else {
-    if(!c.practical.checklist) c.practical.checklist=[];
-    if(_guideModalIdx!==null) c.practical.checklist[_guideModalIdx]=newItem;
-    else c.practical.checklist.push(newItem);
-  }
-  saveCountryEdit(_guideModalCountryId);
-  closeGuideItemModal();
-  renderContent();
+  return _glSaveListItem(c,isTip?'tips':'checklist',newItem);
 }
 // ── Modale Dates du séjour (même style que conseils/checklist) ──
 var _datesModalCountryId=null;
@@ -7803,24 +8133,24 @@ function removeGuideListItem(countryId, listField, idx){
   showConfirm('Supprimer '+label+' ?', function(){
     var c = COUNTRIES.find(function(co){return co.id===countryId;});
     if(!c) return;
-    if(listField==='tips'){ c.practical.tips.splice(idx,1); }
-    else if(listField==='emergency'){ c.practical.emergency.splice(idx,1); }
-    else if(listField==='phrases'){ c.practical.phrases.splice(idx,1); }
-    else if(listField==='checklist'){
-      c.practical.checklist.splice(idx,1);
-      var newChecklistState = {};
-      Object.keys(S.checklist).forEach(function(k){
-        if(k.indexOf(countryId+'_cl_')!==0) { newChecklistState[k]=S.checklist[k]; return; }
-        var n = parseInt(k.slice((countryId+'_cl_').length),10);
-        if(n<idx) newChecklistState[k]=S.checklist[k];
-        else if(n>idx) newChecklistState[countryId+'_cl_'+(n-1)]=S.checklist[k];
-        // n===idx : l'item supprimé, on ne le reporte pas
-      });
-      S.checklist = newChecklistState;
+    if(['tips','emergency','phrases','checklist'].indexOf(listField)<0) return;
+    // La liste (et, pour la checklist, la renumérotation des coches) n'est modifiée localement
+    // qu'APRÈS la confirmation du serveur ; la logique de renumérotation est inchangée.
+    var renumber = null;
+    if(listField==='checklist'){
+      renumber = function(){
+        var newChecklistState = {};
+        Object.keys(S.checklist).forEach(function(k){
+          if(k.indexOf(countryId+'_cl_')!==0) { newChecklistState[k]=S.checklist[k]; return; }
+          var n = parseInt(k.slice((countryId+'_cl_').length),10);
+          if(n<idx) newChecklistState[k]=S.checklist[k];
+          else if(n>idx) newChecklistState[countryId+'_cl_'+(n-1)]=S.checklist[k];
+          // n===idx : l'item supprimé, on ne le reporte pas
+        });
+        S.checklist = newChecklistState;
+      };
     }
-    saveCountryEdit(countryId);
-    save();
-    renderContent();
+    _glDelete(countryId, listField, idx, renumber);
   }, 'Supprimer');
 }
 
@@ -17131,9 +17461,7 @@ function removeAlertItem(countryId, idx){
   showConfirm('Supprimer cette alerte ?', function(){
     var c = COUNTRIES.find(function(co){return co.id===countryId;});
     if(!c || !c.alerts) return;
-    c.alerts.splice(idx,1);
-    saveCountryEdit(countryId);
-    renderContent();
+    _glDelete(countryId, 'alerts', idx, null);
   }, 'Supprimer');
 }
 function parseAlert(text){
